@@ -1,5 +1,6 @@
 import 'package:eduphin/login_logout/ui_helper.dart';
 import 'package:eduphin/manager_dashboard/manager_dashboard.dart';
+import 'package:eduphin/moderator_dashboard/moderator_dashboard.dart';
 import 'package:flutter/material.dart';
 
 import 'forgot_password.dart';
@@ -18,40 +19,52 @@ class _LoginPageState extends State<LoginPage> {
   bool _isObscure = true;
   bool _isLoading = false;
 
-  Future<void> _login() async {
-    // Basic validation
-    if (emailController.text.isEmpty || passwordController.text.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: const Text('Please enter both email and password.'),
-          backgroundColor: Theme.of(context).colorScheme.error,
-        ),
-      );
-      return;
-    }
-
-    setState(() {
-      _isLoading = true;
-    });
-
-    // Simulate a network request for authentication
-    await Future.delayed(const Duration(seconds: 2));
-
-    // In a real app, you would validate credentials and handle roles.
-    // For now, we'll navigate to the moderator dashboard on success.
-    if (mounted) {
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (context) => const ManagerDashboardPage()),
-      );
-    }
-  }
-
   @override
   void dispose() {
     emailController.dispose();
     passwordController.dispose();
     super.dispose();
+  }
+
+  Future<void> _login() async {
+    setState(() {
+      _isLoading = true;
+    });
+
+    // Simulate network delay for a better user experience
+    await Future.delayed(const Duration(seconds: 1));
+
+    final username = emailController.text.trim();
+    final password = passwordController.text.trim();
+
+    // Navigate to the correct dashboard based on credentials
+    if (username == "priya@eduphin.com" && password == "eduphin@mod") {
+      if (!mounted) return;
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(
+            builder: (_) =>
+                const ModeratorDashboardPage()), // Assuming this is the moderator dashboard
+      );
+    } else if (username == "raj@iias.com" && password == "87654321") {
+      if (!mounted) return;
+      // Assuming 'Raj' is a manager and should be directed to the ManagerDashboard.
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (_) => const ManagerDashboardPage()),
+      );
+    } else {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Invalid username or password")),
+      );
+    }
+
+    if (mounted) {
+      setState(() {
+        _isLoading = false;
+      });
+    }
   }
 
   @override

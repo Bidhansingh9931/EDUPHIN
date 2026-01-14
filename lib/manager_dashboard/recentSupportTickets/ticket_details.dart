@@ -88,7 +88,7 @@ class _TicketDetailsPageState extends State<TicketDetailsPage> {
           Expanded(
             child: SingleChildScrollView(
               controller: _scrollController,
-              padding: const EdgeInsets.fromLTRB(16, 16, 16, 50),
+              padding: const EdgeInsets.fromLTRB(16, 16, 16,16),
               child: CustomTicketDetailsBox(
                   name: "Ananya Sharma",
                   category: "IT Support",
