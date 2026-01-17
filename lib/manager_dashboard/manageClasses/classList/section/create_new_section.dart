@@ -1,25 +1,23 @@
 import 'package:flutter/material.dart';
 
-class CreateNewClassPage extends StatefulWidget {
-  const CreateNewClassPage({super.key});
+class CreateNewSectionPage extends StatefulWidget {
+  const CreateNewSectionPage({super.key});
 
   @override
-  State<StatefulWidget> createState() => _CreateNewClassPageState();
+  State<CreateNewSectionPage> createState() => _CreateNewSectionPageState();
 }
 
-class _CreateNewClassPageState extends State<CreateNewClassPage> {
-  final _classNameController = TextEditingController();
-  final _classCodeController = TextEditingController();
-  final _descriptionController = TextEditingController();
-  String? _selectedLevel;
-  final List<String> _levels = ['Primary', 'Secondary', 'Sr. Sec', 'Graduation'];
+class _CreateNewSectionPageState extends State<CreateNewSectionPage> {
+  final _sectionNameController = TextEditingController();
+  final _mentorController = TextEditingController();
+  final _limitController = TextEditingController();
   bool _isLoading = false;
 
-  Future<void> _createClass() async {
+  Future<void> _createSection() async {
     // Basic validation
-    if (_classNameController.text.isEmpty ||
-        _classCodeController.text.isEmpty ||
-        _selectedLevel == null) {
+    if (_sectionNameController.text.isEmpty ||
+        _mentorController.text.isEmpty ||
+        _limitController.text.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Please fill all required fields.')),
       );
@@ -33,22 +31,21 @@ class _CreateNewClassPageState extends State<CreateNewClassPage> {
     // Simulate API call
     await Future.delayed(const Duration(seconds: 2));
 
-    final classData = {
-      'name': _classNameController.text,
-      'code': _classCodeController.text,
-      'description': _descriptionController.text,
-      'level': _selectedLevel,
+    final sectionData = {
+      'name': _sectionNameController.text,
+      'mentor': _mentorController.text,
+      'limit': _limitController.text,
     };
 
     // In a real app, you would send this to your API
-    print('Creating class: $classData');
+    print('Creating section: $sectionData');
 
     if (mounted) {
       setState(() {
         _isLoading = false;
       });
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Class created successfully!')),
+        const SnackBar(content: Text('Section created successfully!')),
       );
       Navigator.pop(context); // Go back after creation
     }
@@ -56,11 +53,12 @@ class _CreateNewClassPageState extends State<CreateNewClassPage> {
 
   @override
   void dispose() {
-    _classNameController.dispose();
-    _classCodeController.dispose();
-    _descriptionController.dispose();
+    _sectionNameController.dispose();
+    _mentorController.dispose();
+    _limitController.dispose();
     super.dispose();
   }
+
 
   @override
   Widget build(BuildContext context) {
@@ -68,7 +66,7 @@ class _CreateNewClassPageState extends State<CreateNewClassPage> {
     return Scaffold(
       backgroundColor: theme.scaffoldBackgroundColor,
       appBar: AppBar(
-        title: const Text("Create New Class"),
+        title: const Text("Create New Section"),
         centerTitle: true,
       ),
       body: Padding(
@@ -86,14 +84,14 @@ class _CreateNewClassPageState extends State<CreateNewClassPage> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text("Class Name"),
+                      const Text("Section Name"),
                       const SizedBox(
                         height: 8,
                       ),
                       TextField(
-                        controller: _classNameController,
+                        controller: _sectionNameController,
                         decoration: InputDecoration(
-                          hintText: "e.g., Class X",
+                          hintText: "e.g., Section A",
                           hintStyle: TextStyle(color: Colors.grey.shade700),
                           border: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(10),
@@ -103,14 +101,14 @@ class _CreateNewClassPageState extends State<CreateNewClassPage> {
                       const SizedBox(
                         height: 16,
                       ),
-                      const Text("Class Code"),
+                      const Text("Mentor Teacher"),
                       const SizedBox(
                         height: 8,
                       ),
                       TextField(
-                        controller: _classCodeController,
+                        controller: _mentorController,
                         decoration: InputDecoration(
-                          hintText: "e.g., C-X",
+                          hintText: "e.g., Mrs. Anjali Sharma",
                           hintStyle: TextStyle(color: Colors.grey.shade700),
                           border: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(10),
@@ -120,48 +118,20 @@ class _CreateNewClassPageState extends State<CreateNewClassPage> {
                       const SizedBox(
                         height: 16,
                       ),
-                      const Text("Description (Optional)"),
+                      const Text("Class Limit"),
                       const SizedBox(
                         height: 8,
                       ),
                       TextField(
-                        controller: _descriptionController,
-                        maxLines: 5,
+                        controller: _limitController,
+                        keyboardType: TextInputType.number,
                         decoration: InputDecoration(
-                          hintText: "Enter a short description for the class",
+                          hintText: "e.g., 40",
                           hintStyle: TextStyle(color: Colors.grey.shade700),
                           border: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(10),
                           ),
                         ),
-                      ),
-                      const SizedBox(
-                        height: 16,
-                      ),
-                      const Text("Level"),
-                      const SizedBox(
-                        height: 8,
-                      ),
-                      DropdownButtonFormField<String>(
-                        initialValue: _selectedLevel,
-                        hint: Text("Select Level",
-                            style: TextStyle(color: Colors.grey.shade700)),
-                        decoration: InputDecoration(
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                        ),
-                        onChanged: (String? newValue) {
-                          setState(() {
-                            _selectedLevel = newValue;
-                          });
-                        },
-                        items: _levels.map<DropdownMenuItem<String>>((String value) {
-                          return DropdownMenuItem<String>(
-                            value: value,
-                            child: Text(value),
-                          );
-                        }).toList(),
                       ),
                       const SizedBox(
                         height: 16,
@@ -173,17 +143,19 @@ class _CreateNewClassPageState extends State<CreateNewClassPage> {
                             width: 150,
                             height: 50,
                             child: ElevatedButton(
-                              onPressed: _isLoading ? null : _createClass,
+                              onPressed: _isLoading ? null : _createSection,
                               style: ElevatedButton.styleFrom(
                                   backgroundColor: Colors.blue),
                               child: _isLoading
                                   ? const CircularProgressIndicator(
-                                      valueColor: AlwaysStoppedAnimation<Color>(
-                                          Colors.white))
-                                  : Text("Create Class",
-                                      style: TextStyle(
-                                          color: theme.colorScheme.onPrimary,
-                                          fontSize: 16)),
+                                valueColor: AlwaysStoppedAnimation<Color>(
+                                    Colors.white))
+                                  : Flexible(
+                                    child: Text("Create Section",
+                                    style: TextStyle(
+                                        color: theme.colorScheme.onPrimary,
+                                        fontSize: 16)),
+                                  ),
                             ),
                           ),
                           SizedBox(

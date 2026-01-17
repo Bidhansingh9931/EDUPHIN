@@ -8,6 +8,26 @@ class AddNewFine extends StatefulWidget{
 }
 
 class _AddNewFineState extends State<AddNewFine>{
+  late final TextEditingController _reasonController;
+  late final TextEditingController _amountController;
+  late final TextEditingController _remarksController;
+
+  @override
+  void initState() {
+    super.initState();
+    _reasonController = TextEditingController();
+    _amountController = TextEditingController();
+    _remarksController = TextEditingController();
+  }
+
+  @override
+  void dispose() {
+    _reasonController.dispose();
+    _amountController.dispose();
+    _remarksController.dispose();
+    super.dispose();
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -35,6 +55,7 @@ class _AddNewFineState extends State<AddNewFine>{
                         Text("Reason",style: TextStyle(fontSize: 16,color: theme.colorScheme.onPrimary),),
                         const SizedBox(height: 8,),
                         TextField(
+                          controller: _reasonController,
                           decoration: InputDecoration(
                             hintText: "e.g., Late Fee Payment",
                             hintStyle: TextStyle(color: Colors.grey.shade700),
@@ -47,6 +68,8 @@ class _AddNewFineState extends State<AddNewFine>{
                         Text("Amount",style: TextStyle(fontSize: 16,color: theme.colorScheme.onPrimary),),
                         const SizedBox(height: 8,),
                         TextField(
+                          controller: _amountController,
+                          keyboardType: TextInputType.number,
                           decoration: InputDecoration(
                             hintText: "200",
                             hintStyle: TextStyle(color: Colors.grey.shade700),
@@ -59,6 +82,7 @@ class _AddNewFineState extends State<AddNewFine>{
                         Text("Remarks",style: TextStyle(fontSize: 16,color: theme.colorScheme.onPrimary),),
                         const SizedBox(height: 8,),
                         TextField(
+                          controller: _remarksController,
                           maxLines: 3,
                           decoration: InputDecoration(
                             hintText: "Add any additional remarks",
@@ -99,7 +123,14 @@ class _AddNewFineState extends State<AddNewFine>{
             Expanded(
               child: SizedBox(
                 height: 50,
-                child: ElevatedButton(onPressed: (){},
+                child: ElevatedButton(onPressed: (){
+                  final result = {
+                    'reason': _reasonController.text,
+                    'amount': _amountController.text,
+                    'remarks': _remarksController.text,
+                  };
+                  Navigator.pop(context, result);
+                },
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Colors.blue.withAlpha(40),
                       shape: RoundedRectangleBorder(

@@ -1,6 +1,13 @@
 import 'package:eduphin/manager_dashboard/account_statics/accountant/add_accountant.dart';
 import 'package:flutter/material.dart';
 
+class Accountant {
+  final String name;
+  final String designation;
+
+  Accountant({required this.name, required this.designation});
+}
+
 class AccountantListPage extends StatefulWidget {
   const AccountantListPage({super.key});
 
@@ -19,7 +26,7 @@ class _AccountantListPageState extends State<AccountantListPage> {
               width: double.infinity,
               height: 50,
               child: FloatingActionButton(onPressed: (){
-                Navigator.push(context, MaterialPageRoute(builder: (context)=>AddAccountantPage()));
+                Navigator.push(context, MaterialPageRoute(builder: (context)=>const AddAccountantPage()));
               },child: Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
@@ -48,10 +55,10 @@ class _AccountantListPageState extends State<AccountantListPage> {
             ],
           ),
         ),
-        body: Padding(
-          padding: const EdgeInsets.only(bottom: 115),
+        body: const Padding(
+          padding: EdgeInsets.only(bottom: 115),
           child: SingleChildScrollView(
-            child: const Column(children: [
+            child: Column(children: [
               CustomAccountantListBox(),
             ]),
           ),
@@ -74,6 +81,39 @@ class _CustomAccountantListBoxState extends State<CustomAccountantListBox> {
     "Accountant Branch",
     "Accountant Department",
   ];
+
+  final List<Accountant> _accountants = [];
+  bool _isLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchAccountants();
+  }
+
+  Future<void> _fetchAccountants() async {
+    // Simulate API call to fetch accountants.
+    // Replace this with your actual API call.
+    await Future.delayed(const Duration(seconds: 2));
+    final List<Accountant> newAccountants = [
+      Accountant(name: "Rohan Mehra", designation: "Principal"),
+      Accountant(name: "Sunita Williams", designation: "Vice Principal"),
+      Accountant(name: "Anjali Sharma", designation: "Academic Head"),
+      Accountant(name: "Vikram Rathore", designation: "Admissions Officer"),
+      Accountant(name: "Priya Kapoor", designation: "HR Manager"),
+      Accountant(name: "Amit Dessai", designation: "Finance Manager"),
+      Accountant(name: "Sneha Verma", designation: "IT Head"),
+      Accountant(name: "Rajesh Kumar", designation: "Operations Manager"),
+      Accountant(name: "Deepa Singh", designation: "Librarian"),
+    ];
+
+    if (mounted) {
+      setState(() {
+        _accountants.addAll(newAccountants);
+        _isLoading = false;
+      });
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -122,293 +162,48 @@ class _CustomAccountantListBoxState extends State<CustomAccountantListBox> {
             ),
           ),
           const SizedBox(height: 16),
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: theme.colorScheme.onPrimary.withAlpha(25),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Row(
-              children: [
-                const SizedBox(width: 16),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        "Rohan Mehra",
-                        style: TextStyle(
-                            fontSize: 16, color: theme.colorScheme.onPrimary),
+          _isLoading
+              ? const Center(child: CircularProgressIndicator())
+              : ListView.separated(
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  itemCount: _accountants.length,
+                  separatorBuilder: (context, index) => const SizedBox(height: 16),
+                  itemBuilder: (context, index) {
+                    final accountant = _accountants[index];
+                    return Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: theme.colorScheme.onPrimary.withAlpha(25),
+                        borderRadius: BorderRadius.circular(12),
                       ),
-                      const SizedBox(height: 4),
-                      Text(
-                        "Principal",
-                        style: TextStyle(
-                            fontSize: 14,
-                            color: theme.colorScheme.onPrimary.withAlpha(180)),
-                      )
-                    ],
-                  ),
-                )
-              ],
-            ),
-          ),
-          const SizedBox(height: 16),
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: theme.colorScheme.onPrimary.withAlpha(25),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Row(
-              children: [
-                const SizedBox(width: 16),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        "Sunita Williams",
-                        style: TextStyle(
-                            fontSize: 16, color: theme.colorScheme.onPrimary),
+                      child: Row(
+                        children: [
+                          const SizedBox(width: 16),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  accountant.name,
+                                  style: TextStyle(
+                                      fontSize: 16, color: theme.colorScheme.onPrimary),
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  accountant.designation,
+                                  style: TextStyle(
+                                      fontSize: 14,
+                                      color: theme.colorScheme.onPrimary.withAlpha(180)),
+                                )
+                              ],
+                            ),
+                          )
+                        ],
                       ),
-                      const SizedBox(height: 4),
-                      Text(
-                        "Vice Principal",
-                        style: TextStyle(
-                            fontSize: 14,
-                            color: theme.colorScheme.onPrimary.withAlpha(180)),
-                      )
-                    ],
-                  ),
-                )
-              ],
-            ),
-          ),
-          const SizedBox(height: 16),
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: theme.colorScheme.onPrimary.withAlpha(25),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Row(
-              children: [
-                const SizedBox(width: 16),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        "Anjali Sharma",
-                        style: TextStyle(
-                            fontSize: 16, color: theme.colorScheme.onPrimary),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        "Academic Head",
-                        style: TextStyle(
-                            fontSize: 14,
-                            color: theme.colorScheme.onPrimary.withAlpha(180)),
-                      )
-                    ],
-                  ),
-                )
-              ],
-            ),
-          ),
-          const SizedBox(height: 16),
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: theme.colorScheme.onPrimary.withAlpha(25),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Row(
-              children: [
-                const SizedBox(width: 16),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        "Vikram Rathore",
-                        style: TextStyle(
-                            fontSize: 16, color: theme.colorScheme.onPrimary),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        "Admissions Officer",
-                        style: TextStyle(
-                            fontSize: 14,
-                            color: theme.colorScheme.onPrimary.withAlpha(180)),
-                      )
-                    ],
-                  ),
-                )
-              ],
-            ),
-          ),
-          const SizedBox(height: 16),
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: theme.colorScheme.onPrimary.withAlpha(25),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Row(
-              children: [
-                const SizedBox(width: 16),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        "Priya Kapoor",
-                        style: TextStyle(
-                            fontSize: 16, color: theme.colorScheme.onPrimary),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        "HR Manager",
-                        style: TextStyle(
-                            fontSize: 14,
-                            color: theme.colorScheme.onPrimary.withAlpha(180)),
-                      )
-                    ],
-                  ),
-                )
-              ],
-            ),
-          ),
-          const SizedBox(height: 16),
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: theme.colorScheme.onPrimary.withAlpha(25),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Row(
-              children: [
-                const SizedBox(width: 16),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        "Amit Dessai",
-                        style: TextStyle(
-                            fontSize: 16, color: theme.colorScheme.onPrimary),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        "Finance Manager",
-                        style: TextStyle(
-                            fontSize: 14,
-                            color: theme.colorScheme.onPrimary.withAlpha(180)),
-                      )
-                    ],
-                  ),
-                )
-              ],
-            ),
-          ),
-          const SizedBox(height: 16),
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: theme.colorScheme.onPrimary.withAlpha(25),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Row(
-              children: [
-                const SizedBox(width: 16),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        "Sneha Verma",
-                        style: TextStyle(
-                            fontSize: 16, color: theme.colorScheme.onPrimary),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        "IT Head",
-                        style: TextStyle(
-                            fontSize: 14,
-                            color: theme.colorScheme.onPrimary.withAlpha(180)),
-                      )
-                    ],
-                  ),
-                )
-              ],
-            ),
-          ),
-          const SizedBox(height: 16),
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: theme.colorScheme.onPrimary.withAlpha(25),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Row(
-              children: [
-                const SizedBox(width: 16),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        "Rajesh Kumar",
-                        style: TextStyle(
-                            fontSize: 16, color: theme.colorScheme.onPrimary),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        "Operations Manager",
-                        style: TextStyle(
-                            fontSize: 14,
-                            color: theme.colorScheme.onPrimary.withAlpha(180)),
-                      )
-                    ],
-                  ),
-                )
-              ],
-            ),
-          ),
-          const SizedBox(height: 16),
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: theme.colorScheme.onPrimary.withAlpha(25),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Row(
-              children: [
-                const SizedBox(width: 16),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        "Deepa Singh",
-                        style: TextStyle(
-                            fontSize: 16, color: theme.colorScheme.onPrimary),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        "Librarian",
-                        style: TextStyle(
-                            fontSize: 14,
-                            color: theme.colorScheme.onPrimary.withAlpha(180)),
-                      )
-                    ],
-                  ),
+                    );
+                  },
                 ),
-              ],
-            ),
-          ),
         ],
       ),
     );

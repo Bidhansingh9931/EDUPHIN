@@ -2,6 +2,24 @@ import 'package:flutter/material.dart';
 
 import 'account_details.dart';
 
+class Employee {
+  final String name;
+  final String info;
+  final String role;
+  final Color roleColor;
+  final String status;
+  final Color statusColor;
+
+  Employee({
+    required this.name,
+    required this.info,
+    required this.role,
+    required this.roleColor,
+    required this.status,
+    required this.statusColor,
+  });
+}
+
 class EmployeesSalaryPage extends StatefulWidget {
   const EmployeesSalaryPage({super.key});
 
@@ -10,7 +28,111 @@ class EmployeesSalaryPage extends StatefulWidget {
 }
 
 class _EmployeesSalaryPageState extends State<EmployeesSalaryPage> {
-  String? _selectedRole = "Teacher";
+  String? _selectedRole = "All";
+  bool _isLoading = true;
+  List<Employee> _allEmployees = [];
+  List<Employee> _filteredEmployees = [];
+  final TextEditingController _searchController = TextEditingController();
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchEmployees();
+    _searchController.addListener(_filterEmployees);
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _fetchEmployees() async {
+    // Simulate API call to fetch employees.
+    // Replace this with your actual API call.
+    await Future.delayed(const Duration(seconds: 2));
+    final List<Employee> employees = [
+      Employee(
+        name: "Ananya Sharma",
+        info: "ananya.sharma@example.com",
+        role: "Teacher",
+        roleColor: Colors.blue,
+        status: "Full-time",
+        statusColor: Colors.green,
+      ),
+      Employee(
+        name: "Rohan Mehra",
+        info: "+91 98765 43210",
+        role: "Administrator",
+        roleColor: Colors.purple,
+        status: "Full-time",
+        statusColor: Colors.green,
+      ),
+      Employee(
+        name: "Priya Verma",
+        info: "priya.verma@example.com",
+        role: "Teacher",
+        roleColor: Colors.blue,
+        status: "Part-time",
+        statusColor: Colors.orange,
+      ),
+      Employee(
+        name: "Vikram Singh",
+        info: "+91 91234 56789",
+        role: "Support Staff",
+        roleColor: Colors.indigo,
+        status: "Full-time",
+        statusColor: Colors.green,
+      ),
+      Employee(
+        name: "Sonia Gupta",
+        info: "sonia.gupta@example.com",
+        role: "Librarian",
+        roleColor: Colors.teal,
+        status: "Full-time",
+        statusColor: Colors.green,
+      ),
+      Employee(
+        name: "Amit Kumar",
+        info: "+91 99887 76655",
+        role: "Teacher",
+        roleColor: Colors.blue,
+        status: "Part-time",
+        statusColor: Colors.orange,
+      ),
+    ];
+
+    if (mounted) {
+      setState(() {
+        _allEmployees = employees;
+        _filteredEmployees = employees;
+        _isLoading = false;
+      });
+    }
+  }
+
+  void _filterEmployees() {
+    List<Employee> results = _allEmployees;
+
+    // Filter by role
+    if (_selectedRole != null && _selectedRole != "All") {
+      results = results.where((employee) => employee.role == _selectedRole).toList();
+    }
+
+    // Filter by search query
+    final query = _searchController.text.toLowerCase();
+    if (query.isNotEmpty) {
+      results = results.where((employee) {
+        return employee.name.toLowerCase().contains(query) ||
+            employee.info.toLowerCase().contains(query);
+      }).toList();
+    }
+
+    setState(() {
+      _filteredEmployees = results;
+    });
+  }
+
 
   @override
   Widget build(BuildContext context) {
@@ -34,14 +156,15 @@ class _EmployeesSalaryPageState extends State<EmployeesSalaryPage> {
                 color: theme.primaryColor,
                 borderRadius: BorderRadius.circular(12),
               ),
-              child: const TextField(
-                decoration: InputDecoration(
+              child: TextField(
+                controller: _searchController,
+                decoration: const InputDecoration(
                   icon: Icon(Icons.search, color: Colors.white70),
                   hintText: "Search for employees...",
                   hintStyle: TextStyle(color: Colors.white70),
                   border: InputBorder.none,
                 ),
-                style: TextStyle(color: Colors.white),
+                style: const TextStyle(color: Colors.white),
               ),
             ),
 
@@ -66,9 +189,10 @@ class _EmployeesSalaryPageState extends State<EmployeesSalaryPage> {
                 onChanged: (String? newValue) {
                   setState(() {
                     _selectedRole = newValue;
+                    _filterEmployees();
                   });
                 },
-                items: <String>["Teacher", "Administrator", "Support Staff", "Librarian"]
+                items: <String>["All", "Teacher", "Administrator", "Support Staff", "Librarian"]
                     .map<DropdownMenuItem<String>>((String value) {
                   return DropdownMenuItem<String>(
                     value: value,
@@ -82,62 +206,29 @@ class _EmployeesSalaryPageState extends State<EmployeesSalaryPage> {
 
             /// Employee List
             Expanded(
-              child: ListView(
-                children: [
-                  const EmployeeCard(
-                    name: "Ananya Sharma",
-                    info: "ananya.sharma@example.com",
-                    role: "Teacher",
-                    roleColor: Colors.blue,
-                    status: "Full-time",
-                    statusColor: Colors.green,
-                  ),
-                  const EmployeeCard(
-                    name: "Rohan Mehra",
-                    info: "+91 98765 43210",
-                    role: "Administrator",
-                    roleColor: Colors.purple,
-                    status: "Full-time",
-                    statusColor: Colors.green,
-                  ),
-                  InkWell(
-                    onTap: (){
-                      Navigator.push(context, MaterialPageRoute(builder: (context)=>AccountDetailsPage()));
+              child: _isLoading
+                  ? const Center(child: CircularProgressIndicator())
+                  : ListView.builder(
+                itemCount: _filteredEmployees.length,
+                itemBuilder: (context, index) {
+                  final employee = _filteredEmployees[index];
+                  return InkWell(
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (context) => const AccountDetailsPage()),
+                      );
                     },
-                    child: const EmployeeCard(
-                      name: "Priya Verma",
-                      info: "priya.verma@example.com",
-                      role: "Teacher",
-                      roleColor: Colors.blue,
-                      status: "Part-time",
-                      statusColor: Colors.orange,
+                    child: EmployeeCard(
+                      name: employee.name,
+                      info: employee.info,
+                      role: employee.role,
+                      roleColor: employee.roleColor,
+                      status: employee.status,
+                      statusColor: employee.statusColor,
                     ),
-                  ),
-                  const EmployeeCard(
-                    name: "Vikram Singh",
-                    info: "+91 91234 56789",
-                    role: "Support Staff",
-                    roleColor: Colors.indigo,
-                    status: "Full-time",
-                    statusColor: Colors.green,
-                  ),
-                  const EmployeeCard(
-                    name: "Sonia Gupta",
-                    info: "sonia.gupta@example.com",
-                    role: "Librarian",
-                    roleColor: Colors.teal,
-                    status: "Full-time",
-                    statusColor: Colors.green,
-                  ),
-                  const EmployeeCard(
-                    name: "Amit Kumar",
-                    info: "+91 99887 76655",
-                    role: "Teacher",
-                    roleColor: Colors.blue,
-                    status: "Part-time",
-                    statusColor: Colors.orange,
-                  ),
-                ],
+                  );
+                },
               ),
             )
           ],

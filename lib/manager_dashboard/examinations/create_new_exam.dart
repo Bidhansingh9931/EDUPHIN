@@ -50,11 +50,17 @@ class _CreateExamScreenState extends State<CreateExamScreen> {
   }
 
   void createExam() {
-    if (!_formKey.currentState!.validate() ||
-        startDate == null ||
-        endDate == null) {
+    if (!_formKey.currentState!.validate()) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text("Please fill all required fields.")),
+      );
+      return;
+    }
+
+    if (endDate!.isBefore(startDate!)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+            content: Text("End date cannot be earlier than the start date.")),
       );
       return;
     }
@@ -70,11 +76,12 @@ class _CreateExamScreenState extends State<CreateExamScreen> {
     };
 
     /// 🔹 Send this to API later
-    debugPrint("Exam Created: $data");
+    debugPrint("Exam Created: \$data");
 
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(content: Text("Exam Created (Simulation)")),
     );
+    Navigator.pop(context, data);
   }
 
   @override
@@ -207,6 +214,8 @@ class _CreateExamScreenState extends State<CreateExamScreen> {
                               TextFormField(
                                 controller: startDateController,
                                 readOnly: true,
+                                validator: (v) =>
+                                    v!.isEmpty ? "Please select a start date" : null,
                                 onTap: () => pickDate(startDateController, true),
                                 style: const TextStyle(color: Colors.white),
                                 decoration: InputDecoration(
@@ -240,6 +249,8 @@ class _CreateExamScreenState extends State<CreateExamScreen> {
                               TextFormField(
                                 controller: endDateController,
                                 readOnly: true,
+                                validator: (v) =>
+                                    v!.isEmpty ? "Please select an end date" : null,
                                 onTap: () => pickDate(endDateController, false),
                                 style: const TextStyle(color: Colors.white),
                                 decoration: InputDecoration(

@@ -13,9 +13,14 @@ class UpcomingEvents extends StatefulWidget {
 }
 
 class _UpcomingEventsState extends State<UpcomingEvents> {
+  bool _isLoading = false;
   late TextEditingController _dateController;
   late TextEditingController _startTimeController;
   late TextEditingController _endTimeController;
+  final TextEditingController _titleController = TextEditingController();
+  final TextEditingController _descriptionController = TextEditingController();
+  final TextEditingController _venueController = TextEditingController();
+  final TextEditingController _ticketPriceController = TextEditingController();
 
   bool isTicked = false;
   bool manager = false;
@@ -40,6 +45,10 @@ class _UpcomingEventsState extends State<UpcomingEvents> {
     _dateController.dispose();
     _startTimeController.dispose();
     _endTimeController.dispose();
+    _titleController.dispose();
+    _descriptionController.dispose();
+    _venueController.dispose();
+    _ticketPriceController.dispose();
     super.dispose();
   }
 
@@ -88,6 +97,53 @@ class _UpcomingEventsState extends State<UpcomingEvents> {
     }
   }
 
+  void _generateEvent() async {
+    setState(() {
+      _isLoading = true;
+    });
+
+    // Simulate API call to generate event.
+    // Replace this with your actual API call.
+    await Future.delayed(const Duration(seconds: 2));
+
+    final eventData = {
+      'title': _titleController.text,
+      'description': _descriptionController.text,
+      'venue': _venueController.text,
+      'date': _dateController.text,
+      'startTime': _startTimeController.text,
+      'endTime': _endTimeController.text,
+      'isTicketed': isTicked,
+      'ticketPrice': _ticketPriceController.text,
+      'attendees': {
+        'manager': manager,
+        'teachers': teachers,
+        'students': students,
+        'staff': staff,
+        'librarian': librarian,
+        'counselor': counselor,
+        'accountants': accountants,
+        'openForAll': openForAll,
+      }
+    };
+
+    // For demonstration, we'll just print the data.
+    print('Generating event with data: $eventData');
+
+
+    setState(() {
+      _isLoading = false;
+    });
+
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Event generated successfully!')),
+      );
+      // You might want to navigate away or clear the controllers after success.
+      // Navigator.pop(context);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -105,6 +161,7 @@ class _UpcomingEventsState extends State<UpcomingEvents> {
               Text("Event Title"),
               const SizedBox(height: 8),
               TextField(
+                controller: _titleController,
                 decoration: InputDecoration(
                   hintText: "Enter Event Title",
                   hintStyle:
@@ -124,6 +181,7 @@ class _UpcomingEventsState extends State<UpcomingEvents> {
               Text("Description"),
               const SizedBox(height: 8),
               TextField(
+                controller: _descriptionController,
                 maxLines: 5,
                 decoration: InputDecoration(
                   hintText: "Enter a detailed Description for the event",
@@ -140,6 +198,7 @@ class _UpcomingEventsState extends State<UpcomingEvents> {
               Text("Venue"),
               const SizedBox(height: 8),
               TextField(
+                controller: _venueController,
                 decoration: InputDecoration(
                   prefixIcon:
                       Icon(Icons.location_on, color: theme.colorScheme.onPrimary),
@@ -343,6 +402,7 @@ class _UpcomingEventsState extends State<UpcomingEvents> {
               Text("Ticket Price"),
               const SizedBox(height: 8),
               TextField(
+                controller: _ticketPriceController,
                 decoration: InputDecoration(
                   prefixIcon: const Icon(Icons.currency_rupee, color: Colors.white),
                   hintText: "Enter Ticket Price",
@@ -360,16 +420,24 @@ class _UpcomingEventsState extends State<UpcomingEvents> {
               SizedBox(
                 width: double.infinity,
                 height: 50,
-                child: ElevatedButton(onPressed: () { },
+                child: ElevatedButton(
+                  onPressed: _isLoading ? null : _generateEvent,
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Colors.blue,
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(12),
                     ),
                   ),
-                  child: Text("Generate Event",
-                    style: TextStyle(color: theme.colorScheme.onPrimary, fontSize: 20),
-                  ),
+                  child: _isLoading
+                      ? CircularProgressIndicator(
+                          valueColor: AlwaysStoppedAnimation<Color>(
+                              theme.colorScheme.onPrimary),
+                        )
+                      : Text(
+                          "Generate Event",
+                          style: TextStyle(
+                              color: theme.colorScheme.onPrimary, fontSize: 20),
+                        ),
                 ),
               ),
               const SizedBox(height: 8),

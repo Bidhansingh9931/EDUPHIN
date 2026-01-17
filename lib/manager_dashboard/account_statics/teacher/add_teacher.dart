@@ -12,6 +12,7 @@ class AddTeacherPage extends StatefulWidget {
 }
 
 class _AddTeacherPageState extends State<AddTeacherPage> {
+  bool _isLoading = false;
   final TextEditingController _fullNameController = TextEditingController(text: "Rajveer K.Malhotra");
   final TextEditingController _emailController = TextEditingController(text: "raj@iias.com");
   final TextEditingController _newPasswordController = TextEditingController(text: "");
@@ -41,6 +42,62 @@ class _AddTeacherPageState extends State<AddTeacherPage> {
   final TextEditingController _emergencyContactNameController = TextEditingController(text: "John Doe");
   final TextEditingController _emergencyContactNumberController = TextEditingController(text: "+91 0987654321");
 
+  void _addTeacher() async {
+    setState(() {
+      _isLoading = true;
+    });
+
+    // Simulate API call to add teacher data.
+    // Replace this with your actual API call.
+    await Future.delayed(const Duration(seconds: 2));
+
+    // Here you can collect data from controllers and send to your API
+    final teacherData = {
+      'fullName': _fullNameController.text,
+      'email': _emailController.text,
+      'role': _roleController.text,
+      'gender': _genderController.text,
+      'dateOfBirth': _dateOfBirthController.text,
+      'relationshipStatus': _relationshipStatusController.text,
+      'phoneNumber': _phoneNumberController.text,
+      'alternateNumber': _alternateNumberController.text,
+      'address': _addressController.text,
+      'city': _cityController.text,
+      'state': _stateController.text,
+      'pinCode': _pinCodeController.text,
+      'position': _positionController.text,
+      'employmentType': _employmentTypeController.text,
+      'joiningDate': _joiningDateController.text,
+      'experience': _experienceController.text,
+      'status': _statusController.text,
+      'reference': _referenceController.text,
+      'qualification': _qualificationController.text,
+      'matriculationMarks': _matriculationMarksController.text,
+      'intermediateMarks': _intermediateMarksController.text,
+      'bankAccountNumber': _bankAccountNumberController.text,
+      'ifscCode': _ifscCodeController.text,
+      'bankName': _bankNameController.text,
+      'branch': _branchController.text,
+      'emergencyContactName': _emergencyContactNameController.text,
+      'emergencyContactNumber': _emergencyContactNumberController.text,
+    };
+
+    // For demonstration, we'll just print the data.
+    print('Adding teacher with data: $teacherData');
+
+    setState(() {
+      _isLoading = false;
+    });
+
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Teacher added successfully!')),
+      );
+      // You might want to navigate away or clear the controllers after success.
+      // Navigator.pop(context);
+    }
+  }
+
 
   @override
   Widget build(BuildContext context) {
@@ -53,14 +110,32 @@ class _AddTeacherPageState extends State<AddTeacherPage> {
             SizedBox(
               width: 200,
               height: 50,
-              child: FloatingActionButton(onPressed: (){},child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(Icons.add,color: theme.colorScheme.onSurface,),
-                  const SizedBox(width: 2,),
-                  Text("Add Student",style: TextStyle(color: theme.colorScheme.onSurface,fontSize: 20),),
-                ],
-              ),),
+              child: FloatingActionButton(
+                onPressed: _isLoading ? null : _addTeacher,
+                child: _isLoading
+                    ? CircularProgressIndicator(
+                  valueColor: AlwaysStoppedAnimation<Color>(
+                      theme.colorScheme.onSurface),
+                )
+                    : Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(
+                      Icons.add,
+                      color: theme.colorScheme.onSurface,
+                    ),
+                    const SizedBox(
+                      width: 2,
+                    ),
+                    Text(
+                      "Add Teacher",
+                      style: TextStyle(
+                          color: theme.colorScheme.onSurface,
+                          fontSize: 20),
+                    ),
+                  ],
+                ),
+              ),
             ),
             Spacer(),
             SizedBox(
@@ -353,100 +428,78 @@ class DeleteTeacherDialog extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.transparent,
-      body: Stack(
-        children: [
-          // 🔹 Blur Background
-          BackdropFilter(
-            filter: ImageFilter.blur(sigmaX: 6, sigmaY: 6),
-            child: Container(color: Colors.transparent),
-          ),
-
-          // 🔹 Center Card
-          Center(
-            child: Container(
-              margin: const EdgeInsets.symmetric(horizontal: 24),
-              padding: const EdgeInsets.all(20),
-              decoration: BoxDecoration(
-                color: const Color(0xFF1F2937),
-                borderRadius: BorderRadius.circular(20),
+        backgroundColor: Colors.transparent,
+        body: Stack(
+            children: [
+              // 🔹 Blur Background
+              BackdropFilter(
+                filter: ImageFilter.blur(sigmaX: 6, sigmaY: 6),
+                child: Container(color: Colors.transparent),
               ),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const Text(
-                    "Delete Counselor",
-                    style: TextStyle(
-                      fontSize: 20,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.white,
-                    ),
-                  ),
 
-                  const SizedBox(height: 12),
-
-                  Text(
-                    "Are you sure you want to delete this Teacher "
-                        "$teacherName? This action cannot be undone.",
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      color: Colors.grey.shade400,
-                      fontSize: 14,
-                    ),
-                  ),
-
-                  const SizedBox(height: 24),
-
-                  // 🔴 Delete Button
-                  SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton(
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFFC5392A),
-                        padding: const EdgeInsets.symmetric(vertical: 14),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
+              // 🔹 Center Card
+              Center(
+                  child: Container(
+                      margin: const EdgeInsets.symmetric(horizontal: 24),
+                      padding: const EdgeInsets.all(20),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF1F2937),
+                        borderRadius: BorderRadius.circular(20),
                       ),
-                      onPressed: () {
-                        Navigator.pop(context);
-                        // 🔥 delete logic here
-                      },
-                      child: const Text(
-                        "Yes, Delete",
-                        style: TextStyle(fontSize: 16),
-                      ),
-                    ),
-                  ),
+                      child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Text(
+                              "Delete Counselor",
+                              style: TextStyle(
+                                fontSize: 20,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.white,
+                              ),
+                            ),
 
-                  const SizedBox(height: 12),
+                            const SizedBox(height: 12),
 
-                  // ⚪ Cancel Button
-                  SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton(
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF374151),
-                        padding: const EdgeInsets.symmetric(vertical: 14),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                      ),
-                      onPressed: () {
-                        Navigator.pop(context);
-                      },
-                      child: const Text(
-                        "Cancel",
-                        style: TextStyle(fontSize: 16),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ],
-      ),
+                            Text(
+                              "Are you sure you want to delete this Teacher "
+                                  "$teacherName? This action cannot be undone.",
+                              textAlign: TextAlign.center,
+                              style: TextStyle(
+                                color: Colors.grey.shade400,
+                                fontSize: 14,
+                              ),
+                            ),
+
+                            const SizedBox(height: 24),
+
+                            // 🔴 Delete Button
+                            SizedBox(
+                                width: double.infinity,
+                                child: ElevatedButton(
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: const Color(0xFFC5392A),
+                                      padding: const EdgeInsets.symmetric(
+                                          vertical: 14),
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(12),
+                                      ),
+                                    ),
+                                    onPressed: () {
+                                      Navigator.pop(context);
+                                      // 🔥 delete logic here
+                                    },
+                                    child: const Text(
+                                        "Yes, Delete",
+                                        style: TextStyle(fontSize: 16)
+                                    )
+                                )
+                            )
+                          ]
+                      )
+                  )
+              )
+            ]
+        )
     );
   }
 }

@@ -2,137 +2,173 @@ import 'package:flutter/material.dart';
 
 import 'fee_details.dart';
 
-class StudentFeeDetailsPage extends StatefulWidget{
+// Data model for student fee details
+class StudentFeeInfo {
+  final String name;
+  final String regNo;
+  final String className;
+  final String status;
+  final String imageUrl;
+
+  StudentFeeInfo({
+    required this.name,
+    required this.regNo,
+    required this.className,
+    required this.status,
+    required this.imageUrl,
+  });
+}
+
+class StudentFeeDetailsPage extends StatefulWidget {
   const StudentFeeDetailsPage({super.key});
 
   @override
   State<StatefulWidget> createState() => _StudentFeeDetailsPageState();
 }
 
-class _StudentFeeDetailsPageState extends State<StudentFeeDetailsPage>{
+class _StudentFeeDetailsPageState extends State<StudentFeeDetailsPage> {
+  String _selectClass = "Class 1";
+  String _selectSection = "Section A";
+
+  // Dummy data - replace with API call
+  final List<StudentFeeInfo> _studentFeeDetails = [
+    StudentFeeInfo(
+      name: "Ananya Sharma",
+      regNo: "S-1024",
+      className: "10-A",
+      status: "Active",
+      imageUrl: "assets/images/random_boy.jpg",
+    ),
+    StudentFeeInfo(
+      name: "Rohan Verma",
+      regNo: "S-1025",
+      className: "10-A",
+      status: "Active",
+      imageUrl: "assets/images/random_boy.jpg",
+    ),
+    StudentFeeInfo(
+      name: "Priya Singh",
+      regNo: "S-1026",
+      className: "10-A",
+      status: "Inactive",
+      imageUrl: "assets/images/random_boy.jpg",
+    ),
+  ];
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    var selectClass = "Class 1";
-    var selectSection = "Section A";
     return Scaffold(
       appBar: AppBar(
-        title: Text("Student Fee Details"),
+        title: const Text("Student Fee Details"),
         centerTitle: true,
       ),
       body: Padding(
-        padding: const EdgeInsets.fromLTRB(16,16,16,100),
-        child: SingleChildScrollView(
-          child: Column(
-            children: [
-              Row(
-                children: [
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          "Class",
-                          style: TextStyle(
-                              fontSize: 16,
-                              color: theme.colorScheme.onPrimary),
-                        ),
-                        const SizedBox(height: 8),
-                        DropDownBox(
-                          key: ValueKey(selectClass),
-                          initialValue: selectClass,
-                          items: const [
-                            "Class 1",
-                            "Class 2",
-                            "Class 3",
-                            "Class 4",
-                            "Class 5",
-                            "Class 6",
-                            "Class 7",
-                            "Class 8",
-                            "Class 9",
-                            "Class 10",
-                            "Class 11",
-                            "Class 12"
-                          ],
-                          onChanged: (value) {
-                            if (value != null) {
-                              setState(() {
-                                selectClass = value;
-                              });
-                            }
-                          },
-                          hintText: "--Select Subject",
-                        ),
-                      ],
-                    ),
+        padding: const EdgeInsets.fromLTRB(16, 16, 16, 100),
+        child: Column(
+          children: [
+            Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        "Class",
+                        style: TextStyle(
+                            fontSize: 16, color: theme.colorScheme.onPrimary),
+                      ),
+                      const SizedBox(height: 8),
+                      DropDownBox(
+                        key: ValueKey(_selectClass),
+                        initialValue: _selectClass,
+                        items: const [
+                          "Class 1",
+                          "Class 2",
+                          "Class 3",
+                          "Class 4",
+                          "Class 5",
+                          "Class 6",
+                          "Class 7",
+                          "Class 8",
+                          "Class 9",
+                          "Class 10",
+                          "Class 11",
+                          "Class 12"
+                        ],
+                        onChanged: (value) {
+                          if (value != null) {
+                            setState(() {
+                              _selectClass = value;
+                            });
+                          }
+                        },
+                        hintText: "--Select Subject",
+                      ),
+                    ],
                   ),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          "Section",
-                          style: TextStyle(
-                              fontSize: 16,
-                              color: theme.colorScheme.onPrimary),
-                        ),
-                        const SizedBox(height: 8),
-                        DropDownBox(
-                          key: ValueKey(selectSection),
-                          initialValue: selectSection,
-                          items: const [
-                            "Section A",
-                            "Section B",
-                            "Section C",
-                            "Section D",
-                            "Section E",
-                            "Section F"
-
-                          ],
-                          onChanged: (value) {
-                            if (value != null) {
-                              setState(() {
-                                selectSection = value;
-                              });
-                            }
-                          },
-                          hintText: "--Select Section",
-                        ),
-                      ],
-                    ),
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        "Section",
+                        style: TextStyle(
+                            fontSize: 16, color: theme.colorScheme.onPrimary),
+                      ),
+                      const SizedBox(height: 8),
+                      DropDownBox(
+                        key: ValueKey(_selectSection),
+                        initialValue: _selectSection,
+                        items: const [
+                          "Section A",
+                          "Section B",
+                          "Section C",
+                          "Section D",
+                          "Section E",
+                          "Section F"
+                        ],
+                        onChanged: (value) {
+                          if (value != null) {
+                            setState(() {
+                              _selectSection = value;
+                            });
+                          }
+                        },
+                        hintText: "--Select Section",
+                      ),
+                    ],
                   ),
-                ],
+                ),
+              ],
+            ),
+            const SizedBox(
+              height: 16,
+            ),
+            Expanded(
+              child: ListView.builder(
+                itemCount: _studentFeeDetails.length,
+                itemBuilder: (context, index) {
+                  final student = _studentFeeDetails[index];
+                  return Padding(
+                    padding: const EdgeInsets.only(bottom: 16.0),
+                    child: CustomStudentInfoFeeDetailContainerBox(
+                      heading: student.name,
+                      subHeading: "Reg. No: ${student.regNo}, Class: ${student.className}",
+                      isActive: student.status,
+                      imageUrl: student.imageUrl,
+                    ),
+                  );
+                },
               ),
-              SizedBox(height: 16,),
-              CustomStudentInfoFeeDetailContainerBox(
-                heading: "Ananya Sharma",
-                subHeading: "Reg. No: S-1024, Class: 10-A",
-                isActive: "Active",
-              ),
-              SizedBox(height: 16,),
-              CustomStudentInfoFeeDetailContainerBox(
-                heading: "Rohan Verma",
-                subHeading: "Reg. No: S-1025, Class: 10-A",
-                isActive: "Active",
-              ),
-              SizedBox(height: 16,),
-              CustomStudentInfoFeeDetailContainerBox(
-                heading: "Priya Singh",
-                subHeading: "Reg. No: S-1026, Class: 10-A",
-                isActive: "Inactive",
-              ),
-
-              SizedBox(height: 16,),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );
   }
-
-
 }
 
 class DropDownBox extends StatelessWidget {
@@ -154,7 +190,8 @@ class DropDownBox extends StatelessWidget {
     return DropdownButtonFormField(
         initialValue: initialValue,
         isExpanded: true,
-        items: items.map((e) => DropdownMenuItem(value: e, child: Text(e))).toList(),
+        items:
+            items.map((e) => DropdownMenuItem(value: e, child: Text(e))).toList(),
         onChanged: onChanged,
         decoration: InputDecoration(
           hintText: hintText,
@@ -165,27 +202,24 @@ class DropDownBox extends StatelessWidget {
   }
 }
 
-class CustomStudentInfoFeeDetailContainerBox extends StatefulWidget {
+class CustomStudentInfoFeeDetailContainerBox extends StatelessWidget {
   final String heading;
   final String subHeading;
   final String isActive;
+  final String imageUrl;
 
   const CustomStudentInfoFeeDetailContainerBox({
     super.key,
     required this.heading,
     required this.subHeading,
     required this.isActive,
+    required this.imageUrl,
   });
 
   @override
-  State<CustomStudentInfoFeeDetailContainerBox> createState() => _CustomStudentInfoFeeDetailContainerBoxState();
-}
-
-class _CustomStudentInfoFeeDetailContainerBoxState extends State<CustomStudentInfoFeeDetailContainerBox> {
-  @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final isActive = widget.isActive == "Active";
+    final isActiveStatus = isActive == "Active";
 
     return Container(
       decoration: BoxDecoration(
@@ -200,55 +234,75 @@ class _CustomStudentInfoFeeDetailContainerBoxState extends State<CustomStudentIn
             Row(
               children: [
                 ClipRRect(
-                  borderRadius: BorderRadius.circular(40),
-                    child: Image(image: AssetImage("assets/images/random_boy.jpg"),height: 50,width: 50,)),
-                SizedBox(width: 10,),
+                    borderRadius: BorderRadius.circular(40),
+                    child: Image(
+                      image: AssetImage(imageUrl),
+                      height: 50,
+                      width: 50,
+                    )),
+                const SizedBox(
+                  width: 10,
+                ),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(widget.heading,
-                          style:
-                          TextStyle(color: theme.colorScheme.onPrimary, fontSize: 20)),
-                      Text(widget.subHeading,
-                          style:
-                          TextStyle(color: theme.colorScheme.onPrimary.withAlpha(150), fontSize: 14)),
+                      Text(heading,
+                          style: TextStyle(
+                              color: theme.colorScheme.onPrimary,
+                              fontSize: 20)),
+                      Text(subHeading,
+                          style: TextStyle(
+                              color: theme.colorScheme.onPrimary.withAlpha(150),
+                              fontSize: 14)),
                     ],
                   ),
                 ),
                 Container(
                     decoration: BoxDecoration(
-                      color: isActive
+                      color: isActiveStatus
                           ? Colors.green.withAlpha(700)
-                          : Colors.blue.withAlpha(30),
+                          : Colors.red.withAlpha(700),
                       borderRadius: BorderRadius.circular(10),
                     ),
                     child: Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 8, vertical: 4),
                       child: Text(
-                        widget.isActive,
-                        style: const TextStyle(color: Colors.white, fontSize: 14),
+                        isActive,
+                        style:
+                            const TextStyle(color: Colors.white, fontSize: 14),
                       ),
                     ))
               ],
             ),
-            SizedBox(height: 8,),
+            const SizedBox(
+              height: 8,
+            ),
             SizedBox(
               width: double.infinity,
               height: 30,
-              child: ElevatedButton(onPressed: (){
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (context) => const FeeDetailsPage()),
-                );
-              },
+              child: ElevatedButton(
+                  onPressed: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                          builder: (context) => FeeDetailsPage(
+                            studentName: heading,
+                            studentDetails: subHeading
+                          ),
+                    ));
+                  },
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Colors.blue.shade700,
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(30),
                     ),
                   ),
-                  child: Text("Fee Details",style: TextStyle(color: Colors.white,fontSize: 16),)),
+                  child: const Text(
+                    "Fee Details",
+                    style: TextStyle(color: Colors.white, fontSize: 16),
+                  )),
             ),
           ],
         ),

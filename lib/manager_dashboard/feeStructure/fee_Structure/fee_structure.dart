@@ -4,6 +4,36 @@ import 'package:flutter/material.dart';
 
 import 'edit_fee.dart';
 
+class InstituteFee {
+  final String title;
+  final String mandatoryOrOptional;
+  final String detail;
+  final int amount;
+
+  InstituteFee({
+    required this.title,
+    required this.mandatoryOrOptional,
+    required this.detail,
+    required this.amount,
+  });
+}
+
+class ClassFee {
+  final String heading;
+  final String subHeading;
+  final String isOptional;
+  final String details;
+  final int fee;
+
+  ClassFee({
+    required this.heading,
+    required this.subHeading,
+    required this.isOptional,
+    required this.details,
+    required this.fee,
+  });
+}
+
 class FeeStructurePage extends StatefulWidget {
   const FeeStructurePage({super.key});
 
@@ -12,6 +42,57 @@ class FeeStructurePage extends StatefulWidget {
 }
 
 class _FeeStructurePageState extends State<FeeStructurePage> {
+  bool _isLoading = true;
+  List<InstituteFee> _instituteFees = [];
+  List<ClassFee> _classFees = [];
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchData();
+  }
+
+  Future<void> _fetchData() async {
+    // Simulate API call
+    await Future.delayed(const Duration(seconds: 1));
+
+    final instituteFeesData = [
+      InstituteFee(
+        title: "Annual Tuition Fee",
+        mandatoryOrOptional: "Mandatory",
+        detail: "Standard annual fee for all academic programs",
+        amount: 75000,
+      ),
+      InstituteFee(
+          title: "Sports Facility Fee",
+          mandatoryOrOptional: "Optional",
+          detail: "Standard annual fee for all academic programs",
+          amount: 3000),
+    ];
+
+    final classFeesData = [
+      ClassFee(
+          heading: "Class: 10th Grade",
+          subHeading: "Lab Fee",
+          isOptional: "Mandatory",
+          details: "Mandatory for all science stream students in 10th grade.",
+          fee: 4000),
+      ClassFee(
+          heading: "Class: 5th Grade",
+          subHeading: "Art Supplies Fee",
+          isOptional: "Optional",
+          details:
+              "Provides all necessary art supplies for the year long art class.",
+          fee: 4000),
+    ];
+
+    setState(() {
+      _instituteFees = instituteFeesData;
+      _classFees = classFeesData;
+      _isLoading = false;
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -24,17 +105,23 @@ class _FeeStructurePageState extends State<FeeStructurePage> {
           width: double.infinity,
           child: FloatingActionButton(
             onPressed: () {
-              Navigator.push(context, MaterialPageRoute(builder: (context)=>CreateNewFeePage()));
+              Navigator.push(context,
+                  MaterialPageRoute(builder: (context) => const CreateNewFeePage()));
             },
             backgroundColor: Colors.blue.shade900,
             child: const Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Icon(Icons.add,),
+                Icon(
+                  Icons.add,
+                ),
                 SizedBox(
                   width: 5,
                 ),
-                Text("Create New Fee",style: TextStyle(fontSize: 20),),
+                Text(
+                  "Create New Fee",
+                  style: TextStyle(fontSize: 20),
+                ),
               ],
             ),
           ),
@@ -44,71 +131,147 @@ class _FeeStructurePageState extends State<FeeStructurePage> {
         title: const Text("Fee Structure"),
         centerTitle: true,
       ),
-      body: const Padding(
-        padding: EdgeInsets.fromLTRB(16, 16, 16, 100),
-        child: SingleChildScrollView(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                "Institute - Wide Fee",
-                style: TextStyle(fontSize: 18),
+      body: _isLoading
+          ? const Center(child: CircularProgressIndicator())
+          : Padding(
+              padding: const EdgeInsets.fromLTRB(16, 16, 16, 100),
+              child: SingleChildScrollView(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      "Institute - Wide Fee",
+                      style: TextStyle(fontSize: 18),
+                    ),
+                    const SizedBox(
+                      height: 16,
+                    ),
+                    ListView.builder(
+                      shrinkWrap: true,
+                      physics: const NeverScrollableScrollPhysics(),
+                      itemCount: _instituteFees.length,
+                      itemBuilder: (context, index) {
+                        final fee = _instituteFees[index];
+                        return Padding(
+                          padding: const EdgeInsets.only(bottom: 16.0),
+                          child: CustomInstituteContainerBox(
+                            title: fee.title,
+                            mandatoryOrOptional: fee.mandatoryOrOptional,
+                            detail: fee.detail,
+                            amount: fee.amount,
+                            onEdit: () async {
+                              final result = await Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (context) => EditFeePage(
+                                    feeName: fee.title,
+                                    amount: fee.amount.toString(),
+                                    description: fee.detail,
+                                    applyTo: "institute",
+                                    isOptional:
+                                        fee.mandatoryOrOptional == "Optional",
+                                  ),
+                                ),
+                              );
+                              if (result != null) {
+                                setState(() {
+                                  _instituteFees[index] = InstituteFee(
+                                    title: result['feeName'],
+                                    mandatoryOrOptional: result['isOptional']
+                                        ? "Optional"
+                                        : "Mandatory",
+                                    detail: result['description'],
+                                    amount: int.parse(result['amount']),
+                                  );
+                                });
+                              }
+                            },
+                            onDelete: () {
+                              showDeleteFeeDialog(
+                                context,
+                                feeName: fee.title,
+                                onConfirm: () {
+                                  setState(() {
+                                    _instituteFees.removeAt(index);
+                                  });
+                                },
+                              );
+                            },
+                          ),
+                        );
+                      },
+                    ),
+                    const Text(
+                      "Class Specific Fee",
+                      style: TextStyle(fontSize: 18),
+                    ),
+                    const SizedBox(
+                      height: 16,
+                    ),
+                    ListView.builder(
+                      shrinkWrap: true,
+                      physics: const NeverScrollableScrollPhysics(),
+                      itemCount: _classFees.length,
+                      itemBuilder: (context, index) {
+                        final fee = _classFees[index];
+                        return Padding(
+                          padding: const EdgeInsets.only(bottom: 16.0),
+                          child: CustomSpecificContainerBox(
+                              heading: fee.heading,
+                              subHeading: fee.subHeading,
+                              isOptional: fee.isOptional,
+                              details: fee.details,
+                              fee: fee.fee,
+                              onEdit: () async {
+                                final result = await Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (context) => EditFeePage(
+                                      feeName: fee.subHeading,
+                                      amount: fee.fee.toString(),
+                                      description: fee.details,
+                                      applyTo: "class",
+                                      isOptional: fee.isOptional == "Optional",
+                                    ),
+                                  ),
+                                );
+                                if (result != null) {
+                                  setState(() {
+                                    _classFees[index] = ClassFee(
+                                      heading: fee.heading,
+                                      subHeading: result['feeName'],
+                                      isOptional: result['isOptional']
+                                          ? "Optional"
+                                          : "Mandatory",
+                                      details: result['description'],
+                                      fee: int.parse(result['amount']),
+                                    );
+                                  });
+                                }
+                              },
+                              onDelete: () {
+                                showDeleteFeeDialog(
+                                  context,
+                                  feeName: fee.subHeading,
+                                  onConfirm: () {
+                                    setState(() {
+                                      _classFees.removeAt(index);
+                                    });
+                                  },
+                                );
+                              }),
+                        );
+                      },
+                    ),
+                  ],
+                ),
               ),
-              SizedBox(
-                height: 16,
-              ),
-              CustomInstituteContainerBox(
-                title: "Annual Tuition Fee",
-                mandatoryOrOptional: "Mandatory",
-                detail: "Standard annual fee for all academic programs",
-                amount: 75000,
-              ),
-              SizedBox(
-                height: 16,
-              ),
-              CustomInstituteContainerBox(
-                  title: "Sports Facility Fee",
-                  mandatoryOrOptional: "Optional",
-                  detail: "Standard annual fee for all academic programs",
-                  amount: 3000),
-              SizedBox(
-                height: 16,
-              ),
-              Text(
-                "Class Specific Fee",
-                style: TextStyle(fontSize: 18),
-              ),
-              SizedBox(
-                height: 16,
-              ),
-              CustomSpecificContainerBox(
-                  heading: "Class: 10th Grade",
-                  subHeading: "Lab Fee",
-                  isOptional: "Mandatory",
-                  details: "Mandatory for all science stream students in 10th grade.",
-                  fee: 4000
-              ),
-              SizedBox(
-                height: 16,
-              ),
-              CustomSpecificContainerBox(heading: "Class: 5th Grade",
-                  subHeading: "Art Supplies Fee",
-                  isOptional: "Optional",
-                  details: "Provides all necessary art supplies for the year long art class.",
-                  fee: 4000),
-              SizedBox(
-                height: 16,
-              ),
-
-            ],
-          ),
-        ),
-      ),
+            ),
     );
   }
 }
 
-void showDeleteDialog(BuildContext context) {
+void showDeleteFeeDialog(BuildContext context, {required String feeName, required VoidCallback onConfirm}) {
   showGeneralDialog(
     context: context,
     barrierDismissible: true,
@@ -116,19 +279,22 @@ void showDeleteDialog(BuildContext context) {
     barrierColor: const Color.fromRGBO(0, 0, 0, 0.6),
     transitionDuration: const Duration(milliseconds: 200),
     pageBuilder: (_, __, ___) {
-      return const DeleteManagerDialog(
-        managerName: "Rajeev K.Malhotra",
+      return DeleteFeeDialog(
+        feeName: feeName,
+        onConfirm: onConfirm,
       );
     },
   );
 }
 
-class DeleteManagerDialog extends StatelessWidget {
-  final String managerName;
+class DeleteFeeDialog extends StatelessWidget {
+  final String feeName;
+  final VoidCallback onConfirm;
 
-  const DeleteManagerDialog({
+  const DeleteFeeDialog({
     super.key,
-    required this.managerName,
+    required this.feeName,
+    required this.onConfirm,
   });
 
   @override
@@ -156,7 +322,7 @@ class DeleteManagerDialog extends StatelessWidget {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   const Text(
-                    "Delete Event",
+                    "Delete Fee",
                     style: TextStyle(
                       fontSize: 20,
                       fontWeight: FontWeight.bold,
@@ -167,7 +333,7 @@ class DeleteManagerDialog extends StatelessWidget {
                   const SizedBox(height: 12),
 
                   Text(
-                    "Are you sure you want to delete this section "
+                    "Are you sure you want to delete \"$feeName\"? "
                     "This action cannot be undone.",
                     textAlign: TextAlign.center,
                     style: TextStyle(
@@ -191,7 +357,7 @@ class DeleteManagerDialog extends StatelessWidget {
                       ),
                       onPressed: () {
                         Navigator.pop(context);
-                        // 🔥 delete logic here
+                        onConfirm();
                       },
                       child: const Text(
                         "Yes, Delete",
@@ -232,11 +398,13 @@ class DeleteManagerDialog extends StatelessWidget {
   }
 }
 
-class CustomInstituteContainerBox extends StatefulWidget {
+class CustomInstituteContainerBox extends StatelessWidget {
   final String title;
   final String mandatoryOrOptional;
   final int amount;
   final String detail;
+  final VoidCallback onEdit;
+  final VoidCallback onDelete;
 
   const CustomInstituteContainerBox({
     super.key,
@@ -244,17 +412,14 @@ class CustomInstituteContainerBox extends StatefulWidget {
     required this.mandatoryOrOptional,
     required this.detail,
     required this.amount,
+    required this.onEdit,
+    required this.onDelete,
   });
 
   @override
-  State<CustomInstituteContainerBox> createState() => _CustomInstituteContainerBoxState();
-}
-
-class _CustomInstituteContainerBoxState extends State<CustomInstituteContainerBox> {
-  @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final isMandatory = widget.mandatoryOrOptional == "Mandatory";
+    final isMandatory = mandatoryOrOptional == "Mandatory";
 
     return Container(
       decoration: BoxDecoration(
@@ -269,9 +434,9 @@ class _CustomInstituteContainerBoxState extends State<CustomInstituteContainerBo
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text(widget.title,
-                    style:
-                        TextStyle(color: theme.colorScheme.onPrimary, fontSize: 20)),
+                Text(title,
+                    style: TextStyle(
+                        color: theme.colorScheme.onPrimary, fontSize: 20)),
                 Container(
                     decoration: BoxDecoration(
                       color: isMandatory
@@ -280,10 +445,12 @@ class _CustomInstituteContainerBoxState extends State<CustomInstituteContainerBo
                       borderRadius: BorderRadius.circular(10),
                     ),
                     child: Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 8, vertical: 4),
                       child: Text(
-                        widget.mandatoryOrOptional,
-                        style: const TextStyle(color: Colors.white, fontSize: 12),
+                        mandatoryOrOptional,
+                        style:
+                            const TextStyle(color: Colors.white, fontSize: 12),
                       ),
                     ))
               ],
@@ -295,13 +462,12 @@ class _CustomInstituteContainerBoxState extends State<CustomInstituteContainerBo
                   size: 16,
                   color: Colors.blue,
                 ),
-                Text(widget.amount.toString(),
+                Text(amount.toString(),
                     style: const TextStyle(color: Colors.blue, fontSize: 14)),
               ],
             ),
             const SizedBox(height: 8),
-            Text(widget.detail,
-                style: const TextStyle(color: Colors.grey, fontSize: 14)),
+            Text(detail, style: const TextStyle(color: Colors.grey, fontSize: 14)),
             Divider(
               color: theme.colorScheme.onPrimary.withAlpha(180),
               thickness: 1,
@@ -312,9 +478,7 @@ class _CustomInstituteContainerBoxState extends State<CustomInstituteContainerBo
                 SizedBox(
                   width: 150,
                   child: ElevatedButton(
-                    onPressed: () {
-                      Navigator.push(context, MaterialPageRoute(builder: (context)=>EditFeePage()));
-                    },
+                    onPressed: onEdit,
                     style: ElevatedButton.styleFrom(
                         backgroundColor: Colors.blue.withAlpha(45)),
                     child: const Row(
@@ -328,7 +492,8 @@ class _CustomInstituteContainerBoxState extends State<CustomInstituteContainerBo
                           width: 5,
                         ),
                         Text("Edit",
-                            style: TextStyle(color: Colors.blue, fontSize: 20)),
+                            style:
+                                TextStyle(color: Colors.blue, fontSize: 20)),
                       ],
                     ),
                   ),
@@ -337,7 +502,7 @@ class _CustomInstituteContainerBoxState extends State<CustomInstituteContainerBo
                 SizedBox(
                   width: 150,
                   child: ElevatedButton(
-                    onPressed: () => showDeleteDialog(context),
+                    onPressed: onDelete,
                     style: ElevatedButton.styleFrom(
                         backgroundColor: Colors.red.withAlpha(45)),
                     child: const Row(
@@ -354,7 +519,8 @@ class _CustomInstituteContainerBoxState extends State<CustomInstituteContainerBo
                             ),
                             Text(
                               "Delete",
-                              style: TextStyle(color: Colors.red, fontSize: 20),
+                              style:
+                                  TextStyle(color: Colors.red, fontSize: 20),
                             ),
                           ],
                         ),
@@ -371,12 +537,14 @@ class _CustomInstituteContainerBoxState extends State<CustomInstituteContainerBo
   }
 }
 
-class CustomSpecificContainerBox extends StatefulWidget {
+class CustomSpecificContainerBox extends StatelessWidget {
   final String heading;
   final String subHeading;
   final String isOptional;
   final int fee;
   final String details;
+  final VoidCallback onEdit;
+  final VoidCallback onDelete;
 
   const CustomSpecificContainerBox({
     super.key,
@@ -385,17 +553,14 @@ class CustomSpecificContainerBox extends StatefulWidget {
     required this.isOptional,
     required this.details,
     required this.fee,
+    required this.onEdit,
+    required this.onDelete,
   });
 
   @override
-  State<CustomSpecificContainerBox> createState() => _CustomSpecificContainerBoxState();
-}
-
-class _CustomSpecificContainerBoxState extends State<CustomSpecificContainerBox> {
-  @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final isMandatory = widget.isOptional == "Mandatory";
+    final isMandatory = isOptional == "Mandatory";
 
     return Container(
       decoration: BoxDecoration(
@@ -410,9 +575,10 @@ class _CustomSpecificContainerBoxState extends State<CustomSpecificContainerBox>
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text(widget.heading,
-                    style:
-                    TextStyle(color: theme.colorScheme.onPrimary.withAlpha(150), fontSize: 14)),
+                Text(heading,
+                    style: TextStyle(
+                        color: theme.colorScheme.onPrimary.withAlpha(150),
+                        fontSize: 14)),
                 Container(
                     decoration: BoxDecoration(
                       color: isMandatory
@@ -421,18 +587,22 @@ class _CustomSpecificContainerBoxState extends State<CustomSpecificContainerBox>
                       borderRadius: BorderRadius.circular(10),
                     ),
                     child: Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 8, vertical: 4),
                       child: Text(
-                        widget.isOptional,
-                        style: const TextStyle(color: Colors.white, fontSize: 12),
+                        isOptional,
+                        style:
+                            const TextStyle(color: Colors.white, fontSize: 12),
                       ),
                     ))
               ],
             ),
-            Text(widget.subHeading,
-                style:
-                TextStyle(color: theme.colorScheme.onPrimary, fontSize: 20)),
-            SizedBox(height: 5,),
+            Text(subHeading,
+                style: TextStyle(
+                    color: theme.colorScheme.onPrimary, fontSize: 20)),
+            const SizedBox(
+              height: 5,
+            ),
             Row(
               children: [
                 const Icon(
@@ -440,13 +610,12 @@ class _CustomSpecificContainerBoxState extends State<CustomSpecificContainerBox>
                   size: 16,
                   color: Colors.blue,
                 ),
-                Text(widget.fee.toString(),
+                Text(fee.toString(),
                     style: const TextStyle(color: Colors.blue, fontSize: 14)),
               ],
             ),
             const SizedBox(height: 8),
-            Text(widget.details,
-                style: const TextStyle(color: Colors.grey, fontSize: 14)),
+            Text(details, style: const TextStyle(color: Colors.grey, fontSize: 14)),
             Divider(
               color: theme.colorScheme.onPrimary.withAlpha(180),
               thickness: 1,
@@ -457,9 +626,7 @@ class _CustomSpecificContainerBoxState extends State<CustomSpecificContainerBox>
                 SizedBox(
                   width: 150,
                   child: ElevatedButton(
-                    onPressed: () {
-                      Navigator.push(context, MaterialPageRoute(builder: (context)=>EditFeePage()));
-                    },
+                    onPressed: onEdit,
                     style: ElevatedButton.styleFrom(
                         backgroundColor: Colors.blue.withAlpha(45)),
                     child: const Row(
@@ -473,7 +640,8 @@ class _CustomSpecificContainerBoxState extends State<CustomSpecificContainerBox>
                           width: 5,
                         ),
                         Text("Edit",
-                            style: TextStyle(color: Colors.blue, fontSize: 20)),
+                            style:
+                                TextStyle(color: Colors.blue, fontSize: 20)),
                       ],
                     ),
                   ),
@@ -482,7 +650,7 @@ class _CustomSpecificContainerBoxState extends State<CustomSpecificContainerBox>
                 SizedBox(
                   width: 150,
                   child: ElevatedButton(
-                    onPressed: () => showDeleteDialog(context),
+                    onPressed: onDelete,
                     style: ElevatedButton.styleFrom(
                         backgroundColor: Colors.red.withAlpha(45)),
                     child: const Row(
@@ -499,7 +667,8 @@ class _CustomSpecificContainerBoxState extends State<CustomSpecificContainerBox>
                             ),
                             Text(
                               "Delete",
-                              style: TextStyle(color: Colors.red, fontSize: 20),
+                              style:
+                                  TextStyle(color: Colors.red, fontSize: 20),
                             ),
                           ],
                         ),
@@ -515,4 +684,3 @@ class _CustomSpecificContainerBoxState extends State<CustomSpecificContainerBox>
     );
   }
 }
-

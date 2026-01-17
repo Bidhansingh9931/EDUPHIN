@@ -6,7 +6,7 @@ import 'package:flutter/material.dart';
 import 'add_new_fine.dart';
 
 class FeeDetailsPage extends StatefulWidget {
-  const FeeDetailsPage({super.key});
+  const FeeDetailsPage({super.key, required String studentName, required String studentDetails});
 
   @override
   State<StatefulWidget> createState() => _FeeDetailsPageState();

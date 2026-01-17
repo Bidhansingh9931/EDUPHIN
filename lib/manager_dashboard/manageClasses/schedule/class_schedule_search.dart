@@ -4,23 +4,27 @@ import 'searchSchedule/daily_class_schedule.dart';
 
 // import 'add_new_schedule.dart';
 
-class ClassScheduleSearchPage extends StatefulWidget{
+class ClassScheduleSearchPage extends StatefulWidget {
   const ClassScheduleSearchPage({super.key});
 
   @override
   State<StatefulWidget> createState() => _ClassScheduleSearchPageState();
 }
 
-class _ClassScheduleSearchPageState extends State<ClassScheduleSearchPage>{
+class _ClassScheduleSearchPageState extends State<ClassScheduleSearchPage> {
   final TextEditingController _selectDateController = TextEditingController();
 
-  bool classSelected = false;
-  bool sectionSelected = false;
+  bool _isLoading = true;
+  String? _selectedClass;
+  String? _selectedSection;
+  List<String> _classList = [];
+  List<String> _sectionList = [];
 
 
   @override
   void initState() {
     super.initState();
+    _fetchDropdownData();
   }
 
   @override
@@ -28,6 +32,31 @@ class _ClassScheduleSearchPageState extends State<ClassScheduleSearchPage>{
     _selectDateController.dispose();
     super.dispose();
   }
+
+  Future<void> _fetchDropdownData() async {
+    // Simulate API call to fetch dropdown data.
+    // Replace this with your actual API call.
+    await Future.delayed(const Duration(seconds: 2));
+
+    final List<String> fetchedClasses = [
+      "Class 1",
+      "Class 2",
+      "Class 3",
+      "Class 4"
+    ];
+    final List<String> fetchedSections = ["A", "B", "C", "D"];
+
+    if (mounted) {
+      setState(() {
+        _classList = fetchedClasses;
+        _sectionList = fetchedSections;
+        _selectedClass = fetchedClasses.isNotEmpty ? fetchedClasses.first : null;
+        _selectedSection = fetchedSections.isNotEmpty ? fetchedSections.first : null;
+        _isLoading = false;
+      });
+    }
+  }
+
 
   Future<void> selectDate(
       BuildContext context,
@@ -46,10 +75,9 @@ class _ClassScheduleSearchPageState extends State<ClassScheduleSearchPage>{
       "${pickedDate.day}-${pickedDate.month}-${pickedDate.year}";
     }
   }
+
   @override
   Widget build(BuildContext context) {
-    var selectedSubject = "Class 1";
-    var selectedSection = "A";
     final theme = Theme.of(context);
     return Scaffold(
       backgroundColor: theme.scaffoldBackgroundColor,
@@ -58,8 +86,10 @@ class _ClassScheduleSearchPageState extends State<ClassScheduleSearchPage>{
         centerTitle: true,
       ),
       body: Padding(
-        padding: const EdgeInsets.fromLTRB(16,16,16,115),
-        child: SingleChildScrollView(
+        padding: const EdgeInsets.fromLTRB(16, 16, 16, 115),
+        child: _isLoading
+            ? const Center(child: CircularProgressIndicator())
+            : SingleChildScrollView(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -78,22 +108,14 @@ class _ClassScheduleSearchPageState extends State<ClassScheduleSearchPage>{
                         ),
                         const SizedBox(height: 8),
                         DropDownBox(
-                          key: ValueKey(selectedSubject),
-                          initialValue: selectedSubject,
-                          items: const [
-                            "Class 1",
-                            "Class 2",
-                            "Class 3",
-                            "Class 4"
-                          ],
+                          value: _selectedClass,
+                          items: _classList,
                           onChanged: (value) {
-                            if (value != null) {
-                              setState(() {
-                                selectedSubject = value;
-                              });
-                            }
+                            setState(() {
+                              _selectedClass = value;
+                            });
                           },
-                          hintText: "--Select Subject",
+                          hintText: "--Select Class",
                         ),
                       ],
                     ),
@@ -111,15 +133,12 @@ class _ClassScheduleSearchPageState extends State<ClassScheduleSearchPage>{
                         ),
                         const SizedBox(height: 8),
                         DropDownBox(
-                          key: ValueKey(selectedSection),
-                          initialValue: selectedSection,
-                          items: const ["A", "B", "C", "D"],
+                          value: _selectedSection,
+                          items: _sectionList,
                           onChanged: (value) {
-                            if (value != null) {
-                              setState(() {
-                                selectedSection = value;
-                              });
-                            }
+                            setState(() {
+                              _selectedSection = value;
+                            });
                           },
                           hintText: "--Select Section",
                         ),
@@ -153,20 +172,34 @@ class _ClassScheduleSearchPageState extends State<ClassScheduleSearchPage>{
         ),
       ),
       bottomNavigationBar: Padding(
-        padding: const EdgeInsets.only(bottom: 60),
+        padding: const EdgeInsets.only(bottom: 60, left: 16, right: 16),
         child: SizedBox(
           width: double.infinity,
           height: 50,
-          child: ElevatedButton(onPressed: (){
-            Navigator.push(
-              context,
-              MaterialPageRoute(builder: (context) => const DailyClassSchedulePage()),
-            );
+          child: ElevatedButton(onPressed: () {
+            if (_selectedClass != null &&
+                _selectedSection != null &&
+                _selectDateController.text.isNotEmpty) {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                    builder: (context) => const DailyClassSchedulePage(
+                      // You'll need to update DailyClassSchedulePage to accept these parameters
+                      // e.g. DailyClassSchedulePage(className: _selectedClass!, section: _selectedSection!, date: _selectDateController.text)
+                    )),
+              );
+            } else {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                    content: Text('Please select class, section, and date.')),
+              );
+            }
           },
               style: ElevatedButton.styleFrom(
                 backgroundColor: Colors.blue,
               ),
-              child: Text("Search",style: TextStyle(color: Colors.white,fontSize: 20),)),
+              child: Text("Search",
+                  style: TextStyle(color: Colors.white, fontSize: 20))),
         ),
       ),
     );
@@ -175,14 +208,14 @@ class _ClassScheduleSearchPageState extends State<ClassScheduleSearchPage>{
 }
 
 class DropDownBox extends StatelessWidget {
-  final String initialValue;
+  final String? value;
   final List<String> items;
   final ValueChanged<String?> onChanged;
   final String? hintText;
 
   const DropDownBox({
     super.key,
-    required this.initialValue,
+    required this.value,
     required this.items,
     required this.onChanged,
     this.hintText,
@@ -190,10 +223,11 @@ class DropDownBox extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return DropdownButtonFormField(
-        initialValue: initialValue,
+    return DropdownButtonFormField<String>(
+        value: value,
         isExpanded: true,
-        items: items.map((e) => DropdownMenuItem(value: e, child: Text(e))).toList(),
+        items:
+        items.map((e) => DropdownMenuItem(value: e, child: Text(e))).toList(),
         onChanged: onChanged,
         decoration: InputDecoration(
           hintText: hintText,

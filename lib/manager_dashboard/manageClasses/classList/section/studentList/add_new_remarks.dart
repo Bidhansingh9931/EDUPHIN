@@ -1,212 +1,164 @@
 import 'package:flutter/material.dart';
 
-class AddNewRemarksPage extends StatefulWidget{
+class AddNewRemarksPage extends StatefulWidget {
   const AddNewRemarksPage({super.key});
 
   @override
-  State<StatefulWidget> createState() => _AddNewRemarksPageState();
+  State<AddNewRemarksPage> createState() => _AddNewRemarksPageState();
 }
 
 class _AddNewRemarksPageState extends State<AddNewRemarksPage> {
-  final TextEditingController _startDateController = TextEditingController();
-  final TextEditingController _endDateController = TextEditingController();
+  String? _selectedRemarkType = 'Positive';
+  final _descriptionController = TextEditingController();
+  final _fromDateController = TextEditingController();
+  final _toDateController = TextEditingController();
+  bool _isLoading = false;
 
-  bool positive = false;
-  bool negative = false;
-  
+  Future<void> _addRemark() async {
+    if (_selectedRemarkType == null ||
+        _descriptionController.text.isEmpty ||
+        _fromDateController.text.isEmpty ||
+        _toDateController.text.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please fill all fields.')),
+      );
+      return;
+    }
 
-  @override
-  void initState() {
-    super.initState();
+    setState(() {
+      _isLoading = true;
+    });
+
+    // Simulate API call
+    await Future.delayed(const Duration(seconds: 2));
+
+    final remarkData = {
+      'type': _selectedRemarkType,
+      'description': _descriptionController.text,
+      'from_date': _fromDateController.text,
+      'to_date': _toDateController.text,
+    };
+
+    print('Adding remark: $remarkData');
+
+    if (mounted) {
+      setState(() {
+        _isLoading = false;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Remark added successfully!')),
+      );
+      Navigator.of(context).pop();
+    }
   }
 
   @override
   void dispose() {
-    _startDateController.dispose();
-    _endDateController.dispose();
+    _descriptionController.dispose();
+    _fromDateController.dispose();
+    _toDateController.dispose();
     super.dispose();
   }
 
-  Future<void> selectDate(
-      BuildContext context,
-      TextEditingController controller,
-      ) async {
-    DateTime? pickedDate = await showDatePicker(
-      context: context,
-      initialDate: DateTime.now(),
-      firstDate: DateTime(2000),
-      lastDate: DateTime(2100),
-    );
 
-    if (pickedDate != null) {
-      if (!context.mounted) return;
-      controller.text =
-      "${pickedDate.day}-${pickedDate.month}-${pickedDate.year}";
-    }
-  }
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     return Scaffold(
-      backgroundColor: theme.scaffoldBackgroundColor,
       appBar: AppBar(
-        title: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Expanded(child: Text("Add New Remarks")),
-            IconButton(onPressed: (){
-            }, icon: Icon(Icons.more_vert_sharp)),
-          ],
-        ),
+        title: const Text("Add New Remark"),
       ),
       body: Padding(
-        padding: const EdgeInsets.fromLTRB(16,16,16,50),
+        padding: const EdgeInsets.all(16.0),
         child: SingleChildScrollView(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Row(
-                children: [
-                  customCheckbox(
-                    "Positive",
-                    positive,
-                        (val) {
-                      setState(() {
-                        positive = val!;
-                      });
-                    },
-                  ),
-                  Spacer(),
-                  SizedBox(width: 16),
-                  customCheckbox(
-                    "Negative",
-                    negative,
-                        (val) {
-                      setState(() {
-                        negative = val!;
-                      });
-                    },
-                  ),
-                ],
+              const Text("Remark Type"),
+              const SizedBox(height: 8),
+              DropdownButtonFormField<String>(
+                value: _selectedRemarkType,
+                items: ['Positive', 'Negative'].map((String value) {
+                  return DropdownMenuItem<String>(
+                    value: value,
+                    child: Text(value),
+                  );
+                }).toList(),
+                onChanged: (newValue) {
+                  setState(() {
+                    _selectedRemarkType = newValue;
+                  });
+                },
+                decoration: const InputDecoration(
+                  border: OutlineInputBorder(),
+                ),
               ),
               const SizedBox(height: 16),
-              Text("Remarks"),
+              const Text("Description"),
               const SizedBox(height: 8),
               TextField(
+                controller: _descriptionController,
                 maxLines: 5,
-                decoration: InputDecoration(
-                  hintText: "Enter remark Description",
-                  hintStyle:
-                  theme.textTheme.bodyMedium?.copyWith(color: theme.hintColor),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  filled: true,
-                  fillColor: theme.primaryColor,
+                decoration: const InputDecoration(
+                  hintText: "Enter remark description...",
+                  border: OutlineInputBorder(),
                 ),
               ),
               const SizedBox(height: 16),
-              Text("From Date"),
+              const Text("From Date"),
               const SizedBox(height: 8),
               TextField(
-                controller: _startDateController,
+                controller: _fromDateController,
                 readOnly: true,
-                onTap: () => selectDate(context, _startDateController),
-                decoration: InputDecoration(
-                  prefixIcon: Icon(Icons.calendar_month,
-                      color: theme.colorScheme.onPrimary),
-                  filled: true,
-                  fillColor: theme.primaryColor,
-                  hintText: "Select start Date",
-                  hintStyle:
-                  theme.textTheme.bodyMedium?.copyWith(color: theme.hintColor),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
+                onTap: () => _selectDate(context, _fromDateController),
+                decoration: const InputDecoration(
+                  hintText: "Select From Date",
+                  border: OutlineInputBorder(),
+                  suffixIcon: Icon(Icons.calendar_today),
                 ),
               ),
               const SizedBox(height: 16),
-              Text("To Date"),
+              const Text("To Date"),
               const SizedBox(height: 8),
               TextField(
-                controller: _endDateController,
+                controller: _toDateController,
                 readOnly: true,
-                onTap: () => selectDate(context, _endDateController),
-                decoration: InputDecoration(
-                  prefixIcon: Icon(Icons.calendar_month,
-                      color: theme.colorScheme.onPrimary),
-                  filled: true,
-                  fillColor: theme.primaryColor,
-                  hintText: "Select end Date",
-                  hintStyle:
-                  theme.textTheme.bodyMedium?.copyWith(color: theme.hintColor),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
+                onTap: () => _selectDate(context, _toDateController),
+                decoration: const InputDecoration(
+                  hintText: "Select To Date",
+                  border: OutlineInputBorder(),
+                  suffixIcon: Icon(Icons.calendar_today),
                 ),
               ),
-              const SizedBox(height: 36),
-              Row(
-                children: [
-                  SizedBox(
-                    width: 150,
-                    height: 50,
-                    child: ElevatedButton(onPressed: (){},
-                      style: ElevatedButton.styleFrom(
-                          backgroundColor: theme.colorScheme.surface,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          )
-                      ),
-                      child: Text("Cancel",style: TextStyle(color: Colors.white,fontSize: 20),),
-                    ),
-                  ),
-                  Spacer(),
-                  SizedBox(
-                    width: 150,
-                    height: 50,
-                    child: ElevatedButton(onPressed: (){},
-                      style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.blue.shade900,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          )
-                      ),
-                      child: Text("Submit",style: TextStyle(color: Colors.white,fontSize: 20),),
-                    ),
-                  ),
-                ],
+              const SizedBox(height: 24),
+              SizedBox(
+                width: double.infinity,
+                height: 50,
+                child: ElevatedButton(
+                  onPressed: _isLoading ? null : _addRemark,
+                  child: _isLoading
+                      ? const CircularProgressIndicator(valueColor: AlwaysStoppedAnimation<Color>(Colors.white))
+                      : const Text("Add Remark"),
+                ),
               ),
             ],
           ),
         ),
       ),
-
     );
   }
-}
 
-
-Widget customCheckbox(String title, bool value, Function(bool?) onChanged) {
-  return Container(
-    height: 60,
-    width: 170,
-    padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 10),
-    decoration: BoxDecoration(
-      color: const Color(0xFF1C2530),
-      border: Border.all(color: Colors.grey),
-      borderRadius: BorderRadius.circular(10),
-    ),
-    child: Row(
-      children: [
-        Checkbox(
-          value: value,
-          activeColor: Colors.blue,
-          onChanged: onChanged,
-        ),
-        Expanded(
-            child: Text(title, style: const TextStyle(color: Colors.white))),
-      ],
-    ),
-  );
+  Future<void> _selectDate(BuildContext context, TextEditingController controller) async {
+    final DateTime? picked = await showDatePicker(
+      context: context,
+      initialDate: DateTime.now(),
+      firstDate: DateTime(2000),
+      lastDate: DateTime(2101),
+    );
+    if (picked != null) {
+      setState(() {
+        controller.text = "${picked.day}-${picked.month}-${picked.year}";
+      });
+    }
+  }
 }

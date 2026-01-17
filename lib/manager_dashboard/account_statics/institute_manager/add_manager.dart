@@ -165,7 +165,7 @@ class _AddManagerPageState extends State<AddManagerPage> {
             _manager = formData.manager;
             return SingleChildScrollView(
               child: Padding(
-                padding: const EdgeInsets.all(16.0),
+                padding: const EdgeInsets.fromLTRB(16,16,16,50),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
