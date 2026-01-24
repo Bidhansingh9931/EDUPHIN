@@ -64,7 +64,8 @@ class _StudentFeeDetailsPageState extends State<StudentFeeDetailsPage> {
         centerTitle: true,
       ),
       body: Padding(
-        padding: const EdgeInsets.fromLTRB(16, 16, 16, 100),
+        // Changed bottom padding to 50 as requested
+        padding: const EdgeInsets.fromLTRB(16, 16, 16, 50),
         child: Column(
           children: [
             Row(
@@ -75,8 +76,8 @@ class _StudentFeeDetailsPageState extends State<StudentFeeDetailsPage> {
                     children: [
                       Text(
                         "Class",
-                        style: TextStyle(
-                            fontSize: 16, color: theme.colorScheme.onPrimary),
+                        // Using theme for scalable font
+                        style: theme.textTheme.titleMedium,
                       ),
                       const SizedBox(height: 8),
                       DropDownBox(
@@ -115,8 +116,8 @@ class _StudentFeeDetailsPageState extends State<StudentFeeDetailsPage> {
                     children: [
                       Text(
                         "Section",
-                        style: TextStyle(
-                            fontSize: 16, color: theme.colorScheme.onPrimary),
+                        // Using theme for scalable font
+                        style: theme.textTheme.titleMedium,
                       ),
                       const SizedBox(height: 8),
                       DropDownBox(
@@ -148,19 +149,47 @@ class _StudentFeeDetailsPageState extends State<StudentFeeDetailsPage> {
               height: 16,
             ),
             Expanded(
-              child: ListView.builder(
-                itemCount: _studentFeeDetails.length,
-                itemBuilder: (context, index) {
-                  final student = _studentFeeDetails[index];
-                  return Padding(
-                    padding: const EdgeInsets.only(bottom: 16.0),
-                    child: CustomStudentInfoFeeDetailContainerBox(
-                      heading: student.name,
-                      subHeading: "Reg. No: ${student.regNo}, Class: ${student.className}",
-                      isActive: student.status,
-                      imageUrl: student.imageUrl,
-                    ),
-                  );
+              // Using LayoutBuilder for responsive list/grid
+              child: LayoutBuilder(
+                builder: (context, constraints) {
+                  if (constraints.maxWidth > 600) {
+                    // Use GridView for wider screens
+                    return GridView.builder(
+                      gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
+                          maxCrossAxisExtent: 500, // Max width for each item
+                          mainAxisSpacing: 16,
+                          crossAxisSpacing: 16,
+                          childAspectRatio: 2.5, // Adjust for content
+                      ),
+                      itemCount: _studentFeeDetails.length,
+                      itemBuilder: (context, index) {
+                        final student = _studentFeeDetails[index];
+                        return CustomStudentInfoFeeDetailContainerBox(
+                          heading: student.name,
+                          subHeading: "Reg. No: ${student.regNo}, Class: ${student.className}",
+                          isActive: student.status,
+                          imageUrl: student.imageUrl,
+                        );
+                      },
+                    );
+                  } else {
+                    // Use ListView for narrower screens
+                    return ListView.builder(
+                      itemCount: _studentFeeDetails.length,
+                      itemBuilder: (context, index) {
+                        final student = _studentFeeDetails[index];
+                        return Padding(
+                          padding: const EdgeInsets.only(bottom: 16.0),
+                          child: CustomStudentInfoFeeDetailContainerBox(
+                            heading: student.name,
+                            subHeading: "Reg. No: ${student.regNo}, Class: ${student.className}",
+                            isActive: student.status,
+                            imageUrl: student.imageUrl,
+                          ),
+                        );
+                      },
+                    );
+                  }
                 },
               ),
             ),
@@ -187,6 +216,7 @@ class DropDownBox extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     return DropdownButtonFormField(
         initialValue: initialValue,
         isExpanded: true,
@@ -195,8 +225,18 @@ class DropDownBox extends StatelessWidget {
         onChanged: onChanged,
         decoration: InputDecoration(
           hintText: hintText,
+          contentPadding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
           border: OutlineInputBorder(
             borderRadius: BorderRadius.circular(10.0),
+            borderSide: BorderSide(color: theme.dividerColor),
+          ),
+           enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(10.0),
+            borderSide: BorderSide(color: theme.dividerColor),
+          ),
+          focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(10.0),
+            borderSide: BorderSide(color: theme.colorScheme.primary, width: 2),
           ),
         ));
   }
@@ -226,86 +266,86 @@ class CustomStudentInfoFeeDetailContainerBox extends StatelessWidget {
         borderRadius: BorderRadius.circular(10),
         color: theme.primaryColor,
       ),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                ClipRRect(
-                    borderRadius: BorderRadius.circular(40),
-                    child: Image(
-                      image: AssetImage(imageUrl),
-                      height: 50,
-                      width: 50,
-                    )),
-                const SizedBox(
-                  width: 10,
-                ),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(heading,
-                          style: TextStyle(
-                              color: theme.colorScheme.onPrimary,
-                              fontSize: 20)),
-                      Text(subHeading,
-                          style: TextStyle(
-                              color: theme.colorScheme.onPrimary.withAlpha(150),
-                              fontSize: 14)),
-                    ],
-                  ),
-                ),
-                Container(
-                    decoration: BoxDecoration(
-                      color: isActiveStatus
-                          ? Colors.green.withAlpha(700)
-                          : Colors.red.withAlpha(700),
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 8, vertical: 4),
-                      child: Text(
-                        isActive,
-                        style:
-                            const TextStyle(color: Colors.white, fontSize: 14),
-                      ),
-                    ))
-              ],
-            ),
-            const SizedBox(
-              height: 8,
-            ),
-            SizedBox(
-              width: double.infinity,
-              height: 30,
-              child: ElevatedButton(
-                  onPressed: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                          builder: (context) => FeeDetailsPage(
-                            studentName: heading,
-                            studentDetails: subHeading
-                          ),
-                    ));
-                  },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.blue.shade700,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(30),
-                    ),
-                  ),
-                  child: const Text(
-                    "Fee Details",
-                    style: TextStyle(color: Colors.white, fontSize: 16),
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisAlignment: MainAxisAlignment.center, // Center content vertically
+        children: [
+          Row(
+            children: [
+              ClipRRect(
+                  borderRadius: BorderRadius.circular(40),
+                  child: Image(
+                    image: AssetImage(imageUrl),
+                    height: 50,
+                    width: 50,
+                    fit: BoxFit.cover,
                   )),
-            ),
-          ],
-        ),
+              const SizedBox(
+                width: 10,
+              ),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(heading,
+                        style: theme.textTheme.titleLarge?.copyWith(
+                            color: theme.colorScheme.onPrimary)),
+                    Text(subHeading,
+                        style: theme.textTheme.bodyMedium?.copyWith(
+                            color: theme.colorScheme.onPrimary.withAlpha(150))),
+                  ],
+                ),
+              ),
+              Container(
+                  decoration: BoxDecoration(
+                    color: isActiveStatus
+                        ? Colors.green
+                        : Colors.red,
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 8, vertical: 4),
+                    child: Text(
+                      isActive,
+                      style:
+                          theme.textTheme.labelMedium?.copyWith(color: Colors.white, fontWeight: FontWeight.bold),
+                    ),
+                  ))
+            ],
+          ),
+          const SizedBox(
+            height: 8,
+          ),
+          SizedBox(
+            width: double.infinity,
+            // Removed fixed height to make button responsive
+            child: ElevatedButton(
+                onPressed: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                        builder: (context) => FeeDetailsPage(
+                          studentName: heading,
+                          studentDetails: subHeading
+                        ),
+                  ));
+                },
+                style: ElevatedButton.styleFrom(
+                  // Using theme color for button
+                  backgroundColor: theme.colorScheme.secondary,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(30),
+                  ),
+                ),
+                child: Text(
+                  "Fee Details",
+                  // Using theme for scalable font
+                  style: theme.textTheme.labelLarge?.copyWith(color: theme.colorScheme.onSecondary),
+                )),
+          ),
+        ],
       ),
     );
   }

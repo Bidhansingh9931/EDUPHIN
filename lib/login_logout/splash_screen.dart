@@ -1,7 +1,8 @@
 import 'dart:math';
 import 'package:eduphin/login_logout/login.dart';
-import 'package:eduphin/moderator_dashboard/moderator_dashboard.dart';
+import 'package:eduphin/services/api_service.dart';
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -73,16 +74,16 @@ class _SplashScreenState extends State<SplashScreen>
   }
 
   Future<void> _checkAuthStatusAndNavigate() async {
-    // In a real app, you would check for a token, user session, etc.
-    // For this example, we'll simulate a check that finds no logged-in user.
-    bool isLoggedIn = false; // Change to true to test the logged-in flow
+    final prefs = await SharedPreferences.getInstance();
+    // Check for a login flag. Defaults to false if not found.
+    final bool isLoggedIn = prefs.getBool('isLoggedIn') ?? false;
 
     if (mounted) {
       if (isLoggedIn) {
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(
-              builder: (context) => const ModeratorDashboardPage()),
+              builder: (context) => const BackendUIPage(screen: "moderator_dashboard")),
         );
       } else {
         Navigator.pushReplacement(

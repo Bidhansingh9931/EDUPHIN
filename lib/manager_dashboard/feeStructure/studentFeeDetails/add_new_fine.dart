@@ -1,13 +1,14 @@
 import 'package:flutter/material.dart';
 
-class AddNewFine extends StatefulWidget{
+class AddNewFine extends StatefulWidget {
   const AddNewFine({super.key});
 
   @override
   State<StatefulWidget> createState() => _AddNewFineState();
 }
 
-class _AddNewFineState extends State<AddNewFine>{
+class _AddNewFineState extends State<AddNewFine> {
+  final _formKey = GlobalKey<FormState>();
   late final TextEditingController _reasonController;
   late final TextEditingController _amountController;
   late final TextEditingController _remarksController;
@@ -28,6 +29,17 @@ class _AddNewFineState extends State<AddNewFine>{
     super.dispose();
   }
 
+  void _saveFine() {
+    if (_formKey.currentState!.validate()) {
+      final result = {
+        'reason': _reasonController.text,
+        'amount': _amountController.text,
+        'remarks': _remarksController.text,
+      };
+      Navigator.pop(context, result);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -37,112 +49,141 @@ class _AddNewFineState extends State<AddNewFine>{
         centerTitle: true,
       ),
       backgroundColor: theme.scaffoldBackgroundColor,
-      body: Padding(
-        padding: const EdgeInsets.fromLTRB(16.0, 16.0, 16.0, 16.0),
-        child: SingleChildScrollView(
-          child: Column(
-            children: [
-              Container(
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(10),
-                    color: theme.primaryColor,
-                  ),
-                  child: Padding(
-                    padding: const EdgeInsets.all(16,),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text("Reason",style: TextStyle(fontSize: 16,color: theme.colorScheme.onPrimary),),
-                        const SizedBox(height: 8,),
-                        TextField(
-                          controller: _reasonController,
-                          decoration: InputDecoration(
-                            hintText: "e.g., Late Fee Payment",
-                            hintStyle: TextStyle(color: Colors.grey.shade700),
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(10),
-                            ),
-                          ),
-                        ),
-                        const SizedBox(height: 16,),
-                        Text("Amount",style: TextStyle(fontSize: 16,color: theme.colorScheme.onPrimary),),
-                        const SizedBox(height: 8,),
-                        TextField(
-                          controller: _amountController,
-                          keyboardType: TextInputType.number,
-                          decoration: InputDecoration(
-                            hintText: "200",
-                            hintStyle: TextStyle(color: Colors.grey.shade700),
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(10),
-                            ),
-                          ),
-                        ),
-                        const SizedBox(height: 16,),
-                        Text("Remarks",style: TextStyle(fontSize: 16,color: theme.colorScheme.onPrimary),),
-                        const SizedBox(height: 8,),
-                        TextField(
-                          controller: _remarksController,
-                          maxLines: 3,
-                          decoration: InputDecoration(
-                            hintText: "Add any additional remarks",
-                            hintStyle: TextStyle(color: Colors.grey.shade700),
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(10),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  )
-              ),
-            ],
-          ),
-        ),
-      ),
-      bottomNavigationBar: Padding(
-        padding: const EdgeInsets.fromLTRB(16,16,16,55),
+      floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
+      floatingActionButton: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16.0),
         child: Row(
           children: [
             Expanded(
-              child: SizedBox(
-                height: 50,
-                child: ElevatedButton(onPressed: (){
-                  Navigator.pop(context);
-                },
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.red.withAlpha(40),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                    ),
-                    child: const Text("Cancel",style: TextStyle(color: Colors.red,fontSize: 16),)),
+              child: OutlinedButton(
+                onPressed: () => Navigator.pop(context),
+                style: OutlinedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  side: BorderSide(color: theme.dividerColor),
+                ),
+                child: Text("Cancel", style: theme.textTheme.labelLarge?.copyWith(color: theme.colorScheme.onSurface)),
               ),
             ),
-            const SizedBox(width: 16,),
+            const SizedBox(width: 16),
             Expanded(
-              child: SizedBox(
-                height: 50,
-                child: ElevatedButton(onPressed: (){
-                  final result = {
-                    'reason': _reasonController.text,
-                    'amount': _amountController.text,
-                    'remarks': _remarksController.text,
-                  };
-                  Navigator.pop(context, result);
-                },
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.blue.withAlpha(40),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                    ),
-                    child: const Text("Save",style: TextStyle(color: Colors.blue,fontSize: 16),)),
+              child: ElevatedButton(
+                onPressed: _saveFine,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: theme.colorScheme.primary,
+                  foregroundColor: theme.colorScheme.onPrimary,
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+                child: Text("Save", style: theme.textTheme.labelLarge?.copyWith(color: theme.colorScheme.onPrimary)),
               ),
             ),
           ],
         ),
       ),
+      body: Padding(
+        padding: const EdgeInsets.fromLTRB(16.0, 16.0, 16.0, 50.0),
+        child: Form(
+          key: _formKey,
+          child: SingleChildScrollView(
+            child: Container(
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(10),
+                color: theme.primaryColor,
+              ),
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _buildTextField(
+                    theme: theme,
+                    label: "Reason",
+                    controller: _reasonController,
+                    hint: "e.g., Late Fee Payment",
+                    validator: (value) => value!.isEmpty ? "Reason cannot be empty" : null,
+                  ),
+                  const SizedBox(height: 16),
+                  _buildTextField(
+                    theme: theme,
+                    label: "Amount",
+                    controller: _amountController,
+                    hint: "200",
+                    keyboardType: TextInputType.number,
+                    validator: (value) => value!.isEmpty ? "Amount cannot be empty" : null,
+                  ),
+                  const SizedBox(height: 16),
+                  _buildTextField(
+                    theme: theme,
+                    label: "Remarks",
+                    controller: _remarksController,
+                    hint: "Add any additional remarks",
+                    maxLines: 3,
+                  ),
+                   const SizedBox(height: 80), // Padding for FAB
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildTextField({
+    required ThemeData theme,
+    required String label,
+    required TextEditingController controller,
+    String? hint,
+    int maxLines = 1,
+    TextInputType? keyboardType,
+    String? Function(String?)? validator,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: theme.textTheme.titleMedium?.copyWith(color: theme.colorScheme.onPrimary),
+        ),
+        const SizedBox(height: 8),
+        TextFormField(
+          controller: controller,
+          validator: validator,
+          maxLines: maxLines,
+          keyboardType: keyboardType,
+          style: theme.textTheme.bodyLarge?.copyWith(color: theme.colorScheme.onSurface),
+          decoration: InputDecoration(
+            hintText: hint,
+            hintStyle: TextStyle(color: theme.hintColor),
+            filled: true,
+            fillColor: theme.scaffoldBackgroundColor,
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(10),
+              borderSide: BorderSide.none,
+            ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(10),
+              borderSide: BorderSide.none,
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(10),
+              borderSide: BorderSide(color: theme.colorScheme.primary, width: 2),
+            ),
+            errorBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(10),
+              borderSide: BorderSide(color: theme.colorScheme.error, width: 1),
+            ),
+            focusedErrorBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(10),
+              borderSide: BorderSide(color: theme.colorScheme.error, width: 2),
+            ),
+          ),
+        ),
+      ],
     );
   }
 }

@@ -76,45 +76,56 @@ class _SubjectListPageState extends State<SubjectListPage> {
     final theme = Theme.of(context);
     return Scaffold(
       backgroundColor: theme.scaffoldBackgroundColor,
-      floatingActionButton: Padding(
-        padding: const EdgeInsets.only(left: 32),
-        child: SizedBox(
-          height: 50,
-          width: double.infinity,
-          child: FloatingActionButton(
-            onPressed: () {
-              Navigator.push(context,
-                  MaterialPageRoute(builder: (context) => const CreateNewSubjectPage()));
-            },
-            backgroundColor: theme.primaryColor,
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: const [
-                Icon(Icons.add),
-                SizedBox(width: 5),
-                Text("Create New Subject"),
-              ],
-            ),
-          ),
-        ),
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: () {
+          Navigator.push(
+              context, MaterialPageRoute(builder: (context) => const CreateNewSubjectPage()));
+        },
+        label: const Text("Create New Subject"),
+        icon: const Icon(Icons.add),
       ),
+      floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
       appBar: AppBar(
         title: const Text("Subject List"),
         centerTitle: true,
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
-          : Padding(
-              padding: const EdgeInsets.fromLTRB(16, 16, 16, 80),
-              child: ListView.separated(
-                itemCount: _subjects.length,
-                separatorBuilder: (context, index) => const SizedBox(height: 16),
-                itemBuilder: (context, index) {
-                  final subject = _subjects[index];
-                  return SubjectCard(subject: subject);
-                },
-              ),
+          : LayoutBuilder(
+              builder: (context, constraints) {
+                final bool isWide = constraints.maxWidth > 600;
+                return isWide ? _buildGridView() : _buildListView();
+              },
             ),
+    );
+  }
+
+  Widget _buildListView() {
+    return ListView.separated(
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 80), // Padding for FAB
+      itemCount: _subjects.length,
+      separatorBuilder: (context, index) => const SizedBox(height: 16),
+      itemBuilder: (context, index) {
+        final subject = _subjects[index];
+        return SubjectCard(subject: subject);
+      },
+    );
+  }
+
+  Widget _buildGridView() {
+    return GridView.builder(
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 80), // Padding for FAB
+      itemCount: _subjects.length,
+      gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
+        maxCrossAxisExtent: 500,
+        mainAxisSpacing: 16,
+        crossAxisSpacing: 16,
+        childAspectRatio: 1.5, // Adjust aspect ratio as needed
+      ),
+      itemBuilder: (context, index) {
+        final subject = _subjects[index];
+        return SubjectCard(subject: subject);
+      },
     );
   }
 }
@@ -128,125 +139,98 @@ class SubjectCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final statusColor = subject.isActive ? Colors.green : Colors.red;
+    final statusColor = subject.isActive ? Colors.green.shade600 : Colors.red.shade500;
     final statusText = subject.isActive ? "Active" : "Inactive";
 
     return Container(
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(10),
-        color: theme.primaryColor,
+        borderRadius: BorderRadius.circular(12),
+        color: theme.colorScheme.surface,
       ),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Expanded(
-                  child: Text(
-                    subject.name,
-                    style: TextStyle(
-                        color: theme.colorScheme.onPrimary, fontSize: 20),
-                    overflow: TextOverflow.ellipsis,
-                  ),
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: Text(subject.name,
+                    style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold)),
+              ),
+              const SizedBox(width: 8),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(8),
+                  color: statusColor.withOpacity(0.1),
                 ),
-                Container(
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(10),
-                    color: theme.colorScheme.onPrimary.withAlpha(25),
+                child: Text(statusText,
+                    style: theme.textTheme.labelMedium?.copyWith(color: statusColor, fontWeight: FontWeight.bold)),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Text(subject.description, style: theme.textTheme.bodyMedium?.copyWith(color: theme.hintColor)),
+          const SizedBox(height: 12),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              _buildInfoColumn(theme, "Subject Code", subject.code),
+              _buildInfoColumn(theme, "Credit", subject.credit, crossAxisAlignment: CrossAxisAlignment.center),
+              _buildInfoColumn(theme, "Type", subject.type, crossAxisAlignment: CrossAxisAlignment.end),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Divider(color: theme.dividerColor, thickness: 1),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              Expanded(
+                child: ElevatedButton.icon(
+                  onPressed: () {
+                    Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          // Passing data to the edit page
+                            builder: (context) => UpdateSubjectPage(subject: subject)));
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: theme.colorScheme.primaryContainer,
+                    foregroundColor: theme.colorScheme.onPrimaryContainer,
                   ),
-                  child: Padding(
-                    padding: const EdgeInsets.all(3),
-                    child: Text(statusText,
-                        style: TextStyle(color: statusColor, fontSize: 16)),
-                  ),
-                )
-              ],
-            ),
-            Text(subject.description,
-                style: TextStyle(
-                    color: theme.colorScheme.onPrimary.withAlpha(180),
-                    fontSize: 14)),
-            const SizedBox(height: 8),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: const [
-                Text("Subject Code",
-                    style: TextStyle(color: Colors.grey, fontSize: 14)),
-                Text("Credit",
-                    style: TextStyle(color: Colors.grey, fontSize: 14)),
-                Text("Type",
-                    style: TextStyle(color: Colors.grey, fontSize: 14)),
-              ],
-            ),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(subject.code,
-                    style: TextStyle(
-                        color: theme.colorScheme.onPrimary.withAlpha(180),
-                        fontSize: 14)),
-                Text(subject.credit,
-                    style: TextStyle(
-                        color: theme.colorScheme.onPrimary.withAlpha(180),
-                        fontSize: 14)),
-                Text(subject.type,
-                    style: TextStyle(
-                        color: theme.colorScheme.onPrimary.withAlpha(180),
-                        fontSize: 14)),
-              ],
-            ),
-            Divider(
-              color: theme.colorScheme.onPrimary.withAlpha(180),
-              thickness: 1,
-            ),
-            Row(
-              children: [
-                Expanded(
-                  child: ElevatedButton(
-                    onPressed: () {
-                      Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                              builder: (context) => const UpdateSubjectPage()));
-                    },
-                    style:
-                        ElevatedButton.styleFrom(backgroundColor: Colors.blue.withAlpha(45)),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: const [
-                        Icon(Icons.edit, color: Colors.blue, size: 20),
-                        SizedBox(width: 5),
-                        Text("Edit",
-                            style: TextStyle(color: Colors.blue, fontSize: 20)),
-                      ],
-                    ),
-                  ),
+                  icon: const Icon(Icons.edit, size: 16),
+                  label: const Text("Edit"),
                 ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: ElevatedButton(
-                    onPressed: () => showDeleteDialog(context, subject.name),
-                    style:
-                        ElevatedButton.styleFrom(backgroundColor: Colors.red.withAlpha(45)),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: const [
-                        Icon(Icons.delete, color: Colors.red, size: 20),
-                        SizedBox(width: 3),
-                        Text("Delete",
-                            style: TextStyle(color: Colors.red, fontSize: 20)),
-                      ],
-                    ),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: ElevatedButton.icon(
+                  onPressed: () => showDeleteDialog(context, subject.name),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: theme.colorScheme.errorContainer,
+                    foregroundColor: theme.colorScheme.onErrorContainer,
                   ),
+                  icon: const Icon(Icons.delete, size: 16),
+                  label: const Text("Delete"),
                 ),
-              ],
-            ),
-          ],
-        ),
+              ),
+            ],
+          ),
+        ],
       ),
+    );
+  }
+
+  Widget _buildInfoColumn(ThemeData theme, String label, String value, {CrossAxisAlignment? crossAxisAlignment}) {
+    return Column(
+      crossAxisAlignment: crossAxisAlignment ?? CrossAxisAlignment.start,
+      children: [
+        Text(label, style: theme.textTheme.bodySmall?.copyWith(color: theme.hintColor)),
+        const SizedBox(height: 2),
+        Text(value, style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.bold)),
+      ],
     );
   }
 }
@@ -276,99 +260,69 @@ class DeleteSubjectDialog extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     return Scaffold(
       backgroundColor: Colors.transparent,
-      body: Stack(
-        children: [
-          // 🔹 Blur Background
-          BackdropFilter(
-            filter: ImageFilter.blur(sigmaX: 6, sigmaY: 6),
-            child: Container(color: Colors.transparent),
-          ),
-
-          // 🔹 Center Card
-          Center(
-            child: Container(
-              margin: const EdgeInsets.symmetric(horizontal: 24),
-              padding: const EdgeInsets.all(20),
-              decoration: BoxDecoration(
-                color: const Color(0xFF1F2937),
-                borderRadius: BorderRadius.circular(20),
-              ),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const Text(
-                    "Delete Subject",
-                    style: TextStyle(
-                      fontSize: 20,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.white,
-                    ),
-                  ),
-
-                  const SizedBox(height: 12),
-
-                  Text(
-                    "Are you sure you want to delete the subject: '$subjectName'? This action cannot be undone.",
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      color: Colors.grey.shade400,
-                      fontSize: 14,
-                    ),
-                  ),
-
-                  const SizedBox(height: 24),
-
-                  // 🔴 Delete Button
-                  SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton(
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFFC5392A),
-                        padding: const EdgeInsets.symmetric(vertical: 14),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                      ),
-                      onPressed: () {
-                        // Implement delete logic here
-                        Navigator.pop(context);
-                      },
-                      child: const Text(
-                        "Yes, Delete",
-                        style: TextStyle(fontSize: 16),
+      body: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 6, sigmaY: 6),
+        child: Center(
+          child: Container(
+            margin: const EdgeInsets.symmetric(horizontal: 24),
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              color: theme.cardColor,
+              borderRadius: BorderRadius.circular(20),
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text("Delete Subject", style: theme.textTheme.headlineSmall),
+                const SizedBox(height: 12),
+                Text(
+                  "Are you sure you want to delete the subject: '$subjectName'? This action cannot be undone.",
+                  textAlign: TextAlign.center,
+                  style: theme.textTheme.bodyMedium?.copyWith(color: theme.hintColor),
+                ),
+                const SizedBox(height: 24),
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: theme.colorScheme.error,
+                      foregroundColor: theme.colorScheme.onError,
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
                       ),
                     ),
+                    onPressed: () {
+                      // Implement delete logic here
+                      Navigator.pop(context);
+                    },
+                    child: const Text("Yes, Delete"),
                   ),
-
-                  const SizedBox(height: 12),
-
-                  // ⚪ Cancel Button
-                  SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton(
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF374151),
-                        padding: const EdgeInsets.symmetric(vertical: 14),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                      ),
-                      onPressed: () {
-                        Navigator.pop(context);
-                      },
-                      child: const Text(
-                        "Cancel",
-                        style: TextStyle(fontSize: 16),
+                ),
+                const SizedBox(height: 12),
+                SizedBox(
+                  width: double.infinity,
+                  child: OutlinedButton(
+                    style: OutlinedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      side: BorderSide(color: theme.dividerColor),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
                       ),
                     ),
+                    onPressed: () {
+                      Navigator.pop(context);
+                    },
+                    child: const Text("Cancel"),
                   ),
-                ],
-              ),
+                ),
+              ],
             ),
           ),
-        ],
+        ),
       ),
     );
   }

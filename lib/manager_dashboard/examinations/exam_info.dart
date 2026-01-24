@@ -1,5 +1,3 @@
-// import 'dart:ui';
-
 import 'package:eduphin/manager_dashboard/examinations/create_new_exam.dart';
 import 'package:eduphin/manager_dashboard/examinations/edit_exam.dart';
 import 'package:flutter/material.dart';
@@ -59,13 +57,14 @@ class _ExamInfoPageState extends State<ExamInfoPage> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     return Scaffold(
       floatingActionButton: Padding(
-        padding: const EdgeInsets.only(left: 32),
+        padding: const EdgeInsets.symmetric(horizontal: 16.0),
         child: SizedBox(
           height: 50,
           width: double.infinity,
-          child: FloatingActionButton(
+          child: FloatingActionButton.extended(
             onPressed: () {
               Navigator.push(
                   context,
@@ -73,47 +72,76 @@ class _ExamInfoPageState extends State<ExamInfoPage> {
                       builder: (context) => const CreateExamScreen()));
             },
             backgroundColor: Colors.blue.shade900,
-            child: const Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(
-                  Icons.add_circle_sharp,
-                ),
-                SizedBox(
-                  width: 5,
-                ),
-                Text(
-                  "Create New Exam",
-                  style: TextStyle(fontSize: 20),
-                ),
-              ],
+            label: Text(
+              "Create New Exam",
+              style: theme.textTheme.titleMedium
+                  ?.copyWith(color: theme.colorScheme.onPrimary),
+            ),
+            icon: const Icon(
+              Icons.add_circle_sharp,
             ),
           ),
         ),
       ),
-      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+      floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
+      backgroundColor: theme.scaffoldBackgroundColor,
       appBar: AppBar(
         title: const Text("Exam List"),
         centerTitle: true,
       ),
       body: Padding(
-        padding: const EdgeInsets.fromLTRB(16, 16, 16, 100),
-        child: ListView.separated(
-          itemCount: _exams.length,
-          separatorBuilder: (context, index) => const SizedBox(height: 16),
-          itemBuilder: (context, index) {
-            final exam = _exams[index];
-            return CustomExamListContainerBox(
-              heading: exam.heading,
-              subHeading: exam.subHeading,
-              type: exam.type,
-              examCode: exam.examCode,
-              isActive: exam.isActive,
-              startEndDate: exam.startEndDate,
-            );
+        padding: const EdgeInsets.fromLTRB(16, 16, 16, 50),
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            if (constraints.maxWidth < 600) {
+              return _buildListView();
+            } else {
+              return _buildGridView();
+            }
           },
         ),
       ),
+    );
+  }
+
+  Widget _buildListView() {
+    return ListView.separated(
+      itemCount: _exams.length,
+      separatorBuilder: (context, index) => const SizedBox(height: 16),
+      itemBuilder: (context, index) {
+        final exam = _exams[index];
+        return CustomExamListContainerBox(
+          heading: exam.heading,
+          subHeading: exam.subHeading,
+          type: exam.type,
+          examCode: exam.examCode,
+          isActive: exam.isActive,
+          startEndDate: exam.startEndDate,
+        );
+      },
+    );
+  }
+
+  Widget _buildGridView() {
+    return GridView.builder(
+      itemCount: _exams.length,
+      gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
+        maxCrossAxisExtent: 500,
+        mainAxisSpacing: 16,
+        crossAxisSpacing: 16,
+        childAspectRatio: 1.8, // Adjust this for best fit
+      ),
+      itemBuilder: (context, index) {
+        final exam = _exams[index];
+        return CustomExamListContainerBox(
+          heading: exam.heading,
+          subHeading: exam.subHeading,
+          type: exam.type,
+          examCode: exam.examCode,
+          isActive: exam.isActive,
+          startEndDate: exam.startEndDate,
+        );
+      },
     );
   }
 }
@@ -150,137 +178,155 @@ class CustomExamListContainerBox extends StatelessWidget {
         padding: const EdgeInsets.all(16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(heading,
-                    style: TextStyle(
-                        color: theme.colorScheme.onPrimary.withAlpha(150),
-                        fontSize: 14)),
-                Container(
-                    decoration: BoxDecoration(
-                      color: isActiveStatus ? Colors.green : Colors.blue.withAlpha(25),
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 8, vertical: 4),
-                      child: Text(
-                        isActive,
-                        style: const TextStyle(
-                            color: Colors.white60,
-                            fontSize: 12,
-                            fontWeight: FontWeight.bold),
-                      ),
-                    )),
-              ],
-            ),
-            Text(subHeading,
-                style:
-                    TextStyle(color: theme.colorScheme.onPrimary, fontSize: 20)),
-            const SizedBox(
-              height: 5,
-            ),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text("Type",
-                        style: TextStyle(
-                            color: theme.colorScheme.onPrimary.withAlpha(150),
-                            fontSize: 14)),
-                    Text(type,
-                        style: TextStyle(
-                            color: theme.colorScheme.onPrimary, fontSize: 14)),
-                  ],
-                ),
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text("Exam Code",
-                        style: TextStyle(
-                            color: theme.colorScheme.onPrimary.withAlpha(150),
-                            fontSize: 14)),
-                    Text(examCode,
-                        style: TextStyle(
-                            color: theme.colorScheme.onPrimary, fontSize: 14)),
-                  ],
-                ),
-              ],
-            ),
-            const SizedBox(
-              height: 5,
-            ),
             Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text("Start Date - End Date",
-                    style: TextStyle(
-                        color: theme.colorScheme.onPrimary.withAlpha(150),
-                        fontSize: 14)),
-                Text(startEndDate,
-                    style: const TextStyle(color: Colors.blue, fontSize: 14)),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(heading,
+                        style: theme.textTheme.bodyMedium?.copyWith(
+                            color: theme.colorScheme.onPrimary.withAlpha(150))),
+                    Container(
+                        decoration: BoxDecoration(
+                          color: isActiveStatus
+                              ? Colors.green
+                              : Colors.blue.withAlpha(25),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 8, vertical: 4),
+                          child: Text(
+                            isActive,
+                            style: theme.textTheme.labelSmall?.copyWith(
+                                color: Colors.white,
+                                fontWeight: FontWeight.bold),
+                          ),
+                        )),
+                  ],
+                ),
+                Text(subHeading,
+                    style: theme.textTheme.titleLarge
+                        ?.copyWith(color: theme.colorScheme.onPrimary)),
+                const SizedBox(
+                  height: 5,
+                ),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text("Type",
+                              style: theme.textTheme.bodyMedium?.copyWith(
+                                  color: theme.colorScheme.onPrimary
+                                      .withAlpha(150))),
+                          Text(type,
+                              style: theme.textTheme.bodyMedium?.copyWith(
+                                  color: theme.colorScheme.onPrimary)),
+                        ],
+                      ),
+                    ),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text("Exam Code",
+                              style: theme.textTheme.bodyMedium?.copyWith(
+                                  color: theme.colorScheme.onPrimary
+                                      .withAlpha(150))),
+                          Text(examCode,
+                              style: theme.textTheme.bodyMedium?.copyWith(
+                                  color: theme.colorScheme.onPrimary)),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(
+                  height: 5,
+                ),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text("Start Date - End Date",
+                        style: theme.textTheme.bodyMedium?.copyWith(
+                            color: theme.colorScheme.onPrimary
+                                .withAlpha(150))),
+                    Text(startEndDate,
+                        style: theme.textTheme.bodyMedium
+                            ?.copyWith(color: Colors.blue)),
+                  ],
+                ),
               ],
             ),
-            const SizedBox(height: 8),
-            Divider(
-              color: theme.colorScheme.onPrimary.withAlpha(180),
-              thickness: 1,
-            ),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            Column(
               children: [
-                ElevatedButton(
-                  onPressed: () {
-                    Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                            builder: (context) => EditExamPage(
-                                  // Assuming EditExamPage takes these parameters.
-                                  examName: subHeading,
-                                  examType: type,
-                                  examCode: examCode,
-                                  isActive: isActive == "Active",
-                                  startEndDate: startEndDate,
-                                )));
-                  },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.grey.withAlpha(55),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                  ),
-                  child: const Row(
-                    children: [
-                      Icon(
-                        Icons.edit,
-                        color: Colors.white,
-                        size: 20,
-                      ),
-                      SizedBox(
-                        width: 5,
-                      ),
-                      Text("Edit",
-                          style: TextStyle(color: Colors.white, fontSize: 20)),
-                    ],
-                  ),
+                const SizedBox(height: 8),
+                Divider(
+                  color: theme.colorScheme.onPrimary.withAlpha(180),
+                  thickness: 1,
                 ),
-                ElevatedButton(
-                  onPressed: () {},
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.blue.withAlpha(55),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(10),
+                Row(
+                  children: [
+                    Expanded(
+                      child: ElevatedButton.icon(
+                        onPressed: () {
+                          Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                  builder: (context) => EditExamPage(
+                                        examName: subHeading,
+                                        examType: type,
+                                        examCode: examCode,
+                                        isActive: isActive == "Active",
+                                        startEndDate: startEndDate,
+                                      )));
+                        },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.grey.withAlpha(55),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                        ),
+                        icon: const Icon(
+                          Icons.edit,
+                          color: Colors.white,
+                          size: 16,
+                        ),
+                        label: Text("Edit",
+                            style: theme.textTheme.labelLarge
+                                ?.copyWith(color: Colors.white)),
+                      ),
                     ),
-                  ),
-                  child: const Text(
-                    "Manage Schedule",
-                    style: TextStyle(color: Colors.white, fontSize: 20),
-                  ),
+                    const SizedBox(
+                      width: 8,
+                    ),
+                    Expanded(
+                      child: ElevatedButton(
+                        onPressed: () {},
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.blue.withAlpha(55),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                        ),
+                        child: Text(
+                          "Manage Schedule",
+                          textAlign: TextAlign.center,
+                          style: theme.textTheme.labelLarge
+                              ?.copyWith(color: Colors.white),
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ],
             ),

@@ -26,12 +26,21 @@ class _EventAttendeesState extends State<EventAttendees> {
   List<Attendee> _allAttendees = [];
   List<Attendee> _filteredAttendees = [];
   bool _isLoading = true;
+  final TextEditingController _searchController = TextEditingController();
 
   @override
   void initState() {
     super.initState();
     _fetchAttendees();
+    _searchController.addListener(_filterAttendees);
   }
+
+    @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
 
   Future<void> _fetchAttendees() async {
     // Simulate API call to fetch attendees.
@@ -58,13 +67,24 @@ class _EventAttendeesState extends State<EventAttendees> {
 
   void _filterAttendees() {
     setState(() {
-      if (_selectedFilter == "All") {
-        _filteredAttendees = _allAttendees;
-      } else {
-        _filteredAttendees = _allAttendees
+      List<Attendee> results = _allAttendees;
+
+      if (_selectedFilter != "All") {
+        results = results
             .where((attendee) => attendee.attendance == _selectedFilter)
             .toList();
       }
+
+      final String query = _searchController.text.toLowerCase();
+      if (query.isNotEmpty) {
+        results = results.where((attendee) {
+          return attendee.name.toLowerCase().contains(query) ||
+              attendee.email.toLowerCase().contains(query) ||
+              attendee.status.toLowerCase().contains(query);
+        }).toList();
+      }
+      
+      _filteredAttendees = results;
     });
   }
 
@@ -73,7 +93,7 @@ class _EventAttendeesState extends State<EventAttendees> {
     final theme = Theme.of(context);
     return Scaffold(
       appBar: AppBar(
-        title: Row(
+        title: const Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
             Text("Event Attendees"),
@@ -84,118 +104,152 @@ class _EventAttendeesState extends State<EventAttendees> {
       backgroundColor: theme.scaffoldBackgroundColor,
       body: Padding(
         padding: const EdgeInsets.fromLTRB(16, 16, 16, 50),
-        child: SingleChildScrollView(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text("Annual Sports Day"),
-              const SizedBox(height: 8),
-              SearchBar(
-                leading:
-                    Icon(Icons.search, color: theme.colorScheme.onSurface),
-                hintText: "Search for students, teachers...",
-                hintStyle: WidgetStateProperty.all(TextStyle(
-                  color: theme.hintColor,
-                )),
-                elevation: const WidgetStatePropertyAll(2),
-                backgroundColor: WidgetStatePropertyAll(theme.cardColor),
-                shape: WidgetStatePropertyAll(
-                  RoundedRectangleBorder(
-                    borderRadius: const BorderRadius.all(Radius.circular(30)),
-                    side: BorderSide(color: theme.dividerColor, width: 1),
-                  ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text("Annual Sports Day", style: theme.textTheme.headlineSmall),
+            const SizedBox(height: 8),
+            SearchBar(
+              controller: _searchController,
+              leading:
+                  Icon(Icons.search, color: theme.colorScheme.onSurface),
+              hintText: "Search for students, teachers...",
+              hintStyle: WidgetStateProperty.all(TextStyle(
+                color: theme.hintColor,
+              )),
+              elevation: const WidgetStatePropertyAll(2),
+              backgroundColor: WidgetStatePropertyAll(theme.cardColor),
+              shape: WidgetStatePropertyAll(
+                RoundedRectangleBorder(
+                  borderRadius: const BorderRadius.all(Radius.circular(30)),
+                  side: BorderSide(color: theme.dividerColor, width: 1),
                 ),
               ),
-              const SizedBox(height: 16),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text("ATTENDEE LIST (${_allAttendees.length}) "),
-                  DropdownButton<String>(
-                    value: _selectedFilter,
-                    items: <String>["All", "Attended", "Not Attended"]
-                        .map((String value) {
-                      return DropdownMenuItem<String>(
-                        value: value,
-                        child: Text(value,
-                            style: TextStyle(color: Colors.blueAccent)),
-                      );
-                    }).toList(),
-                    onChanged: (String? newValue) {
-                      setState(() {
-                        _selectedFilter = newValue!;
-                        _filterAttendees();
-                      });
-                    },
-                  ),
-                ],
-              ),
-              Divider(
-                color: theme.dividerColor,
-                thickness: 2,
-              ),
-              _isLoading
+            ),
+            const SizedBox(height: 16),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Expanded(child: Text("ATTENDEE LIST (${_filteredAttendees.length})", style: theme.textTheme.titleMedium)),
+                DropdownButton<String>(
+                  value: _selectedFilter,
+                  underline: const SizedBox.shrink(),
+                  items: <String>["All", "Attended", "Not Attended"]
+                      .map((String value) {
+                    return DropdownMenuItem<String>(
+                      value: value,
+                      child: Text(value),
+                    );
+                  }).toList(),
+                  onChanged: (String? newValue) {
+                    setState(() {
+                      _selectedFilter = newValue!;
+                      _filterAttendees();
+                    });
+                  },
+                ),
+              ],
+            ),
+            Divider(
+              color: theme.dividerColor,
+              thickness: 2,
+            ),
+            Expanded(
+              child: _isLoading
                   ? const Center(child: CircularProgressIndicator())
-                  : ListView.separated(
-                      shrinkWrap: true,
-                      physics: const NeverScrollableScrollPhysics(),
-                      itemBuilder: (context, index) {
-                        final attendee = _filteredAttendees[index];
-                        final isAttended = attendee.attendance == 'Attended';
-                        return ListTile(
-                          title: Text(
-                            attendee.name,
-                            style: TextStyle(color: Colors.white, fontSize: 16),
-                          ),
-                          subtitle: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                attendee.email,
-                                style: TextStyle(
-                                    color:
-                                        theme.colorScheme.onSurface.withAlpha(180),
-                                    fontSize: 14),
-                              ),
-                              const SizedBox(height: 4),
-                              Text(
-                                attendee.status,
-                                style: TextStyle(
-                                    color:
-                                        theme.colorScheme.onSurface.withAlpha(180),
-                                    fontSize: 14),
-                              )
-                            ],
-                          ),
-                          trailing: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Text(
-                                attendee.attendance,
-                                style: TextStyle(
-                                    color: isAttended
-                                        ? Colors.green
-                                        : Colors.red,
-                                    fontSize: 14),
-                              ),
-                              const SizedBox(width: 8),
-                              Icon(
-                                isAttended
-                                    ? Icons.check_circle_outline
-                                    : Icons.cancel_outlined,
-                                color: isAttended ? Colors.green : Colors.red,
-                                size: 16,
-                              ),
-                            ],
-                          ),
-                        );
+                  : LayoutBuilder(
+                      builder: (context, constraints) {
+                        if (constraints.maxWidth < 600) {
+                          return _buildAttendeeList();
+                        } else {
+                          return _buildAttendeeGrid();
+                        }
                       },
-                      separatorBuilder: (context, index) =>
-                          Divider(color: theme.dividerColor, thickness: 1),
-                      itemCount: _filteredAttendees.length),
-            ],
-          ),
+                    ),
+            ),
+          ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildAttendeeList() {
+    return ListView.separated(
+        itemBuilder: (context, index) {
+          final attendee = _filteredAttendees[index];
+          return _buildAttendeeTile(attendee);
+        },
+        separatorBuilder: (context, index) =>
+            Divider(color: Theme.of(context).dividerColor, thickness: 1),
+        itemCount: _filteredAttendees.length);
+  }
+
+  Widget _buildAttendeeGrid() {
+    return GridView.builder(
+      gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
+        maxCrossAxisExtent: 400, // Each item will have a maximum width of 400
+        mainAxisSpacing: 16,
+        crossAxisSpacing: 16,
+        childAspectRatio: 3, // Adjust aspect ratio for better layout
+      ),
+      itemCount: _filteredAttendees.length,
+      itemBuilder: (context, index) {
+        final attendee = _filteredAttendees[index];
+        return Card(
+            elevation: 2,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            child: _buildAttendeeTile(attendee)
+        );
+      },
+    );
+  }
+
+  Widget _buildAttendeeTile(Attendee attendee) {
+    final theme = Theme.of(context);
+    final isAttended = attendee.attendance == 'Attended';
+    final statusColor = isAttended ? Colors.green : Colors.red;
+
+    return ListTile(
+      title: Text(
+        attendee.name,
+        style: theme.textTheme.titleMedium,
+      ),
+      subtitle: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const SizedBox(height: 4),
+          Text(
+            attendee.email,
+            style: theme.textTheme.bodyMedium?.copyWith(
+              color: theme.colorScheme.onSurface.withAlpha(180),
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            attendee.status,
+            style: theme.textTheme.bodyMedium?.copyWith(
+              color: theme.colorScheme.onSurface.withAlpha(180),
+            ),
+          )
+        ],
+      ),
+      trailing: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            attendee.attendance,
+            style: theme.textTheme.bodyMedium?.copyWith(color: statusColor),
+          ),
+          const SizedBox(width: 8),
+          Icon(
+            isAttended
+                ? Icons.check_circle_outline
+                : Icons.cancel_outlined,
+            color: statusColor,
+            size: 16,
+          ),
+        ],
       ),
     );
   }

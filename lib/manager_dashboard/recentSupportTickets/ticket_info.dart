@@ -138,12 +138,13 @@ class _TicketInfoPageState extends State<TicketInfoPage> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     return Scaffold(
-      backgroundColor: const Color(0xFF0F1A24),
+      backgroundColor: theme.scaffoldBackgroundColor,
       appBar: AppBar(
-        backgroundColor: const Color(0xFF0F1A24),
+        backgroundColor: theme.scaffoldBackgroundColor,
         elevation: 0,
-        leading: const Icon(Icons.arrow_back),
+        leading: BackButton(color: theme.colorScheme.onSurface),
         title: const Text(
           "Recent Support Tickets",
           style: TextStyle(fontWeight: FontWeight.w600),
@@ -157,17 +158,49 @@ class _TicketInfoPageState extends State<TicketInfoPage> {
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
-          : ListView.separated(
-              padding: const EdgeInsets.fromLTRB(16, 16, 16, 50),
-              itemCount: _tickets.length,
-              itemBuilder: (context, index) {
-                return TicketCard(
-                  key: ValueKey(_tickets[index].serial), // Use a unique key
-                  ticket: _tickets[index],
-                );
-              },
-              separatorBuilder: (context, index) => const SizedBox(height: 16),
-            ),
+          // Use LayoutBuilder for responsive UI
+          : LayoutBuilder(builder: (context, constraints) {
+              if (constraints.maxWidth > 700) {
+                // Use GridView for wider screens
+                return _buildGridView();
+              } else {
+                // Use ListView for narrower screens
+                return _buildListView();
+              }
+            }),
+    );
+  }
+
+  Widget _buildListView() {
+    return ListView.separated(
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 50),
+      itemCount: _tickets.length,
+      itemBuilder: (context, index) {
+        return TicketCard(
+          key: ValueKey(_tickets[index].serial), // Use a unique key
+          ticket: _tickets[index],
+        );
+      },
+      separatorBuilder: (context, index) => const SizedBox(height: 16),
+    );
+  }
+
+  Widget _buildGridView() {
+    return GridView.builder(
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 50),
+      itemCount: _tickets.length,
+      gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
+        maxCrossAxisExtent: 600, // Adjust as needed
+        mainAxisSpacing: 16,
+        crossAxisSpacing: 16,
+        childAspectRatio: 1.8, // Adjust for content
+      ),
+      itemBuilder: (context, index) {
+        return TicketCard(
+          key: ValueKey(_tickets[index].serial), // Use a unique key
+          ticket: _tickets[index],
+        );
+      },
     );
   }
 }
@@ -202,7 +235,7 @@ class _TicketCardState extends State<TicketCard> {
       case TicketPriority.high:
         return Colors.redAccent;
       case TicketPriority.medium:
-        return Colors.amber;
+        return Colors.amber.shade700;
       case TicketPriority.low:
         return Colors.lightBlueAccent;
     }
@@ -210,71 +243,68 @@ class _TicketCardState extends State<TicketCard> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: const Color(0xFF1C2A3A),
+        color: theme.colorScheme.surface,
         borderRadius: BorderRadius.circular(16),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _rowText("Serial No.", widget.ticket.serial, "Issued By",
+          _rowText(theme, "Serial No.", widget.ticket.serial, "Issued By",
               widget.ticket.issuedBy),
           const SizedBox(height: 12),
-          const Text("Title", style: TextStyle(color: Colors.grey)),
+          Text("Title", style: TextStyle(color: theme.hintColor)),
           const SizedBox(height: 4),
-          Text(widget.ticket.title, style: const TextStyle(fontSize: 16)),
+          Text(widget.ticket.title, style: theme.textTheme.titleMedium),
           const SizedBox(height: 12),
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              _priorityChip(),
-              _columnText("Category", widget.ticket.category),
+              _priorityChip(theme),
+              _columnText(theme, "Category", widget.ticket.category),
             ],
           ),
           const SizedBox(height: 12),
-          const Text("Assigned to", style: TextStyle(color: Colors.grey)),
+          Text("Assigned to", style: TextStyle(color: theme.hintColor)),
           const SizedBox(height: 6),
           Row(
             children:
-                widget.ticket.assignedUsers.map((e) => _avatar(e)).toList(),
+                widget.ticket.assignedUsers.map((e) => _avatar(theme, e)).toList(),
           ),
           const SizedBox(height: 12),
-          const Text("Created At", style: TextStyle(color: Colors.grey)),
+          Text("Created At", style: TextStyle(color: theme.hintColor)),
           const SizedBox(height: 4),
           Text(widget.ticket.createdAt),
           const Divider(height: 32),
           Row(
             children: [
               _actionButton(
-                "Change Status",
-                () => _openStatusBottomSheet(context),
+                theme,
+                text: "Change Status",
+                onTap: () => _openStatusBottomSheet(context),
+                isPrimary: false,
               ),
               const SizedBox(width: 10),
               _actionButton(
-                "Set Priority",
-                () => _openPriorityBottomSheet(context),
+                theme,
+                text: "Set Priority",
+                onTap: () => _openPriorityBottomSheet(context),
+                isPrimary: false,
               ),
               const SizedBox(width: 10),
-              Expanded(
-                child: ElevatedButton(
-                  onPressed: () {
-                    Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                            builder: (context) => const TicketDetailsPage()));
-                  },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.blue,
-                    padding: const EdgeInsets.symmetric(vertical: 16),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                  ),
-                  child: const Text("View",
-                      style: TextStyle(color: Colors.white)),
-                ),
+              _actionButton(
+                theme,
+                text: "View",
+                onTap: () {
+                   Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                          builder: (context) => const TicketDetailsPage()));
+                },
+                isPrimary: true,
               ),
             ],
           ),
@@ -290,13 +320,13 @@ class _TicketCardState extends State<TicketCard> {
     _showSheet(
       context: context,
       title: "Change Ticket Status",
-      content: Column(
+      contentBuilder: (modalStateSetter) => Column(
         children: TicketStatus.values
             .map((status) => _radioTile<TicketStatus>(
                   status.displayName,
                   status,
                   tempSelection,
-                  (v) => setState(() => tempSelection = v),
+                  (v) => modalStateSetter(() => tempSelection = v!),
                 ))
             .toList(),
       ),
@@ -310,13 +340,13 @@ class _TicketCardState extends State<TicketCard> {
     _showSheet(
       context: context,
       title: "Set Ticket Priority",
-      content: Column(
+      contentBuilder: (modalStateSetter) => Column(
         children: TicketPriority.values
             .map((priority) => _radioTile<TicketPriority>(
                   priority.displayName,
                   priority,
                   tempSelection,
-                  (v) => setState(() => tempSelection = v),
+                  (v) => modalStateSetter(() => tempSelection = v!),
                 ))
             .toList(),
       ),
@@ -330,13 +360,14 @@ class _TicketCardState extends State<TicketCard> {
   void _showSheet({
     required BuildContext context,
     required String title,
-    required Widget content,
+    required Widget Function(StateSetter) contentBuilder,
     required String buttonText,
     required VoidCallback onConfirm,
   }) {
+    final theme = Theme.of(context);
     showModalBottomSheet(
       context: context,
-      backgroundColor: const Color(0xFF1C2A3A),
+      backgroundColor: theme.cardColor,
       isScrollControlled: true,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
@@ -347,11 +378,9 @@ class _TicketCardState extends State<TicketCard> {
             padding: EdgeInsets.fromLTRB(
                 16, 16, 16, MediaQuery.of(context).padding.bottom + 16),
             child: Column(mainAxisSize: MainAxisSize.min, children: [
-              Text(title,
-                  style: const TextStyle(
-                      fontSize: 18, fontWeight: FontWeight.w600)),
+              Text(title, style: theme.textTheme.headlineSmall),
               const SizedBox(height: 16),
-              content,
+              contentBuilder(setModalState),
               const SizedBox(height: 20),
               SizedBox(
                 width: double.infinity,
@@ -361,13 +390,12 @@ class _TicketCardState extends State<TicketCard> {
                     Navigator.pop(context);
                   },
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.blue,
+                    backgroundColor: theme.colorScheme.primary,
                     padding: const EdgeInsets.symmetric(vertical: 14),
                     shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(14)),
                   ),
-                  child: Text(buttonText,
-                      style: const TextStyle(color: Colors.white)),
+                  child: Text(buttonText,style: TextStyle(color: Colors.white,fontWeight: FontWeight.bold,fontSize: 16),),
                 ),
               ),
             ]),
@@ -378,40 +406,57 @@ class _TicketCardState extends State<TicketCard> {
   }
 
   Widget _radioTile<T>(
-      String text, T value, T groupValue, ValueChanged<T> onChanged) {
+      String text, T value, T groupValue, ValueChanged<T?> onChanged) {
+    final theme = Theme.of(context);
     return Container(
       margin: const EdgeInsets.only(bottom: 10),
       decoration: BoxDecoration(
-        color: const Color(0xFF243447),
+        color: theme.colorScheme.surface,
         borderRadius: BorderRadius.circular(12),
       ),
-      child: RadioListTile<T>(
-        value: value,
-        groupValue: groupValue,
-        onChanged: (v) => onChanged(v as T),
-        title: Text(text),
-        activeColor: Colors.blue,
-        controlAffinity: ListTileControlAffinity.trailing,
+       child: InkWell(
+        onTap: () {
+          if (value != groupValue) {
+            onChanged(value);
+          }
+        },
+        borderRadius: BorderRadius.circular(12),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          child: Row(
+            children: [
+              Expanded(
+                child: Text(text, style: theme.textTheme.bodyLarge),
+              ),
+              Radio<T>(
+                value: value,
+                groupValue: groupValue,
+                onChanged: onChanged,
+                activeColor: theme.colorScheme.primary,
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
 
-  Widget _rowText(String l1, String v1, String l2, String v2) {
+  Widget _rowText(ThemeData theme, String l1, String v1, String l2, String v2) {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [_columnText(l1, v1), _columnText(l2, v2)],
+      children: [_columnText(theme, l1, v1), _columnText(theme, l2, v2)],
     );
   }
 
-  Widget _columnText(String label, String value) {
+  Widget _columnText(ThemeData theme, String label, String value) {
     return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      Text(label, style: const TextStyle(color: Colors.grey)),
+      Text(label, style: TextStyle(color: theme.hintColor)),
       const SizedBox(height: 4),
-      Text(value),
+      Text(value, style: theme.textTheme.bodyLarge),
     ]);
   }
 
-  Widget _priorityChip() {
+  Widget _priorityChip(ThemeData theme) {
     final color = _getPriorityColor(_selectedPriority);
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
@@ -420,37 +465,41 @@ class _TicketCardState extends State<TicketCard> {
         borderRadius: BorderRadius.circular(20),
       ),
       child: Text(_selectedPriority.displayName,
-          style: TextStyle(color: color, fontWeight: FontWeight.w600)),
+          style: theme.textTheme.labelLarge?.copyWith(color: color, fontWeight: FontWeight.w600)),
     );
   }
 
-  Widget _avatar(String text) {
+  Widget _avatar(ThemeData theme, String text) {
     return Container(
       margin: const EdgeInsets.only(right: 6),
       width: 40,
       height: 40,
-      decoration: const BoxDecoration(
-        color: Colors.blueAccent,
+      decoration: BoxDecoration(
+        color: theme.colorScheme.secondary,
         shape: BoxShape.circle,
       ),
       alignment: Alignment.center,
-      child: Text(text, style: const TextStyle(fontWeight: FontWeight.bold)),
+      child: Text(text, style: theme.textTheme.labelLarge?.copyWith(color: theme.colorScheme.onSecondary, fontWeight: FontWeight.bold)),
     );
   }
 
-  Widget _actionButton(String text, VoidCallback onTap) {
+  Widget _actionButton(ThemeData theme, {required String text, required VoidCallback onTap, required bool isPrimary}) {
+    final Color textColor = isPrimary ? theme.colorScheme.onPrimary : theme.colorScheme.onSecondaryContainer;
     return Expanded(
       child: ElevatedButton(
         onPressed: onTap,
         style: ElevatedButton.styleFrom(
-          backgroundColor: Colors.blue.withAlpha(55),
+          backgroundColor: isPrimary ? theme.colorScheme.primary : theme.colorScheme.secondaryContainer,
+          foregroundColor: isPrimary ? theme.colorScheme.onPrimary : theme.colorScheme.onSecondaryContainer,
           padding: const EdgeInsets.symmetric(vertical: 16),
           shape:
               RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         ),
-        child: Text(text,
-            textAlign: TextAlign.center,
-            style: const TextStyle(color: Colors.white)),
+        child: Text(
+          text,
+          textAlign: TextAlign.center,
+          style: TextStyle(color: textColor),
+        ),
       ),
     );
   }

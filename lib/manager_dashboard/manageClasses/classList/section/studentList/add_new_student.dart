@@ -10,13 +10,12 @@ class AddNewStudentPage extends StatefulWidget {
 class _AddNewStudentPageState extends State<AddNewStudentPage> {
   final _nameController = TextEditingController();
   final _regNoController = TextEditingController();
+  final _formKey = GlobalKey<FormState>(); // Add a form key for validation
   bool _isLoading = false;
 
   Future<void> _addStudent() async {
-    if (_nameController.text.isEmpty || _regNoController.text.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please fill all fields.')),
-      );
+    // Validate form
+    if (!_formKey.currentState!.validate()) {
       return;
     }
 
@@ -56,40 +55,86 @@ class _AddNewStudentPageState extends State<AddNewStudentPage> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     return Scaffold(
+      backgroundColor: theme.scaffoldBackgroundColor,
       appBar: AppBar(
         title: const Text("Add New Student"),
       ),
-      body: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          children: [
-            TextField(
-              controller: _nameController,
-              decoration: InputDecoration(
-                labelText: "Student Name",
-                border: OutlineInputBorder(),
+      // Using a SingleChildScrollView to prevent overflow on small screens
+      body: SingleChildScrollView(
+        // Applying responsive padding, including 50 at the bottom
+        padding: const EdgeInsets.fromLTRB(16.0, 16.0, 16.0, 50.0),
+        child: Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 500), // Limit form width on large screens
+            child: Form(
+              key: _formKey,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  // Using TextFormField for validation
+                  TextFormField(
+                    controller: _nameController,
+                    decoration: InputDecoration(
+                      labelText: "Student Name",
+                      filled: true,
+                      fillColor: theme.colorScheme.surface,
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide.none,
+                      ),
+                    ),
+                    validator: (value) {
+                      if (value == null || value.isEmpty) {
+                        return 'Please enter the student\'s name';
+                      }
+                      return null;
+                    },
+                  ),
+                  const SizedBox(height: 16),
+                  TextFormField(
+                    controller: _regNoController,
+                    decoration: InputDecoration(
+                      labelText: "Registration Number",
+                      filled: true,
+                      fillColor: theme.colorScheme.surface,
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide.none,
+                      ),
+                    ),
+                    validator: (value) {
+                      if (value == null || value.isEmpty) {
+                        return 'Please enter the registration number';
+                      }
+                      return null;
+                    },
+                  ),
+                  const SizedBox(height: 24),
+                  ElevatedButton(
+                    onPressed: _isLoading ? null : _addStudent,
+                    style: ElevatedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                      backgroundColor: theme.colorScheme.primary,
+                      foregroundColor: theme.colorScheme.onPrimary,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                    child: _isLoading
+                        ? const SizedBox(
+                            height: 24,
+                            width: 24,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 3,
+                              valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                            ),
+                          )
+                        : const Text("Add Student"),
+                  ),
+                ],
               ),
             ),
-            const SizedBox(height: 16),
-            TextField(
-              controller: _regNoController,
-              decoration: InputDecoration(
-                labelText: "Registration Number",
-                border: OutlineInputBorder(),
-              ),
-            ),
-            const SizedBox(height: 24),
-            SizedBox(
-              width: double.infinity,
-              height: 50,
-              child: ElevatedButton(
-                onPressed: _isLoading ? null : _addStudent,
-                child: _isLoading
-                    ? const CircularProgressIndicator(valueColor: AlwaysStoppedAnimation<Color>(Colors.white))
-                    : const Text("Add Student"),
-              ),
-            ),
-          ],
+          ),
         ),
       ),
     );

@@ -46,7 +46,7 @@ class _LoginPageState extends State<LoginPage> {
             builder: (_) =>
                 const ModeratorDashboardPage()), // Assuming this is the moderator dashboard
       );
-    } else if (username == "" && password == "") {
+    } else if (username == "raj@iias.com" && password == "87654321") {
       if (!mounted) return;
       // Assuming 'Raj' is a manager and should be directed to the ManagerDashboard.
       Navigator.pushReplacement(

@@ -109,11 +109,13 @@ class _AvailableBooksScreenState extends State<AvailableBooksScreen> {
       },
     ];
 
-    setState(() {
-      _allBooks = bookData.map((data) => Book.fromMap(data)).toList();
-      _filteredBooks = _allBooks;
-      _isLoading = false;
-    });
+    if (mounted) {
+      setState(() {
+        _allBooks = bookData.map((data) => Book.fromMap(data)).toList();
+        _filteredBooks = _allBooks;
+        _isLoading = false;
+      });
+    }
   }
 
   void _filterBooks(String query) {
@@ -122,111 +124,58 @@ class _AvailableBooksScreenState extends State<AvailableBooksScreen> {
       _filteredBooks = _allBooks.where((book) {
         final titleMatch = book.title.toLowerCase().contains(lowerCaseQuery);
         final authorMatch = book.author.toLowerCase().contains(lowerCaseQuery);
-        return titleMatch || authorMatch;
+        final categoryMatch = book.category.toLowerCase().contains(lowerCaseQuery);
+        return titleMatch || authorMatch || categoryMatch;
       }).toList();
     });
   }
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     return Scaffold(
-      backgroundColor: const Color(0xff0B1220),
+      backgroundColor: theme.scaffoldBackgroundColor,
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
-        leading: const BackButton(color: Colors.white),
-        title: const Text(
+        leading: BackButton(color: theme.colorScheme.onSurface),
+        title: Text(
           "Available Books",
-          style: TextStyle(color: Colors.white),
+          style: TextStyle(color: theme.colorScheme.onSurface),
         ),
       ),
       body: Padding(
-        padding: const EdgeInsets.only(bottom: 50),
+        padding: const EdgeInsets.fromLTRB(16, 0, 16, 50),
         child: Column(
           children: [
             // Search Bar
-            Padding(
-              padding: const EdgeInsets.all(16),
-              child: TextField(
-                controller: searchController,
-                style: const TextStyle(color: Colors.white),
-                decoration: InputDecoration(
-                  hintText: "Search by Title, Author...",
-                  hintStyle: const TextStyle(color: Colors.white54),
-                  prefixIcon: const Icon(Icons.search, color: Colors.white70),
-                  filled: true,
-                  fillColor: const Color(0xff101820),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(28),
-                    borderSide: BorderSide.none,
-                  ),
+            TextField(
+              controller: searchController,
+              style: TextStyle(color: theme.colorScheme.onSurface),
+              decoration: InputDecoration(
+                hintText: "Search by Title, Author, or Category...",
+                hintStyle: TextStyle(color: theme.hintColor),
+                prefixIcon: Icon(Icons.search, color: theme.hintColor),
+                filled: true,
+                fillColor: theme.cardColor,
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(28),
+                  borderSide: BorderSide.none,
                 ),
-                onChanged: _filterBooks,
               ),
+              onChanged: _filterBooks,
             ),
-
+            const SizedBox(height: 16),
             Expanded(
               child: _isLoading
                   ? const Center(child: CircularProgressIndicator())
-                  : ListView.builder(
-                      itemCount: _filteredBooks.length,
-                      padding: const EdgeInsets.symmetric(horizontal: 16),
-                      itemBuilder: (context, index) {
-                        final book = _filteredBooks[index];
-
-                        return Container(
-                          margin: const EdgeInsets.only(bottom: 16),
-                          padding: const EdgeInsets.all(16),
-                          decoration: BoxDecoration(
-                            color: const Color(0xff0F1A2B),
-                            borderRadius: BorderRadius.circular(18),
-                          ),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              // Index + Title
-                              Text(
-                                "${index + 1}.  ${book.title}",
-                                style: const TextStyle(
-                                  color: Colors.white,
-                                  fontWeight: FontWeight.w700,
-                                  fontSize: 16,
-                                ),
-                              ),
-
-                              const SizedBox(height: 12),
-
-                              Row(
-                                children: [
-                                  Expanded(
-                                    child: Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
-                                      children: [
-                                        info("Author", book.author),
-                                        info("Year", book.year),
-                                        info("Volume", book.volume),
-                                        info("Format", book.format),
-                                      ],
-                                    ),
-                                  ),
-                                  Expanded(
-                                    child: Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
-                                      children: [
-                                        info("Publisher", book.publisher),
-                                        info("Edition", book.edition),
-                                        info("Category", book.category),
-                                        info("Language", book.language),
-                                      ],
-                                    ),
-                                  ),
-                                ],
-                              )
-                            ],
-                          ),
-                        );
+                  : LayoutBuilder(
+                      builder: (context, constraints) {
+                        if (constraints.maxWidth > 600) {
+                          return _buildGridView(_filteredBooks);
+                        } else {
+                          return _buildListView(_filteredBooks);
+                        }
                       },
                     ),
             )
@@ -236,22 +185,114 @@ class _AvailableBooksScreenState extends State<AvailableBooksScreen> {
     );
   }
 
-  Widget info(String label, String value) {
+  Widget _buildListView(List<Book> books) {
+    return ListView.builder(
+      itemCount: books.length,
+      itemBuilder: (context, index) {
+        return Padding(
+          padding: const EdgeInsets.only(bottom: 16.0),
+          child: _BookCard(book: books[index], index: index),
+        );
+      },
+    );
+  }
+
+  Widget _buildGridView(List<Book> books) {
+    return GridView.builder(
+      itemCount: books.length,
+      gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
+        maxCrossAxisExtent: 500,
+        mainAxisSpacing: 16,
+        crossAxisSpacing: 16,
+        childAspectRatio: 1.6, // Adjust for content
+      ),
+      itemBuilder: (context, index) {
+        return _BookCard(book: books[index], index: index);
+      },
+    );
+  }
+}
+
+class _BookCard extends StatelessWidget {
+  final Book book;
+  final int index;
+
+  const _BookCard({required this.book, required this.index});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: theme.primaryColor,
+        borderRadius: BorderRadius.circular(18),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            "${index + 1}.  ${book.title}",
+            style: theme.textTheme.titleMedium?.copyWith(
+              color: theme.colorScheme.onPrimary,
+              fontWeight: FontWeight.bold,
+            ),
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+          ),
+          const SizedBox(height: 12),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _buildInfoField(theme, "Author", book.author),
+                    _buildInfoField(theme, "Year", book.year),
+                    _buildInfoField(theme, "Volume", book.volume),
+                    _buildInfoField(theme, "Format", book.format),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _buildInfoField(theme, "Publisher", book.publisher),
+                    _buildInfoField(theme, "Edition", book.edition),
+                    _buildInfoField(theme, "Category", book.category),
+                    _buildInfoField(theme, "Language", book.language),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildInfoField(ThemeData theme, String label, String value) {
     return Padding(
-      padding: const EdgeInsets.only(bottom: 6),
-      child: RichText(
-        text: TextSpan(
-          children: [
-            TextSpan(
-              text: "$label\n",
-              style: const TextStyle(color: Colors.white54, fontSize: 12),
-            ),
-            TextSpan(
-              text: value,
-              style: const TextStyle(color: Colors.white, fontSize: 13),
-            ),
-          ],
-        ),
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            label,
+            style: theme.textTheme.bodySmall
+                ?.copyWith(color: theme.colorScheme.onPrimary.withOpacity(0.7)),
+          ),
+          Text(
+            value,
+            style: theme.textTheme.bodyMedium
+                ?.copyWith(color: theme.colorScheme.onPrimary),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+        ],
       ),
     );
   }

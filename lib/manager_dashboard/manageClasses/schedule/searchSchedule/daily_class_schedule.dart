@@ -58,7 +58,6 @@ class _DailyClassSchedulePageState extends State<DailyClassSchedulePage>{
     }
   }
 
-
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -70,39 +69,69 @@ class _DailyClassSchedulePageState extends State<DailyClassSchedulePage>{
       ),
       body: _isLoading
         ? const Center(child: CircularProgressIndicator())
-        : Padding(
-        padding: const EdgeInsets.fromLTRB(16,16,16,115),
-        child: ListView.separated(
-          itemCount: _schedule.length,
-          separatorBuilder: (context, index) => const SizedBox(height: 16),
-          itemBuilder: (context, index) {
-            final entry = _schedule[index];
-            return CustomContainer(
-              title: entry.title,
-              subtitle: entry.subtitle,
-              time: entry.time,
+        : LayoutBuilder(
+        builder: (context, constraints) {
+          // Use GridView for wider screens
+          if (constraints.maxWidth > 600) {
+            return GridView.builder(
+              padding: const EdgeInsets.fromLTRB(16, 16, 16, 50),
+              itemCount: _schedule.length,
+              gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
+                maxCrossAxisExtent: 400, // Max width per item
+                mainAxisSpacing: 16,
+                crossAxisSpacing: 16,
+                childAspectRatio: 2.5, // Adjust for content
+              ),
+              itemBuilder: (context, index) {
+                final entry = _schedule[index];
+                return ScheduleCard(
+                  className: "${widget.className} - ${widget.section}",
+                  title: entry.title,
+                  subtitle: entry.subtitle,
+                  time: entry.time,
+                );
+              },
             );
-          },
-        ),
+          } else {
+            // Use ListView for narrower screens
+            return ListView.separated(
+              padding: const EdgeInsets.fromLTRB(16, 16, 16, 50),
+              itemCount: _schedule.length,
+              separatorBuilder: (context, index) => const SizedBox(height: 16),
+              itemBuilder: (context, index) {
+                final entry = _schedule[index];
+                return ScheduleCard(
+                  className: "${widget.className} - ${widget.section}",
+                  title: entry.title,
+                  subtitle: entry.subtitle,
+                  time: entry.time,
+                );
+              },
+            );
+          }
+        },
       ),
     );
   }
-
 }
-class CustomContainer extends StatelessWidget{
+
+// Renamed to ScheduleCard for clarity
+class ScheduleCard extends StatelessWidget{
+  final String className;
   final String title;
   final String subtitle;
   final String time;
 
-  const CustomContainer({
+  const ScheduleCard({
     super.key,
+    required this.className,
     required this.title,
     required this.subtitle,
     required this.time,
   });
+
   @override
   Widget build(BuildContext context) {
-
     final theme = Theme.of(context);
     return Container(
       width: double.infinity,
@@ -110,35 +139,57 @@ class CustomContainer extends StatelessWidget{
         color: theme.colorScheme.surface,
         borderRadius: BorderRadius.circular(10),
       ),
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(16,16,16,16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children:[
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(title,style: const TextStyle(fontSize: 16,color: Colors.white,fontWeight: FontWeight.bold),),
-                ElevatedButton(onPressed: (){
-                  Navigator.push(context, MaterialPageRoute(builder: (context)=>const OverrideSchedulePage()));
-                },
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.blue.shade400,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                ), child: const Text("Override",style: TextStyle(fontSize: 14,color: Colors.white,fontWeight: FontWeight.bold),)
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisAlignment: MainAxisAlignment.center, // For Grid layout
+        children:[
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Use flexible to prevent overflow on very small screens
+              Flexible(
+                child: Text(
+                  title,
+                  // Using theme for scalable and consistent fonts
+                  style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
                 ),
-              ],
-            ),
-            Text(subtitle,style: TextStyle(fontSize: 12,color: Colors.white.withAlpha(150),fontWeight: FontWeight.bold)),
-            Text(time,style: TextStyle(fontSize: 12,color: Colors.white.withAlpha(150),fontWeight: FontWeight.bold),
-
-            ),
-          ],
-        ),
+              ),
+              ElevatedButton(onPressed: (){
+                // Passing data to the OverrideSchedulePage
+                Navigator.push(context, MaterialPageRoute(builder: (context)=>OverrideSchedulePage(
+                  scheduleDetails: OriginalScheduleDetails(
+                    className: className,
+                    subject: title,
+                    teacher: subtitle,
+                    time: time,
+                  ),
+                )));
+              },
+              style: ElevatedButton.styleFrom(
+                // Using theme colors for consistency
+                backgroundColor: theme.colorScheme.primary,
+                foregroundColor: theme.colorScheme.onPrimary,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10),
+                ),
+              ), 
+              child: const Text("Override")
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Text(
+            subtitle, 
+            style: theme.textTheme.bodyMedium?.copyWith(color: theme.hintColor, fontWeight: FontWeight.bold)
+          ),
+          Text(
+            time, 
+            style: theme.textTheme.bodyMedium?.copyWith(color: theme.hintColor, fontWeight: FontWeight.bold)
+          ),
+        ],
       ),
     );
   }
-
 }

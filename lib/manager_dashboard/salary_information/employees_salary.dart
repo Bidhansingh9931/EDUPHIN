@@ -140,31 +140,28 @@ class _EmployeesSalaryPageState extends State<EmployeesSalaryPage> {
     return Scaffold(
       backgroundColor: theme.scaffoldBackgroundColor,
       appBar: AppBar(
-        backgroundColor: theme.primaryColor,
-        leading: const Icon(Icons.arrow_back),
+        backgroundColor: theme.appBarTheme.backgroundColor ?? theme.primaryColor,
+        leading: const BackButton(),
         title: const Text("Employees Salary"),
         centerTitle: true,
       ),
       body: Padding(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.fromLTRB(16, 16, 16, 0), // Removed bottom padding here
         child: Column(
           children: [
             /// Search Bar
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12),
-              decoration: BoxDecoration(
-                color: theme.primaryColor,
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: TextField(
-                controller: _searchController,
-                decoration: const InputDecoration(
-                  icon: Icon(Icons.search, color: Colors.white70),
-                  hintText: "Search for employees...",
-                  hintStyle: TextStyle(color: Colors.white70),
-                  border: InputBorder.none,
+            TextField(
+              controller: _searchController,
+              decoration: InputDecoration(
+                prefixIcon: Icon(Icons.search, color: theme.hintColor),
+                hintText: "Search for employees...",
+                hintStyle: TextStyle(color: theme.hintColor),
+                filled: true,
+                fillColor: theme.cardColor,
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide.none,
                 ),
-                style: const TextStyle(color: Colors.white),
               ),
             ),
 
@@ -173,19 +170,18 @@ class _EmployeesSalaryPageState extends State<EmployeesSalaryPage> {
             /// Filter
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 12),
-              height: 50,
               decoration: BoxDecoration(
-                color: theme.primaryColor,
+                color: theme.cardColor,
                 borderRadius: BorderRadius.circular(12),
               ),
               child: DropdownButton<String>(
                 value: _selectedRole,
-                hint: const Text("Filter by Role", style: TextStyle(color: Colors.white70)),
+                hint: Text("Filter by Role", style: TextStyle(color: theme.hintColor)),
                 isExpanded: true,
-                dropdownColor: theme.primaryColor,
+                dropdownColor: theme.cardColor,
                 underline: const SizedBox(),
-                icon: const Icon(Icons.keyboard_arrow_down, color: Colors.white70),
-                style: const TextStyle(color: Colors.white),
+                icon: Icon(Icons.keyboard_arrow_down, color: theme.hintColor),
+                style: theme.textTheme.bodyLarge,
                 onChanged: (String? newValue) {
                   setState(() {
                     _selectedRole = newValue;
@@ -208,63 +204,81 @@ class _EmployeesSalaryPageState extends State<EmployeesSalaryPage> {
             Expanded(
               child: _isLoading
                   ? const Center(child: CircularProgressIndicator())
-                  : ListView.builder(
-                itemCount: _filteredEmployees.length,
-                itemBuilder: (context, index) {
-                  final employee = _filteredEmployees[index];
-                  return InkWell(
-                    onTap: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(builder: (context) => const AccountDetailsPage()),
-                      );
-                    },
-                    child: EmployeeCard(
-                      name: employee.name,
-                      info: employee.info,
-                      role: employee.role,
-                      roleColor: employee.roleColor,
-                      status: employee.status,
-                      statusColor: employee.statusColor,
-                    ),
-                  );
-                },
-              ),
+                  : LayoutBuilder(builder: (context, constraints) {
+                      if (constraints.maxWidth > 600) {
+                        return _buildGridView();
+                      } else {
+                        return _buildListView();
+                      }
+                    }),
             )
           ],
         ),
       ),
     );
   }
+
+  Widget _buildListView() {
+    return ListView.separated(
+      padding: const EdgeInsets.only(bottom: 50), // Added bottom padding
+      itemCount: _filteredEmployees.length,
+      itemBuilder: (context, index) {
+        return InkWell(
+          onTap: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (context) => const AccountDetailsPage()),
+            );
+          },
+          child: EmployeeCard(
+            employee: _filteredEmployees[index],
+          ),
+        );
+      },
+      separatorBuilder: (context, index) => const SizedBox(height: 12),
+    );
+  }
+
+  Widget _buildGridView() {
+    return GridView.builder(
+      padding: const EdgeInsets.only(bottom: 50), // Added bottom padding
+      itemCount: _filteredEmployees.length,
+      gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
+        maxCrossAxisExtent: 400,
+        mainAxisSpacing: 12,
+        crossAxisSpacing: 12,
+        childAspectRatio: 2.8, // Adjust for better card shape
+      ),
+      itemBuilder: (context, index) {
+        return InkWell(
+          onTap: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (context) => const AccountDetailsPage()),
+            );
+          },
+          child: EmployeeCard(
+            employee: _filteredEmployees[index],
+          ),
+        );
+      },
+    );
+  }
 }
 
 /// ---------------- Employee Card ----------------
 class EmployeeCard extends StatelessWidget {
-  final String name;
-  final String info;
-  final String role;
-  final Color roleColor;
-  final String status;
-  final Color statusColor;
+  final Employee employee;
 
-  const EmployeeCard({
-    super.key,
-    required this.name,
-    required this.info,
-    required this.role,
-    required this.roleColor,
-    required this.status,
-    required this.statusColor,
-  });
+  const EmployeeCard({super.key, required this.employee});
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     return Container(
-      margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: theme.primaryColor,
+        color: theme.cardColor,
         borderRadius: BorderRadius.circular(14),
       ),
       child: Row(
@@ -272,8 +286,8 @@ class EmployeeCard extends StatelessWidget {
           /// Avatar
           CircleAvatar(
             radius: 26,
-            backgroundColor: Colors.grey.shade700,
-            child: const Icon(Icons.person, size: 30),
+            backgroundColor: theme.colorScheme.secondaryContainer,
+            child: Icon(Icons.person, size: 30, color: theme.colorScheme.onSecondaryContainer),
           ),
           const SizedBox(width: 12),
 
@@ -281,28 +295,26 @@ class EmployeeCard extends StatelessWidget {
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisAlignment: MainAxisAlignment.center, // Center content for GridView
               children: [
-                Text(name,
-                    style: const TextStyle(
-                        fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white)),
+                Text(employee.name, style: theme.textTheme.titleMedium),
                 const SizedBox(height: 4),
-                Text(info,
-                    style: TextStyle(
-                        fontSize: 13,
-                        color: Colors.grey.shade400)),
+                Text(employee.info, style: theme.textTheme.bodySmall?.copyWith(color: theme.hintColor)),
                 const SizedBox(height: 8),
                 Row(
                   children: [
                     Chip(
-                      label: Text(role),
-                      backgroundColor: roleColor.withAlpha(50),
-                      labelStyle: TextStyle(color: roleColor),
+                      label: Text(employee.role),
+                      backgroundColor: employee.roleColor.withAlpha(35),
+                      labelStyle: TextStyle(color: employee.roleColor, fontWeight: FontWeight.bold),
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                     ),
                     const SizedBox(width: 8),
                     Chip(
-                      label: Text(status),
-                      backgroundColor: statusColor.withAlpha(50),
-                      labelStyle: TextStyle(color: statusColor),
+                      label: Text(employee.status),
+                      backgroundColor: employee.statusColor.withAlpha(35),
+                      labelStyle: TextStyle(color: employee.statusColor, fontWeight: FontWeight.bold),
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                     ),
                   ],
                 )

@@ -33,7 +33,6 @@ class _SectionsPageState extends State<SectionsPage> {
 
   Future<void> _fetchSections() async {
     // Simulate API call to fetch sections.
-    // Replace this with your actual API call.
     await Future.delayed(const Duration(seconds: 2));
 
     final List<Section> fetchedSections = [
@@ -56,28 +55,15 @@ class _SectionsPageState extends State<SectionsPage> {
     final theme = Theme.of(context);
     return Scaffold(
       backgroundColor: theme.scaffoldBackgroundColor,
-      floatingActionButton: Padding(
-        padding: const EdgeInsets.only(left: 32),
-        child: SizedBox(
-          height: 50,
-          width: double.infinity,
-          child: FloatingActionButton(
-            onPressed: () {
-              // Navigate to a page to create a new section
-              Navigator.push(context, MaterialPageRoute(builder: (context) => const CreateNewSectionPage()));
-            },
-            backgroundColor: theme.primaryColor,
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: const [
-                Icon(Icons.add),
-                SizedBox(width: 5),
-                Text("Create New Section"),
-              ],
-            ),
-          ),
-        ),
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: () {
+          Navigator.push(context,
+              MaterialPageRoute(builder: (context) => const CreateNewSectionPage()));
+        },
+        label: const Text("Create New Section"),
+        icon: const Icon(Icons.add),
       ),
+      floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
       appBar: AppBar(
         title: Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -90,16 +76,36 @@ class _SectionsPageState extends State<SectionsPage> {
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
-          : Padding(
-              padding: const EdgeInsets.fromLTRB(16, 16, 16, 80), // Added bottom padding for FAB
-              child: ListView.separated(
-                itemCount: _sections.length,
-                separatorBuilder: (context, index) => const SizedBox(height: 16),
-                itemBuilder: (context, index) {
-                  final section = _sections[index];
-                  return SectionCard(section: section);
-                },
-              ),
+          : LayoutBuilder(
+              builder: (context, constraints) {
+                if (constraints.maxWidth > 600) {
+                  return GridView.builder(
+                    padding: const EdgeInsets.fromLTRB(16, 16, 16, 80),
+                    itemCount: _sections.length,
+                    gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
+                      maxCrossAxisExtent: 400,
+                      mainAxisSpacing: 16,
+                      crossAxisSpacing: 16,
+                      childAspectRatio: 1.5, // Adjust for content
+                    ),
+                    itemBuilder: (context, index) {
+                      final section = _sections[index];
+                      return SectionCard(section: section);
+                    },
+                  );
+                } else {
+                  return ListView.separated(
+                    padding: const EdgeInsets.fromLTRB(16, 16, 16, 80), 
+                    itemCount: _sections.length,
+                    separatorBuilder: (context, index) =>
+                        const SizedBox(height: 16),
+                    itemBuilder: (context, index) {
+                      final section = _sections[index];
+                      return SectionCard(section: section);
+                    },
+                  );
+                }
+              },
             ),
     );
   }
@@ -118,87 +124,85 @@ class SectionCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(10),
         color: theme.primaryColor,
       ),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(section.name, style: TextStyle(color: theme.colorScheme.onPrimary, fontSize: 20)),
-                const Padding(
-                  padding: EdgeInsets.all(3),
-                  child: Text("Class Limit", style: TextStyle(color: Colors.green, fontSize: 16)),
-                )
-              ],
-            ),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text("Mentor: ${section.mentor}", style: TextStyle(color: theme.colorScheme.onPrimary.withAlpha(180), fontSize: 14)),
-                Text(section.limit.toString(), style: TextStyle(color: theme.colorScheme.onPrimary.withAlpha(180), fontSize: 14)),
-              ],
-            ),
-            const SizedBox(height: 8),
-            Divider(
-              color: theme.colorScheme.onPrimary.withAlpha(180),
-              thickness: 1,
-            ),
-            Row(
-              children: [
-                Expanded(
-                  child: ElevatedButton(
-                    onPressed: () {
-                      Navigator.push(context, MaterialPageRoute(builder: (context) => const EditSectionPage()));
-                    },
-                    style: ElevatedButton.styleFrom(backgroundColor: Colors.blue.withAlpha(45)),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: const [
-                        Icon(Icons.edit, size: 16),
-                        SizedBox(width: 4),
-                        Text("Edit"),
-                      ],
-                    ),
-                  ),
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(section.name,
+                  style: theme.textTheme.headlineSmall
+                      ?.copyWith(color: theme.colorScheme.onPrimary)),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  Text("Class Limit",
+                      style: theme.textTheme.labelMedium
+                          ?.copyWith(color: Colors.green.shade300)),
+                  Text(section.limit.toString(),
+                      style: theme.textTheme.titleLarge
+                          ?.copyWith(color: theme.colorScheme.onPrimary)),
+                ],
+              )
+            ],
+          ),
+          Text("Mentor: ${section.mentor}",
+              style: theme.textTheme.bodyLarge
+                  ?.copyWith(color: theme.colorScheme.onPrimary.withAlpha(180))),
+          const SizedBox(height: 12),
+          Divider(
+            color: theme.colorScheme.onPrimary.withAlpha(180),
+            thickness: 1,
+          ),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              Expanded(
+                child: ElevatedButton.icon(
+                  onPressed: () {
+                    Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                            builder: (context) => const EditSectionPage()));
+                  },
+                  style: ElevatedButton.styleFrom(
+                      backgroundColor: theme.colorScheme.primaryContainer,
+                      foregroundColor: theme.colorScheme.onPrimaryContainer),
+                  icon: const Icon(Icons.edit, size: 16),
+                  label: const Text("Edit"),
                 ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: ElevatedButton(
-                    onPressed: () {
-                      Navigator.push(context, MaterialPageRoute(builder: (context) => const StudentListPage()));
-                    },
-                    style: ElevatedButton.styleFrom(backgroundColor: theme.colorScheme.onPrimary.withAlpha(45)),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(Icons.people_alt_outlined, color: theme.colorScheme.onPrimary, size: 16),
-                        const SizedBox(width: 4),
-                        Flexible(child: Text("Students", style: TextStyle(color: theme.colorScheme.onPrimary), overflow: TextOverflow.ellipsis,)),
-                      ],
-                    ),
-                  ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: ElevatedButton.icon(
+                  onPressed: () {
+                    Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                            builder: (context) => const StudentListPage()));
+                  },
+                  style: ElevatedButton.styleFrom(
+                      backgroundColor: theme.colorScheme.secondaryContainer,
+                      foregroundColor: theme.colorScheme.onSecondaryContainer),
+                  icon: const Icon(Icons.people_alt_outlined, size: 16),
+                  label: const Text("Students", overflow: TextOverflow.ellipsis),
                 ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: ElevatedButton(
-                    onPressed: () => showDeleteDialog(context, section.name),
-                    style: ElevatedButton.styleFrom(backgroundColor: Colors.red.withAlpha(45)),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: const [
-                        Icon(Icons.delete, color: Colors.red, size: 16),
-                        SizedBox(width: 4),
-                        Flexible(child: Text("Delete", style: TextStyle(color: Colors.red))),
-                      ],
-                    ),
-                  ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: ElevatedButton.icon(
+                  onPressed: () => showDeleteDialog(context, section.name),
+                  style: ElevatedButton.styleFrom(
+                      backgroundColor: theme.colorScheme.errorContainer,
+                      foregroundColor: theme.colorScheme.onErrorContainer),
+                  icon: const Icon(Icons.delete, size: 16),
+                  label: const Text("Delete"),
                 ),
-              ],
-            ),
-          ],
-        ),
+              ),
+            ],
+          ),
+        ],
       ),
     );
   }
@@ -229,94 +233,76 @@ class DeleteSectionDialog extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     return Scaffold(
       backgroundColor: Colors.transparent,
-      body: Stack(
-        children: [
-          // 🔹 Blur Background
-          BackdropFilter(
-            filter: ImageFilter.blur(sigmaX: 6, sigmaY: 6),
-            child: Container(color: Colors.transparent),
-          ),
-
-          // 🔹 Center Card
-          Center(
-            child: Container(
-              margin: const EdgeInsets.symmetric(horizontal: 24),
-              padding: const EdgeInsets.all(20),
-              decoration: BoxDecoration(
-                color: const Color(0xFF1F2937),
-                borderRadius: BorderRadius.circular(20),
-              ),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const Text(
-                    "Delete Section",
-                    style: TextStyle(
-                      fontSize: 20,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.white,
-                    ),
+      body: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 6, sigmaY: 6),
+        child: Center(
+          child: Container(
+            margin: const EdgeInsets.symmetric(horizontal: 24),
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              color: theme.cardColor,
+              borderRadius: BorderRadius.circular(20),
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  "Delete Section",
+                  style: theme.textTheme.headlineSmall?.copyWith(
+                    color: theme.colorScheme.onSurface,
                   ),
-                  const SizedBox(height: 12),
-                  Text(
-                    "Are you sure you want to delete this section: $sectionName? "
-                    "This action cannot be undone.",
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      color: Colors.grey.shade400,
-                      fontSize: 14,
-                    ),
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  "Are you sure you want to delete this section: $sectionName? This action cannot be undone.",
+                  textAlign: TextAlign.center,
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    color: theme.colorScheme.onSurface.withAlpha(35),
                   ),
-                  const SizedBox(height: 24),
-                  // 🔴 Delete Button
-                  SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton(
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFFC5392A),
-                        padding: const EdgeInsets.symmetric(vertical: 14),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                      ),
-                      onPressed: () {
-                        // Implement delete logic here
-                        Navigator.pop(context);
-                      },
-                      child: const Text(
-                        "Yes, Delete",
-                        style: TextStyle(fontSize: 16),
+                ),
+                const SizedBox(height: 24),
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: theme.colorScheme.error,
+                      foregroundColor: theme.colorScheme.onError,
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
                       ),
                     ),
+                    onPressed: () {
+                      // Implement delete logic here
+                      Navigator.pop(context);
+                    },
+                    child: const Text("Yes, Delete"),
                   ),
-                  const SizedBox(height: 12),
-                  // ⚪ Cancel Button
-                  SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton(
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF374151),
-                        padding: const EdgeInsets.symmetric(vertical: 14),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                      ),
-                      onPressed: () {
-                        Navigator.pop(context);
-                      },
-                      child: const Text(
-                        "Cancel",
-                        style: TextStyle(fontSize: 16),
+                ),
+                const SizedBox(height: 12),
+                SizedBox(
+                  width: double.infinity,
+                  child: OutlinedButton(
+                    style: OutlinedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                       side: BorderSide(color: theme.dividerColor),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
                       ),
                     ),
+                    onPressed: () {
+                      Navigator.pop(context);
+                    },
+                    child: const Text("Cancel"),
                   ),
-                ],
-              ),
+                ),
+              ],
             ),
           ),
-        ],
+        ),
       ),
     );
   }

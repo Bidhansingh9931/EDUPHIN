@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
-// Data models
+// --- DATA MODELS ---
+
 class AccountDetails {
   final String bankAccount;
   final String ifsc;
@@ -31,8 +32,9 @@ class PastSalaryRecord {
   });
 }
 
+// --- MAIN WIDGET ---
 
-class AccountDetailsPage extends StatefulWidget{
+class AccountDetailsPage extends StatefulWidget {
   const AccountDetailsPage({super.key});
 
   @override
@@ -42,17 +44,16 @@ class AccountDetailsPage extends StatefulWidget{
 class _AccountDetailsPageState extends State<AccountDetailsPage> {
   bool _isLoading = true;
   bool _isSaving = false;
-
   AccountDetails? _accountDetails;
   final List<PastSalaryRecord> _pastRecords = [];
 
-  final TextEditingController _bankAccountController = TextEditingController();
-  final TextEditingController _ifscController = TextEditingController();
-  final TextEditingController _bankNameController = TextEditingController();
-  final TextEditingController _employerBranchController = TextEditingController();
-  final TextEditingController _zoneController = TextEditingController();
-  final TextEditingController _currentSalaryController = TextEditingController();
-
+  // Text editing controllers for the form fields
+  final _bankAccountController = TextEditingController();
+  final _ifscController = TextEditingController();
+  final _bankNameController = TextEditingController();
+  final _employerBranchController = TextEditingController();
+  final _zoneController = TextEditingController();
+  final _currentSalaryController = TextEditingController();
 
   @override
   void initState() {
@@ -72,8 +73,7 @@ class _AccountDetailsPageState extends State<AccountDetailsPage> {
   }
 
   Future<void> _fetchAccountDetails() async {
-    // Simulate API call. Replace with your actual API fetching logic.
-    await Future.delayed(const Duration(seconds: 2));
+    await Future.delayed(const Duration(seconds: 1)); // Simulate API call
 
     final details = AccountDetails(
         bankAccount: "111122223333",
@@ -81,14 +81,21 @@ class _AccountDetailsPageState extends State<AccountDetailsPage> {
         bankName: "Unity Bank",
         employerBranch: "Unity Branch - Sector 2",
         zone: "Sector 2",
-        currentSalary: "75,000"
-    );
+        currentSalary: "75,000");
 
     final records = [
-      PastSalaryRecord(monthYear: "May 2024", amount: "75,000", paidOn: "paid on 31 May 2024"),
-      PastSalaryRecord(monthYear: "April 2024", amount: "75,000", paidOn: "paid on 30 April 2024"),
-      PastSalaryRecord(monthYear: "March 2024", amount: "75,000", paidOn: "paid on 31 Mar 2024"),
-      PastSalaryRecord(monthYear: "February 2024", amount: "75,000", paidOn: "paid on 29 Feb 2024"),
+      PastSalaryRecord(
+          monthYear: "May 2024",
+          amount: "75,000",
+          paidOn: "paid on 31 May 2024"),
+      PastSalaryRecord(
+          monthYear: "April 2024",
+          amount: "75,000",
+          paidOn: "paid on 30 April 2024"),
+      PastSalaryRecord(
+          monthYear: "March 2024",
+          amount: "75,000",
+          paidOn: "paid on 31 Mar 2024"),
     ];
 
     if (mounted) {
@@ -96,7 +103,6 @@ class _AccountDetailsPageState extends State<AccountDetailsPage> {
         _accountDetails = details;
         _pastRecords.addAll(records);
 
-        // Populate controllers
         _bankAccountController.text = details.bankAccount;
         _ifscController.text = details.ifsc;
         _bankNameController.text = details.bankName;
@@ -110,12 +116,8 @@ class _AccountDetailsPageState extends State<AccountDetailsPage> {
   }
 
   Future<void> _saveAccountDetails() async {
-    setState(() {
-      _isSaving = true;
-    });
-
-    // Simulate API call to save data.
-    await Future.delayed(const Duration(seconds: 2));
+    setState(() => _isSaving = true);
+    await Future.delayed(const Duration(seconds: 2)); // Simulate API call
 
     final updatedDetails = {
       "bank_account": _bankAccountController.text,
@@ -126,118 +128,176 @@ class _AccountDetailsPageState extends State<AccountDetailsPage> {
       "current_salary": _currentSalaryController.text,
     };
 
-    // In a real app, you would send this data to your API.
     print('Saving data: $updatedDetails');
 
-    if (mounted) {
-      setState(() {
-        _isSaving = false;
-      });
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Account details updated successfully!')),
-      );
-    }
-  }
+    if (!mounted) return;
 
+    setState(() => _isSaving = false);
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Account details updated successfully!')),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     return Scaffold(
+      backgroundColor: theme.scaffoldBackgroundColor,
       appBar: AppBar(
         title: const Text("Account Details"),
       ),
+      floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
+      floatingActionButton: _isLoading ? null : _buildSaveButton(theme),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
-          : Padding(
-        padding: const EdgeInsets.fromLTRB(16, 16, 16, 50),
-        child: SingleChildScrollView(
-          child: Column(
-            children: [
-              if (_accountDetails != null)
-              SectionCard(
-                title: "Banking Information",
-                icon: Icons.account_balance,
-                children: [
-                  CustomTextField(label: "Bank Account Number", controller: _bankAccountController, editable: true),
-                  CustomTextField(label: "IFSC Code", controller: _ifscController, editable: true),
-                  CustomTextField(label: "Bank Name", controller: _bankNameController, editable: true),
-                  const SizedBox(height: 10),
-                  const Divider(color: Colors.white24),
-                  CustomTextField(label: "Employer Branch", controller: _employerBranchController, editable: true),
-                  CustomTextField(label: "Zone / Sector", controller: _zoneController, editable: true),
-                  CustomTextField(label: "Current Salary(per month)", controller: _currentSalaryController, editable: true),
+          : LayoutBuilder(builder: (context, constraints) {
+              // Use a different layout for wider screens
+              if (constraints.maxWidth > 800) {
+                return _buildWideLayout();
+              } else {
+                return _buildNarrowLayout();
+              }
+            }),
+    );
+  }
 
-                ],
-              ),
-              const SizedBox(height: 16),
-              SectionCard(
-                title: "Past Salary Record",
-                icon: Icons.access_time_sharp,
-                children: [
-                ListView.separated(
-                  shrinkWrap: true,
-                  physics: const NeverScrollableScrollPhysics(),
-                  itemCount: _pastRecords.length,
-                  separatorBuilder: (context, index) => const SizedBox(height: 16),
-                  itemBuilder: (context, index) {
-                    final record = _pastRecords[index];
-                    return _buildSalaryRecordCard(record);
-                    },
-                ),
-              ]),
-              const SizedBox(height: 24),
-              SizedBox(
-                width: double.infinity,
-                height: 50,
-                child: ElevatedButton(
-                  onPressed: _isSaving ? null : _saveAccountDetails,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Theme.of(context).primaryColor,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                  ),
-                  child: _isSaving
-                      ? const CircularProgressIndicator(
-                    valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                  )
-                      : const Text("Save Changes", style: TextStyle(fontSize: 18)),
-                ),
-              ),
-            ],
-          ),
+  Widget _buildSaveButton(ThemeData theme) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16.0),
+      child: SizedBox(
+        width: double.infinity,
+        child: FloatingActionButton.extended(
+          onPressed: _isSaving ? null : _saveAccountDetails,
+          label: _isSaving
+              ? const CircularProgressIndicator(
+                  valueColor: AlwaysStoppedAnimation(Colors.white))
+              : Text("Save Changes",
+                  style: theme.textTheme.labelLarge
+                      ?.copyWith(color: theme.colorScheme.onPrimary)),
         ),
       ),
     );
   }
 
+  // --- LAYOUTS ---
+
+  Widget _buildNarrowLayout() {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 50),
+      child: Column(
+        children: [
+          _buildBankingInfoSection(),
+          const SizedBox(height: 16),
+          _buildPastSalariesSection(),
+          const SizedBox(height: 80), // Padding for FAB
+        ],
+      ),
+    );
+  }
+
+  Widget _buildWideLayout() {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 50),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Expanded(
+            flex: 2,
+            child: SingleChildScrollView(child: _buildBankingInfoSection()),
+          ),
+          const SizedBox(width: 16),
+          Expanded(
+            flex: 3,
+            child: SingleChildScrollView(child: _buildPastSalariesSection()),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // --- SECTIONS ---
+
+  Widget _buildBankingInfoSection() {
+    return SectionCard(
+      title: "Banking Information",
+      icon: Icons.account_balance,
+      children: [
+        CustomTextField(
+            label: "Bank Account Number",
+            controller: _bankAccountController,
+            editable: true),
+        CustomTextField(
+            label: "IFSC Code", controller: _ifscController, editable: true),
+        CustomTextField(
+            label: "Bank Name", controller: _bankNameController, editable: true),
+        const Divider(height: 24),
+        CustomTextField(
+            label: "Employer Branch",
+            controller: _employerBranchController,
+            editable: true),
+        CustomTextField(
+            label: "Zone / Sector", controller: _zoneController, editable: true),
+        CustomTextField(
+            label: "Current Salary(per month)",
+            controller: _currentSalaryController,
+            editable: true),
+      ],
+    );
+  }
+
+  Widget _buildPastSalariesSection() {
+    return SectionCard(
+      title: "Past Salary Record",
+      icon: Icons.history,
+      children: [
+        ListView.separated(
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          itemCount: _pastRecords.length,
+          separatorBuilder: (context, index) => const SizedBox(height: 16),
+          itemBuilder: (context, index) {
+            return _buildSalaryRecordCard(_pastRecords[index]);
+          },
+        )
+      ],
+    );
+  }
+
   Widget _buildSalaryRecordCard(PastSalaryRecord record) {
+    final theme = Theme.of(context);
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white10,
+        color: theme.scaffoldBackgroundColor, // Use theme color
         borderRadius: BorderRadius.circular(14),
       ),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(record.monthYear, style: const TextStyle(fontSize: 16, color: Colors.white)),
+              Text(record.monthYear, style: theme.textTheme.titleMedium),
               Row(
                 children: [
-                  const Icon(Icons.currency_rupee, size: 20, color: Colors.green),
-                  Text(record.amount, style: const TextStyle(fontSize: 16, color: Colors.green)),
+                  Icon(Icons.currency_rupee,
+                      size: 20, color: Colors.green.shade400),
+                  Text(record.amount,
+                      style: theme.textTheme.titleMedium
+                          ?.copyWith(color: Colors.green.shade400)),
                 ],
               )
             ],
           ),
+          const SizedBox(height: 4),
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(record.paidOn, style: const TextStyle(fontSize: 14, color: Colors.grey)),
-              const Text("View Details", style: TextStyle(fontSize: 14, color: Colors.lightBlue)),
+              Text(record.paidOn,
+                  style: theme.textTheme.bodySmall
+                      ?.copyWith(color: theme.hintColor)),
+              Text("View Details",
+                  style: theme.textTheme.bodySmall
+                      ?.copyWith(color: theme.colorScheme.secondary)),
             ],
           ),
         ],
@@ -245,19 +305,27 @@ class _AccountDetailsPageState extends State<AccountDetailsPage> {
     );
   }
 }
+
+// --- REUSABLE WIDGETS ---
+
 class SectionCard extends StatelessWidget {
   final String title;
   final IconData icon;
   final List<Widget> children;
 
-  const SectionCard({super.key, required this.title, required this.icon, required this.children});
+  const SectionCard(
+      {super.key,
+      required this.title,
+      required this.icon,
+      required this.children});
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: const Color(0xFF1B263B),
+        color: theme.colorScheme.surface, // Use theme color
         borderRadius: BorderRadius.circular(14),
       ),
       child: Column(
@@ -265,12 +333,14 @@ class SectionCard extends StatelessWidget {
         children: [
           Row(
             children: [
-              Icon(icon, color: Colors.blueAccent),
-              const SizedBox(width: 8),
-              Text(title, style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
+              Icon(icon, color: theme.colorScheme.secondary),
+              const SizedBox(width: 10),
+              Text(title,
+                  style: theme.textTheme.titleLarge
+                      ?.copyWith(fontWeight: FontWeight.bold)),
             ],
           ),
-          const SizedBox(height: 20),
+          const SizedBox(height: 16),
           ...children,
         ],
       ),
@@ -283,7 +353,6 @@ class CustomTextField extends StatelessWidget {
   final TextEditingController controller;
   final bool editable;
   final IconData? icon;
-  final bool isPassword;
 
   const CustomTextField({
     super.key,
@@ -291,35 +360,40 @@ class CustomTextField extends StatelessWidget {
     required this.controller,
     this.editable = true,
     this.icon,
-    this.isPassword = false,
   });
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(label, style: const TextStyle(color: Colors.white54, fontSize: 13)),
-        const SizedBox(height: 6),
-        Container(
-          decoration: BoxDecoration(
-            color: editable ? const Color(0xFF0D1B2A) : Colors.white10,
-            borderRadius: BorderRadius.circular(10),
-          ),
-          child: TextField(
+    final theme = Theme.of(context);
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12.0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(label,
+              style: theme.textTheme.labelMedium
+                  ?.copyWith(color: theme.hintColor)),
+          const SizedBox(height: 6),
+          TextFormField(
             enabled: editable,
             controller: controller,
-            obscureText: isPassword,
-            style: const TextStyle(color: Colors.white),
+            style: theme.textTheme.bodyLarge,
             decoration: InputDecoration(
-              border: InputBorder.none,
-              prefixIcon: icon != null ? Icon(icon, color: Colors.white54) : null,
-              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+              filled: true,
+              fillColor: editable
+                  ? theme.scaffoldBackgroundColor
+                  : theme.colorScheme.surface.withAlpha(100),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(10),
+                borderSide: BorderSide.none,
+              ),
+              prefixIcon: icon != null ? Icon(icon, color: theme.hintColor) : null,
+              contentPadding:
+                  const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
             ),
           ),
-        ),
-        const SizedBox(height: 12),
-      ],
+        ],
+      ),
     );
   }
 }

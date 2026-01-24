@@ -91,21 +91,41 @@ class ViewAttendancePageState extends State<ViewAttendancePage> {
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
-          : SingleChildScrollView(
+          : Padding(
               padding: const EdgeInsets.fromLTRB(16, 16, 16, 50),
               child: Column(
                 children: [
                   if (_studentDetails != null)
                     StudentInfoCard(details: _studentDetails!),
                   const SizedBox(height: 16),
-                  ListView.separated(
-                    shrinkWrap: true,
-                    physics: const NeverScrollableScrollPhysics(),
-                    itemCount: _attendanceRecords.length,
-                    separatorBuilder: (context, index) => const SizedBox(height: 10),
-                    itemBuilder: (context, index) {
-                      return AttendanceRecordCard(record: _attendanceRecords[index]);
-                    },
+                  Expanded(
+                    child: LayoutBuilder(builder: (context, constraints) {
+                      if (constraints.maxWidth > 600) {
+                        return GridView.builder(
+                          itemCount: _attendanceRecords.length,
+                          gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
+                            maxCrossAxisExtent: 400,
+                            mainAxisSpacing: 10,
+                            crossAxisSpacing: 10,
+                            childAspectRatio: 3,
+                          ),
+                          itemBuilder: (context, index) {
+                            return AttendanceRecordCard(
+                                record: _attendanceRecords[index]);
+                          },
+                        );
+                      } else {
+                        return ListView.separated(
+                          itemCount: _attendanceRecords.length,
+                          separatorBuilder: (context, index) =>
+                              const SizedBox(height: 10),
+                          itemBuilder: (context, index) {
+                            return AttendanceRecordCard(
+                                record: _attendanceRecords[index]);
+                          },
+                        );
+                      }
+                    }),
                   ),
                 ],
               ),
@@ -135,12 +155,19 @@ class StudentInfoCard extends StatelessWidget {
         children: [
           Text(
             details.name,
-            style: theme.textTheme.headlineSmall,
+            style: theme.textTheme.headlineSmall?.copyWith(
+              color: theme.colorScheme.onSurface,
+              fontWeight: FontWeight.bold,
+            ),
           ),
           const SizedBox(height: 5),
-          Text("Roll No : ${details.rollNo}", style: theme.textTheme.bodyMedium),
+          Text("Roll No : ${details.rollNo}",
+              style: theme.textTheme.bodyLarge
+                  ?.copyWith(color: theme.colorScheme.onSurface.withAlpha(35))),
           const SizedBox(height: 5),
-          Text("Class : ${details.className}", style: theme.textTheme.bodyMedium),
+          Text("Class : ${details.className}",
+              style: theme.textTheme.bodyLarge
+                  ?.copyWith(color: theme.colorScheme.onSurface.withAlpha(35))),
         ],
       ),
     );
@@ -155,32 +182,92 @@ class AttendanceRecordCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final double percentage = record.totalClasses > 0
+        ? record.attendedClasses / record.totalClasses
+        : 0.0;
+    final Color progressColor;
+    if (percentage >= 0.8) {
+      progressColor = Colors.green.shade400;
+    } else if (percentage >= 0.5) {
+      progressColor = Colors.orange.shade400;
+    } else {
+      progressColor = Colors.red.shade400;
+    }
+
     return Container(
-      width: double.infinity,
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: theme.colorScheme.surface,
         borderRadius: BorderRadius.circular(10),
       ),
       child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           Expanded(
+            flex: 3,
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 Text(
-                  "${record.date},",
-                  style: theme.textTheme.bodyLarge,
+                  record.date,
+                  style: theme.textTheme.titleMedium
+                      ?.copyWith(fontWeight: FontWeight.bold),
                 ),
-                Text(record.day, style: theme.textTheme.bodyLarge),
+                const SizedBox(height: 4),
+                Text(record.day,
+                    style: theme.textTheme.bodyMedium
+                        ?.copyWith(color: theme.hintColor)),
               ],
             ),
           ),
-          Column(
-            children: [
-              Text("Attended: ${record.attendedClasses}/${record.totalClasses}", style: theme.textTheme.bodyLarge),
-              Text("Total Classes", style: theme.textTheme.bodyMedium),
-            ],
+          Expanded(
+            flex: 2,
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                SizedBox(
+                  height: 50,
+                  width: 50,
+                  child: Stack(
+                    fit: StackFit.expand,
+                    children: [
+                      CircularProgressIndicator(
+                        value: percentage,
+                        strokeWidth: 5,
+                        backgroundColor: progressColor.withAlpha(35),
+                        valueColor:
+                            AlwaysStoppedAnimation<Color>(progressColor),
+                      ),
+                      Center(
+                        child: Text(
+                          "${(percentage * 100).toStringAsFixed(0)}%",
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      )
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 16),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    Text(
+                      "${record.attendedClasses}/${record.totalClasses}",
+                      style: theme.textTheme.titleMedium
+                          ?.copyWith(fontWeight: FontWeight.bold),
+                    ),
+                    Text(
+                      "Classes",
+                      style: theme.textTheme.bodySmall
+                          ?.copyWith(color: theme.hintColor),
+                    ),
+                  ],
+                )
+              ],
+            ),
           ),
         ],
       ),

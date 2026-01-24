@@ -8,19 +8,15 @@ class CreateNewSectionPage extends StatefulWidget {
 }
 
 class _CreateNewSectionPageState extends State<CreateNewSectionPage> {
+  final _formKey = GlobalKey<FormState>(); // Add a form key for validation
   final _sectionNameController = TextEditingController();
   final _mentorController = TextEditingController();
   final _limitController = TextEditingController();
   bool _isLoading = false;
 
   Future<void> _createSection() async {
-    // Basic validation
-    if (_sectionNameController.text.isEmpty ||
-        _mentorController.text.isEmpty ||
-        _limitController.text.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please fill all required fields.')),
-      );
+    // Validate the form before proceeding
+    if (!_formKey.currentState!.validate()) {
       return;
     }
 
@@ -59,7 +55,6 @@ class _CreateNewSectionPageState extends State<CreateNewSectionPage> {
     super.dispose();
   }
 
-
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -69,112 +64,137 @@ class _CreateNewSectionPageState extends State<CreateNewSectionPage> {
         title: const Text("Create New Section"),
         centerTitle: true,
       ),
-      body: Padding(
+      body: SingleChildScrollView(
         padding: const EdgeInsets.fromLTRB(16, 16, 16, 50),
-        child: SingleChildScrollView(
-          child: Column(
-            children: [
-              Container(
+        child: Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 500), // Limits width on large screens
+            child: Form(
+              key: _formKey,
+              child: Container(
                 decoration: BoxDecoration(
                   borderRadius: BorderRadius.circular(10),
                   color: theme.primaryColor,
                 ),
-                child: Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text("Section Name"),
-                      const SizedBox(
-                        height: 8,
-                      ),
-                      TextField(
-                        controller: _sectionNameController,
-                        decoration: InputDecoration(
-                          hintText: "e.g., Section A",
-                          hintStyle: TextStyle(color: Colors.grey.shade700),
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(
-                        height: 16,
-                      ),
-                      const Text("Mentor Teacher"),
-                      const SizedBox(
-                        height: 8,
-                      ),
-                      TextField(
-                        controller: _mentorController,
-                        decoration: InputDecoration(
-                          hintText: "e.g., Mrs. Anjali Sharma",
-                          hintStyle: TextStyle(color: Colors.grey.shade700),
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(
-                        height: 16,
-                      ),
-                      const Text("Class Limit"),
-                      const SizedBox(
-                        height: 8,
-                      ),
-                      TextField(
-                        controller: _limitController,
-                        keyboardType: TextInputType.number,
-                        decoration: InputDecoration(
-                          hintText: "e.g., 40",
-                          hintStyle: TextStyle(color: Colors.grey.shade700),
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(
-                        height: 16,
-                      ),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          SizedBox(
-                            width: 150,
-                            height: 50,
-                            child: ElevatedButton(
-                              onPressed: _isLoading ? null : _createSection,
-                              style: ElevatedButton.styleFrom(
-                                  backgroundColor: Colors.blue),
-                              child: _isLoading
-                                  ? const CircularProgressIndicator(
-                                valueColor: AlwaysStoppedAnimation<Color>(
-                                    Colors.white))
-                                  : Flexible(
-                                    child: Text("Create Section",
-                                    style: TextStyle(
-                                        color: theme.colorScheme.onPrimary,
-                                        fontSize: 16)),
-                                  ),
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _buildTextField(
+                      theme: theme,
+                      controller: _sectionNameController,
+                      label: "Section Name",
+                      hint: "e.g., Section A",
+                      validator: (value) =>
+                          value!.isEmpty ? 'Please enter a section name' : null,
+                    ),
+                    const SizedBox(height: 16),
+                    _buildTextField(
+                      theme: theme,
+                      controller: _mentorController,
+                      label: "Mentor Teacher",
+                      hint: "e.g., Mrs. Anjali Sharma",
+                      validator: (value) =>
+                          value!.isEmpty ? 'Please assign a mentor' : null,
+                    ),
+                    const SizedBox(height: 16),
+                    _buildTextField(
+                      theme: theme,
+                      controller: _limitController,
+                      label: "Class Limit",
+                      hint: "e.g., 40",
+                      keyboardType: TextInputType.number,
+                      validator: (value) =>
+                          value!.isEmpty ? 'Please set a class limit' : null,
+                    ),
+                    const SizedBox(height: 24),
+                    // Responsive button row
+                    Row(
+                      children: [
+                        Expanded(
+                          child: OutlinedButton(
+                            onPressed: () => Navigator.pop(context),
+                            style: OutlinedButton.styleFrom(
+                              padding: const EdgeInsets.symmetric(vertical: 16),
+                              foregroundColor: theme.colorScheme.onPrimary,
+                              side: BorderSide(color: theme.dividerColor),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
                             ),
+                            child: const Text("Cancel"),
                           ),
-                          SizedBox(
-                            width: 150,
-                            height: 50,
-                            child: ElevatedButton(onPressed: (){
-                              Navigator.pop(context);
-                            }, child: Text("Cancel",style: TextStyle(color: theme.colorScheme.onPrimary,fontSize: 16))),
+                        ),
+                        const SizedBox(width: 16),
+                        Expanded(
+                          child: ElevatedButton(
+                            onPressed: _isLoading ? null : _createSection,
+                            style: ElevatedButton.styleFrom(
+                              padding: const EdgeInsets.symmetric(vertical: 16),
+                              backgroundColor: theme.colorScheme.primaryContainer,
+                              foregroundColor: theme.colorScheme.onPrimaryContainer,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                            ),
+                            child: _isLoading
+                                ? const SizedBox(
+                                    height: 24,
+                                    width: 24,
+                                    child: CircularProgressIndicator(strokeWidth: 3),
+                                  )
+                                : const Text("Create Section"),
                           ),
-                        ],
-                      ),
-                    ],
-                  ),
+                        ),
+                      ],
+                    ),
+                  ],
                 ),
               ),
-            ],
+            ),
           ),
         ),
       ),
+    );
+  }
+
+  Widget _buildTextField({
+    required ThemeData theme,
+    required TextEditingController controller,
+    required String label,
+    required String hint,
+    TextInputType? keyboardType,
+    String? Function(String?)? validator,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(label, style: theme.textTheme.titleMedium?.copyWith(color: theme.colorScheme.onPrimary)),
+        const SizedBox(height: 8),
+        TextFormField(
+          controller: controller,
+          keyboardType: keyboardType,
+          decoration: InputDecoration(
+            hintText: hint,
+            hintStyle: TextStyle(color: theme.hintColor),
+            filled: true,
+            fillColor: theme.scaffoldBackgroundColor,
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(10),
+              borderSide: BorderSide.none,
+            ),
+            errorBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(10),
+              borderSide: BorderSide(color: theme.colorScheme.error, width: 1),
+            ),
+            focusedErrorBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(10),
+              borderSide: BorderSide(color: theme.colorScheme.error, width: 2),
+            ),
+          ),
+          validator: validator,
+        ),
+      ],
     );
   }
 }

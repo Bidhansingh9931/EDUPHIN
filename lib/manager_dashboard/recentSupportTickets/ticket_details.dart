@@ -35,7 +35,8 @@ class TicketDetails {
 
   factory TicketDetails.fromJson(Map<String, dynamic> json) {
     var messagesList = json['messages'] as List;
-    List<ChatMessage> messages = messagesList.map((i) => ChatMessage.fromJson(i as Map<String, dynamic>)).toList();
+    List<ChatMessage> messages =
+        messagesList.map((i) => ChatMessage.fromJson(i as Map<String, dynamic>)).toList();
 
     return TicketDetails(
       name: json['name'] as String,
@@ -51,9 +52,7 @@ class TicketDetails {
 // --- MAIN WIDGET ---
 
 class TicketDetailsPage extends StatefulWidget {
-  // TODO: In a real app, you would pass the ticket ID to this page
-  // final String ticketId;
-  const TicketDetailsPage({super.key /*, required this.ticketId */});
+  const TicketDetailsPage({super.key});
 
   @override
   State<StatefulWidget> createState() => _TicketDetailsPageState();
@@ -73,12 +72,9 @@ class _TicketDetailsPageState extends State<TicketDetailsPage> {
     _fetchTicketDetails();
   }
 
-  // TODO: Replace this with your actual API call using widget.ticketId
   Future<void> _fetchTicketDetails() async {
-    // Simulate network delay
     await Future.delayed(const Duration(seconds: 1));
 
-    // Dummy data for demonstration
     final dummyData = {
       "name": "Ananya Sharma",
       "category": "IT Support",
@@ -87,7 +83,10 @@ class _TicketDetailsPageState extends State<TicketDetailsPage> {
       "status": "In Progress",
       "messages": [
         {"text": "Hello, I'm having trouble with the Wi-Fi in the library.", "isUser": true},
-        {"text": "Hi Ananya, we are looking into the issue. Can you provide more details?", "isUser": false},
+        {
+          "text": "Hi Ananya, we are looking into the issue. Can you provide more details?",
+          "isUser": false
+        },
       ]
     };
 
@@ -139,27 +138,22 @@ class _TicketDetailsPageState extends State<TicketDetailsPage> {
 
   String _getBotReply(String message) {
     message = message.toLowerCase();
-    if (message.contains("hello")) {
+    if (message.contains("hello") || message.contains("hi")) {
       return "Hi! How can I help you?";
     } else if (message.contains("flutter")) {
       return "Flutter is awesome for app development!";
     } else if (message.contains("bye")) {
       return "Goodbye! Have a great day 😊";
-    } else if (message.contains("hi")) {
-      return "Hi! How May I Help You?";
     } else if (message.contains("how are you")) {
       return "I'm fine, thank you!";
-    } else if (message.contains("what can you do")) {
-      return "I can help you 😊";
-    } else if (message.contains("how can you help me")) {
+    } else if (message.contains("what can you do") ||
+        message.contains("how can you help me")) {
       return "I can help you by answering questions and providing support.";
-    }else if (message.contains("thank you")) {
+    } else if (message.contains("thank you")) {
       return "I am here to help. If you have any more questions, feel free to ask!";
-    }
-    else if (message.contains("your name")) {
+    } else if (message.contains("your name")) {
       return "I am a chatBot created by Bidhan Kumar Singh";
-    }
-    else {
+    } else {
       return "Sorry, I didn't understand that.";
     }
   }
@@ -176,28 +170,39 @@ class _TicketDetailsPageState extends State<TicketDetailsPage> {
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
           : _ticketDetails == null
-          ? const Center(child: Text("Failed to load ticket details."))
-          : Column(
-        children: [
-          Expanded(
-            child: SingleChildScrollView(
-              controller: _scrollController,
-              padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
-              child: CustomTicketDetailsBox(
-                ticket: _ticketDetails!,
-                messages: _sessionMessages, // Pass the live session messages
-              ),
-            ),
-          ),
-          _buildInputArea(theme),
-        ],
-      ),
+              ? const Center(child: Text("Failed to load ticket details."))
+              : Column(
+                  children: [
+                    Expanded(
+                      child: ListView.builder(
+                        controller: _scrollController,
+                        padding: const EdgeInsets.fromLTRB(16, 16, 16, 50),
+                        itemCount: _sessionMessages.length + 1, // +1 for the header card
+                        itemBuilder: (context, index) {
+                          if (index == 0) {
+                            // The first item is the details box
+                            return Padding(
+                              padding: const EdgeInsets.only(bottom: 16.0),
+                              child: CustomTicketDetailsBox(
+                                ticket: _ticketDetails!,
+                              ),
+                            );
+                          }
+                          // Subsequent items are chat messages
+                          final message = _sessionMessages[index - 1];
+                          return ChatBubble(message: message);
+                        },
+                      ),
+                    ),
+                    _buildInputArea(theme),
+                  ],
+                ),
     );
   }
 
   Widget _buildInputArea(ThemeData theme) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      padding: const EdgeInsets.all(8).copyWith(bottom: MediaQuery.of(context).padding.bottom + 8),
       decoration: BoxDecoration(
         color: theme.cardColor,
         boxShadow: [
@@ -205,31 +210,33 @@ class _TicketDetailsPageState extends State<TicketDetailsPage> {
             color: Colors.black.withAlpha(35),
             spreadRadius: 1,
             blurRadius: 5,
-            offset: const Offset(0, -3),
+            offset: const Offset(0, -2),
           ),
         ],
       ),
-      child: Padding(
-        padding: const EdgeInsets.only(bottom: 50),
-        child: Row(
-          children: [
-            Expanded(
-              child: TextField(
-                controller: _controller,
-                decoration: InputDecoration(
-                  hintText: "Ask something...",
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+      child: Row(
+        children: [
+          Expanded(
+            child: TextField(
+              controller: _controller,
+              decoration: InputDecoration(
+                hintText: "Ask something...",
+                filled: true,
+                fillColor: theme.scaffoldBackgroundColor,
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(24),
+                  borderSide: BorderSide.none,
                 ),
+                contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
               ),
             ),
-            const SizedBox(width: 8),
-            IconButton(
-              icon: const Icon(Icons.send, color: Colors.blue),
-              onPressed: _sendMessage,
-            )
-          ],
-        ),
+          ),
+          const SizedBox(width: 8),
+          IconButton(
+            icon: Icon(Icons.send, color: theme.colorScheme.primary),
+            onPressed: _sendMessage,
+          )
+        ],
       ),
     );
   }
@@ -239,53 +246,42 @@ class _TicketDetailsPageState extends State<TicketDetailsPage> {
 
 class CustomTicketDetailsBox extends StatelessWidget {
   final TicketDetails ticket;
-  final List<ChatMessage> messages;
 
   const CustomTicketDetailsBox({
     super.key,
     required this.ticket,
-    required this.messages,
   });
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final isHigh = ticket.priority == "High";
-
     return Container(
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(10),
+        borderRadius: BorderRadius.circular(12),
         color: theme.primaryColor,
       ),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                _buildDetailColumn(theme, "Name", ticket.name),
-                _buildDetailColumn(theme, "Category", ticket.category),
-              ],
-            ),
-            const SizedBox(height: 16),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                _buildDetailColumn(theme, "Ticket ID", ticket.ticketId),
-                _buildPriorityStatus(theme, ticket.priority, isHigh),
-              ],
-            ),
-            const SizedBox(height: 5),
-            _buildDetailColumn(theme, "Status", ticket.status, valueColor: Colors.blue),
-            const SizedBox(height: 8),
-            Divider(color: theme.colorScheme.onPrimary.withAlpha(180), thickness: 1),
-            const SizedBox(height: 8),
-            ChatMessagesList(messages: messages),
-          ],
-        ),
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Using a Wrap widget for responsive details
+          Wrap(
+            spacing: 16.0, // Horizontal space between items
+            runSpacing: 16.0, // Vertical space between lines
+            children: [
+              _buildDetailColumn(theme, "Name", ticket.name),
+              _buildDetailColumn(theme, "Category", ticket.category),
+              _buildDetailColumn(theme, "Ticket ID", ticket.ticketId),
+              _buildDetailColumn(theme, "Status", ticket.status, valueColor: theme.colorScheme.secondary),
+              _buildPriorityStatus(theme, ticket.priority, ticket.priority == "High"),
+            ],
+          ),
+          const Divider(height: 32, thickness: 1),
+          Text(
+            "Conversation",
+            style: theme.textTheme.titleMedium?.copyWith(color: theme.colorScheme.onPrimary),
+          ),
+        ],
       ),
     );
   }
@@ -293,73 +289,75 @@ class CustomTicketDetailsBox extends StatelessWidget {
   Widget _buildDetailColumn(ThemeData theme, String title, String value, {Color? valueColor}) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
       children: [
-        Text(title, style: TextStyle(color: theme.colorScheme.onPrimary.withAlpha(150), fontSize: 14)),
-        Text(value, style: TextStyle(color: valueColor ?? theme.colorScheme.onPrimary, fontSize: 14)),
+        Text(title, style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onPrimary.withAlpha(150))),
+        const SizedBox(height: 2),
+        Text(
+          value,
+          style: theme.textTheme.bodyLarge?.copyWith(
+              color: valueColor ?? theme.colorScheme.onPrimary,
+              fontWeight: FontWeight.w500),
+        ),
       ],
     );
   }
 
   Widget _buildPriorityStatus(ThemeData theme, String priority, bool isHigh) {
+    final priorityColor = isHigh ? theme.colorScheme.error : theme.colorScheme.secondary;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
       children: [
-        Text("Priority", style: TextStyle(color: theme.colorScheme.onPrimary.withAlpha(150), fontSize: 14)),
+        Text("Priority",
+            style: theme.textTheme.bodySmall
+                ?.copyWith(color: theme.colorScheme.onPrimary.withAlpha(150))),
+        const SizedBox(height: 2),
         Container(
-            decoration: BoxDecoration(
-              color: isHigh ? Colors.red.withAlpha(100) : Colors.blue.withAlpha(25),
-              borderRadius: BorderRadius.circular(10),
-            ),
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-              child: Text(
-                priority,
-                style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
-              ),
-            )),
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+          decoration: BoxDecoration(
+            color: priorityColor.withAlpha(35),
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Text(
+            priority,
+            style: theme.textTheme.labelMedium?.copyWith(color: priorityColor, fontWeight: FontWeight.bold),
+          ),
+        ),
       ],
     );
   }
 }
 
-class ChatMessagesList extends StatelessWidget {
-  final List<ChatMessage> messages;
+// New, reusable widget for displaying chat messages
+class ChatBubble extends StatelessWidget {
+  final ChatMessage message;
 
-  const ChatMessagesList({super.key, required this.messages});
+  const ChatBubble({super.key, required this.message});
 
   @override
   Widget build(BuildContext context) {
-    if (messages.isEmpty) {
-      return const Center(
-        child: Padding(
-          padding: EdgeInsets.symmetric(vertical: 24.0),
-          child: Text("No messages yet. Start a conversation!", style: TextStyle(color: Colors.white70)),
+    final theme = Theme.of(context);
+    final isUser = message.isUser;
+    return Align(
+      alignment: isUser ? Alignment.centerRight : Alignment.centerLeft,
+      child: Container(
+        padding: const EdgeInsets.all(12),
+        margin: const EdgeInsets.symmetric(vertical: 5),
+        decoration: BoxDecoration(
+          // Using theme colors for a consistent look
+          color: isUser ? theme.colorScheme.primary : theme.colorScheme.surface,
+          borderRadius: BorderRadius.circular(12),
         ),
-      );
-    }
-    return ListView.builder(
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      itemCount: messages.length,
-      itemBuilder: (context, index) {
-        final message = messages[index];
-        final isUser = message.isUser;
-        return Align(
-          alignment: isUser ? Alignment.centerRight : Alignment.centerLeft,
-          child: Container(
-            padding: const EdgeInsets.all(12),
-            margin: const EdgeInsets.symmetric(vertical: 5),
-            decoration: BoxDecoration(
-              color: isUser ? Colors.blue : Colors.grey.shade300,
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Text(
-              message.text,
-              style: TextStyle(color: isUser ? Colors.white : Colors.black),
-            ),
+        child: Text(
+          message.text,
+          style: theme.textTheme.bodyLarge?.copyWith(
+            color: isUser
+                ? theme.colorScheme.onPrimary
+                : theme.colorScheme.onSurface,
           ),
-        );
-      },
+        ),
+      ),
     );
   }
 }

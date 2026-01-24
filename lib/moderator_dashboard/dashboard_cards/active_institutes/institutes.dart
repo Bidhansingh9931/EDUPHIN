@@ -1,8 +1,42 @@
+import 'dart:async';
 import 'package:eduphin/moderator_dashboard/dashboard_cards/active_institutes/add_institute.dart';
 import 'package:eduphin/moderator_dashboard/dashboard_cards/active_institutes/view_institute_page.dart';
 import 'package:flutter/material.dart';
 
 import 'manage/manage_institute.dart';
+
+// 1. Data Provider to fetch institute data
+class InstituteProvider {
+  // In the future, you will replace this with your actual API call
+  Future<List<Institute>> fetchInstitutes() async {
+    // Simulate a network delay to mimic an API call
+    await Future.delayed(const Duration(seconds: 2));
+
+    // This is where you would fetch your data from an API.
+    return [
+      Institute(
+          name: "Global Tech Academy",
+          code: "GTA2024",
+          chairman: "Dr. Evelyn Reed",
+          address: "123 Tech Park, Silicon Valley, CA 94043, USA",
+          email: "contact@gta.edu",
+          phone: "+1(555)123-4567",
+          website: "www.globaltechacademy.edu",
+          affiliation: "International Board of Education (IBE)",
+          pan: "PUWPS1245"),
+      Institute(
+          name: "St. Xavier's High School",
+          code: "SXHS01",
+          chairman: "Mr. John Doe",
+          address: "456 Edu Street, New Delhi, India",
+          email: "contact@sxhs.edu.in",
+          phone: "+91 11 2345 6789",
+          website: "www.sxhs.edu.in",
+          affiliation: "CBSE",
+          pan: "ABCDE1234F"),
+    ];
+  }
+}
 
 class InstitutesPage extends StatefulWidget {
   const InstitutesPage({super.key});
@@ -12,37 +46,39 @@ class InstitutesPage extends StatefulWidget {
 }
 
 class _InstitutesPageState extends State<InstitutesPage> {
-  final List<Institute> _allInstitutes = [
-    Institute(
-        name: "Global Tech Academy",
-        code: "GTA2024",
-        chairman: "Dr. Evelyn Reed",
-        address: "123 Tech Park, Silicon Valley, CA 94043, USA",
-        email: "contact@gta.edu",
-        phone: "+1(555)123-4567",
-        website: "www.globaltechacademy.edu",
-        affiliation: "International Board of Education (IBE)",
-        pan: "PUWPS1245"),
-    Institute(
-        name: "St. Xavier's High School",
-        code: "SXHS01",
-        chairman: "Mr. John Doe",
-        address: "456 Edu Street, New Delhi, India",
-        email: "contact@sxhs.edu.in",
-        phone: "+91 11 2345 6789",
-        website: "www.sxhs.edu.in",
-        affiliation: "CBSE",
-        pan: "ABCDE1234F"),
-    // Add more institutes with complete data here
-  ];
-  final _searchController = TextEditingController();
+  final InstituteProvider _provider = InstituteProvider();
+  List<Institute> _allInstitutes = [];
   List<Institute> _filteredInstitutes = [];
+  final _searchController = TextEditingController();
+  bool _isLoading = true;
 
   @override
   void initState() {
     super.initState();
-    _filteredInstitutes = _allInstitutes;
+    _fetchData();
     _searchController.addListener(_filterInstitutes);
+  }
+
+  Future<void> _fetchData() async {
+    try {
+      final data = await _provider.fetchInstitutes();
+      if (mounted) {
+        setState(() {
+          _allInstitutes = data;
+          _filteredInstitutes = data;
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to load institutes: \$e')),
+        );
+      }
+    }
   }
 
   @override
@@ -73,21 +109,28 @@ class _InstitutesPageState extends State<InstitutesPage> {
     if (newInstitute != null && newInstitute is Institute && mounted) {
       setState(() {
         _allInstitutes.add(newInstitute);
-        _filterInstitutes(); // Refresh the filtered list
+        _filterInstitutes();
       });
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    final screenWidth = MediaQuery.of(context).size.width;
+
+    double responsiveFontSize(double baseSize) {
+      if (screenWidth > 1200) return baseSize * 1.2;
+      if (screenWidth > 600) return baseSize * 1.1;
+      return baseSize;
+    }
+
     return Scaffold(
       backgroundColor: const Color(0xFF0D1B2A),
       body: SafeArea(
         child: Column(
           children: [
-            // ---------- TOP BAR ----------
             Padding(
-              padding: const EdgeInsets.all(16),
+              padding: EdgeInsets.all(screenWidth * 0.04),
               child: Row(
                 children: [
                   GestureDetector(
@@ -95,26 +138,24 @@ class _InstitutesPageState extends State<InstitutesPage> {
                     child: const Icon(Icons.arrow_back, color: Colors.white),
                   ),
                   const SizedBox(width: 12),
-                  const Text(
+                  Text(
                     "Active Institutes",
                     style: TextStyle(
                       color: Colors.white,
-                      fontSize: 20,
+                      fontSize: responsiveFontSize(20),
                       fontWeight: FontWeight.bold,
                     ),
                   ),
                 ],
               ),
             ),
-
-            // ---------- SEARCH + ADD BUTTON ----------
             Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
+              padding: EdgeInsets.symmetric(horizontal: screenWidth * 0.04),
               child: Row(
                 children: [
-                  // SEARCH BAR
                   Expanded(
                     child: Container(
+                      height: 50,
                       padding: const EdgeInsets.symmetric(horizontal: 16),
                       decoration: BoxDecoration(
                         color: const Color(0xFF1B263B),
@@ -127,11 +168,15 @@ class _InstitutesPageState extends State<InstitutesPage> {
                           Expanded(
                             child: TextField(
                               controller: _searchController,
-                              style: const TextStyle(color: Colors.white),
-                              decoration: const InputDecoration(
+                              style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: responsiveFontSize(14)),
+                              decoration: InputDecoration(
                                 border: InputBorder.none,
                                 hintText: "Search by name or code...",
-                                hintStyle: TextStyle(color: Colors.white54),
+                                hintStyle: TextStyle(
+                                    color: Colors.white54,
+                                    fontSize: responsiveFontSize(14)),
                               ),
                             ),
                           ),
@@ -140,14 +185,14 @@ class _InstitutesPageState extends State<InstitutesPage> {
                     ),
                   ),
                   const SizedBox(width: 10),
-                  // ADD BUTTON
                   GestureDetector(
                     onTap: _navigateAndAdd,
                     child: Container(
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF1B263B),
-                        borderRadius: BorderRadius.circular(30),
+                      width: 50,
+                      height: 50,
+                      decoration: const BoxDecoration(
+                        color: Color(0xFF1B263B),
+                        shape: BoxShape.circle,
                       ),
                       child: const Icon(Icons.add, color: Colors.white),
                     ),
@@ -156,16 +201,53 @@ class _InstitutesPageState extends State<InstitutesPage> {
               ),
             ),
             const SizedBox(height: 15),
-
-            // ---------- INSTITUTE LIST ----------
             Expanded(
-              child: ListView.builder(
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                itemCount: _filteredInstitutes.length,
-                itemBuilder: (context, index) {
-                  return InstituteCard(_filteredInstitutes[index]);
-                },
-              ),
+              child: _isLoading
+                  ? const Center(child: CircularProgressIndicator())
+                  : _filteredInstitutes.isEmpty
+                      ? Center(
+                          child: Text(
+                          "No institutes found.",
+                          style: TextStyle(
+                              color: Colors.white54,
+                              fontSize: responsiveFontSize(14)),
+                        ))
+                      : LayoutBuilder(builder: (context, constraints) {
+                          if (constraints.maxWidth > 600) {
+                            int crossAxisCount = constraints.maxWidth > 1200
+                                ? 4
+                                : (constraints.maxWidth > 900 ? 3 : 2);
+                            return GridView.builder(
+                              padding: EdgeInsets.all(screenWidth * 0.04),
+                              itemCount: _filteredInstitutes.length,
+                              gridDelegate:
+                                  SliverGridDelegateWithFixedCrossAxisCount(
+                                crossAxisCount: crossAxisCount,
+                                crossAxisSpacing: 16,
+                                mainAxisSpacing: 16,
+                                childAspectRatio: 2.2,
+                              ),
+                              itemBuilder: (context, index) {
+                                return InstituteCard(
+                                  _filteredInstitutes[index],
+                                  isGridView: true,
+                                );
+                              },
+                            );
+                          } else {
+                            return ListView.builder(
+                              padding: EdgeInsets.symmetric(
+                                  horizontal: screenWidth * 0.04),
+                              itemCount: _filteredInstitutes.length,
+                              itemBuilder: (context, index) {
+                                return InstituteCard(
+                                  _filteredInstitutes[index],
+                                  isGridView: false,
+                                );
+                              },
+                            );
+                          }
+                        }),
             ),
           ],
         ),
@@ -174,9 +256,6 @@ class _InstitutesPageState extends State<InstitutesPage> {
   }
 }
 
-//
-// DATA MODEL
-//
 class Institute {
   final String name;
   final String code;
@@ -201,18 +280,23 @@ class Institute {
   });
 }
 
-//
-// CARD
-//
 class InstituteCard extends StatelessWidget {
   final Institute data;
+  final bool isGridView;
 
-  const InstituteCard(this.data, {super.key});
+  const InstituteCard(this.data, {super.key, this.isGridView = false});
 
   @override
   Widget build(BuildContext context) {
+    final screenWidth = MediaQuery.of(context).size.width;
+    double responsiveFontSize(double baseSize) {
+      if (screenWidth > 1200) return baseSize * 1.2;
+      if (screenWidth > 600) return baseSize * 1.1;
+      return baseSize;
+    }
+
     return Container(
-      margin: const EdgeInsets.symmetric(vertical: 10),
+      margin: isGridView ? EdgeInsets.zero : const EdgeInsets.only(bottom: 16),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: const Color(0xFF1B263B),
@@ -220,6 +304,8 @@ class InstituteCard extends StatelessWidget {
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisAlignment:
+            isGridView ? MainAxisAlignment.center : MainAxisAlignment.start,
         children: [
           Row(
             children: [
@@ -229,7 +315,8 @@ class InstituteCard extends StatelessWidget {
                   color: const Color(0xFF0E86D4),
                   borderRadius: BorderRadius.circular(12),
                 ),
-                child: const Icon(Icons.school, color: Colors.white, size: 26),
+                child: Icon(Icons.school,
+                    color: Colors.white, size: responsiveFontSize(26)),
               ),
               const SizedBox(width: 16),
               Expanded(
@@ -238,23 +325,26 @@ class InstituteCard extends StatelessWidget {
                   children: [
                     Text(
                       data.name,
-                      style: const TextStyle(
+                      style: TextStyle(
                         color: Colors.white,
-                        fontSize: 16,
+                        fontSize: responsiveFontSize(16),
                         fontWeight: FontWeight.bold,
                       ),
+                      overflow: TextOverflow.ellipsis,
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      "Code: ${data.code}",
-                      style: const TextStyle(color: Colors.white54, fontSize: 13),
+                      "Code: \${data.code}",
+                      style: TextStyle(
+                          color: Colors.white54,
+                          fontSize: responsiveFontSize(13)),
                     ),
                   ],
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 16),
+          SizedBox(height: isGridView ? 20 : 16),
           Row(
             children: [
               Expanded(
@@ -265,7 +355,8 @@ class InstituteCard extends StatelessWidget {
                     Navigator.push(
                         context,
                         MaterialPageRoute(
-                            builder: (_) => ViewInstitutePage(institute: data)));
+                            builder: (_) =>
+                                ViewInstitutePage(instituteId: data.code)));
                   },
                 ),
               ),
@@ -275,11 +366,8 @@ class InstituteCard extends StatelessWidget {
                   icon: Icons.settings_outlined,
                   label: "Manage",
                   onTap: () {
-                    Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                            builder: (_) =>
-                            ManageInstitute()));
+                    Navigator.push(context,
+                        MaterialPageRoute(builder: (_) => ManageInstitute()));
                   },
                 ),
               ),
@@ -291,9 +379,6 @@ class InstituteCard extends StatelessWidget {
   }
 }
 
-//
-// BUTTON WIDGET
-//
 class ActionButton extends StatelessWidget {
   final IconData icon;
   final String label;
@@ -308,6 +393,13 @@ class ActionButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final screenWidth = MediaQuery.of(context).size.width;
+    double responsiveFontSize(double baseSize) {
+      if (screenWidth > 1200) return baseSize * 1.2;
+      if (screenWidth > 600) return baseSize * 1.1;
+      return baseSize;
+    }
+
     return GestureDetector(
       onTap: onTap,
       child: Container(
@@ -319,9 +411,11 @@ class ActionButton extends StatelessWidget {
         child: Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(icon, color: Colors.white, size: 18),
+            Icon(icon, color: Colors.white, size: responsiveFontSize(18)),
             const SizedBox(width: 6),
-            Text(label, style: const TextStyle(color: Colors.white)),
+            Text(label,
+                style: TextStyle(
+                    color: Colors.white, fontSize: responsiveFontSize(14))),
           ],
         ),
       ),

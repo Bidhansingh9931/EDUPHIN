@@ -20,14 +20,21 @@ class MockClassApiService {
   Future<List<String>> fetchClassLevels() async {
     // Simulate fetching data for dropdowns from an API
     await Future.delayed(const Duration(milliseconds: 500));
-    return ['Primary', 'Secondary', 'Higher Secondary', 'Undergraduate', 'Postgraduate'];
+    return [
+      'Primary',
+      'Secondary',
+      'Higher Secondary',
+      'Undergraduate',
+      'Postgraduate'
+    ];
   }
 
   Future<bool> addClass(NewClass newClass) async {
     // Simulate sending data to an API
     await Future.delayed(const Duration(seconds: 1));
     debugPrint("Submitting to API:");
-    debugPrint('ClassName: ${newClass.className}, ClassCode: ${newClass.classCode}, Level: ${newClass.level}, Description: ${newClass.description}');
+    debugPrint(
+        'ClassName: ${newClass.className}, ClassCode: ${newClass.classCode}, Level: ${newClass.level}, Description: ${newClass.description}');
     // Simulate a successful API call
     return true;
   }
@@ -41,33 +48,6 @@ class AddNewClassPage extends StatefulWidget {
 }
 
 class _AddNewClassPageState extends State<AddNewClassPage> {
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return Scaffold(
-      backgroundColor: theme.scaffoldBackgroundColor,
-      appBar: AppBar(
-        title: const Text("Add New Class"),
-        centerTitle: true,
-      ),
-      body: const SingleChildScrollView(
-        child: Padding(
-          padding: EdgeInsets.all(8.0),
-          child: CustomAddClassBox(),
-        ),
-      ),
-    );
-  }
-}
-
-class CustomAddClassBox extends StatefulWidget {
-  const CustomAddClassBox({super.key});
-
-  @override
-  State<CustomAddClassBox> createState() => _CustomAddClassBoxState();
-}
-
-class _CustomAddClassBoxState extends State<CustomAddClassBox> {
   final _formKey = GlobalKey<FormState>();
   final _apiService = MockClassApiService();
   late Future<List<String>> _levelsFuture;
@@ -83,7 +63,8 @@ class _CustomAddClassBoxState extends State<CustomAddClassBox> {
   }
 
   Future<void> _submitForm() async {
-    if (_newClass.className.isEmpty || _newClass.classCode.isEmpty || _newClass.level == null) {
+    // Use form validation before submitting
+    if (!_formKey.currentState!.validate()) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Please fill all required fields.'),
@@ -99,11 +80,11 @@ class _CustomAddClassBoxState extends State<CustomAddClassBox> {
 
     final success = await _apiService.addClass(_newClass);
 
-    setState(() {
-      _isSubmitting = false;
-    });
-
     if (mounted) {
+      setState(() {
+        _isSubmitting = false;
+      });
+
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(success ? 'Class added successfully!' : 'Failed to add class.'),
@@ -119,7 +100,26 @@ class _CustomAddClassBoxState extends State<CustomAddClassBox> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    return FutureBuilder<List<String>>(
+    return Scaffold(
+      backgroundColor: theme.scaffoldBackgroundColor,
+      appBar: AppBar(
+        title: const Text("Add New Class"),
+        centerTitle: true,
+      ),
+      // Using a responsive FAB for actions
+      floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
+      floatingActionButton: FutureBuilder<List<String>>(
+        future: _levelsFuture,
+        builder: (context, snapshot) {
+          // Only show button if data has loaded to prevent premature submission
+          if (snapshot.hasData) {
+            return _buildActionButtons(theme);
+          } else {
+            return const SizedBox.shrink();
+          }
+        },
+      ),
+      body: FutureBuilder<List<String>>(
         future: _levelsFuture,
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
@@ -128,150 +128,193 @@ class _CustomAddClassBoxState extends State<CustomAddClassBox> {
             return Center(child: Text("Error loading data: ${snapshot.error}"));
           } else if (snapshot.hasData) {
             final levels = snapshot.data!;
-            _newClass.level ??= levels.isNotEmpty ? levels.first : null;
-
-            return Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(16.0),
-                decoration: BoxDecoration(
-                  color: theme.primaryColor,
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Form(
-                  key: _formKey,
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        "Class Name",
-                        style: TextStyle(fontSize: 16, color: theme.colorScheme.onPrimary),
-                      ),
-                      const SizedBox(height: 8),
-                      TextFormField(
-                        initialValue: _newClass.className,
-                        onChanged: (value) => _newClass.className = value,
-                        decoration: InputDecoration(
-                          hintText: "Enter Class Name",
-                          hintStyle: TextStyle(color: theme.hintColor),
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(10.0),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 16),
-                      Text(
-                        "Class Code",
-                        style: TextStyle(fontSize: 16, color: theme.colorScheme.onPrimary),
-                      ),
-                      const SizedBox(height: 8),
-                      TextFormField(
-                        initialValue: _newClass.classCode,
-                        onChanged: (value) => _newClass.classCode = value,
-                        decoration: InputDecoration(
-                          hintText: "Enter Class Code",
-                          hintStyle: TextStyle(color: theme.hintColor),
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(10.0),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 16),
-                      Text(
-                        "Description (Optional)",
-                        style: TextStyle(fontSize: 16, color: theme.colorScheme.onPrimary),
-                      ),
-                      const SizedBox(height: 8),
-                      TextFormField(
-                        initialValue: _newClass.description,
-                        onChanged: (value) => _newClass.description = value,
-                        maxLines: 5,
-                        decoration: InputDecoration(
-                          hintText: "Enter a brief description of the class...",
-                          hintStyle: TextStyle(color: theme.hintColor),
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(10.0),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 16),
-                      Text(
-                        "Level",
-                        style: TextStyle(fontSize: 16, color: theme.colorScheme.onPrimary),
-                      ),
-                      const SizedBox(height: 8),
-                      DropdownButtonFormField<String>(
-                        initialValue: _newClass.level,
-                        hint: Text("Select Level", style: TextStyle(color: theme.hintColor)),
-                        decoration: InputDecoration(
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(10.0),
-                          ),
-                        ),
-                        items: levels.map((String level) {
-                          return DropdownMenuItem<String>(
-                            value: level,
-                            child: Text(level),
-                          );
-                        }).toList(),
-                        onChanged: (newValue) {
-                          setState(() {
-                            _newClass.level = newValue;
-                          });
-                        },
-                      ),
-                      const SizedBox(height: 26),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          SizedBox(
-                            width: 150,
-                            height: 40,
-                            child: ElevatedButton(
-                                onPressed: () {
-                                  Navigator.of(context).pop();
-                                },
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: theme.colorScheme.onPrimary.withAlpha(25),
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(10.0),
-                                  ),
-                                ),
-                                child: Text(
-                                  "Cancel",
-                                  style: TextStyle(fontSize: 20, color: theme.colorScheme.onPrimary),
-                                )),
-                          ),
-                          const SizedBox(width: 16),
-                          ElevatedButton(
-                              onPressed: _isSubmitting ? null : _submitForm,
-                              style: ElevatedButton.styleFrom(
-                                  backgroundColor: theme.colorScheme.primary,
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(10.0),
-                                  )),
-                              child: _isSubmitting
-                                  ? const CircularProgressIndicator(valueColor: AlwaysStoppedAnimation(Colors.white))
-                                  : Row(
-                                      children: [
-                                        Icon(
-                                          Icons.add,
-                                          color: theme.colorScheme.onPrimary,
-                                        ),
-                                        const SizedBox(width: 10),
-                                        Text(
-                                          "Add Class",
-                                          style: TextStyle(fontSize: 20, color: theme.colorScheme.onPrimary),
-                                        ),
-                                      ],
-                                    )),
-                        ],
-                      )
-                    ],
-                  ),
-                ));
+            return _buildForm(theme, levels);
           } else {
             return const Center(child: Text('No levels data available'));
           }
-        });
+        },
+      ),
+    );
+  }
+
+  // Builds the main form content
+  Widget _buildForm(ThemeData theme, List<String> levels) {
+    return SingleChildScrollView(
+      // Added responsive padding, including 50 at the bottom
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 120),
+      child: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 600), // Limit width on large screens
+          child: Form(
+            key: _formKey,
+            child: Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(16.0),
+              decoration: BoxDecoration(
+                color: theme.primaryColor,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _buildTextField(
+                    theme: theme,
+                    label: "Class Name",
+                    hint: "Enter Class Name",
+                    onChanged: (value) => _newClass.className = value,
+                    validator: (value) =>
+                        value!.isEmpty ? 'Class name is required' : null,
+                  ),
+                  const SizedBox(height: 16),
+                  _buildTextField(
+                    theme: theme,
+                    label: "Class Code",
+                    hint: "Enter Class Code",
+                    onChanged: (value) => _newClass.classCode = value,
+                    validator: (value) =>
+                        value!.isEmpty ? 'Class code is required' : null,
+                  ),
+                  const SizedBox(height: 16),
+                  _buildTextField(
+                    theme: theme,
+                    label: "Description (Optional)",
+                    hint: "Enter a brief description of the class...",
+                    onChanged: (value) => _newClass.description = value,
+                    maxLines: 5,
+                  ),
+                  const SizedBox(height: 16),
+                  _buildDropdown(theme, levels),
+                  const SizedBox(height: 80), // Padding for the FAB
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  // Refactored TextField for reusability and consistency
+  Widget _buildTextField({
+    required ThemeData theme,
+    required String label,
+    required String hint,
+    required ValueChanged<String> onChanged,
+    String? Function(String?)? validator,
+    int maxLines = 1,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: theme.textTheme.titleMedium
+              ?.copyWith(color: theme.colorScheme.onPrimary),
+        ),
+        const SizedBox(height: 8),
+        TextFormField(
+          onChanged: onChanged,
+          maxLines: maxLines,
+          validator: validator,
+          decoration: InputDecoration(
+            hintText: hint,
+            hintStyle: TextStyle(color: theme.hintColor),
+            filled: true,
+            fillColor: theme.scaffoldBackgroundColor,
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(10.0),
+              borderSide: BorderSide.none,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  // Refactored Dropdown for reusability and consistency
+  Widget _buildDropdown(ThemeData theme, List<String> levels) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          "Level",
+          style: theme.textTheme.titleMedium
+              ?.copyWith(color: theme.colorScheme.onPrimary),
+        ),
+        const SizedBox(height: 8),
+        DropdownButtonFormField<String>(
+          initialValue: _newClass.level,
+          hint: Text("Select Level", style: TextStyle(color: theme.hintColor)),
+          decoration: InputDecoration(
+            filled: true,
+            fillColor: theme.scaffoldBackgroundColor,
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(10.0),
+              borderSide: BorderSide.none,
+            ),
+          ),
+          items: levels.map((String level) {
+            return DropdownMenuItem<String>(value: level, child: Text(level));
+          }).toList(),
+          onChanged: (newValue) {
+            setState(() {
+              _newClass.level = newValue;
+            });
+          },
+          validator: (value) => value == null ? 'Please select a level' : null,
+        ),
+      ],
+    );
+  }
+
+  // Responsive action buttons, now in the FAB
+  Widget _buildActionButtons(ThemeData theme) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16.0),
+      child: Row(
+        children: [
+          Expanded(
+            child: OutlinedButton(
+              onPressed: () {
+                Navigator.of(context).pop();
+              },
+              style: OutlinedButton.styleFrom(
+                padding: const EdgeInsets.symmetric(vertical: 16),
+                side: BorderSide(color: theme.dividerColor),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12.0),
+                ),
+              ),
+              child: Text("Cancel", style: theme.textTheme.labelLarge?.copyWith(color: theme.colorScheme.onSurface)),
+            ),
+          ),
+          const SizedBox(width: 16),
+          Expanded(
+            child: ElevatedButton.icon(
+              onPressed: _isSubmitting ? null : _submitForm,
+              style: ElevatedButton.styleFrom(
+                padding: const EdgeInsets.symmetric(vertical: 16),
+                backgroundColor: theme.colorScheme.primary,
+                foregroundColor: theme.colorScheme.onPrimary,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12.0),
+                ),
+              ),
+              icon: _isSubmitting ? Container() : const Icon(Icons.add),
+              label: _isSubmitting
+                  ? const SizedBox(
+                      height: 24,
+                      width: 24,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 3,
+                        valueColor: AlwaysStoppedAnimation(Colors.white),
+                      ),
+                    )
+                  : Text("Add Class", style: theme.textTheme.labelLarge?.copyWith(color: theme.colorScheme.onPrimary)),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }

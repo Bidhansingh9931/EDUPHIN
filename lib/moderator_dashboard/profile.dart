@@ -1,7 +1,9 @@
-import 'dart:async';
 
 import 'package:eduphin/login_logout/login.dart';
 import 'package:flutter/material.dart';
+
+import 'profile_model.dart';
+import 'profile_provider.dart';
 
 class ModeratorProfilePage extends StatefulWidget {
   const ModeratorProfilePage({super.key});
@@ -11,9 +13,9 @@ class ModeratorProfilePage extends StatefulWidget {
 }
 
 class _ModeratorProfilePageState extends State<ModeratorProfilePage> {
-  late Future<Map<String, dynamic>> _profileDataFuture;
+  final ProfileProvider _profileProvider = ProfileProvider();
+  late Future<ProfileData> _profileDataFuture;
 
-  // Text editing controllers for editable fields
   final _phoneController = TextEditingController();
   final _altPhoneController = TextEditingController();
   final _address1Controller = TextEditingController();
@@ -23,89 +25,94 @@ class _ModeratorProfilePageState extends State<ModeratorProfilePage> {
   final _newPasswordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
 
-  // State for dropdowns
   String? _genderValue;
   String? _marriageStatusValue;
+  bool _isLoading = false;
 
   @override
   void initState() {
     super.initState();
-    _profileDataFuture = _fetchProfileData();
+    _profileDataFuture = _profileProvider.fetchProfileData();
+    _profileDataFuture.then(_initializeControllers);
   }
 
-  Future<Map<String, dynamic>> _fetchProfileData() async {
-    // Simulate network delay
-    await Future.delayed(const Duration(seconds: 1));
-
-    // In a real app, this data would come from an API
-    final data = {
-      "name": "Priya S. Verma",
-      "role": "Moderator",
-      "email": "priya@example.com",
-      "avatar": "assets/images/girl_image.webp",
-      "gender": "Female",
-      "dob": "22-04-2004",
-      "phone": "9988776655",
-      "alt_phone": "8877665544",
-      "marriage_status": "Single",
-      "address1": "Flat 101, Amber Crest",
-      "city": "Jaipur",
-      "district": "Rajapark",
-      "pincode": "302004",
-      "bank_account": "111122223333",
-      "ifsc": "UN11100010",
-      "bank_name": "Unity Bank",
-      "employer_branch": "Unity Branch - Sector 2",
-      "zone": "Sector 2",
-      "emergency_contact_name": "Shaurya Verma",
-      "emergency_contact_number": "9090909090",
-      "user_name": "Priya Verma",
-      "position": "Assistant",
-      "employment_type": "Full-time",
-      "joining_date": "20 Jan 2023",
-      "experience": "1.5 years",
-      "status": "Active",
-    };
-
-    // Initialize controllers and state variables with fetched data
-    _phoneController.text = data['phone']!;
-    _altPhoneController.text = data['alt_phone']!;
-    _address1Controller.text = data['address1']!;
-    _cityController.text = data['city']!;
-    _districtController.text = data['district']!;
-    _pincodeController.text = data['pincode']!;
-    _genderValue = data['gender'];
-    _marriageStatusValue = data['marriage_status'];
-
-    return data;
+  void _initializeControllers(ProfileData data) {
+    _phoneController.text = data.phone;
+    _altPhoneController.text = data.altPhone;
+    _address1Controller.text = data.address1;
+    _cityController.text = data.city;
+    _districtController.text = data.district;
+    _pincodeController.text = data.pincode;
+    setState(() {
+      _genderValue = data.gender;
+      _marriageStatusValue = data.marriageStatus;
+    });
   }
 
-  void _saveChanges() {
-    // In a real app, you would send the updated data to an API
-    final updatedData = {
-      "phone": _phoneController.text,
-      "alt_phone": _altPhoneController.text,
-      "gender": _genderValue,
-      "marriage_status": _marriageStatusValue,
-      "address1": _address1Controller.text,
-      "city": _cityController.text,
-      "district": _districtController.text,
-      "pincode": _pincodeController.text,
-      "new_password": _newPasswordController.text,
-    };
-    debugPrint("Saving data: $updatedData");
-    // For demonstration, just show a snackbar
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text("Changes saved successfully! (Simulated)"),
-        backgroundColor: Colors.green,
-      ),
+  Future<void> _saveChanges() async {
+    if (mounted) {
+      setState(() {
+        _isLoading = true;
+      });
+    }
+
+    final currentData = await _profileDataFuture;
+
+    final updatedData = ProfileData(
+      name: currentData.name,
+      role: currentData.role,
+      email: currentData.email,
+      avatar: currentData.avatar,
+      gender: _genderValue ?? currentData.gender,
+      dob: currentData.dob, // Assuming DOB is not editable
+      phone: _phoneController.text,
+      altPhone: _altPhoneController.text,
+      marriageStatus: _marriageStatusValue ?? currentData.marriageStatus,
+      address1: _address1Controller.text,
+      city: _cityController.text,
+      district: _districtController.text,
+      pincode: _pincodeController.text,
+      bankAccount: currentData.bankAccount,
+      ifsc: currentData.ifsc,
+      bankName: currentData.bankName,
+      employerBranch: currentData.employerBranch,
+      zone: currentData.zone,
+      emergencyContactName: currentData.emergencyContactName,
+      emergencyContactNumber: currentData.emergencyContactNumber,
+      userName: currentData.userName,
+      position: currentData.position,
+      employmentType: currentData.employmentType,
+      joiningDate: currentData.joiningDate,
+      experience: currentData.experience,
+      status: currentData.status,
     );
+
+    try {
+      await _profileProvider.saveProfileData(updatedData);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text("Changes saved successfully! (Simulated)"),
+          backgroundColor: Colors.green,
+        ),
+      );
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text("Failed to save changes: $e"),
+          backgroundColor: Colors.red,
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
+    }
   }
 
   @override
   void dispose() {
-    // Dispose controllers to free up resources
     _phoneController.dispose();
     _altPhoneController.dispose();
     _address1Controller.dispose();
@@ -119,19 +126,31 @@ class _ModeratorProfilePageState extends State<ModeratorProfilePage> {
 
   @override
   Widget build(BuildContext context) {
+    final screenWidth = MediaQuery.of(context).size.width;
+
+    double responsiveFontSize(double baseFontSize) {
+      if (screenWidth > 1200) {
+        return baseFontSize * 1.2;
+      } else if (screenWidth > 600) {
+        return baseFontSize * 1.1;
+      }
+      return baseFontSize;
+    }
+
     return Scaffold(
       appBar: AppBar(
         centerTitle: true,
         title: Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Text("Moderator Profile",style: TextStyle(color: Colors.white,fontSize: 20,)),
-            Icon(Icons.download, color: Colors.white),
+            Text("Moderator Profile", style: TextStyle(color: Colors.white, fontSize: responsiveFontSize(20))),
+            const Icon(Icons.download, color: Colors.white),
           ],
         ),
+        backgroundColor: const Color(0xFF0D1B2A),
       ),
       backgroundColor: const Color(0xFF0D1B2A),
-      body: FutureBuilder<Map<String, dynamic>>(
+      body: FutureBuilder<ProfileData>(
         future: _profileDataFuture,
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
@@ -143,153 +162,146 @@ class _ModeratorProfilePageState extends State<ModeratorProfilePage> {
 
             return SafeArea(
               child: SingleChildScrollView(
-                padding: const EdgeInsets.all(16),
+                padding: EdgeInsets.all(screenWidth * 0.04),
                 child: Column(
                   children: [
-                    // -------- PROFILE HEADER --------
                     CircleAvatar(
-                      radius: 45,
-                      backgroundImage: AssetImage(data['avatar']!),
+                      radius: screenWidth * 0.12,
+                      backgroundImage: AssetImage(data.avatar),
                     ),
                     const SizedBox(height: 12),
                     Text(
-                      data['name']!,
-                      style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold),
+                      data.name,
+                      style: TextStyle(color: Colors.white, fontSize: responsiveFontSize(20), fontWeight: FontWeight.bold),
                     ),
-                    Text(data['role']!, style: const TextStyle(color: Colors.white54)),
-                    Text(data['email']!, style: const TextStyle(color: Colors.white54)),
+                    Text(data.role, style: TextStyle(color: Colors.white54, fontSize: responsiveFontSize(14))),
+                    Text(data.email, style: TextStyle(color: Colors.white54, fontSize: responsiveFontSize(14))),
                     const SizedBox(height: 25),
-
-                    // -------- PERSONAL INFO --------
                     SectionCard(
                       title: "Personal Information",
                       icon: Icons.person,
                       children: [
-                        CustomDropdown(
-                          label: "Gender",
-                          value: _genderValue,
-                          items: const ["Male", "Female", "Others"],
-                          onChanged: (newValue) {
-                            setState(() {
-                              _genderValue = newValue;
-                            });
-                          },
-                        ),
-                        CustomTextField(label: "Date of Birth", controller: TextEditingController(text: data['dob']!), icon: Icons.calendar_month, editable: true),
-                        CustomTextField(label: "Phone", controller: _phoneController),
-                        CustomTextField(label: "Alternate Phone", controller: _altPhoneController),
-                        CustomDropdown(
-                          label: "Marriage Status",
-                          value: _marriageStatusValue,
-                          items: const ["Single", "Married", "Divorced", "Widowed"],
-                          onChanged: (newValue) {
-                            setState(() {
-                              _marriageStatusValue = newValue;
-                            });
-                          },
-                        ),
+                        _buildResponsiveGrid(
+                          [
+                            CustomDropdown(
+                              label: "Gender",
+                              value: _genderValue,
+                              items: const ["Male", "Female", "Others"],
+                              onChanged: (newValue) {
+                                setState(() {
+                                  _genderValue = newValue;
+                                });
+                              },
+                            ),
+                            CustomTextField(label: "Date of Birth", controller: TextEditingController(text: data.dob), icon: Icons.calendar_month, editable: false),
+                            CustomTextField(label: "Phone", controller: _phoneController),
+                            CustomTextField(label: "Alternate Phone", controller: _altPhoneController),
+                            CustomDropdown(
+                              label: "Marriage Status",
+                              value: _marriageStatusValue,
+                              items: const ["Single", "Married", "Divorced", "Widowed"],
+                              onChanged: (newValue) {
+                                setState(() {
+                                  _marriageStatusValue = newValue;
+                                });
+                              },
+                            ),
+                          ],
+                        )
                       ],
                     ),
                     const SizedBox(height: 20),
-
-                    // -------- ADDRESS INFO --------
                     SectionCard(
                       title: "Address Information",
                       icon: Icons.location_on,
                       children: [
-                        CustomTextField(label: "Address Line 1", controller: _address1Controller),
-                        CustomTextField(label: "City", controller: _cityController),
-                        CustomTextField(label: "District", controller: _districtController),
-                        CustomTextField(label: "Pincode", controller: _pincodeController),
+                        _buildResponsiveGrid([
+                          CustomTextField(label: "Address Line 1", controller: _address1Controller),
+                          CustomTextField(label: "City", controller: _cityController),
+                          CustomTextField(label: "District", controller: _districtController),
+                          CustomTextField(label: "Pincode", controller: _pincodeController),
+                        ])
                       ],
                     ),
                     const SizedBox(height: 20),
-
-                    // -------- BANKING INFO --------
                     SectionCard(
                       title: "Banking Information",
                       icon: Icons.account_balance,
                       children: [
-                        CustomTextField(label: "Bank Account Number", controller: TextEditingController(text: data['bank_account']!), editable: false),
-                        CustomTextField(label: "IFSC Code", controller: TextEditingController(text: data['ifsc']!), editable: false),
-                        CustomTextField(label: "Bank Name", controller: TextEditingController(text: data['bank_name']!), editable: false),
+                        CustomTextField(label: "Bank Account Number", controller: TextEditingController(text: data.bankAccount), editable: false),
+                        CustomTextField(label: "IFSC Code", controller: TextEditingController(text: data.ifsc), editable: false),
+                        CustomTextField(label: "Bank Name", controller: TextEditingController(text: data.bankName), editable: false),
                         const SizedBox(height: 10),
                         const Divider(color: Colors.white24),
-                        CustomTextField(label: "Employer Branch", controller: TextEditingController(text: data['employer_branch']!), editable: false),
-                        CustomTextField(label: "Zone / Sector", controller: TextEditingController(text: data['zone']!), editable: false),
+                        CustomTextField(label: "Employer Branch", controller: TextEditingController(text: data.employerBranch), editable: false),
+                        CustomTextField(label: "Zone / Sector", controller: TextEditingController(text: data.zone), editable: false),
                       ],
                     ),
                     const SizedBox(height: 20),
-
-                    // -------- EMERGENCY CONTACT --------
                     SectionCard(
                       title: "Emergency Contact",
                       icon: Icons.phone_in_talk,
                       children: [
-                        CustomTextField(label: "Contact Name", controller: TextEditingController(text: data['emergency_contact_name']!), editable: false),
-                        CustomTextField(label: "Contact Number", controller: TextEditingController(text: data['emergency_contact_number']!), editable: false),
+                        CustomTextField(label: "Contact Name", controller: TextEditingController(text: data.emergencyContactName), editable: false),
+                        CustomTextField(label: "Contact Number", controller: TextEditingController(text: data.emergencyContactNumber), editable: false),
                       ],
                     ),
                     const SizedBox(height: 20),
-
-                    // -------- SECURITY SETTINGS --------
                     SectionCard(
                       title: "Security Settings",
                       icon: Icons.lock,
                       children: [
-                        CustomTextField(label: "New Password", controller: _newPasswordController, isPassword: true),
-                        CustomTextField(label: "Confirm Password", controller: _confirmPasswordController, isPassword: true),
+                        _buildResponsiveGrid([
+                          CustomTextField(label: "New Password", controller: _newPasswordController, isPassword: true),
+                          CustomTextField(label: "Confirm Password", controller: _confirmPasswordController, isPassword: true),
+                        ])
                       ],
                     ),
                     const SizedBox(height: 20),
-
-                    // -------- ACCOUNT DETAILS --------
                     SectionCard(
                       title: "Account Details",
                       icon: Icons.person_pin,
                       children: [
-                        CustomTextField(label: "User Name", controller: TextEditingController(text: data['user_name']!), editable: false),
-                        CustomTextField(label: "Email Address", controller: TextEditingController(text: data['email']!), editable: false),
+                        CustomTextField(label: "User Name", controller: TextEditingController(text: data.userName), editable: false),
+                        CustomTextField(label: "Email Address", controller: TextEditingController(text: data.email), editable: false),
                       ],
                     ),
                     const SizedBox(height: 20),
-
-                    // -------- EMPLOYMENT DETAILS --------
                     SectionCard(
                       title: "Employment Details",
                       icon: Icons.badge,
                       children: [
-                        CustomTextField(label: "Position", controller: TextEditingController(text: data['position']!), editable: false),
-                        CustomTextField(label: "Employment Type", controller: TextEditingController(text: data['employment_type']!), editable: false),
-                        CustomTextField(label: "Joining Date", controller: TextEditingController(text: data['joining_date']!), editable: false),
-                        CustomTextField(label: "Experience", controller: TextEditingController(text: data['experience']!), editable: false),
-                        CustomTextField(label: "Status", controller: TextEditingController(text: data['status']!), editable: false),
+                        CustomTextField(label: "Position", controller: TextEditingController(text: data.position), editable: false),
+                        CustomTextField(label: "Employment Type", controller: TextEditingController(text: data.employmentType), editable: false),
+                        CustomTextField(label: "Joining Date", controller: TextEditingController(text: data.joiningDate), editable: false),
+                        CustomTextField(label: "Experience", controller: TextEditingController(text: data.experience), editable: false),
+                        CustomTextField(label: "Status", controller: TextEditingController(text: data.status), editable: false),
                       ],
                     ),
                     const SizedBox(height: 30),
-
-                    // -------- BUTTONS --------
                     ElevatedButton(
                       style: ElevatedButton.styleFrom(
                         backgroundColor: const Color(0xFF0E86D4),
-                        minimumSize: const Size(double.infinity, 50),
+                        minimumSize: Size(double.infinity, screenWidth * 0.12),
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                       ),
-                      onPressed: _saveChanges,
-                      child: const Text("SAVE CHANGES", style: TextStyle(color: Colors.white, fontSize: 16)),
+                      onPressed: _isLoading ? null : _saveChanges,
+                      child: _isLoading
+                          ? const CircularProgressIndicator(color: Colors.white)
+                          : Text("SAVE CHANGES", style: TextStyle(color: Colors.white, fontSize: responsiveFontSize(16))),
                     ),
                     const SizedBox(height: 20),
                     ElevatedButton(
                       style: ElevatedButton.styleFrom(
                         backgroundColor: const Color(0xFF0E86D4),
-                        minimumSize: const Size(double.infinity, 50),
+                        minimumSize: Size(double.infinity, screenWidth * 0.12),
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                       ),
                       onPressed: () {
                         Navigator.pushReplacement(
                             context, MaterialPageRoute(builder: (context) => const LoginPage()));
                       },
-                      child: const Text("Log Out", style: TextStyle(color: Colors.white, fontSize: 16)),
+                      child: Text("Log Out", style: TextStyle(color: Colors.white, fontSize: responsiveFontSize(16))),
                     ),
                     const SizedBox(height: 30),
                   ],
@@ -303,15 +315,35 @@ class _ModeratorProfilePageState extends State<ModeratorProfilePage> {
       ),
     );
   }
+
+  Widget _buildResponsiveGrid(List<Widget> children) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        if (constraints.maxWidth > 600) {
+          return GridView.builder(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            itemCount: children.length,
+            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: 2,
+              crossAxisSpacing: 16,
+              mainAxisSpacing: 0,
+              childAspectRatio: 3.5,
+            ),
+            itemBuilder: (context, index) {
+              return children[index];
+            },
+          );
+        } else {
+          return Column(
+            children: children,
+          );
+        }
+      },
+    );
+  }
 }
 
-//
-// ───────────────────────────────────────────────────────────
-//                       REUSABLE WIDGETS
-// ───────────────────────────────────────────────────────────
-//
-
-// -------- SECTION CARD --------
 class SectionCard extends StatelessWidget {
   final String title;
   final IconData icon;
@@ -321,8 +353,15 @@ class SectionCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final screenWidth = MediaQuery.of(context).size.width;
+    double responsiveFontSize(double baseFontSize) {
+      if (screenWidth > 1200) return baseFontSize * 1.2;
+      if (screenWidth > 600) return baseFontSize * 1.1;
+      return baseFontSize;
+    }
+
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: EdgeInsets.all(screenWidth * 0.04),
       decoration: BoxDecoration(
         color: const Color(0xFF1B263B),
         borderRadius: BorderRadius.circular(14),
@@ -334,7 +373,7 @@ class SectionCard extends StatelessWidget {
             children: [
               Icon(icon, color: Colors.blueAccent),
               const SizedBox(width: 8),
-              Text(title, style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
+              Text(title, style: TextStyle(color: Colors.white, fontSize: responsiveFontSize(18), fontWeight: FontWeight.bold)),
             ],
           ),
           const SizedBox(height: 20),
@@ -345,7 +384,6 @@ class SectionCard extends StatelessWidget {
   }
 }
 
-// -------- TEXT FIELD --------
 class CustomTextField extends StatelessWidget {
   final String label;
   final TextEditingController controller;
@@ -364,10 +402,17 @@ class CustomTextField extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final screenWidth = MediaQuery.of(context).size.width;
+    double responsiveFontSize(double baseFontSize) {
+      if (screenWidth > 1200) return baseFontSize * 1.2;
+      if (screenWidth > 600) return baseFontSize * 1.1;
+      return baseFontSize;
+    }
+    
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(label, style: const TextStyle(color: Colors.white54, fontSize: 13)),
+        Text(label, style: TextStyle(color: Colors.white54, fontSize: responsiveFontSize(13))),
         const SizedBox(height: 6),
         Container(
           decoration: BoxDecoration(
@@ -378,7 +423,7 @@ class CustomTextField extends StatelessWidget {
             enabled: editable,
             controller: controller,
             obscureText: isPassword,
-            style: const TextStyle(color: Colors.white),
+            style: TextStyle(color: Colors.white, fontSize: responsiveFontSize(14)),
             decoration: InputDecoration(
               border: InputBorder.none,
               prefixIcon: icon != null ? Icon(icon, color: Colors.white54) : null,
@@ -392,8 +437,6 @@ class CustomTextField extends StatelessWidget {
   }
 }
 
-
-// -------- DROPDOWN --------
 class CustomDropdown extends StatelessWidget {
   final String label;
   final String? value;
@@ -410,10 +453,17 @@ class CustomDropdown extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final screenWidth = MediaQuery.of(context).size.width;
+    double responsiveFontSize(double baseFontSize) {
+      if (screenWidth > 1200) return baseFontSize * 1.2;
+      if (screenWidth > 600) return baseFontSize * 1.1;
+      return baseFontSize;
+    }
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(label, style: const TextStyle(color: Colors.white54)),
+        Text(label, style: TextStyle(color: Colors.white54, fontSize: responsiveFontSize(13))),
         const SizedBox(height: 6),
         Container(
           width: double.infinity,
@@ -429,7 +479,7 @@ class CustomDropdown extends StatelessWidget {
               items: items.map((String item) {
                 return DropdownMenuItem(
                   value: item,
-                  child: Text(item),
+                  child: Text(item, style: TextStyle(fontSize: responsiveFontSize(14))),
                 );
               }).toList(),
               dropdownColor: const Color(0xFF1B263B),

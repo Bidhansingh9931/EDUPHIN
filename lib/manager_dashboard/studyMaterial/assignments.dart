@@ -64,13 +64,11 @@ class _AssignmentsPageState extends State<AssignmentsPage> {
     // Simulate network delay
     await Future.delayed(const Duration(seconds: 1));
 
-    // Dummy data from your original code, now structured for a dynamic list
     final List<String> fetchedClasses = [
       "Class 6", "Class 7", "Class 8", "Class 9", "Class 10", "Class 11", "Class 12"
     ];
     final List<String> fetchedSections = ["Section A", "Section B", "Section C"];
     final List<Map<String, dynamic>> fetchedAssignmentsData = [
-      // Class 10, Section A
       {
         "title": "Algebraic Equations",
         "subject": "Mathematics",
@@ -98,7 +96,6 @@ class _AssignmentsPageState extends State<AssignmentsPage> {
         "uploadedDate": "10 Nov 2025",
         "dueDate": "18 Nov 2025"
       },
-      // Class 10, Section B
       {
         "title": "Federalism",
         "subject": "Social Studies",
@@ -117,7 +114,6 @@ class _AssignmentsPageState extends State<AssignmentsPage> {
         "uploadedDate": "05 Nov 2025",
         "dueDate": "17 Nov 2025"
       },
-      // Class 9, Section A
       {
         "title": "Number Systems",
         "subject": "Mathematics",
@@ -134,11 +130,8 @@ class _AssignmentsPageState extends State<AssignmentsPage> {
         classes = fetchedClasses;
         sections = fetchedSections;
         allAssignments = fetchedAssignmentsData.map((data) => Assignment.fromJson(data)).toList();
-
-        // Set initial filter values
         selectedClass = "Class 10";
         selectedSection = "Section A";
-
         _filterAssignments();
         isLoading = false;
       });
@@ -165,159 +158,176 @@ class _AssignmentsPageState extends State<AssignmentsPage> {
     });
   }
 
-  InputDecoration dropdownStyle() {
-    return InputDecoration(
-      filled: true,
-      fillColor: const Color(0xff101820),
-      border: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(12),
-        borderSide: BorderSide.none,
-      ),
-      contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     return Scaffold(
-      backgroundColor: const Color(0xff0B1220),
+      backgroundColor: theme.scaffoldBackgroundColor,
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
-        leading: const BackButton(color: Colors.white),
-        title: const Text("Assignments", style: TextStyle(color: Colors.white)),
+        leading: BackButton(color: theme.colorScheme.onSurface),
+        title: Text("Assignments", style: TextStyle(color: theme.colorScheme.onSurface)),
       ),
       body: isLoading
           ? const Center(child: CircularProgressIndicator())
-          : ListView(
-        padding: const EdgeInsets.fromLTRB(16, 16, 16, 50),
-        children: [
-          // FILTER CARD
-          Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: const Color(0xff0F1A2B),
-              borderRadius: BorderRadius.circular(20),
-            ),
+          : Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16.0),
             child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text("Select Class *", style: TextStyle(color: Colors.white70)),
-                const SizedBox(height: 6),
-                DropdownButtonFormField<String>(
-                  initialValue: selectedClass,
-                  dropdownColor: const Color(0xff101820),
-                  style: const TextStyle(color: Colors.white),
-                  decoration: dropdownStyle(),
-                  items: classes.map((e) => DropdownMenuItem(value: e, child: Text(e))).toList(),
-                  onChanged: (v) {
-                    if (v != null) {
-                      setState(() => selectedClass = v);
-                      _filterAssignments();
-                    }
-                  },
-                ),
-                const SizedBox(height: 16),
-                const Text("Select Section *", style: TextStyle(color: Colors.white70)),
-                const SizedBox(height: 6),
-                DropdownButtonFormField<String>(
-                  initialValue: selectedSection,
-                  dropdownColor: const Color(0xff101820),
-                  style: const TextStyle(color: Colors.white),
-                  decoration: dropdownStyle(),
-                  items: sections.map((e) => DropdownMenuItem(value: e, child: Text(e))).toList(),
-                  onChanged: (v) {
-                    if (v != null) {
-                      setState(() => selectedSection = v);
-                      _filterAssignments();
-                    }
-                  },
-                ),
+                 _buildFilterSection(theme),
+                 const SizedBox(height: 16),
+                 Expanded(
+                   child: filteredAssignments.isNotEmpty 
+                    ? _buildAssignmentsList()
+                    : const Center(
+                       child: Text("No assignments found for the selected filters."),
+                    ),
+                 )
               ],
             ),
           ),
-          const SizedBox(height: 16),
-          // SUBJECT SECTIONS
-          if (filteredAssignments.isNotEmpty)
-            ...filteredAssignments.entries.map((entry) {
-              return Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const SizedBox(height: 16),
-                  Text(
-                    entry.key, // Subject Name
-                    style: const TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.w700,
-                        fontSize: 16),
-                  ),
-                  const SizedBox(height: 10),
-                  ...entry.value.map((a) => buildAssignmentCard(a)), // List of assignments
-                ],
-              );
-            })
-          else
-             const Center(
-                child: Padding(
-                  padding: EdgeInsets.all(20.0),
-                  child: Text(
-                    "No assignments found for the selected filters.",
-                    style: TextStyle(color: Colors.white54),
-                  ),
-                ),
-              ),
+    );
+  }
+  
+  Widget _buildFilterSection(ThemeData theme) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surface,
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: _buildDropdown(theme, "Select Class *", selectedClass, classes, (v) {
+              if (v != null) {
+                setState(() => selectedClass = v);
+                _filterAssignments();
+              }
+            }),
+          ),
+          const SizedBox(width: 16),
+          Expanded(
+            child: _buildDropdown(theme, "Select Section *", selectedSection, sections, (v) {
+              if (v != null) {
+                setState(() => selectedSection = v);
+                _filterAssignments();
+              }
+            }),
+          ),
         ],
       ),
     );
   }
+  
+  Widget _buildDropdown(ThemeData theme, String label, String? value, List<String> items, ValueChanged<String?> onChanged) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(label, style: theme.textTheme.labelMedium?.copyWith(color: theme.colorScheme.onSurface.withAlpha(35))),
+        const SizedBox(height: 6),
+        DropdownButtonFormField<String>(
+          initialValue: value,
+          dropdownColor: theme.cardColor,
+          style: theme.textTheme.bodyLarge,
+          decoration: InputDecoration(
+            filled: true,
+            fillColor: theme.scaffoldBackgroundColor,
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide.none,
+            ),
+            contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+          ),
+          items: items.map((e) => DropdownMenuItem(value: e, child: Text(e))).toList(),
+          onChanged: onChanged,
+        ),
+      ],
+    );
+  }
 
-  Widget buildAssignmentCard(Assignment a) {
+  Widget _buildAssignmentsList() {
+    final subjects = filteredAssignments.keys.toList();
+    return ListView.builder(
+      padding: const EdgeInsets.only(bottom: 50),
+      itemCount: subjects.length,
+      itemBuilder: (context, index) {
+        final subject = subjects[index];
+        final assignments = filteredAssignments[subject]!;
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Padding(
+              padding: const EdgeInsets.only(top: 16, bottom: 10),
+              child: Text(
+                subject, // Subject Name
+                style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700),
+              ),
+            ),
+            ...assignments.map((a) => _AssignmentCard(assignment: a)),
+          ],
+        );
+      },
+    );
+  }
+}
+
+
+class _AssignmentCard extends StatelessWidget {
+  final Assignment assignment;
+
+  const _AssignmentCard({required this.assignment});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: const Color(0xff0F1A2B),
+        color: theme.colorScheme.surface,
         borderRadius: BorderRadius.circular(18),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            a.title,
-            style: const TextStyle(
-              color: Colors.lightBlueAccent,
+            assignment.title,
+            style: theme.textTheme.titleMedium?.copyWith(
+              color: theme.colorScheme.secondary,
               fontWeight: FontWeight.w700,
-              fontSize: 15,
             ),
           ),
           const SizedBox(height: 10),
           Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Expanded(
-                child: info("Uploaded by", a.uploadedBy),
+                child: _buildInfoColumn(theme, "Uploaded by", assignment.uploadedBy),
               ),
               Expanded(
-                child: info("Uploaded Date", a.uploadedDate),
+                child: _buildInfoColumn(theme, "Uploaded Date", assignment.uploadedDate),
               ),
             ],
           ),
-          const SizedBox(height: 4),
-          info("Due Date", a.dueDate),
+          _buildInfoColumn(theme, "Due Date", assignment.dueDate),
           const SizedBox(height: 12),
           SizedBox(
             width: double.infinity,
             child: ElevatedButton(
               onPressed: () {
-                Navigator.push(context, MaterialPageRoute(builder: (context) => AssignmentSubmissionsScreen()));
+                Navigator.push(context, MaterialPageRoute(builder: (context) => const AssignmentSubmissionsScreen()));
               },
               style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xff2D9CFF),
+                backgroundColor: theme.colorScheme.primary,
+                foregroundColor: theme.colorScheme.onPrimary,
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(10),
                 ),
                 padding: const EdgeInsets.symmetric(vertical: 12),
               ),
-              child: const Text("View Submission", style: TextStyle(color: Colors.white)),
+              child: const Text("View Submission"),
             ),
           )
         ],
@@ -325,22 +335,22 @@ class _AssignmentsPageState extends State<AssignmentsPage> {
     );
   }
 
-  Widget info(String label, String value) {
+  Widget _buildInfoColumn(ThemeData theme, String label, String value) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 6),
-      child: RichText(
-        text: TextSpan(
-          children: [
-            TextSpan(
-              text: "$label\n",
-              style: const TextStyle(color: Colors.white54, fontSize: 12),
-            ),
-            TextSpan(
-              text: value,
-              style: const TextStyle(color: Colors.white, fontSize: 13),
-            ),
-          ],
-        ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            label,
+            style: theme.textTheme.bodySmall?.copyWith(color: theme.hintColor),
+          ),
+          const SizedBox(height: 2),
+          Text(
+            value,
+            style: theme.textTheme.bodyMedium,
+          ),
+        ],
       ),
     );
   }

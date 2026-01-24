@@ -8,6 +8,7 @@ class CreateNewClassPage extends StatefulWidget {
 }
 
 class _CreateNewClassPageState extends State<CreateNewClassPage> {
+  final _formKey = GlobalKey<FormState>();
   final _classNameController = TextEditingController();
   final _classCodeController = TextEditingController();
   final _descriptionController = TextEditingController();
@@ -16,13 +17,8 @@ class _CreateNewClassPageState extends State<CreateNewClassPage> {
   bool _isLoading = false;
 
   Future<void> _createClass() async {
-    // Basic validation
-    if (_classNameController.text.isEmpty ||
-        _classCodeController.text.isEmpty ||
-        _selectedLevel == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please fill all required fields.')),
-      );
+    // Use form validation
+    if (!_formKey.currentState!.validate()) {
       return;
     }
 
@@ -40,7 +36,6 @@ class _CreateNewClassPageState extends State<CreateNewClassPage> {
       'level': _selectedLevel,
     };
 
-    // In a real app, you would send this to your API
     print('Creating class: $classData');
 
     if (mounted) {
@@ -50,7 +45,7 @@ class _CreateNewClassPageState extends State<CreateNewClassPage> {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Class created successfully!')),
       );
-      Navigator.pop(context); // Go back after creation
+      Navigator.pop(context);
     }
   }
 
@@ -71,138 +66,171 @@ class _CreateNewClassPageState extends State<CreateNewClassPage> {
         title: const Text("Create New Class"),
         centerTitle: true,
       ),
-      body: Padding(
+      body: SingleChildScrollView(
         padding: const EdgeInsets.fromLTRB(16, 16, 16, 50),
-        child: SingleChildScrollView(
-          child: Column(
-            children: [
-              Container(
+        child: Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 500), // Limit form width
+            child: Form(
+              key: _formKey,
+              child: Container(
                 decoration: BoxDecoration(
                   borderRadius: BorderRadius.circular(10),
                   color: theme.primaryColor,
                 ),
-                child: Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text("Class Name"),
-                      const SizedBox(
-                        height: 8,
-                      ),
-                      TextField(
-                        controller: _classNameController,
-                        decoration: InputDecoration(
-                          hintText: "e.g., Class X",
-                          hintStyle: TextStyle(color: Colors.grey.shade700),
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(
-                        height: 16,
-                      ),
-                      const Text("Class Code"),
-                      const SizedBox(
-                        height: 8,
-                      ),
-                      TextField(
-                        controller: _classCodeController,
-                        decoration: InputDecoration(
-                          hintText: "e.g., C-X",
-                          hintStyle: TextStyle(color: Colors.grey.shade700),
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(
-                        height: 16,
-                      ),
-                      const Text("Description (Optional)"),
-                      const SizedBox(
-                        height: 8,
-                      ),
-                      TextField(
-                        controller: _descriptionController,
-                        maxLines: 5,
-                        decoration: InputDecoration(
-                          hintText: "Enter a short description for the class",
-                          hintStyle: TextStyle(color: Colors.grey.shade700),
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(
-                        height: 16,
-                      ),
-                      const Text("Level"),
-                      const SizedBox(
-                        height: 8,
-                      ),
-                      DropdownButtonFormField<String>(
-                        initialValue: _selectedLevel,
-                        hint: Text("Select Level",
-                            style: TextStyle(color: Colors.grey.shade700)),
-                        decoration: InputDecoration(
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                        ),
-                        onChanged: (String? newValue) {
-                          setState(() {
-                            _selectedLevel = newValue;
-                          });
-                        },
-                        items: _levels.map<DropdownMenuItem<String>>((String value) {
-                          return DropdownMenuItem<String>(
-                            value: value,
-                            child: Text(value),
-                          );
-                        }).toList(),
-                      ),
-                      const SizedBox(
-                        height: 16,
-                      ),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          SizedBox(
-                            width: 150,
-                            height: 50,
-                            child: ElevatedButton(
-                              onPressed: _isLoading ? null : _createClass,
-                              style: ElevatedButton.styleFrom(
-                                  backgroundColor: Colors.blue),
-                              child: _isLoading
-                                  ? const CircularProgressIndicator(
-                                      valueColor: AlwaysStoppedAnimation<Color>(
-                                          Colors.white))
-                                  : Text("Create Class",
-                                      style: TextStyle(
-                                          color: theme.colorScheme.onPrimary,
-                                          fontSize: 16)),
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _buildTextField(
+                      theme: theme,
+                      controller: _classNameController,
+                      label: "Class Name",
+                      hint: "e.g., Class X",
+                      validator: (value) =>
+                          value!.isEmpty ? 'Please enter a class name' : null,
+                    ),
+                    const SizedBox(height: 16),
+                    _buildTextField(
+                      theme: theme,
+                      controller: _classCodeController,
+                      label: "Class Code",
+                      hint: "e.g., C-X",
+                      validator: (value) =>
+                          value!.isEmpty ? 'Please enter a class code' : null,
+                    ),
+                    const SizedBox(height: 16),
+                    _buildTextField(
+                      theme: theme,
+                      controller: _descriptionController,
+                      label: "Description (Optional)",
+                      hint: "Enter a short description for the class",
+                      maxLines: 5,
+                    ),
+                    const SizedBox(height: 16),
+                    _buildDropdownField(theme),
+                    const SizedBox(height: 24),
+                    // --- Responsive Button Row ---
+                    Row(
+                      children: [
+                        Expanded(
+                          child: OutlinedButton(
+                            onPressed: () => Navigator.of(context).pop(),
+                            style: OutlinedButton.styleFrom(
+                              padding: const EdgeInsets.symmetric(vertical: 16),
+                              foregroundColor: theme.colorScheme.onPrimary,
+                              side: BorderSide(color: theme.dividerColor),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
                             ),
+                            child: const Text("Cancel"),
                           ),
-                          SizedBox(
-                            width: 150,
-                            height: 50,
-                            child: ElevatedButton(onPressed: (){
-                              Navigator.pop(context);
-                            }, child: Text("Cancel",style: TextStyle(color: theme.colorScheme.onPrimary,fontSize: 16))),
+                        ),
+                        const SizedBox(width: 16),
+                        Expanded(
+                          child: ElevatedButton(
+                            onPressed: _isLoading ? null : _createClass,
+                            style: ElevatedButton.styleFrom(
+                              padding: const EdgeInsets.symmetric(vertical: 16),
+                              backgroundColor: theme.colorScheme.primaryContainer,
+                              foregroundColor: theme.colorScheme.onPrimaryContainer,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                            ),
+                            child: _isLoading
+                                ? const SizedBox(
+                                    height: 24,
+                                    width: 24,
+                                    child: CircularProgressIndicator(strokeWidth: 3),
+                                  )
+                                : const Text("Create Class"),
                           ),
-                        ],
-                      ),
-                    ],
-                  ),
+                        ),
+                      ],
+                    ),
+                  ],
                 ),
               ),
-            ],
+            ),
           ),
         ),
       ),
+    );
+  }
+
+  Widget _buildTextField({
+    required ThemeData theme,
+    required TextEditingController controller,
+    required String label,
+    required String hint,
+    int maxLines = 1,
+    String? Function(String?)? validator,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(label, style: theme.textTheme.titleMedium?.copyWith(color: theme.colorScheme.onPrimary)),
+        const SizedBox(height: 8),
+        TextFormField(
+          controller: controller,
+          maxLines: maxLines,
+          decoration: InputDecoration(
+            hintText: hint,
+            hintStyle: TextStyle(color: theme.hintColor),
+            filled: true,
+            fillColor: theme.scaffoldBackgroundColor,
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(10),
+              borderSide: BorderSide.none,
+            ),
+            errorBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(10),
+              borderSide: BorderSide(color: theme.colorScheme.error, width: 1),
+            ),
+            focusedErrorBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(10),
+              borderSide: BorderSide(color: theme.colorScheme.error, width: 2),
+            ),
+          ),
+          validator: validator,
+        ),
+      ],
+    );
+  }
+
+  Widget _buildDropdownField(ThemeData theme) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text("Level", style: theme.textTheme.titleMedium?.copyWith(color: theme.colorScheme.onPrimary)),
+        const SizedBox(height: 8),
+        DropdownButtonFormField<String>(
+          initialValue: _selectedLevel,
+          hint: Text("Select Level", style: TextStyle(color: theme.hintColor)),
+          decoration: InputDecoration(
+            filled: true,
+            fillColor: theme.scaffoldBackgroundColor,
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(10),
+              borderSide: BorderSide.none,
+            ),
+          ),
+          onChanged: (String? newValue) {
+            setState(() {
+              _selectedLevel = newValue;
+            });
+          },
+          items: _levels.map<DropdownMenuItem<String>>((String value) {
+            return DropdownMenuItem<String>(
+              value: value,
+              child: Text(value),
+            );
+          }).toList(),
+          validator: (value) => value == null ? 'Please select a level' : null,
+        ),
+      ],
     );
   }
 }

@@ -1,5 +1,4 @@
 import 'dart:ui';
-
 import 'package:flutter/material.dart';
 import 'dart:io';
 import 'package:dotted_border/dotted_border.dart';
@@ -53,13 +52,15 @@ class _UpcomingEventsState extends State<UpcomingEvents> {
   }
 
   void _updateOpenForAll() {
-    openForAll = manager &&
-        teachers &&
-        students &&
-        staff &&
-        librarian &&
-        accountants &&
-        counselor;
+    setState(() {
+      openForAll = manager &&
+          teachers &&
+          students &&
+          staff &&
+          librarian &&
+          accountants &&
+          counselor;
+    });
   }
 
   Future<void> selectDate(
@@ -76,7 +77,7 @@ class _UpcomingEventsState extends State<UpcomingEvents> {
     if (pickedDate != null) {
       if (!context.mounted) return;
       controller.text =
-          "${pickedDate.day}-${pickedDate.month}-${pickedDate.year}";
+          "\${pickedDate.day}-\${pickedDate.month}-\${pickedDate.year}";
     }
   }
 
@@ -128,8 +129,7 @@ class _UpcomingEventsState extends State<UpcomingEvents> {
     };
 
     // For demonstration, we'll just print the data.
-    print('Generating event with data: $eventData');
-
+    print('Generating event with data: \$eventData');
 
     setState(() {
       _isLoading = false;
@@ -139,8 +139,6 @@ class _UpcomingEventsState extends State<UpcomingEvents> {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Event generated successfully!')),
       );
-      // You might want to navigate away or clear the controllers after success.
-      // Navigator.pop(context);
     }
   }
 
@@ -150,341 +148,381 @@ class _UpcomingEventsState extends State<UpcomingEvents> {
     return Scaffold(
       backgroundColor: theme.scaffoldBackgroundColor,
       appBar: AppBar(
-        title: Text("Generate New Event"),
+        title: const Text("Generate New Event"),
       ),
       body: Padding(
         padding: const EdgeInsets.fromLTRB(16, 16, 16, 50),
-        child: SingleChildScrollView(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text("Event Title"),
-              const SizedBox(height: 8),
-              TextField(
-                controller: _titleController,
-                decoration: InputDecoration(
-                  hintText: "Enter Event Title",
-                  hintStyle:
-                      theme.textTheme.bodyMedium?.copyWith(color: theme.hintColor),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  filled: true,
-                  fillColor: theme.primaryColor,
-                ),
-              ),
-              const SizedBox(height: 16),
-              Text("Event Poster"),
-              const SizedBox(height: 8),
-              EventPosterUpload(),
-              const SizedBox(height: 16),
-              Text("Description"),
-              const SizedBox(height: 8),
-              TextField(
-                controller: _descriptionController,
-                maxLines: 5,
-                decoration: InputDecoration(
-                  hintText: "Enter a detailed Description for the event",
-                  hintStyle:
-                      theme.textTheme.bodyMedium?.copyWith(color: theme.hintColor),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  filled: true,
-                  fillColor: theme.primaryColor,
-                ),
-              ),
-              const SizedBox(height: 16),
-              Text("Venue"),
-              const SizedBox(height: 8),
-              TextField(
-                controller: _venueController,
-                decoration: InputDecoration(
-                  prefixIcon:
-                      Icon(Icons.location_on, color: theme.colorScheme.onPrimary),
-                  filled: true,
-                  fillColor: theme.primaryColor,
-                  hintText: "Enter the Venue",
-                  hintStyle:
-                      theme.textTheme.bodyMedium?.copyWith(color: theme.hintColor),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 16),
-              Text("Event Date"),
-              const SizedBox(height: 8),
-              TextField(
-                controller: _dateController,
-                readOnly: true,
-                onTap: () => selectDate(context, _dateController),
-                decoration: InputDecoration(
-                  prefixIcon: Icon(Icons.calendar_month,
-                      color: theme.colorScheme.onPrimary),
-                  filled: true,
-                  fillColor: theme.primaryColor,
-                  hintText: "Select Event Date",
-                  hintStyle:
-                      theme.textTheme.bodyMedium?.copyWith(color: theme.hintColor),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 16),
-              Text("Event Start Time"),
-              const SizedBox(height: 8),
-              TextField(
-                controller: _startTimeController,
-                readOnly: true,
-                onTap: () => selectTime(context, _startTimeController),
-                decoration: InputDecoration(
-                  prefixIcon: Icon(Icons.access_time_rounded,
-                      color: theme.colorScheme.onPrimary),
-                  filled: true,
-                  fillColor: theme.primaryColor,
-                  hintText: "Select Start Time",
-                  hintStyle:
-                      theme.textTheme.bodyMedium?.copyWith(color: theme.hintColor),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 16),
-              Text("Event End Time"),
-              const SizedBox(height: 8),
-              TextField(
-                controller: _endTimeController,
-                readOnly: true,
-                onTap: () => selectTime(context, _endTimeController),
-                decoration: InputDecoration(
-                  prefixIcon: Icon(Icons.access_time_rounded,
-                      color: theme.colorScheme.onPrimary),
-                  filled: true,
-                  fillColor: theme.primaryColor,
-                  hintText: "Select End Time",
-                  hintStyle:
-                      theme.textTheme.bodyMedium?.copyWith(color: theme.hintColor),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 16),
-              Text("Who can attend the event?"),
-              const SizedBox(height: 8),
-              Row(
-                children: [
-                  customCheckbox(
-                    "Institute Manager",
-                    manager,
-                    (val) {
-                      setState(() {
-                        manager = val!;
-                        _updateOpenForAll();
-                      });
-                    },
-                  ),
-                  Spacer(),
-                  SizedBox(width: 16),
-                  customCheckbox(
-                    "Counselors",
-                    counselor,
-                    (val) {
-                      setState(() {
-                        counselor = val!;
-                        _updateOpenForAll();
-                      });
-                    },
-                  ),
-                ],
-              ),
-              const SizedBox(height: 8),
-              Row(
-                children: [
-                  customCheckbox(
-                    "Teacher",
-                    teachers,
-                    (val) {
-                      setState(() {
-                        teachers = val!;
-                        _updateOpenForAll();
-                      });
-                    },
-                  ),
-                  Spacer(),
-                  SizedBox(width: 16),
-                  customCheckbox(
-                    "Students",
-                    students,
-                    (val) {
-                      setState(() {
-                        students = val!;
-                        _updateOpenForAll();
-                      });
-                    },
-                  ),
-                ],
-              ),
-              const SizedBox(height: 8),
-              Row(
-                children: [
-                  customCheckbox(
-                    "Librarians",
-                    librarian,
-                    (val) {
-                      setState(() {
-                        librarian = val!;
-                        _updateOpenForAll();
-                      });
-                    },
-                  ),
-                  Spacer(),
-                  SizedBox(width: 16),
-                  customCheckbox(
-                    "Accountants",
-                    accountants,
-                    (val) {
-                      setState(() {
-                        accountants = val!;
-                        _updateOpenForAll();
-                      });
-                    },
-                  ),
-                ],
-              ),
-              const SizedBox(height: 8),
-              Row(
-                children: [
-                  customCheckbox(
-                    "Staffs",
-                    staff,
-                    (val) {
-                      setState(() {
-                        staff = val!;
-                        _updateOpenForAll();
-                      });
-                    },
-                  ),
-                  Spacer(),
-                  SizedBox(width: 16),
-                  customCheckbox(
-                    "Open for all",
-                    openForAll,
-                    (val) {
-                      setState(() {
-                        openForAll = val!;
-                        manager = val;
-                        teachers = val;
-                        students = val;
-                        staff = val;
-                        librarian = val;
-                        accountants = val;
-                        counselor = val;
-                      });
-                    },
-                  ),
-                ],
-              ),
-              const SizedBox(height: 16),
-              SwitchListTile(
-                title: const Text("Ticketed Event?",style: TextStyle(fontSize: 20,color: Colors.white),),
-                value: isTicked,
-                onChanged: (val) {
-                  setState(() {
-                    isTicked = val;
-                  });
-                },
-              ),
-              const SizedBox(height: 16),
-              Text("Ticket Price"),
-              const SizedBox(height: 8),
-              TextField(
-                controller: _ticketPriceController,
-                decoration: InputDecoration(
-                  prefixIcon: const Icon(Icons.currency_rupee, color: Colors.white),
-                  hintText: "Enter Ticket Price",
-                  hintStyle:
-                      theme.textTheme.bodyMedium?.copyWith(color: theme.hintColor,
-                      ),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  filled: true,
-                  fillColor: theme.primaryColor,
-                ),
-              ),
-              const SizedBox(height: 16),
-              SizedBox(
-                width: double.infinity,
-                height: 50,
-                child: ElevatedButton(
-                  onPressed: _isLoading ? null : _generateEvent,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.blue,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                  ),
-                  child: _isLoading
-                      ? CircularProgressIndicator(
-                          valueColor: AlwaysStoppedAnimation<Color>(
-                              theme.colorScheme.onPrimary),
-                        )
-                      : Text(
-                          "Generate Event",
-                          style: TextStyle(
-                              color: theme.colorScheme.onPrimary, fontSize: 20),
-                        ),
-                ),
-              ),
-              const SizedBox(height: 8),
-              SizedBox(
-                width: double.infinity,
-                height: 50,
-                child: ElevatedButton(onPressed: () { },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: theme.colorScheme.surface,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                  ),
-                  child: Text("Cancel",
-                    style: TextStyle(color: theme.colorScheme.onPrimary, fontSize: 20),
-                ),
-              ),
-
-              ),
-              const SizedBox(height: 8),
-              SizedBox(
-                width: double.infinity,
-                height: 50,
-                child: ElevatedButton(onPressed: ()=>showDeleteDialog(context),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.red,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                  ),
-                  child: Text("Delete Event",
-                    style: TextStyle(color: theme.colorScheme.onPrimary, fontSize: 20),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 8),
-            ],
-          ),
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            if (constraints.maxWidth > 800) {
+              return _buildWideLayout(theme);
+            } else {
+              return _buildNarrowLayout(theme);
+            }
+          },
         ),
       ),
     );
   }
 
+  Widget _buildNarrowLayout(ThemeData theme) {
+    return SingleChildScrollView(
+      child: _buildFormContent(theme),
+    );
+  }
+
+  Widget _buildWideLayout(ThemeData theme) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Expanded(
+          child: SingleChildScrollView(
+            child: Padding(
+              padding: const EdgeInsets.only(right: 8.0),
+              child: _buildLeftColumn(theme),
+            ),
+          ),
+        ),
+        Expanded(
+          child: SingleChildScrollView(
+            child: Padding(
+              padding: const EdgeInsets.only(left: 8.0),
+              child: _buildRightColumn(theme),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Column _buildFormContent(ThemeData theme) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _buildLeftColumn(theme),
+        const SizedBox(height: 16),
+        _buildRightColumn(theme),
+      ],
+    );
+  }
+
+  Column _buildLeftColumn(ThemeData theme) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text("Event Title"),
+        const SizedBox(height: 8),
+        TextField(
+          controller: _titleController,
+          decoration: InputDecoration(
+            hintText: "Enter Event Title",
+            hintStyle:
+                theme.textTheme.bodyMedium?.copyWith(color: theme.hintColor),
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+            filled: true,
+            fillColor: theme.primaryColor,
+          ),
+        ),
+        const SizedBox(height: 16),
+        const Text("Event Poster"),
+        const SizedBox(height: 8),
+        const EventPosterUpload(),
+        const SizedBox(height: 16),
+        const Text("Description"),
+        const SizedBox(height: 8),
+        TextField(
+          controller: _descriptionController,
+          maxLines: 5,
+          decoration: InputDecoration(
+            hintText: "Enter a detailed Description for the event",
+            hintStyle:
+                theme.textTheme.bodyMedium?.copyWith(color: theme.hintColor),
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+            filled: true,
+            fillColor: theme.primaryColor,
+          ),
+        ),
+        const SizedBox(height: 16),
+        const Text("Venue"),
+        const SizedBox(height: 8),
+        TextField(
+          controller: _venueController,
+          decoration: InputDecoration(
+            prefixIcon:
+                Icon(Icons.location_on, color: theme.colorScheme.onPrimary),
+            filled: true,
+            fillColor: theme.primaryColor,
+            hintText: "Enter the Venue",
+            hintStyle:
+                theme.textTheme.bodyMedium?.copyWith(color: theme.hintColor),
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+          ),
+        ),
+        const SizedBox(height: 16),
+        const Text("Event Date"),
+        const SizedBox(height: 8),
+        TextField(
+          controller: _dateController,
+          readOnly: true,
+          onTap: () => selectDate(context, _dateController),
+          decoration: InputDecoration(
+            prefixIcon:
+                Icon(Icons.calendar_month, color: theme.colorScheme.onPrimary),
+            filled: true,
+            fillColor: theme.primaryColor,
+            hintText: "Select Event Date",
+            hintStyle:
+                theme.textTheme.bodyMedium?.copyWith(color: theme.hintColor),
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+          ),
+        ),
+        const SizedBox(height: 16),
+        const Text("Event Start Time"),
+        const SizedBox(height: 8),
+        TextField(
+          controller: _startTimeController,
+          readOnly: true,
+          onTap: () => selectTime(context, _startTimeController),
+          decoration: InputDecoration(
+            prefixIcon: Icon(Icons.access_time_rounded,
+                color: theme.colorScheme.onPrimary),
+            filled: true,
+            fillColor: theme.primaryColor,
+            hintText: "Select Start Time",
+            hintStyle:
+                theme.textTheme.bodyMedium?.copyWith(color: theme.hintColor),
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+          ),
+        ),
+        const SizedBox(height: 16),
+        const Text("Event End Time"),
+        const SizedBox(height: 8),
+        TextField(
+          controller: _endTimeController,
+          readOnly: true,
+          onTap: () => selectTime(context, _endTimeController),
+          decoration: InputDecoration(
+            prefixIcon: Icon(Icons.access_time_rounded,
+                color: theme.colorScheme.onPrimary),
+            filled: true,
+            fillColor: theme.primaryColor,
+            hintText: "Select End Time",
+            hintStyle:
+                theme.textTheme.bodyMedium?.copyWith(color: theme.hintColor),
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Column _buildRightColumn(ThemeData theme) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text("Who can attend the event?"),
+        const SizedBox(height: 8),
+        Wrap(
+          spacing: 16.0,
+          runSpacing: 8.0,
+          children: [
+            customCheckbox(
+              "Institute Manager",
+              manager,
+              (val) {
+                setState(() {
+                  manager = val!;
+                  _updateOpenForAll();
+                });
+              },
+            ),
+            customCheckbox(
+              "Counselors",
+              counselor,
+              (val) {
+                setState(() {
+                  counselor = val!;
+                  _updateOpenForAll();
+                });
+              },
+            ),
+            customCheckbox(
+              "Teacher",
+              teachers,
+              (val) {
+                setState(() {
+                  teachers = val!;
+                  _updateOpenForAll();
+                });
+              },
+            ),
+            customCheckbox(
+              "Students",
+              students,
+              (val) {
+                setState(() {
+                  students = val!;
+                  _updateOpenForAll();
+                });
+              },
+            ),
+            customCheckbox(
+              "Librarians",
+              librarian,
+              (val) {
+                setState(() {
+                  librarian = val!;
+                  _updateOpenForAll();
+                });
+              },
+            ),
+            customCheckbox(
+              "Accountants",
+              accountants,
+              (val) {
+                setState(() {
+                  accountants = val!;
+                  _updateOpenForAll();
+                });
+              },
+            ),
+            customCheckbox(
+              "Staffs",
+              staff,
+              (val) {
+                setState(() {
+                  staff = val!;
+                  _updateOpenForAll();
+                });
+              },
+            ),
+            customCheckbox(
+              "Open for all",
+              openForAll,
+              (val) {
+                setState(() {
+                  openForAll = val!;
+                  manager = val;
+                  teachers = val;
+                  students = val;
+                  staff = val;
+                  librarian = val;
+                  accountants = val;
+                  counselor = val;
+                });
+              },
+            ),
+          ],
+        ),
+        const SizedBox(height: 16),
+        SwitchListTile(
+          title: Text(
+            "Ticketed Event?",
+            style: theme.textTheme.titleMedium
+                ?.copyWith(color: theme.colorScheme.onSurface),
+          ),
+          value: isTicked,
+          onChanged: (val) {
+            setState(() {
+              isTicked = val;
+            });
+          },
+        ),
+        const SizedBox(height: 16),
+        const Text("Ticket Price"),
+        const SizedBox(height: 8),
+        TextField(
+          controller: _ticketPriceController,
+          decoration: InputDecoration(
+            prefixIcon:
+                const Icon(Icons.currency_rupee, color: Colors.white),
+            hintText: "Enter Ticket Price",
+            hintStyle: theme.textTheme.bodyMedium?.copyWith(
+              color: theme.hintColor,
+            ),
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+            filled: true,
+            fillColor: theme.primaryColor,
+          ),
+        ),
+        const SizedBox(height: 16),
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            ElevatedButton(
+              onPressed: _isLoading ? null : _generateEvent,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.blue,
+                padding: const EdgeInsets.symmetric(vertical: 16),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+              child: _isLoading
+                  ? CircularProgressIndicator(
+                      valueColor: AlwaysStoppedAnimation<Color>(
+                          theme.colorScheme.onPrimary),
+                    )
+                  : Text(
+                      "Generate Event",
+                      style: theme.textTheme.titleMedium
+                          ?.copyWith(color: theme.colorScheme.onPrimary),
+                    ),
+            ),
+            const SizedBox(height: 8),
+            ElevatedButton(
+              onPressed: () {},
+              style: ElevatedButton.styleFrom(
+                backgroundColor: theme.colorScheme.surface,
+                padding: const EdgeInsets.symmetric(vertical: 16),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+              child: Text(
+                "Cancel",
+                style: theme.textTheme.titleMedium
+                    ?.copyWith(color: theme.colorScheme.onPrimary),
+              ),
+            ),
+            const SizedBox(height: 8),
+            ElevatedButton(
+              onPressed: () => showDeleteDialog(context, _titleController.text),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.red,
+                padding: const EdgeInsets.symmetric(vertical: 16),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+              child: Text(
+                "Delete Event",
+                style: theme.textTheme.titleMedium
+                    ?.copyWith(color: theme.colorScheme.onPrimary),
+              ),
+            ),
+          ],
+        )
+      ],
+    );
+  }
+
   Widget customCheckbox(String title, bool value, Function(bool?) onChanged) {
     return Container(
-      height: 60,
-      width: 170,
       padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 10),
       decoration: BoxDecoration(
         color: const Color(0xFF1C2530),
@@ -492,14 +530,14 @@ class _UpcomingEventsState extends State<UpcomingEvents> {
         borderRadius: BorderRadius.circular(10),
       ),
       child: Row(
+        mainAxisSize: MainAxisSize.min,
         children: [
           Checkbox(
             value: value,
             activeColor: Colors.blue,
             onChanged: onChanged,
           ),
-          Expanded(
-              child: Text(title, style: const TextStyle(color: Colors.white))),
+          Text(title, style: const TextStyle(color: Colors.white)),
         ],
       ),
     );
@@ -530,6 +568,7 @@ class _EventPosterUploadState extends State<EventPosterUpload> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     return InkWell(
       onTap: pickImage,
       child: DottedBorder(
@@ -538,33 +577,27 @@ class _EventPosterUploadState extends State<EventPosterUpload> {
         borderType: BorderType.RRect,
         radius: const Radius.circular(12),
         child: Container(
-          height: 180,
+          height: 150,
           width: double.infinity,
           decoration: BoxDecoration(
-            color: const Color(0xFF1C2530),
+            color: theme.cardColor.withOpacity(0.5),
             borderRadius: BorderRadius.circular(12),
           ),
           child: image == null
-              ? Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: const [
-                    CircleAvatar(
-                      radius: 22,
-                      backgroundColor: Colors.blue,
-                      child: Icon(Icons.upload, color: Colors.white),
-                    ),
-                    SizedBox(height: 12),
-                    Text(
-                      "Upload Event Poster",
-                      style: TextStyle(
-                          color: Colors.white, fontWeight: FontWeight.w600),
-                    ),
-                    SizedBox(height: 6),
-                    Text(
-                      "Tap to upload an image from your gallery",
-                      style: TextStyle(color: Colors.grey, fontSize: 12),
-                    ),
-                  ],
+              ? Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.cloud_upload_outlined,
+                          size: 40, color: theme.hintColor),
+                      const SizedBox(height: 8),
+                      Text(
+                        'Upload Event Poster',
+                        style: theme.textTheme.bodyMedium
+                            ?.copyWith(color: theme.hintColor),
+                      ),
+                    ],
+                  ),
                 )
               : ClipRRect(
                   borderRadius: BorderRadius.circular(12),
@@ -572,6 +605,7 @@ class _EventPosterUploadState extends State<EventPosterUpload> {
                     image!,
                     fit: BoxFit.cover,
                     width: double.infinity,
+                    height: 150,
                   ),
                 ),
         ),
@@ -580,91 +614,40 @@ class _EventPosterUploadState extends State<EventPosterUpload> {
   }
 }
 
-class EventDateField extends StatelessWidget {
-  final TextEditingController controller;
-
-  const EventDateField({super.key, required this.controller});
-
-  Future<void> selectDate(
-    BuildContext context,
-    TextEditingController controller,
-  ) async {
-    DateTime? pickedDate = await showDatePicker(
-      context: context,
-      initialDate: DateTime.now(),
-      firstDate: DateTime(2000),
-      lastDate: DateTime(2100),
-    );
-
-    if (pickedDate != null) {
-      if (!context.mounted) return;
-      controller.text =
-          "${pickedDate.day}-${pickedDate.month}-${pickedDate.year}";
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return InkWell(
-      onTap: () => selectDate(context, controller),
-      child: Container(
-        height: 52,
-        padding: const EdgeInsets.symmetric(horizontal: 14),
-        decoration: BoxDecoration(
-          color: const Color(0xFF1C2530),
-          borderRadius: BorderRadius.circular(10),
-        ),
-        child: Row(
-          children: [
-            const Icon(Icons.calendar_month, color: Colors.grey),
-            const SizedBox(width: 10),
-            Text(
-              controller.text.isEmpty ? "Select a date" : controller.text,
-              style: TextStyle(
-                color: controller.text.isEmpty ? Colors.grey : Colors.white,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-void showDeleteDialog(BuildContext context) {
+void showDeleteDialog(BuildContext context, String eventName) {
   showGeneralDialog(
     context: context,
     barrierDismissible: true,
     barrierLabel: "Delete",
-    barrierColor: Color.fromRGBO(0, 0, 0, 0.6),
+    barrierColor: const Color.fromRGBO(0, 0, 0, 0.6),
     transitionDuration: const Duration(milliseconds: 200),
     pageBuilder: (_, __, ___) {
-      return const DeleteManagerDialog(
-        managerName: "Rajeev K.Malhotra",
+      return DeleteEventDialog(
+        eventName: eventName,
       );
     },
   );
 }
-class DeleteManagerDialog extends StatelessWidget {
-  final String managerName;
 
-  const DeleteManagerDialog({
+class DeleteEventDialog extends StatelessWidget {
+  final String eventName;
+
+  const DeleteEventDialog({
     super.key,
-    required this.managerName,
+    required this.eventName,
   });
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     return Scaffold(
       backgroundColor: Colors.transparent,
       body: Stack(
         children: [
-          // 🔹 Blur Background
           BackdropFilter(
             filter: ImageFilter.blur(sigmaX: 6, sigmaY: 6),
             child: Container(color: Colors.transparent),
           ),
-
-          // 🔹 Center Card
           Center(
             child: Container(
               margin: const EdgeInsets.symmetric(horizontal: 24),
@@ -676,30 +659,19 @@ class DeleteManagerDialog extends StatelessWidget {
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  const Text(
-                    "Delete Event",
-                    style: TextStyle(
-                      fontSize: 20,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.white,
-                    ),
-                  ),
-
-                  const SizedBox(height: 12),
-
                   Text(
-                    "Are you sure you want to delete this event? "
-                        "This action cannot be undone.",
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      color: Colors.grey.shade400,
-                      fontSize: 14,
-                    ),
+                    "Delete Event",
+                    style:
+                        theme.textTheme.titleLarge?.copyWith(color: Colors.white),
                   ),
-
+                  const SizedBox(height: 12),
+                  Text(
+                    "Are you sure you want to delete the event: '\$eventName'? This action cannot be undone.",
+                    textAlign: TextAlign.center,
+                    style: theme.textTheme.bodyMedium
+                        ?.copyWith(color: Colors.grey.shade400),
+                  ),
                   const SizedBox(height: 24),
-
-                  // 🔴 Delete Button
                   SizedBox(
                     width: double.infinity,
                     child: ElevatedButton(
@@ -712,37 +684,15 @@ class DeleteManagerDialog extends StatelessWidget {
                       ),
                       onPressed: () {
                         Navigator.pop(context);
-                        // 🔥 delete logic here
+                        // delete logic here
                       },
-                      child: const Text(
+                      child: Text(
                         "Yes, Delete",
-                        style: TextStyle(fontSize: 16),
+                        style: theme.textTheme.labelLarge
+                            ?.copyWith(color: Colors.white),
                       ),
                     ),
-                  ),
-
-                  const SizedBox(height: 12),
-
-                  // ⚪ Cancel Button
-                  SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton(
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF374151),
-                        padding: const EdgeInsets.symmetric(vertical: 14),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                      ),
-                      onPressed: () {
-                        Navigator.pop(context);
-                      },
-                      child: const Text(
-                        "Cancel",
-                        style: TextStyle(fontSize: 16),
-                      ),
-                    ),
-                  ),
+                  )
                 ],
               ),
             ),

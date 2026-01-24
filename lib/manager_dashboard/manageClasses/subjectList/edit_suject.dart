@@ -1,62 +1,42 @@
+import 'package:eduphin/manager_dashboard/manageClasses/subjectList/subject_list.dart';
 import 'package:flutter/material.dart';
 
 class UpdateSubjectPage extends StatefulWidget {
-  const UpdateSubjectPage({super.key});
+  final Subject subject;
+  const UpdateSubjectPage({super.key, required this.subject});
 
   @override
   State<StatefulWidget> createState() => _UpdateSubjectPageState();
 }
 
 class _UpdateSubjectPageState extends State<UpdateSubjectPage> {
+  final _formKey = GlobalKey<FormState>();
   final _nameController = TextEditingController();
   final _codeController = TextEditingController();
   final _descriptionController = TextEditingController();
   final _creditController = TextEditingController();
   String? _selectedType;
   String? _selectedStatus;
-  bool _isLoading = true;
   bool _isSaving = false;
 
   @override
   void initState() {
     super.initState();
-    _fetchSubjectDetails();
+    _populateFields();
   }
 
-  Future<void> _fetchSubjectDetails() async {
-    // Simulate API call to fetch current subject data
-    await Future.delayed(const Duration(seconds: 1));
-
-    // Mock data for an existing subject
-    final subjectData = {
-      'name': 'Financial Accounting Basics',
-      'code': 'FAB-101',
-      'description': 'An introductory course covering the fundamentals of financial accounting principles and practices.',
-      'credit': '4',
-      'type': 'Theory',
-      'status': 'Active',
-    };
-
-    if (mounted) {
-      setState(() {
-        _nameController.text = subjectData['name']!;
-        _codeController.text = subjectData['code']!;
-        _descriptionController.text = subjectData['description']!;
-        _creditController.text = subjectData['credit']!;
-        _selectedType = subjectData['type'];
-        _selectedStatus = subjectData['status'];
-        _isLoading = false;
-      });
-    }
+  void _populateFields() {
+    final subject = widget.subject;
+    _nameController.text = subject.name;
+    _codeController.text = subject.code;
+    _descriptionController.text = subject.description;
+    _creditController.text = subject.credit;
+    _selectedType = subject.type;
+    _selectedStatus = subject.isActive ? 'Active' : 'Inactive';
   }
 
   Future<void> _updateSubject() async {
-    if (_nameController.text.isEmpty ||
-        _codeController.text.isEmpty ||
-        _creditController.text.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please fill all required fields.')),
-      );
+    if (!_formKey.currentState!.validate()) {
       return;
     }
 
@@ -107,164 +87,235 @@ class _UpdateSubjectPageState extends State<UpdateSubjectPage> {
         title: const Text("Update Subject"),
         centerTitle: true,
       ),
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : Padding(
-        padding: const EdgeInsets.fromLTRB(16, 16, 16, 50),
-        child: SingleChildScrollView(
-          child: Column(
-            children: [
-              Container(
+      floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
+      floatingActionButton: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16.0),
+        child: Row(
+          children: [
+            Expanded(
+              child: OutlinedButton(
+                onPressed: () => Navigator.of(context).pop(),
+                style: OutlinedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                  foregroundColor: theme.colorScheme.onSurface,
+                  side: BorderSide(color: theme.dividerColor),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+                child: const Text("Cancel"),
+              ),
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: ElevatedButton(
+                onPressed: _isSaving ? null : _updateSubject,
+                style: ElevatedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                  backgroundColor: theme.colorScheme.primary,
+                  foregroundColor: theme.colorScheme.onPrimary,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+                child: _isSaving
+                    ? const SizedBox(
+                        height: 24,
+                        width: 24,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 3,
+                          valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                        ),
+                      )
+                    : const Text("Update Subject"),
+              ),
+            ),
+          ],
+        ),
+      ),
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.fromLTRB(16, 16, 16, 120),
+        child: Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 700),
+            child: Form(
+              key: _formKey,
+              child: Container(
                 decoration: BoxDecoration(
                   borderRadius: BorderRadius.circular(10),
                   color: theme.primaryColor,
                 ),
-                child: Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text("Subject Name"),
-                      const SizedBox(height: 8),
-                      TextField(
-                        controller: _nameController,
-                        decoration: InputDecoration(
-                          hintText: "Enter Subject Name",
-                          hintStyle: TextStyle(color: Colors.grey.shade700),
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 16),
-                      const Text("Subject Code"),
-                      const SizedBox(height: 8),
-                      TextField(
-                        controller: _codeController,
-                        decoration: InputDecoration(
-                          hintText: "Enter Subject Code",
-                          hintStyle: TextStyle(color: Colors.grey.shade700),
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 16),
-                      const Text("Description (Optional)"),
-                      const SizedBox(height: 8),
-                      TextField(
-                        controller: _descriptionController,
-                        maxLines: 5,
-                        decoration: InputDecoration(
-                          hintText: "Enter a brief description of the subject...",
-                          hintStyle: TextStyle(color: Colors.grey.shade700),
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 16),
-                      const Text("Credit"),
-                      const SizedBox(height: 8),
-                      TextField(
-                        controller: _creditController,
-                        keyboardType: TextInputType.number,
-                        decoration: InputDecoration(
-                          hintText: "Enter Subject Credit",
-                          hintStyle: TextStyle(color: Colors.grey.shade700),
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 16),
-                      const Text("Type"),
-                      const SizedBox(height: 8),
-                      DropdownButtonFormField<String>(
-                        initialValue: _selectedType,
-                        items: ['Theory', 'Practical'].map((String value) {
-                          return DropdownMenuItem<String>(
-                            value: value,
-                            child: Text(value),
-                          );
-                        }).toList(),
-                        onChanged: (newValue) {
-                          setState(() {
-                            _selectedType = newValue;
-                          });
-                        },
-                        decoration: const InputDecoration(
-                          border: OutlineInputBorder(),
-                        ),
-                      ),
-                      const SizedBox(height: 16),
-                      const Text("Status"),
-                      const SizedBox(height: 8),
-                      DropdownButtonFormField<String>(
-                        initialValue: _selectedStatus,
-                        items: ['Active', 'Inactive'].map((String value) {
-                          return DropdownMenuItem<String>(
-                            value: value,
-                            child: Text(value),
-                          );
-                        }).toList(),
-                        onChanged: (newValue) {
-                          setState(() {
-                            _selectedStatus = newValue;
-                          });
-                        },
-                        decoration: const InputDecoration(
-                          border: OutlineInputBorder(),
-                        ),
-                      ),
-                      const SizedBox(height: 16),
-                      const Divider(
-                        color: Colors.white,
-                        thickness: 1,
-                      ),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Expanded(
-                            child: SizedBox(
-                              height: 50,
-                              child: ElevatedButton(
-                                onPressed: _isSaving ? null : _updateSubject,
-                                style: ElevatedButton.styleFrom(
-                                    backgroundColor: Colors.blue.withAlpha(65)),
-                                child: _isSaving
-                                    ? const CircularProgressIndicator(valueColor: AlwaysStoppedAnimation<Color>(Colors.white))
-                                    : Text("Update Subject",
-                                    style: TextStyle(
-                                        color: theme.colorScheme.onPrimary,
-                                        fontSize: 16)),
-                              ),
-                            ),
-                          ),
-                          const SizedBox(width: 16),
-                          Expanded(
-                            child: SizedBox(
-                              height: 50,
-                              child: ElevatedButton(
-                                  onPressed: () {
-                                    Navigator.of(context).pop();
-                                  },
-                                  child: Text("Cancel",
-                                      style: TextStyle(
-                                          color: theme.colorScheme.onPrimary,
-                                          fontSize: 16))),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
+                padding: const EdgeInsets.all(16),
+                child: LayoutBuilder(
+                  builder: (context, constraints) {
+                    final isWide = constraints.maxWidth > 500;
+                    return isWide ? _buildWideLayout(theme) : _buildNarrowLayout(theme);
+                  },
                 ),
               ),
-            ],
+            ),
           ),
         ),
       ),
+    );
+  }
+
+  Widget _buildNarrowLayout(ThemeData theme) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _buildTextField(theme, "Subject Name", _nameController, "Enter Subject Name"),
+        const SizedBox(height: 16),
+        _buildTextField(theme, "Subject Code", _codeController, "Enter Subject Code"),
+        const SizedBox(height: 16),
+        _buildTextField(theme, "Description (Optional)", _descriptionController,
+            "Enter a brief description...",
+            maxLines: 4),
+        const SizedBox(height: 16),
+        _buildTextField(theme, "Credit", _creditController, "Enter Subject Credit",
+            keyboardType: TextInputType.number),
+        const SizedBox(height: 16),
+        _buildDropdownField(theme, "Type", _selectedType, [
+          'Theory',
+          'Practical'
+        ], (val) => setState(() => _selectedType = val)),
+        const SizedBox(height: 16),
+        _buildDropdownField(theme, "Status", _selectedStatus, [
+          'Active',
+          'Inactive'
+        ], (val) => setState(() => _selectedStatus = val)),
+        const SizedBox(height: 80), // Padding for FAB
+      ],
+    );
+  }
+
+  Widget _buildWideLayout(ThemeData theme) {
+    return Column(
+      children: [
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(
+                child: _buildTextField(
+                    theme, "Subject Name", _nameController, "Enter Subject Name")),
+            const SizedBox(width: 16),
+            Expanded(
+                child: _buildTextField(
+                    theme, "Subject Code", _codeController, "Enter Subject Code")),
+          ],
+        ),
+        const SizedBox(height: 16),
+        _buildTextField(theme, "Description (Optional)", _descriptionController,
+            "Enter a brief description...",
+            maxLines: 3),
+        const SizedBox(height: 16),
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(
+                child: _buildTextField(
+                    theme, "Credit", _creditController, "Enter Subject Credit",
+                    keyboardType: TextInputType.number)),
+            const SizedBox(width: 16),
+            Expanded(
+                child: _buildDropdownField(theme, "Type", _selectedType, [
+              'Theory',
+              'Practical'
+            ], (val) => setState(() => _selectedType = val))),
+            const SizedBox(width: 16),
+            Expanded(
+                child: _buildDropdownField(theme, "Status", _selectedStatus, [
+              'Active',
+              'Inactive'
+            ], (val) => setState(() => _selectedStatus = val))),
+          ],
+        ),
+        const SizedBox(height: 80), // Padding for FAB
+      ],
+    );
+  }
+
+  Widget _buildTextField(
+    ThemeData theme,
+    String label,
+    TextEditingController controller,
+    String hint, {
+    int maxLines = 1,
+    TextInputType? keyboardType,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(label,
+            style: theme.textTheme.titleMedium
+                ?.copyWith(color: theme.colorScheme.onPrimary)),
+        const SizedBox(height: 8),
+        TextFormField(
+          controller: controller,
+          maxLines: maxLines,
+          keyboardType: keyboardType,
+          decoration: InputDecoration(
+            hintText: hint,
+            hintStyle: TextStyle(color: theme.hintColor),
+            filled: true,
+            fillColor: theme.scaffoldBackgroundColor,
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(10),
+              borderSide: BorderSide.none,
+            ),
+            errorBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(10),
+              borderSide: BorderSide(color: theme.colorScheme.error, width: 1),
+            ),
+            focusedErrorBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(10),
+              borderSide: BorderSide(color: theme.colorScheme.error, width: 2),
+            ),
+          ),
+          validator: (value) {
+            if (label.contains("Optional")) return null;
+            return value == null || value.isEmpty
+                ? 'This field is required'
+                : null;
+          },
+        ),
+      ],
+    );
+  }
+
+  Widget _buildDropdownField(
+    ThemeData theme,
+    String label,
+    String? value,
+    List<String> items,
+    ValueChanged<String?> onChanged,
+  ) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(label,
+            style: theme.textTheme.titleMedium
+                ?.copyWith(color: theme.colorScheme.onPrimary)),
+        const SizedBox(height: 8),
+        DropdownButtonFormField<String>(
+          initialValue: value,
+          items: items
+              .map((String item) =>
+                  DropdownMenuItem<String>(value: item, child: Text(item)))
+              .toList(),
+          onChanged: onChanged,
+          decoration: InputDecoration(
+            filled: true,
+            fillColor: theme.scaffoldBackgroundColor,
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(10),
+              borderSide: BorderSide.none,
+            ),
+          ),
+          validator: (value) =>
+              value == null ? 'Please make a selection' : null,
+        ),
+      ],
     );
   }
 }

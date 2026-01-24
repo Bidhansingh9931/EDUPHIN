@@ -111,70 +111,32 @@ class _AddCounselorPageState extends State<AddCounselorPage> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     return Scaffold(
-      floatingActionButton: Padding(
-        padding: const EdgeInsets.only(left: 32),
-        child: Row(
-          children: [
-            Expanded(
-              child: SizedBox(
-                height: 50,
-                child: FloatingActionButton(
-                  onPressed: _updateProfile, // Changed to call the update function
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(
-                        Icons.save, // Changed icon to 'save'
-                        color: theme.colorScheme.onSurface,
-                      ),
-                      const SizedBox(
-                        width: 8,
-                      ),
-                      Text(
-                        "Update Profile", // Changed text
-                        style: TextStyle(
-                            color: theme.colorScheme.onSurface, fontSize: 20),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-            const SizedBox(width: 16),
-            SizedBox(
-              width: 150,
-              height: 50,
-              child: FloatingActionButton(
-                onPressed: () => showDeleteDialog(context),
-                backgroundColor: Colors.redAccent,
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(
-                      Icons.delete,
-                      color: theme.colorScheme.onSurface,
-                    ),
-                    const SizedBox(
-                      width: 2,
-                    ),
-                    Text(
-                      "Delete",
-                      style: TextStyle(
-                          color: theme.colorScheme.onSurface, fontSize: 20),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ],
-        ),
+      floatingActionButton: Wrap(
+        spacing: 16,
+        runSpacing: 16,
+        alignment: WrapAlignment.center,
+        children: [
+          FloatingActionButton.extended(
+            heroTag: 'updateProfile',
+            onPressed: _updateProfile,
+            label: const Text("Update Profile"),
+            icon: const Icon(Icons.save),
+          ),
+          FloatingActionButton.extended(
+            heroTag: 'deleteCounselor',
+            onPressed: () => showDeleteDialog(context),
+            backgroundColor: Colors.redAccent,
+            label: const Text("Delete"),
+            icon: const Icon(Icons.delete),
+          ),
+        ],
       ),
       backgroundColor: theme.scaffoldBackgroundColor,
       appBar: AppBar(
         title: Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            const Text('Edit Counselor Profile'),
+            Text('Edit Counselor Profile', style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold, color: theme.colorScheme.onSurface),),
             InkWell(
                 onTap: () => Navigator.pushReplacement(
                     context,
@@ -189,7 +151,7 @@ class _AddCounselorPageState extends State<AddCounselorPage> {
         backgroundColor: theme.appBarTheme.backgroundColor,
       ),
       body: Padding(
-        padding: const EdgeInsets.fromLTRB(16, 16, 16, 110),
+        padding: const EdgeInsets.fromLTRB(16, 16, 16, 120),
         child: SingleChildScrollView(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -206,25 +168,90 @@ class _AddCounselorPageState extends State<AddCounselorPage> {
                   context, "New Password", _newPasswordController),
               const Text("Leave blank to keep existing's password"),
               const SizedBox(height: 20),
-              _buildPersonalDetailsSection(context),
+              _buildSection(context, "Personal Details", [
+                _buildEditableInfoTile(context, "Role", _roleController),
+                _buildEditableInfoTile(context, "Gender", _genderController),
+                _buildEditableInfoTile(context, "Date of Birth", _dateOfBirthController),
+                _buildEditableInfoTile(context, "Relationship Status", _relationshipStatusController),
+              ]),
               const SizedBox(height: 20),
-              _buildContactDetailsSection(context),
+              _buildSection(context, "Contact Details", [
+                _buildEditableInfoTile(context, "Phone Number", _phoneNumberController),
+                _buildEditableInfoTile(context, "Alternate Number", _alternateNumberController),
+              ]),
               const SizedBox(height: 20),
-              _buildAddressDetailsSection(context),
+              _buildSection(context, "Address Details", [
+                _buildEditableInfoTile(context, "Address", _addressController),
+                _buildEditableInfoTile(context, "City", _cityController),
+                _buildEditableInfoTile(context, "State", _stateController),
+                _buildEditableInfoTile(context, "Pin code", _pinCodeController),
+              ]),
               const SizedBox(height: 20),
-              _buildProfessionalInformationSection(context),
+              _buildSection(context, "Professional Information", [
+                _buildEditableInfoTile(context, "Position", _positionController),
+                _buildEditableInfoTile(context, "Employment Type", _employmentTypeController),
+                _buildEditableInfoTile(context, "Joining Date", _joiningDateController),
+                _buildEditableInfoTile(context, "Experience (Years)", _experienceController),
+                _buildEditableInfoTile(context, "Status", _statusController),
+                _buildEditableInfoTile(context, "Reference", _referenceController),
+              ]),
               const SizedBox(height: 20),
-              _buildEducationDetailsSection(context),
+              _buildSection(context, "Education & Documents", [
+                _buildEditableInfoTile(context, "Qualification", _qualificationController),
+                _buildEditableInfoTile(context, "Matriculation Marks (%)", _matriculationMarksController),
+                _buildEditableInfoTile(context, "Intermediate Marks (%)", _intermediateMarksController),
+                _buildEditableInfoTile(context, "Matriculation Marksheet", TextEditingController(text: "View Document"), readOnly: true),
+                _buildEditableInfoTile(context, "Intermediate Marksheet", TextEditingController(text: "View Document"), readOnly: true),
+                _buildEditableInfoTile(context, "Resume", TextEditingController(text: "View Document"), readOnly: true),
+              ]),
               const SizedBox(height: 20),
-              _buildBankingDetailsSection(context),
+              _buildSection(context, "Banking Details", [
+                _buildEditableInfoTile(context, "Bank Account Number", _bankAccountNumberController),
+                _buildEditableInfoTile(context, "IFSC Code", _ifscCodeController),
+                _buildEditableInfoTile(context, "Bank Name", _bankNameController),
+                _buildEditableInfoTile(context, "Branch", _branchController),
+              ]),
               const SizedBox(height: 20),
-              _buildEmergencyContactDetailsSection(context),
+              _buildSection(context, "Emergency Contact", [
+                _buildEditableInfoTile(context, "Contact Name", _emergencyContactNameController),
+                _buildEditableInfoTile(context, "Contact Number", _emergencyContactNumberController),
+              ]),
             ],
           ),
         ),
       ),
     );
   }
+
+  Widget _buildSection(BuildContext context, String title, List<Widget> children) {
+    final theme = Theme.of(context);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(title,
+            style: theme.textTheme.titleLarge
+                ?.copyWith(fontWeight: FontWeight.bold)),
+        const SizedBox(height: 12),
+        LayoutBuilder(builder: (context, constraints) {
+          final isLargeScreen = constraints.maxWidth > 600;
+          if (isLargeScreen) {
+            return Wrap(
+              spacing: 16,
+              runSpacing: 16,
+              children: children.map((child) => 
+                SizedBox(
+                  width: constraints.maxWidth / 2 - 8, // Adjust for spacing
+                  child: child,
+                )).toList(),
+            );
+          } else {
+            return Column(children: children,);
+          }
+        })
+      ],
+    );
+  }
+
 
   Widget _buildEditableInfoTile(
       BuildContext context, String title, TextEditingController controller,
@@ -242,8 +269,8 @@ class _AddCounselorPageState extends State<AddCounselorPage> {
               theme.textTheme.bodyMedium?.copyWith(color: theme.hintColor),
           filled: true,
           fillColor: readOnly
-              ? theme.dividerColor
-              : theme.cardColor, // Fixed bug: removed .withValues()
+              ? theme.dividerColor.withOpacity(0.1)
+              : theme.cardColor, 
           contentPadding:
               const EdgeInsets.symmetric(vertical: 16.0, horizontal: 12.0),
           border: OutlineInputBorder(
@@ -262,146 +289,8 @@ class _AddCounselorPageState extends State<AddCounselorPage> {
       ),
     );
   }
-
-  Widget _buildPersonalDetailsSection(BuildContext context) {
-    final theme = Theme.of(context);
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text("Personal Details",
-            style:
-                theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold)),
-        const SizedBox(height: 12),
-        _buildEditableInfoTile(context, "Role", _roleController),
-        _buildEditableInfoTile(context, "Gender", _genderController),
-        _buildEditableInfoTile(
-            context, "Date of Birth", _dateOfBirthController),
-        _buildEditableInfoTile(
-            context, "Relationship Status", _relationshipStatusController),
-      ],
-    );
-  }
-
-  Widget _buildContactDetailsSection(BuildContext context) {
-    final theme = Theme.of(context);
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text("Contact Details",
-            style:
-                theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold)),
-        const SizedBox(height: 12),
-        _buildEditableInfoTile(
-            context, "Phone Number", _phoneNumberController),
-        _buildEditableInfoTile(
-            context, "Alternate Number", _alternateNumberController),
-      ],
-    );
-  }
-
-  Widget _buildAddressDetailsSection(BuildContext context) {
-    final theme = Theme.of(context);
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text("Address Details",
-            style:
-                theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold)),
-        const SizedBox(height: 12),
-        _buildEditableInfoTile(context, "Address", _addressController),
-        _buildEditableInfoTile(context, "City", _cityController),
-        _buildEditableInfoTile(context, "State", _stateController),
-        _buildEditableInfoTile(context, "Pin code", _pinCodeController),
-      ],
-    );
-  }
-
-  Widget _buildProfessionalInformationSection(BuildContext context) {
-    final theme = Theme.of(context);
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text("Professional Information",
-            style:
-                theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold)),
-        const SizedBox(height: 12),
-        _buildEditableInfoTile(context, "Position", _positionController),
-        _buildEditableInfoTile(
-            context, "Employment Type", _employmentTypeController),
-        _buildEditableInfoTile(
-            context, "Joining Date", _joiningDateController),
-        _buildEditableInfoTile(
-            context, "Experience (Years)", _experienceController),
-        _buildEditableInfoTile(context, "Status", _statusController),
-        _buildEditableInfoTile(context, "Reference", _referenceController),
-      ],
-    );
-  }
-
-  Widget _buildEducationDetailsSection(BuildContext context) {
-    final theme = Theme.of(context);
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text("Education & Documents",
-            style:
-                theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold)),
-        const SizedBox(height: 12),
-        _buildEditableInfoTile(
-            context, "Qualification", _qualificationController),
-        _buildEditableInfoTile(context, "Matriculation Marks (%)",
-            _matriculationMarksController),
-        _buildEditableInfoTile(context, "Intermediate Marks (%)",
-            _intermediateMarksController),
-        _buildEditableInfoTile(
-            context, "Matriculation Marksheet", TextEditingController(text: "View Document"),
-            readOnly: true),
-        _buildEditableInfoTile(
-            context, "Intermediate Marksheet", TextEditingController(text: "View Document"),
-            readOnly: true),
-        _buildEditableInfoTile(context, "Resume", TextEditingController(text: "View Document"),
-            readOnly: true),
-      ],
-    );
-  }
-
-  Widget _buildBankingDetailsSection(BuildContext context) {
-    final theme = Theme.of(context);
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text("Banking Details",
-            style:
-                theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold)),
-        const SizedBox(height: 12),
-        _buildEditableInfoTile(
-            context, "Bank Account Number", _bankAccountNumberController),
-        _buildEditableInfoTile(context, "IFSC Code", _ifscCodeController),
-        _buildEditableInfoTile(context, "Bank Name", _bankNameController),
-        _buildEditableInfoTile(context, "Branch", _branchController),
-      ],
-    );
-  }
-
-  Widget _buildEmergencyContactDetailsSection(BuildContext context) {
-    final theme = Theme.of(context);
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text("Emergency Contact",
-            style:
-                theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold)),
-        const SizedBox(height: 12),
-        _buildEditableInfoTile(
-            context, "Contact Name", _emergencyContactNameController),
-        _buildEditableInfoTile(
-            context, "Contact Number", _emergencyContactNumberController),
-      ],
-    );
-  }
 }
 
-// This widget is now dynamic.
 class CustomProfileBox extends StatelessWidget {
   final String fullName;
   final String position;
@@ -412,6 +301,8 @@ class CustomProfileBox extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final textTheme = theme.textTheme;
+
     return InkWell(
       onTap: () => Navigator.push(context,
           MaterialPageRoute(builder: (context) => const ManagerProfilePage())),
@@ -426,13 +317,11 @@ class CustomProfileBox extends StatelessWidget {
           children: [
             Row(
               children: [
-                Icon(Icons.person,
-                    color: theme.colorScheme.onPrimary, size: 30),
+                Icon(Icons.person, color: theme.colorScheme.onPrimary, size: 30),
                 const SizedBox(width: 8),
                 Text("Profile Overview",
-                    style: TextStyle(
+                    style: textTheme.titleLarge?.copyWith(
                         fontWeight: FontWeight.bold,
-                        fontSize: 20,
                         color: theme.colorScheme.onPrimary))
               ],
             ),
@@ -442,14 +331,12 @@ class CustomProfileBox extends StatelessWidget {
               backgroundImage: AssetImage("assets/images/random_boy.jpg"),
             ),
             const SizedBox(height: 8),
-            Text(fullName, // Now uses the dynamic full name
-                style: TextStyle(
+            Text(fullName,
+                style: textTheme.titleLarge?.copyWith(
                     fontWeight: FontWeight.bold,
-                    fontSize: 20,
                     color: theme.colorScheme.onPrimary)),
-            Text(position, // Now uses the dynamic position
-                style: TextStyle(
-                    fontSize: 16,
+            Text(position,
+                style: textTheme.titleMedium?.copyWith(
                     color: theme.colorScheme.onPrimary.withAlpha(180))),
             const SizedBox(height: 16),
             Container(
@@ -459,11 +346,11 @@ class CustomProfileBox extends StatelessWidget {
                 borderRadius: BorderRadius.circular(10),
                 color: const Color(0xFF2A3F5F),
               ),
-              child: const Row(
+              child: Row(
                 crossAxisAlignment: CrossAxisAlignment.center,
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Padding(
+                  const Padding(
                     padding: EdgeInsets.only(right: 10),
                     child: Icon(
                       Icons.camera_alt_outlined,
@@ -473,9 +360,8 @@ class CustomProfileBox extends StatelessWidget {
                   ),
                   Text(
                     "Update Profile Image",
-                    style: TextStyle(
-                        color: Color(0xFF9FB4CC),
-                        fontSize: 16,
+                    style: textTheme.bodyLarge?.copyWith(
+                        color: const Color(0xFF9FB4CC),
                         fontWeight: FontWeight.bold),
                   ),
                 ],
@@ -488,7 +374,6 @@ class CustomProfileBox extends StatelessWidget {
   }
 }
 
-// Your custom dialog is preserved.
 void showDeleteDialog(BuildContext context) {
   showGeneralDialog(
     context: context,
@@ -498,7 +383,7 @@ void showDeleteDialog(BuildContext context) {
     transitionDuration: const Duration(milliseconds: 200),
     pageBuilder: (_, __, ___) {
       return const DeleteCounselorDialog(
-        counselorName: "Aarav Sharma",
+        counselorName: "Rajveer K.Malhotra",
       );
     },
   );
@@ -514,14 +399,20 @@ class DeleteCounselorDialog extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final textTheme = theme.textTheme;
+
     return Scaffold(
       backgroundColor: Colors.transparent,
       body: Stack(
         children: [
+          // 🔹 Blur Background
           BackdropFilter(
             filter: ImageFilter.blur(sigmaX: 6, sigmaY: 6),
             child: Container(color: Colors.transparent),
           ),
+
+          // 🔹 Center Card
           Center(
             child: Container(
               margin: const EdgeInsets.symmetric(horizontal: 24),
@@ -533,44 +424,41 @@ class DeleteCounselorDialog extends StatelessWidget {
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  const Text(
+                  Text(
                     "Delete Counselor",
-                    style: TextStyle(
-                      fontSize: 20,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.white,
-                    ),
+                    style: textTheme.titleLarge?.copyWith(
+                        color: Colors.white, fontWeight: FontWeight.bold),
                   ),
                   const SizedBox(height: 12),
                   Text(
-                    "Are you sure you want to delete this counselor "
-                    '"$counselorName"? This action cannot be undone.',
+                    "Are you sure you want to delete this Counselor '''$counselorName'''? This action cannot be undone.",
                     textAlign: TextAlign.center,
-                    style: const TextStyle(color: Colors.white70, fontSize: 16),
+                    style:
+                        textTheme.bodyMedium?.copyWith(color: Colors.grey.shade400),
                   ),
-                  const SizedBox(height: 20),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                    children: [
-                      ElevatedButton(
-                        onPressed: () => Navigator.of(context).pop(),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.grey.shade700,
+                  const SizedBox(height: 24),
+
+                  // 🔴 Delete Button
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFFC5392A),
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
                         ),
-                        child: const Text("Cancel"),
                       ),
-                      ElevatedButton(
-                        onPressed: () {
-                          // TODO: Add your delete API call here
-                          Navigator.of(context).pop();
-                        },
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.redAccent,
-                        ),
-                        child: const Text("Delete"),
+                      onPressed: () {
+                        Navigator.pop(context);
+                        // 🔥 delete logic here
+                      },
+                      child: Text(
+                        "Yes, Delete",
+                        style: textTheme.titleMedium,
                       ),
-                    ],
-                  ),
+                    ),
+                  )
                 ],
               ),
             ),

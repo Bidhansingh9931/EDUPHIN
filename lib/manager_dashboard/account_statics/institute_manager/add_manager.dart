@@ -163,35 +163,95 @@ class _AddManagerPageState extends State<AddManagerPage> {
           } else if (snapshot.hasData) {
             final formData = snapshot.data!;
             _manager = formData.manager;
-            return SingleChildScrollView(
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(16,16,16,50),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    CustomProfileBox(manager: _manager),
-                    const SizedBox(height: 20),
-                    _buildEditableInfoTile(context, "Full Name", _manager.fullName, (val) => _manager.fullName = val),
-                    _buildEditableInfoTile(context, "Email", _manager.email, (val) => _manager.email = val),
-                    _buildEditableInfoTile(context, "New Password", _manager.newPassword, (val) => _manager.newPassword = val, isPassword: true),
-                    Text("Leave blank to keep existing's password", style: theme.textTheme.bodySmall),
-                    const SizedBox(height: 20),
-                    _buildPersonalDetailsSection(context, _manager, formData),
-                    const SizedBox(height: 20),
-                    _buildContactDetailsSection(context, _manager),
-                    const SizedBox(height: 20),
-                    _buildAddressDetailsSection(context, _manager),
-                    const SizedBox(height: 20),
-                    _buildProfessionalInformationSection(context, _manager, formData),
-                    const SizedBox(height: 20),
-                    _buildEducationDetailsSection(context, _manager),
-                    const SizedBox(height: 20),
-                    _buildBankingDetailsSection(context, _manager),
-                    const SizedBox(height: 20),
-                    _buildEmergencyContactDetailsSection(context, _manager),
-                  ],
-                ),
-              ),
+            return LayoutBuilder(
+              builder: (context, constraints) {
+                // Use a wider breakpoint for a 2-column layout to avoid cramping
+                final isWide = constraints.maxWidth > 800;
+
+                if (isWide) {
+                  // Wide layout: Two scrollable columns
+                  return Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 16, 16, 50),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Expanded(
+                          flex: 1,
+                          child: SingleChildScrollView(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                CustomProfileBox(manager: _manager),
+                                const SizedBox(height: 20),
+                                _buildEditableInfoTile(context, "Full Name", _manager.fullName, (val) => _manager.fullName = val),
+                                _buildEditableInfoTile(context, "Email", _manager.email, (val) => _manager.email = val),
+                                _buildEditableInfoTile(context, "New Password", _manager.newPassword, (val) => _manager.newPassword = val, isPassword: true),
+                                Text("Leave blank to keep existing's password", style: theme.textTheme.bodySmall),
+                                const SizedBox(height: 20),
+                                _buildPersonalDetailsSection(context, _manager, formData),
+                                const SizedBox(height: 20),
+                                _buildContactDetailsSection(context, _manager),
+                                const SizedBox(height: 20),
+                                _buildAddressDetailsSection(context, _manager),
+                              ],
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 20),
+                        Expanded(
+                          flex: 1,
+                          child: SingleChildScrollView(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                _buildProfessionalInformationSection(context, _manager, formData),
+                                const SizedBox(height: 20),
+                                _buildEducationDetailsSection(context, _manager),
+                                const SizedBox(height: 20),
+                                _buildBankingDetailsSection(context, _manager),
+                                const SizedBox(height: 20),
+                                _buildEmergencyContactDetailsSection(context, _manager),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                } else {
+                  // Narrow layout: A single scrollable column
+                  return SingleChildScrollView(
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 16, 16, 50),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          CustomProfileBox(manager: _manager),
+                          const SizedBox(height: 20),
+                          _buildEditableInfoTile(context, "Full Name", _manager.fullName, (val) => _manager.fullName = val),
+                          _buildEditableInfoTile(context, "Email", _manager.email, (val) => _manager.email = val),
+                          _buildEditableInfoTile(context, "New Password", _manager.newPassword, (val) => _manager.newPassword = val, isPassword: true),
+                          Text("Leave blank to keep existing's password", style: theme.textTheme.bodySmall),
+                          const SizedBox(height: 20),
+                          _buildPersonalDetailsSection(context, _manager, formData),
+                          const SizedBox(height: 20),
+                          _buildContactDetailsSection(context, _manager),
+                          const SizedBox(height: 20),
+                          _buildAddressDetailsSection(context, _manager),
+                          const SizedBox(height: 20),
+                          _buildProfessionalInformationSection(context, _manager, formData),
+                          const SizedBox(height: 20),
+                          _buildEducationDetailsSection(context, _manager),
+                          const SizedBox(height: 20),
+                          _buildBankingDetailsSection(context, _manager),
+                          const SizedBox(height: 20),
+                          _buildEmergencyContactDetailsSection(context, _manager),
+                        ],
+                      ),
+                    ),
+                  );
+                }
+              },
             );
           } else {
             return const Center(child: Text("No data available"));
@@ -432,8 +492,10 @@ class CustomProfileBox extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final isWide = MediaQuery.of(context).size.width > 600;
+
     return InkWell(
-      onTap: () => Navigator.push(context, MaterialPageRoute(builder: (context) => ManagerProfilePage())),
+      onTap: () => Navigator.push(context, MaterialPageRoute(builder: (context) => const ManagerProfilePage())),
       child: Container(
         width: double.infinity,
         padding: const EdgeInsets.all(16.0),
@@ -445,9 +507,9 @@ class CustomProfileBox extends StatelessWidget {
           children: [
             Row(
               children: [
-                Icon(Icons.person, color: theme.colorScheme.onPrimary, size: 30),
+                Icon(Icons.person, color: theme.colorScheme.onPrimary, size: isWide ? 32 : 28),
                 const SizedBox(width: 8),
-                Text("Profile Overview", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 20, color: theme.colorScheme.onPrimary))
+                Text("Profile Overview", style: TextStyle(fontWeight: FontWeight.bold, fontSize: isWide ? 22 : 20, color: theme.colorScheme.onPrimary))
               ],
             ),
             const SizedBox(height: 16),
@@ -456,8 +518,8 @@ class CustomProfileBox extends StatelessWidget {
               backgroundImage: AssetImage("assets/images/random_boy.jpg"),
             ),
             const SizedBox(height: 8),
-            Text(manager.fullName, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 20, color: theme.colorScheme.onPrimary)),
-            Text(manager.role, style: TextStyle(fontSize: 16, color: theme.colorScheme.onPrimary.withAlpha(180))),
+            Text(manager.fullName, style: TextStyle(fontWeight: FontWeight.bold, fontSize: isWide ? 22 : 20, color: theme.colorScheme.onPrimary)),
+            Text(manager.role, style: TextStyle(fontSize: isWide ? 18 : 16, color: theme.colorScheme.onPrimary.withAlpha(180))),
             const SizedBox(height: 16),
             Container(
               height: 50,
@@ -466,15 +528,15 @@ class CustomProfileBox extends StatelessWidget {
                 borderRadius: BorderRadius.circular(10),
                 color: const Color(0xFF2A3F5F),
               ),
-              child: Row(
+              child: const Row(
                 crossAxisAlignment: CrossAxisAlignment.center,
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  const Padding(
+                  Padding(
                     padding: EdgeInsets.only(right: 10),
                     child: Icon(Icons.camera_alt_outlined, size: 30, color: Color(0xFF9FB4CC)),
                   ),
-                  const Text("Update Profile Image", style: TextStyle(color: Color(0xFF9FB4CC), fontSize: 16, fontWeight: FontWeight.bold)),
+                  Text("Update Profile Image", style: TextStyle(color: Color(0xFF9FB4CC), fontSize: 16, fontWeight: FontWeight.bold)),
                 ],
               ),
             )

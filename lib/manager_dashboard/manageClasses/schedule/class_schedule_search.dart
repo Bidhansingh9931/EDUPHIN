@@ -2,8 +2,6 @@ import 'package:flutter/material.dart';
 
 import 'searchSchedule/daily_class_schedule.dart';
 
-// import 'add_new_schedule.dart';
-
 class ClassScheduleSearchPage extends StatefulWidget {
   const ClassScheduleSearchPage({super.key});
 
@@ -12,6 +10,7 @@ class ClassScheduleSearchPage extends StatefulWidget {
 }
 
 class _ClassScheduleSearchPageState extends State<ClassScheduleSearchPage> {
+  final _formKey = GlobalKey<FormState>();
   final TextEditingController _selectDateController = TextEditingController();
 
   bool _isLoading = true;
@@ -19,7 +18,6 @@ class _ClassScheduleSearchPageState extends State<ClassScheduleSearchPage> {
   String? _selectedSection;
   List<String> _classList = [];
   List<String> _sectionList = [];
-
 
   @override
   void initState() {
@@ -34,16 +32,10 @@ class _ClassScheduleSearchPageState extends State<ClassScheduleSearchPage> {
   }
 
   Future<void> _fetchDropdownData() async {
-    // Simulate API call to fetch dropdown data.
-    // Replace this with your actual API call.
-    await Future.delayed(const Duration(seconds: 2));
+    // Simulate API call
+    await Future.delayed(const Duration(seconds: 1));
 
-    final List<String> fetchedClasses = [
-      "Class 1",
-      "Class 2",
-      "Class 3",
-      "Class 4"
-    ];
+    final List<String> fetchedClasses = ["Class 1", "Class 2", "Class 3", "Class 4"];
     final List<String> fetchedSections = ["A", "B", "C", "D"];
 
     if (mounted) {
@@ -57,7 +49,6 @@ class _ClassScheduleSearchPageState extends State<ClassScheduleSearchPage> {
     }
   }
 
-
   Future<void> selectDate(
       BuildContext context,
       TextEditingController controller,
@@ -69,10 +60,23 @@ class _ClassScheduleSearchPageState extends State<ClassScheduleSearchPage> {
       lastDate: DateTime(2100),
     );
 
-    if (pickedDate != null) {
-      if (!context.mounted) return;
-      controller.text =
-      "${pickedDate.day}-${pickedDate.month}-${pickedDate.year}";
+    if (pickedDate != null && mounted) {
+      controller.text = "${pickedDate.day.toString().padLeft(2, '0')}-${pickedDate.month.toString().padLeft(2, '0')}-${pickedDate.year}";
+    }
+  }
+
+  void _searchSchedule() {
+    if (_formKey.currentState!.validate()) {
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => DailyClassSchedulePage(
+            className: _selectedClass!,
+            section: _selectedSection!,
+            date: _selectDateController.text,
+          ),
+        ),
+      );
     }
   }
 
@@ -82,158 +86,126 @@ class _ClassScheduleSearchPageState extends State<ClassScheduleSearchPage> {
     return Scaffold(
       backgroundColor: theme.scaffoldBackgroundColor,
       appBar: AppBar(
-        title: Text("Class Schedule Search"),
+        title: const Text("Class Schedule Search"),
         centerTitle: true,
       ),
-      body: Padding(
-        padding: const EdgeInsets.fromLTRB(16, 16, 16, 115),
-        child: _isLoading
-            ? const Center(child: CircularProgressIndicator())
-            : SingleChildScrollView(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              SizedBox(height: 16,),
-              Row(
-                children: [
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          "Class",
-                          style: TextStyle(
-                              fontSize: 16,
-                              color: theme.colorScheme.onPrimary),
-                        ),
-                        const SizedBox(height: 8),
-                        DropDownBox(
-                          value: _selectedClass,
-                          items: _classList,
-                          onChanged: (value) {
-                            setState(() {
-                              _selectedClass = value;
-                            });
-                          },
-                          hintText: "--Select Class",
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          "Section",
-                          style: TextStyle(
-                              fontSize: 16,
-                              color: theme.colorScheme.onPrimary),
-                        ),
-                        const SizedBox(height: 8),
-                        DropDownBox(
-                          value: _selectedSection,
-                          items: _sectionList,
-                          onChanged: (value) {
-                            setState(() {
-                              _selectedSection = value;
-                            });
-                          },
-                          hintText: "--Select Section",
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
+      floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
+      floatingActionButton: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16.0),
+        child: SizedBox(
+          width: double.infinity,
+          child: ElevatedButton(
+            onPressed: _searchSchedule,
+            style: ElevatedButton.styleFrom(
+              padding: const EdgeInsets.symmetric(vertical: 16),
+              backgroundColor: theme.colorScheme.primary,
+              foregroundColor: theme.colorScheme.onPrimary,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
               ),
-              const SizedBox(height: 16),
-              Text("Date"),
-              const SizedBox(height: 8),
-              TextField(
-                controller: _selectDateController,
-                readOnly: true,
-                onTap: () => selectDate(context, _selectDateController),
-                decoration: InputDecoration(
-                  prefixIcon: Icon(Icons.calendar_month,
-                      color: theme.colorScheme.onPrimary),
-                  filled: true,
-                  fillColor: theme.primaryColor,
-                  hintText: "Select Date",
-                  hintStyle:
-                  theme.textTheme.bodyMedium?.copyWith(color: theme.hintColor),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
+            ),
+            child: const Text("Search"),
+          ),
+        ),
+      ),
+      body: _isLoading
+          ? const Center(child: CircularProgressIndicator())
+          : SingleChildScrollView(
+              padding: const EdgeInsets.fromLTRB(16, 16, 16, 50),
+              child: Center(
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 500),
+                  child: Form(
+                    key: _formKey,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const SizedBox(height: 16),
+                        Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            _buildDropdown(
+                              theme,
+                              label: "Class",
+                              value: _selectedClass,
+                              items: _classList,
+                              onChanged: (value) => setState(() => _selectedClass = value),
+                              hint: "--Select Class",
+                            ),
+                            const SizedBox(width: 16),
+                            _buildDropdown(
+                              theme,
+                              label: "Section",
+                              value: _selectedSection,
+                              items: _sectionList,
+                              onChanged: (value) => setState(() => _selectedSection = value),
+                              hint: "--Select Section",
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 16),
+                        Text("Date", style: theme.textTheme.titleMedium),
+                        const SizedBox(height: 8),
+                        TextFormField(
+                          controller: _selectDateController,
+                          readOnly: true,
+                          onTap: () => selectDate(context, _selectDateController),
+                          decoration: InputDecoration(
+                            prefixIcon: const Icon(Icons.calendar_month),
+                            filled: true,
+                            fillColor: theme.colorScheme.surface,
+                            hintText: "Select Date",
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                              borderSide: BorderSide.none,
+                            ),
+                          ),
+                          validator: (value) =>
+                              value!.isEmpty ? 'Please select a date' : null,
+                        ),
+                        const SizedBox(height: 80), // Padding for FAB
+                      ],
+                    ),
                   ),
                 ),
               ),
-            ],
-          ),
-        ),
-      ),
-      bottomNavigationBar: Padding(
-        padding: const EdgeInsets.only(bottom: 60, left: 16, right: 16),
-        child: SizedBox(
-          width: double.infinity,
-          height: 50,
-          child: ElevatedButton(onPressed: () {
-            if (_selectedClass != null &&
-                _selectedSection != null &&
-                _selectDateController.text.isNotEmpty) {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                    builder: (context) => const DailyClassSchedulePage(
-                      // You'll need to update DailyClassSchedulePage to accept these parameters
-                      // e.g. DailyClassSchedulePage(className: _selectedClass!, section: _selectedSection!, date: _selectDateController.text)
-                    )),
-              );
-            } else {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                    content: Text('Please select class, section, and date.')),
-              );
-            }
-          },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.blue,
-              ),
-              child: Text("Search",
-                  style: TextStyle(color: Colors.white, fontSize: 20))),
-        ),
-      ),
+            ),
     );
   }
 
-}
-
-class DropDownBox extends StatelessWidget {
-  final String? value;
-  final List<String> items;
-  final ValueChanged<String?> onChanged;
-  final String? hintText;
-
-  const DropDownBox({
-    super.key,
-    required this.value,
-    required this.items,
-    required this.onChanged,
-    this.hintText,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return DropdownButtonFormField<String>(
-        value: value,
-        isExpanded: true,
-        items:
-        items.map((e) => DropdownMenuItem(value: e, child: Text(e))).toList(),
-        onChanged: onChanged,
-        decoration: InputDecoration(
-          hintText: hintText,
-          border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(10.0),
+  Widget _buildDropdown(
+    ThemeData theme,
+      {required String label,
+      String? value,
+      required List<String> items,
+      required ValueChanged<String?> onChanged,
+      required String hint}) {
+    return Expanded(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            label,
+            style: theme.textTheme.titleMedium,
           ),
-        ));
+          const SizedBox(height: 8),
+          DropdownButtonFormField<String>(
+            initialValue: value,
+            items: items.map((e) => DropdownMenuItem(value: e, child: Text(e))).toList(),
+            onChanged: onChanged,
+            decoration: InputDecoration(
+              filled: true,
+              fillColor: theme.colorScheme.surface,
+              hintText: hint,
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide.none,
+              ),
+            ),
+            validator: (value) => value == null ? 'Please make a selection' : null,
+          ),
+        ],
+      ),
+    );
   }
 }

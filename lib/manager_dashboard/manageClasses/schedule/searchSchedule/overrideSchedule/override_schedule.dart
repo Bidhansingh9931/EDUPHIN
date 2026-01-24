@@ -35,6 +35,7 @@ class OverrideSchedulePage extends StatefulWidget{
 }
 
 class _OverrideSchedulePageState extends State<OverrideSchedulePage>{
+  final _formKey = GlobalKey<FormState>();
   final _reasonController = TextEditingController();
   final _noteController = TextEditingController();
   final _selectedDateController = TextEditingController();
@@ -49,16 +50,9 @@ class _OverrideSchedulePageState extends State<OverrideSchedulePage>{
   }
 
   Future<void> _overrideSchedule() async {
-    if (_reasonController.text.isEmpty || _selectedDateController.text.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please provide a reason and a date for the override.')),
-      );
+    if (!_formKey.currentState!.validate()) {
       return;
     }
-
-    // Capture context-dependent objects before async gap
-    final navigator = Navigator.of(context);
-    final scaffoldMessenger = ScaffoldMessenger.of(context);
 
     setState(() {
       _isSaving = true;
@@ -81,17 +75,16 @@ class _OverrideSchedulePageState extends State<OverrideSchedulePage>{
 
     print('Overriding schedule with data: $overrideData');
 
-    // Use captured objects after async gap
     if (!mounted) return;
 
     setState(() {
       _isSaving = false;
     });
 
-    scaffoldMessenger.showSnackBar(
+    ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(content: Text('Schedule overridden successfully!')),
     );
-    navigator.pop();
+    Navigator.of(context).pop();
   }
 
 
@@ -109,7 +102,7 @@ class _OverrideSchedulePageState extends State<OverrideSchedulePage>{
     if (pickedDate != null) {
       if (!context.mounted) return;
       controller.text =
-      "${pickedDate.day}-${pickedDate.month}-${pickedDate.year}";
+      "${pickedDate.day.toString().padLeft(2, '0')}-${pickedDate.month.toString().padLeft(2, '0')}-${pickedDate.year}";
     }
   }
   @override
@@ -121,111 +114,169 @@ class _OverrideSchedulePageState extends State<OverrideSchedulePage>{
         title: const Text("Override Schedule"),
         centerTitle: true,
       ),
-      body: Padding(
-        padding: const EdgeInsets.fromLTRB(16,16,16,115),
-        child: SingleChildScrollView(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.start,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              CustomContainer(
-                title: "Original Schedule Details",
-                className: widget.scheduleDetails.className,
-                subject: widget.scheduleDetails.subject,
-                teacher: widget.scheduleDetails.teacher,
-                time: widget.scheduleDetails.time,
-              ),
-              const SizedBox(height: 16),
-              const Text("Reason to Override"),
-              const SizedBox(height: 8),
-              TextField(
-                controller: _reasonController,
-                maxLines: 5,
-                decoration: InputDecoration(
-                  filled: true,
-                  fillColor: Colors.blue.withAlpha(20),
-                  hintText: "Enter reason here...",
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 16),
-              const Text("Date of Override"),
-              const SizedBox(height: 8),
-              TextField(
-                controller: _selectedDateController,
-                readOnly: true,
-                onTap: () => selectDate(context, _selectedDateController),
-                decoration: InputDecoration(
-                  prefixIcon: Icon(Icons.calendar_month,
-                      color: theme.colorScheme.onPrimary),
-                  filled: true,
-                  fillColor: theme.primaryColor,
-                  hintText: "Select Date",
-                  hintStyle:
-                  theme.textTheme.bodyMedium?.copyWith(color: theme.hintColor),
-                  border: OutlineInputBorder(
+      floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
+      floatingActionButton: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16.0),
+        child: Row(
+          children: [
+             Expanded(
+              child: OutlinedButton(
+                onPressed: () => Navigator.of(context).pop(),
+                style: OutlinedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                  foregroundColor: theme.colorScheme.onSurface,
+                  side: BorderSide(color: theme.dividerColor),
+                  shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(12),
                   ),
                 ),
+                child: const Text("Cancel"),
               ),
-              const SizedBox(height: 16),
-              const Text("Note (optional)"),
-              const SizedBox(height: 8),
-              TextField(
-                controller: _noteController,
-                maxLines: 3,
-                decoration: InputDecoration(
-                  filled: true,
-                  fillColor: Colors.blue.withAlpha(20),
-                  hintText: "Enter optional note...",
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(10),
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: ElevatedButton(
+                onPressed: _isSaving ? null : _overrideSchedule,
+                style: ElevatedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                  backgroundColor: theme.colorScheme.primary,
+                  foregroundColor: theme.colorScheme.onPrimary,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
                   ),
                 ),
+                child: _isSaving
+                    ? const SizedBox(
+                        height: 24,
+                        width: 24,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 3,
+                          valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                        ),
+                      )
+                    : const Text("Override"),
               ),
-              const SizedBox(height: 16),
-              SizedBox(
-                height: 50,
-                width: double.infinity,
-                child: ElevatedButton(
-                    onPressed: _isSaving ? null : _overrideSchedule,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.blue.shade400,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                    ),
-                    child: _isSaving
-                      ? const CircularProgressIndicator(valueColor: AlwaysStoppedAnimation<Color>(Colors.white))
-                      : const Text("Override",style: TextStyle(fontSize: 20,color: Colors.white,fontWeight: FontWeight.bold),)
-                ),
-              ),
-              const SizedBox(height: 16),
-              SizedBox(
-                height: 50,
-                width: double.infinity,
-                child: ElevatedButton(onPressed: (){
-                  Navigator.pop(context);
-                },
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.blue.withAlpha(20),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                    ), child: const Text("Cancel",style: TextStyle(fontSize: 20,color: Colors.white,fontWeight: FontWeight.bold),)
-                ),
-              ),
-
-            ],
-          )
+            ),
+          ],
         ),
+      ),
+      body: LayoutBuilder(
+        builder: (context, constraints) {
+          return SingleChildScrollView(
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 50),
+            child: Form(
+              key: _formKey,
+              child: constraints.maxWidth > 700
+                  ? _buildWideLayout(theme)
+                  : _buildNarrowLayout(theme),
+            ),
+          );
+        },
       ),
     );
   }
 
+  Widget _buildNarrowLayout(ThemeData theme) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        CustomContainer(
+          title: "Original Schedule Details",
+          className: widget.scheduleDetails.className,
+          subject: widget.scheduleDetails.subject,
+          teacher: widget.scheduleDetails.teacher,
+          time: widget.scheduleDetails.time,
+        ),
+        const SizedBox(height: 16),
+        _buildFormFields(theme),
+        const SizedBox(height: 80), // Padding for FAB
+      ],
+    );
+  }
+
+  Widget _buildWideLayout(ThemeData theme) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Expanded(
+          flex: 2,
+          child: CustomContainer(
+            title: "Original Schedule Details",
+            className: widget.scheduleDetails.className,
+            subject: widget.scheduleDetails.subject,
+            teacher: widget.scheduleDetails.teacher,
+            time: widget.scheduleDetails.time,
+          ),
+        ),
+        const SizedBox(width: 16),
+        Expanded(
+          flex: 3,
+          child: _buildFormFields(theme),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildFormFields(ThemeData theme) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text("Reason to Override", style: theme.textTheme.titleMedium),
+        const SizedBox(height: 8),
+        TextFormField(
+          controller: _reasonController,
+          maxLines: 5,
+          decoration: InputDecoration(
+            filled: true,
+            fillColor: theme.colorScheme.surface,
+            hintText: "Enter reason here...",
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(10),
+              borderSide: BorderSide.none,
+            ),
+          ),
+          validator: (value) => value!.isEmpty ? 'Please provide a reason' : null,
+        ),
+        const SizedBox(height: 16),
+        Text("Date of Override", style: theme.textTheme.titleMedium),
+        const SizedBox(height: 8),
+        TextFormField(
+          controller: _selectedDateController,
+          readOnly: true,
+          onTap: () => selectDate(context, _selectedDateController),
+          decoration: InputDecoration(
+            prefixIcon: const Icon(Icons.calendar_month),
+            filled: true,
+            fillColor: theme.colorScheme.surface,
+            hintText: "Select Date",
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide.none,
+            ),
+          ),
+          validator: (value) => value!.isEmpty ? 'Please select a date' : null,
+        ),
+        const SizedBox(height: 16),
+        Text("Note (optional)", style: theme.textTheme.titleMedium),
+        const SizedBox(height: 8),
+        TextFormField(
+          controller: _noteController,
+          maxLines: 3,
+          decoration: InputDecoration(
+            filled: true,
+            fillColor: theme.colorScheme.surface,
+            hintText: "Enter optional note...",
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(10),
+              borderSide: BorderSide.none,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
 }
+
 class CustomContainer extends StatelessWidget{
   final String title;
   final String className;
@@ -243,7 +294,6 @@ class CustomContainer extends StatelessWidget{
   });
   @override
   Widget build(BuildContext context) {
-
     final theme = Theme.of(context);
     return Container(
       width: double.infinity,
@@ -251,32 +301,38 @@ class CustomContainer extends StatelessWidget{
         color: theme.colorScheme.surface,
         borderRadius: BorderRadius.circular(10),
       ),
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(16,16,16,16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children:[
-            Text(title,style: const TextStyle(fontSize: 18,color: Colors.white,fontWeight: FontWeight.bold),),
-            const SizedBox(height: 16),
-            const Text("Class Name",style: TextStyle(fontSize: 12,color: Colors.white60),),
-            const SizedBox(height: 5),
-            Text(className,style: const TextStyle(fontSize: 16,color: Colors.white,fontWeight: FontWeight.bold)),
-            const SizedBox(height: 16),
-            const Text("Subject",style: TextStyle(fontSize: 12,color: Colors.white60),),
-            const SizedBox(height: 5),
-            Text(subject,style: const TextStyle(fontSize: 16,color: Colors.white,fontWeight: FontWeight.bold),),
-            const SizedBox(height: 16),
-            const Text("Teacher",style: TextStyle(fontSize: 12,color: Colors.white60),),
-            const SizedBox(height: 5),
-            Text(teacher,style: const TextStyle(fontSize: 16,color: Colors.white,fontWeight: FontWeight.bold),),
-            const SizedBox(height: 16),
-            const Text("Time (From - To)",style: TextStyle(fontSize: 12,color: Colors.white60),),
-            const SizedBox(height: 5),
-            Text(time,style: const TextStyle(fontSize: 16,color: Colors.white,fontWeight: FontWeight.bold),),
-            const SizedBox(height: 16),
-          ],
-        ),
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children:[
+          Text(title, style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold)),
+          const SizedBox(height: 16),
+          _buildDetailRow(theme, "Class Name", className),
+          const SizedBox(height: 16),
+          _buildDetailRow(theme, "Subject", subject),
+          const SizedBox(height: 16),
+          _buildDetailRow(theme, "Teacher", teacher),
+          const SizedBox(height: 16),
+          _buildDetailRow(theme, "Time (From - To)", time),
+        ],
       ),
+    );
+  }
+
+  Widget _buildDetailRow(ThemeData theme, String label, String value) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: theme.textTheme.bodySmall?.copyWith(color: theme.hintColor),
+        ),
+        const SizedBox(height: 4),
+        Text(
+          value,
+          style: theme.textTheme.bodyLarge?.copyWith(fontWeight: FontWeight.w500),
+        ),
+      ],
     );
   }
 }

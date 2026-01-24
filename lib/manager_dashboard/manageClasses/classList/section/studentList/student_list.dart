@@ -58,9 +58,9 @@ class _StudentListPageState extends State<StudentListPage> {
       appBar: AppBar(
         title: Row(
           children: [
-            Text("Student List"),
-            Spacer(),
-            IconButton(onPressed: () {}, icon: Icon(Icons.more_vert_sharp)),
+            const Text("Student List"),
+            const Spacer(),
+            IconButton(onPressed: () {}, icon: const Icon(Icons.more_vert_sharp)),
           ],
         ),
       ),
@@ -68,12 +68,36 @@ class _StudentListPageState extends State<StudentListPage> {
           ? const Center(child: CircularProgressIndicator())
           : Padding(
               padding: const EdgeInsets.fromLTRB(16, 16, 16, 50),
-              child: ListView.separated(
-                itemCount: _students.length,
-                separatorBuilder: (context, index) => const SizedBox(height: 16),
-                itemBuilder: (context, index) {
-                  final student = _students[index];
-                  return StudentCard(student: student);
+              // Using LayoutBuilder to make the list responsive
+              child: LayoutBuilder(
+                builder: (context, constraints) {
+                  // Use GridView for wider screens (tablets, desktops)
+                  if (constraints.maxWidth > 600) {
+                    return GridView.builder(
+                      gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
+                        maxCrossAxisExtent: 400, // Max width for each item
+                        crossAxisSpacing: 16,
+                        mainAxisSpacing: 16,
+                        childAspectRatio: 2.5, // Adjust aspect ratio as needed
+                      ),
+                      itemCount: _students.length,
+                      itemBuilder: (context, index) {
+                        final student = _students[index];
+                        return StudentCard(student: student);
+                      },
+                    );
+                  } else {
+                    // Use ListView for narrower screens (phones)
+                    return ListView.separated(
+                      itemCount: _students.length,
+                      separatorBuilder: (context, index) =>
+                          const SizedBox(height: 16),
+                      itemBuilder: (context, index) {
+                        final student = _students[index];
+                        return StudentCard(student: student);
+                      },
+                    );
+                  }
                 },
               ),
             ),
@@ -98,49 +122,63 @@ class StudentCard extends StatelessWidget {
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisAlignment: MainAxisAlignment.center, // Better for GridView items
         children: [
           Text(
             student.name,
-            style: theme.textTheme.headlineSmall,
+            style: theme.textTheme.titleLarge?.copyWith(
+              color: theme.colorScheme.onSurface,
+            ),
           ),
           const SizedBox(height: 1),
-          Text("Reg No: ${student.regNo}", style: theme.textTheme.bodyMedium),
-          const SizedBox(height: 5),
+          Text(
+            "Reg No: ${student.regNo}",
+            style: theme.textTheme.bodyMedium?.copyWith(
+              color: theme.colorScheme.onSurface.withAlpha(35),
+            ),
+          ),
+          const SizedBox(height: 12),
+          // Using Expanded to make buttons responsive
           Row(
             children: [
-              ElevatedButton(
-                onPressed: () {
-                  Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                          builder: (context) => const ViewAttendancePage()));
-                },
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.blue.withAlpha(55),
-                  foregroundColor: theme.colorScheme.primary,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(8),
+              Expanded(
+                child: ElevatedButton(
+                  onPressed: () {
+                    Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                            builder: (context) => const ViewAttendancePage()));
+                  },
+                  style: ElevatedButton.styleFrom(
+                    // Using theme colors for consistency
+                    backgroundColor: theme.colorScheme.primaryContainer,
+                    foregroundColor: theme.colorScheme.onPrimaryContainer,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
                   ),
+                  child: const Text("View Attendance"),
                 ),
-                child: Text("View Attendance"),
               ),
               const SizedBox(width: 8),
-              Spacer(),
-              ElevatedButton(
-                onPressed: () {
-                  Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                          builder: (context) => const RemarksPage()));
-                },
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.blue.withAlpha(35),
-                  foregroundColor: Colors.white,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(8),
+              Expanded(
+                child: ElevatedButton(
+                  onPressed: () {
+                    Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                            builder: (context) => const RemarksPage()));
+                  },
+                  style: ElevatedButton.styleFrom(
+                    // Using theme colors for consistency
+                    backgroundColor: theme.colorScheme.secondaryContainer,
+                    foregroundColor: theme.colorScheme.onSecondaryContainer,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
                   ),
+                  child: const Text("Add Remark"),
                 ),
-                child: Text("Add Remark"),
               ),
             ],
           ),

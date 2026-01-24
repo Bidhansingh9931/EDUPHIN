@@ -19,50 +19,80 @@ class _StaffListPageState extends State<StaffListPage> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final screenWidth = MediaQuery.of(context).size.width;
+
+    // Responsive font size
+    double responsiveFontSize(double baseSize) {
+      if (screenWidth < 600) {
+        return baseSize;
+      } else if (screenWidth < 1200) {
+        return baseSize * 1.25;
+      } else {
+        return baseSize * 1.5;
+      }
+    }
+
     return Scaffold(
-        floatingActionButton: Padding(
-          padding: const EdgeInsets.only(left: 32),
-          child: SizedBox(
-              width: double.infinity,
-              height: 50,
-              child: FloatingActionButton(onPressed: (){
-                Navigator.push(context, MaterialPageRoute(builder: (context)=>const AddStaffPage()));
-              },child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(Icons.add,color: theme.colorScheme.onSurface,),
-                  const SizedBox(width: 2,),
-                  Text("Add Staff",style: TextStyle(color: theme.colorScheme.onSurface,fontSize: 20),),
-                ],
-              ),)),
-        ),
-        backgroundColor: theme.scaffoldBackgroundColor,
-        appBar: AppBar(
-          title: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
+      floatingActionButton: Container(
+        width: screenWidth > 600 ? 400 : screenWidth * 0.9,
+        height: 50,
+        child: FloatingActionButton(
+          onPressed: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (context) => const AddStaffPage()),
+            );
+          },
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Text(
-                "Staff List",
-                style: TextStyle(
-                    color: theme.colorScheme.onSurface,
-                    fontSize: 20,
-                    fontWeight: FontWeight.bold),
-              ),
               Icon(
-                Icons.download,
+                Icons.add,
                 color: theme.colorScheme.onSurface,
+              ),
+              const SizedBox(width: 8),
+              Text(
+                "Add Staff",
+                style: TextStyle(
+                  color: theme.colorScheme.onSurface,
+                  fontSize: responsiveFontSize(18),
+                ),
               ),
             ],
           ),
         ),
-        body: const Padding(
-          padding: EdgeInsets.only(bottom: 115),
-          child: SingleChildScrollView(
-            child: Column(children: [
-              CustomStaffListBox(),
-            ]),
-          ),
-        ));
+      ),
+      backgroundColor: theme.scaffoldBackgroundColor,
+      appBar: AppBar(
+        title: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(
+              "Staff List",
+              style: TextStyle(
+                  color: theme.colorScheme.onSurface,
+                  fontSize: responsiveFontSize(20),
+                  fontWeight: FontWeight.bold),
+            ),
+            Icon(
+              Icons.download,
+              color: theme.colorScheme.onSurface,
+            ),
+          ],
+        ),
+      ),
+      body: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 16, 16, 50),
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            return const SingleChildScrollView(
+              child: CustomStaffListBox(),
+            );
+          },
+        ),
+      ),
+    );
   }
 }
 
@@ -117,6 +147,19 @@ class _CustomStaffListBoxState extends State<CustomStaffListBox> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final screenWidth = MediaQuery.of(context).size.width;
+
+    // Responsive font size
+    double responsiveFontSize(double baseSize) {
+      if (screenWidth < 600) {
+        return baseSize;
+      } else if (screenWidth < 1200) {
+        return baseSize * 1.25;
+      } else {
+        return baseSize * 1.5;
+      }
+    }
+
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(16.0),
@@ -152,7 +195,9 @@ class _CustomStaffListBoxState extends State<CustomStaffListBox> {
                       const SizedBox(width: 8),
                       Text(
                         value,
-                        style: TextStyle(color: theme.colorScheme.onPrimary),
+                        style: TextStyle(
+                            color: theme.colorScheme.onPrimary,
+                            fontSize: responsiveFontSize(16)),
                       ),
                     ],
                   ),
@@ -178,7 +223,6 @@ class _CustomStaffListBoxState extends State<CustomStaffListBox> {
                       ),
                       child: Row(
                         children: [
-                          const SizedBox(width: 16),
                           Expanded(
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
@@ -186,13 +230,14 @@ class _CustomStaffListBoxState extends State<CustomStaffListBox> {
                                 Text(
                                   staffMember.name,
                                   style: TextStyle(
-                                      fontSize: 16, color: theme.colorScheme.onPrimary),
+                                      fontSize: responsiveFontSize(16),
+                                      color: theme.colorScheme.onPrimary),
                                 ),
                                 const SizedBox(height: 4),
                                 Text(
                                   staffMember.designation,
                                   style: TextStyle(
-                                      fontSize: 14,
+                                      fontSize: responsiveFontSize(14),
                                       color: theme.colorScheme.onPrimary.withAlpha(180)),
                                 )
                               ],

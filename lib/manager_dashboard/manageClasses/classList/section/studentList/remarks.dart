@@ -79,60 +79,74 @@ class _RemarksPageState extends State<RemarksPage> {
     final theme = Theme.of(context);
     return Scaffold(
       backgroundColor: theme.scaffoldBackgroundColor,
+      // Using a responsive FloatingActionButton
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: () {
+          Navigator.push(
+              context,
+              MaterialPageRoute(
+                  builder: (context) => const AddNewRemarksPage()));
+        },
+        label: const Text("Add New Remark"),
+        icon: const Icon(Icons.add),
+      ),
+      floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
       appBar: AppBar(
         title: Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Expanded(child: Text("Remarks for ${widget.studentName}")),
-            IconButton(onPressed: () {}, icon: const Icon(Icons.more_vert_sharp)),
-          ],
-        ),
-      ),
-      body: Padding(
-        padding: const EdgeInsets.fromLTRB(16, 16, 16, 50),
-        child: Column(
-          children: [
-            SizedBox(
-              height: 40,
-              width: double.infinity,
-              child: ElevatedButton(
-                  onPressed: () {
-                    Navigator.push(context, MaterialPageRoute(builder: (context) => const AddNewRemarksPage()));
-                  },
-                  style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.blue.shade500,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(8),
-                      )),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    crossAxisAlignment: CrossAxisAlignment.center,
-                    children: const [
-                      Icon(Icons.add_circle_outline_sharp, color: Colors.white, size: 25),
-                      SizedBox(width: 5),
-                      Text(
-                        "Add New Remark",
-                        style: TextStyle(color: Colors.white, fontSize: 16),
-                      )
-                    ],
-                  )),
+            // Using Flexible to prevent overflow on small screens
+            Flexible(
+              child: Text(
+                "Remarks for ${widget.studentName}",
+                overflow: TextOverflow.ellipsis,
+              ),
             ),
-            const SizedBox(height: 16),
-            _isLoading
-                ? const Center(child: CircularProgressIndicator())
-                : Expanded(
-                    child: ListView.separated(
-                      itemCount: _remarks.length,
-                      separatorBuilder: (context, index) => const SizedBox(height: 16),
-                      itemBuilder: (context, index) {
-                        final remark = _remarks[index];
-                        return RemarkCard(remark: remark);
-                      },
-                    ),
-                  ),
+            IconButton(
+                onPressed: () {},
+                icon: const Icon(Icons.more_vert_sharp)),
           ],
         ),
       ),
+      body: _isLoading
+          ? const Center(child: CircularProgressIndicator())
+          // Using LayoutBuilder for a responsive grid/list
+          : LayoutBuilder(
+              builder: (context, constraints) {
+                // Use GridView for wider screens
+                if (constraints.maxWidth > 600) {
+                  return GridView.builder(
+                    // Increased bottom padding for FAB
+                    padding: const EdgeInsets.fromLTRB(16, 16, 16, 80),
+                    itemCount: _remarks.length,
+                    gridDelegate:
+                        const SliverGridDelegateWithMaxCrossAxisExtent(
+                      maxCrossAxisExtent: 450, // Max width per item
+                      crossAxisSpacing: 16,
+                      mainAxisSpacing: 16,
+                      childAspectRatio: 1.8, // Adjust for content
+                    ),
+                    itemBuilder: (context, index) {
+                      final remark = _remarks[index];
+                      return RemarkCard(remark: remark);
+                    },
+                  );
+                } else {
+                  // Use ListView for narrower screens
+                  return ListView.separated(
+                    // Increased bottom padding for FAB
+                    padding: const EdgeInsets.fromLTRB(16, 16, 16, 120),
+                    itemCount: _remarks.length,
+                    separatorBuilder: (context, index) =>
+                        const SizedBox(height: 16),
+                    itemBuilder: (context, index) {
+                      final remark = _remarks[index];
+                      return RemarkCard(remark: remark);
+                    },
+                  );
+                }
+              },
+            ),
     );
   }
 }
@@ -147,61 +161,78 @@ class RemarkCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final isPositive = remark.type == "Positive";
-    final typeColor = isPositive ? Colors.green : Colors.red;
+    final typeColor = isPositive ? Colors.green.shade600 : Colors.red.shade600;
 
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: theme.colorScheme.surface,
-        borderRadius: BorderRadius.circular(10),
+        borderRadius: BorderRadius.circular(12),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisAlignment: MainAxisAlignment.spaceBetween, // For GridView
         children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            crossAxisAlignment: CrossAxisAlignment.center,
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Container(
-                decoration: BoxDecoration(
-                  color: typeColor.withAlpha(35),
-                  borderRadius: BorderRadius.circular(50),
-                ),
-                child: Padding(
-                  padding: const EdgeInsets.all(5),
-                  child: Text(
-                    remark.type,
-                    style: TextStyle(color: typeColor, fontSize: 16),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 10, vertical: 5),
+                    decoration: BoxDecoration(
+                      color: typeColor.withAlpha(35),
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: Text(
+                      remark.type,
+                      // Using theme for scalable font
+                      style: theme.textTheme.labelLarge
+                          ?.copyWith(color: typeColor, fontWeight: FontWeight.bold),
+                    ),
                   ),
-                ),
+                  IconButton(
+                      onPressed: () {
+                        // TODO: Implement delete functionality
+                      },
+                      icon: Icon(Icons.delete, color: theme.colorScheme.error)),
+                ],
               ),
-              IconButton(
-                  onPressed: () {
-                    // TODO: Implement delete functionality
-                  },
-                  icon: const Icon(Icons.delete)),
+              const SizedBox(height: 10),
+              // Using theme for scalable font
+              Text(remark.description, style: theme.textTheme.bodyLarge),
             ],
           ),
-          const SizedBox(height: 5),
-          Text(remark.description),
-          Divider(
-            color: Colors.white,
-            thickness: 1,
-          ),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          const SizedBox(height: 10),
+          Column(
             children: [
-              Text("Date of Remarks", style: TextStyle(color: theme.colorScheme.onSurface.withAlpha(110), fontSize: 14)),
-              Text(remark.remarkDate, style: TextStyle(color: theme.colorScheme.onSurface, fontSize: 14)),
-            ],
-          ),
-          const SizedBox(height: 2),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text("From Date - To Date", style: TextStyle(color: theme.colorScheme.onSurface.withAlpha(110), fontSize: 14)),
-              Text(remark.dateRange, style: TextStyle(color: theme.colorScheme.onSurface, fontSize: 14)),
+              const Divider(),
+              const SizedBox(height: 4),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  // Using theme for scalable font
+                  Text("Date of Remarks",
+                      style: theme.textTheme.bodyMedium
+                          ?.copyWith(color: theme.hintColor)),
+                  Text(remark.remarkDate, style: theme.textTheme.bodyMedium),
+                ],
+              ),
+              const SizedBox(height: 4),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  // Using theme for scalable font
+                  Text("From Date - To Date",
+                      style: theme.textTheme.bodyMedium
+                          ?.copyWith(color: theme.hintColor)),
+                  Text(remark.dateRange, style: theme.textTheme.bodyMedium),
+                ],
+              ),
             ],
           ),
         ],

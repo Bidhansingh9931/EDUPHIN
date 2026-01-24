@@ -22,20 +22,25 @@ class _TeacherListPageState extends State<TeacherListPage> {
     final theme = Theme.of(context);
     return Scaffold(
         floatingActionButton: Padding(
-          padding: const EdgeInsets.only(left: 32),
+          padding: const EdgeInsets.symmetric(horizontal: 16.0),
           child: SizedBox(
               width: double.infinity,
               height: 50,
-              child: FloatingActionButton(onPressed: (){
-                Navigator.push(context, MaterialPageRoute(builder: (context)=>const AddTeacherPage()));
-              },child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(Icons.add,color: theme.colorScheme.onSurface,),
-                  const SizedBox(width: 2,),
-                  Text("Add Teacher",style: TextStyle(color: theme.colorScheme.onSurface,fontSize: 20),),
-                ],
-              ),)),
+              child: FloatingActionButton.extended(
+                heroTag: 'addTeacherBtn',
+                onPressed: (){
+                  Navigator.push(context, MaterialPageRoute(builder: (context)=>const AddTeacherPage()));
+                },
+                label: Text(
+                  "Add Teacher",
+                  style: theme.textTheme.labelLarge?.copyWith(
+                    color: theme.colorScheme.onSurface,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                icon: Icon(Icons.add, color: theme.colorScheme.onSurface),
+              ),
+          ),
         ),
         backgroundColor: theme.scaffoldBackgroundColor,
         appBar: AppBar(
@@ -44,9 +49,8 @@ class _TeacherListPageState extends State<TeacherListPage> {
             children: [
               Text(
                 "Teacher List",
-                style: TextStyle(
+                style: theme.textTheme.titleLarge?.copyWith(
                     color: theme.colorScheme.onSurface,
-                    fontSize: 20,
                     fontWeight: FontWeight.bold),
               ),
               Icon(
@@ -57,7 +61,7 @@ class _TeacherListPageState extends State<TeacherListPage> {
           ),
         ),
         body: const Padding(
-          padding: EdgeInsets.only(bottom: 115),
+          padding: EdgeInsets.fromLTRB(16, 16, 16, 50),
           child: SingleChildScrollView(
             child: Column(children: [
               CustomTeacherListBox(),
@@ -108,10 +112,12 @@ class _CustomTeacherListBoxState extends State<CustomTeacherListBox> {
       Teacher(name: "Deepa Singh", designation: "Librarian"),
     ];
 
-    setState(() {
-      _teachers.addAll(newTeachers);
-      _isLoading = false;
-    });
+    if (mounted) {
+      setState(() {
+        _teachers.addAll(newTeachers);
+        _isLoading = false;
+      });
+    }
   }
 
   @override
@@ -152,7 +158,9 @@ class _CustomTeacherListBoxState extends State<CustomTeacherListBox> {
                       const SizedBox(width: 8),
                       Text(
                         value,
-                        style: TextStyle(color: theme.colorScheme.onPrimary),
+                        style: theme.textTheme.titleMedium?.copyWith(
+                          color: theme.colorScheme.onPrimary,
+                        ),
                       ),
                     ],
                   ),
@@ -163,46 +171,83 @@ class _CustomTeacherListBoxState extends State<CustomTeacherListBox> {
           const SizedBox(height: 16),
           _isLoading
               ? const Center(child: CircularProgressIndicator())
-              : ListView.separated(
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            itemCount: _teachers.length,
-            separatorBuilder: (context, index) => const SizedBox(height: 16),
-            itemBuilder: (context, index) {
-              final teacher = _teachers[index];
-              return Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: theme.colorScheme.onPrimary.withAlpha(25),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Row(
-                  children: [
-                    const SizedBox(width: 16),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            teacher.name,
-                            style: TextStyle(
-                                fontSize: 16, color: theme.colorScheme.onPrimary),
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            teacher.designation,
-                            style: TextStyle(
-                                fontSize: 14,
-                                color: theme.colorScheme.onPrimary.withAlpha(180)),
-                          )
-                        ],
-                      ),
-                    )
-                  ],
-                ),
-              );
+              : LayoutBuilder(
+            builder: (context, constraints) {
+              if (constraints.maxWidth < 600) {
+                return _buildTeacherList(theme);
+              } else {
+                return _buildTeacherGrid(theme);
+              }
             },
           ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTeacherList(ThemeData theme) {
+    return ListView.separated(
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      itemCount: _teachers.length,
+      separatorBuilder: (context, index) => const SizedBox(height: 16),
+      itemBuilder: (context, index) {
+        final teacher = _teachers[index];
+        return _buildTeacherTile(teacher, theme);
+      },
+    );
+  }
+
+  Widget _buildTeacherGrid(ThemeData theme) {
+    return GridView.builder(
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      itemCount: _teachers.length,
+      gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
+        maxCrossAxisExtent: 400,
+        mainAxisSpacing: 16,
+        crossAxisSpacing: 16,
+        childAspectRatio: 4, // Adjust aspect ratio as needed
+      ),
+      itemBuilder: (context, index) {
+        final teacher = _teachers[index];
+        return _buildTeacherTile(teacher, theme);
+      },
+    );
+  }
+
+  Widget _buildTeacherTile(Teacher teacher, ThemeData theme) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.onPrimary.withAlpha(25),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Row(
+        children: [
+          const SizedBox(width: 16),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Text(
+                  teacher.name,
+                  style: theme.textTheme.titleMedium?.copyWith(
+                    color: theme.colorScheme.onPrimary,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  teacher.designation,
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    color: theme.colorScheme.onPrimary.withAlpha(200),
+                  ),
+                )
+              ],
+            ),
+          )
         ],
       ),
     );

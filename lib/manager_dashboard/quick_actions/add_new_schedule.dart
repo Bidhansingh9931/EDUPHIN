@@ -63,45 +63,19 @@ class MockScheduleApiService {
 //                      ADD NEW SCHEDULE PAGE
 // ───────────────────────────────────────────────────────────
 
-class AddNewSchedule extends StatefulWidget {
-  const AddNewSchedule({super.key});
+class AddNewSchedulePage extends StatefulWidget {
+  const AddNewSchedulePage({super.key});
 
   @override
-  State<StatefulWidget> createState() => _AddNewScheduleState();
+  State<StatefulWidget> createState() => _AddNewSchedulePageState();
 }
 
-class _AddNewScheduleState extends State<AddNewSchedule> {
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Add New Schedule'),
-        centerTitle: true,
-      ),
-      backgroundColor: theme.scaffoldBackgroundColor,
-      body: const Padding(
-        padding: EdgeInsets.fromLTRB(12, 12, 12, 60),
-        child: SingleChildScrollView(
-          child: CustomAddNewScheduleBox(),
-        ),
-      ),
-    );
-  }
-}
-
-class CustomAddNewScheduleBox extends StatefulWidget {
-  const CustomAddNewScheduleBox({super.key});
-
-  @override
-  State<CustomAddNewScheduleBox> createState() => _CustomAddNewScheduleBoxState();
-}
-
-class _CustomAddNewScheduleBoxState extends State<CustomAddNewScheduleBox> {
+class _AddNewSchedulePageState extends State<AddNewSchedulePage> {
   final _formKey = GlobalKey<FormState>();
   final _apiService = MockScheduleApiService();
   late Future<ScheduleFormData> _formDataFuture;
 
+  // Model to hold all form data
   final _newSchedule = NewSchedule();
   bool _isSubmitting = false;
 
@@ -128,17 +102,10 @@ class _CustomAddNewScheduleBoxState extends State<CustomAddNewScheduleBox> {
   }
 
   Future<void> _submitForm() async {
-    // Basic validation
-    if (_newSchedule.aClass == null ||
-        _newSchedule.section == null ||
-        _newSchedule.subject == null ||
-        _newSchedule.teacher == null ||
-        _newSchedule.weekday == null ||
-        _newSchedule.startTime == null ||
-        _newSchedule.endTime == null) {
+    if (!_formKey.currentState!.validate()) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Please fill all fields.'),
+          content: Text('Please fill all required fields.'),
           backgroundColor: Colors.red,
         ),
       );
@@ -166,11 +133,11 @@ class _CustomAddNewScheduleBoxState extends State<CustomAddNewScheduleBox> {
 
     final success = await _apiService.addSchedule(_newSchedule);
 
-    setState(() {
-      _isSubmitting = false;
-    });
-
     if (mounted) {
+      setState(() {
+        _isSubmitting = false;
+      });
+
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(success ? 'Schedule added successfully!' : 'Failed to add schedule.'),
@@ -186,243 +153,242 @@ class _CustomAddNewScheduleBoxState extends State<CustomAddNewScheduleBox> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    return FutureBuilder<ScheduleFormData>(
-      future: _formDataFuture,
-      builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Center(child: CircularProgressIndicator());
-        } else if (snapshot.hasError) {
-          return Center(child: Text("Error loading data: ${snapshot.error}"));
-        } else if (snapshot.hasData) {
-          final formData = snapshot.data!;
-          // Set default values from fetched data if they are not already set
-          _newSchedule.aClass ??= formData.classes.first;
-          _newSchedule.section ??= formData.sections.first;
-          _newSchedule.subject ??= formData.subjects.first;
-          _newSchedule.teacher ??= formData.teachers.first;
-          _newSchedule.weekday ??= formData.weekdays.first;
-
-          return Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(16.0),
-              decoration: BoxDecoration(
-                color: theme.primaryColor,
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Form(
-                key: _formKey,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text("Class", style: TextStyle(fontSize: 16, color: theme.colorScheme.onPrimary)),
-                    const SizedBox(height: 8),
-                    DropDownBox(
-                      key: ValueKey(_newSchedule.aClass),
-                      value: _newSchedule.aClass,
-                      items: formData.classes,
-                      onChanged: (value) => setState(() => _newSchedule.aClass = value),
-                      hintText: "--Select Class",
-                    ),
-                    const SizedBox(height: 16),
-                    Text("Section", style: TextStyle(fontSize: 16, color: theme.colorScheme.onPrimary)),
-                    const SizedBox(height: 8),
-                    DropDownBox(
-                      key: ValueKey(_newSchedule.section),
-                      value: _newSchedule.section,
-                      items: formData.sections,
-                      onChanged: (value) => setState(() => _newSchedule.section = value),
-                      hintText: "--Select Section",
-                    ),
-                    const SizedBox(height: 16),
-                    Text("Subject", style: TextStyle(fontSize: 16, color: theme.colorScheme.onPrimary)),
-                    const SizedBox(height: 8),
-                    DropDownBox(
-                      key: ValueKey(_newSchedule.subject),
-                      value: _newSchedule.subject,
-                      items: formData.subjects,
-                      onChanged: (value) => setState(() => _newSchedule.subject = value),
-                      hintText: "--Select Subject",
-                    ),
-                    const SizedBox(height: 16),
-                    Text("Teacher", style: TextStyle(fontSize: 16, color: theme.colorScheme.onPrimary)),
-                    const SizedBox(height: 8),
-                    DropDownBox(
-                      key: ValueKey(_newSchedule.teacher),
-                      value: _newSchedule.teacher,
-                      items: formData.teachers,
-                      onChanged: (value) => setState(() => _newSchedule.teacher = value),
-                      hintText: "--Select Teacher",
-                    ),
-                    const SizedBox(height: 16),
-                    Text("Weekdays", style: TextStyle(fontSize: 16, color: theme.colorScheme.onPrimary)),
-                    const SizedBox(height: 8),
-                    DropDownBox(
-                      key: ValueKey(_newSchedule.weekday),
-                      value: _newSchedule.weekday,
-                      items: formData.weekdays,
-                      onChanged: (value) => setState(() => _newSchedule.weekday = value),
-                      hintText: "--Select Weekday",
-                    ),
-                    const SizedBox(height: 16),
-                    Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text("Start Time", style: TextStyle(fontSize: 16, color: theme.colorScheme.onPrimary)),
-                              const SizedBox(height: 8),
-                              SizedBox(
-                                height: 50,
-                                child: ElevatedButton(
-                                  onPressed: () => _selectTime(context, isStartTime: true),
-                                  style: ElevatedButton.styleFrom(
-                                      backgroundColor: Colors.transparent,
-                                      shape: RoundedRectangleBorder(
-                                          borderRadius: BorderRadius.circular(10.0),
-                                          side: BorderSide(color: theme.hintColor))),
-                                  child: Row(
-                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                    children: [
-                                      Expanded(
-                                        child: Text(
-                                          _newSchedule.startTime?.format(context) ?? "__:__:__",
-                                          style: TextStyle(color: theme.hintColor, fontSize: 23),
-                                        ),
-                                      ),
-                                      Icon(Icons.access_time, color: theme.hintColor),
-                                    ],
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        const SizedBox(width: 16),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text("End Time", style: TextStyle(fontSize: 16, color: theme.colorScheme.onPrimary)),
-                              const SizedBox(height: 8),
-                              SizedBox(
-                                height: 50,
-                                child: ElevatedButton(
-                                  onPressed: () => _selectTime(context, isStartTime: false),
-                                  style: ElevatedButton.styleFrom(
-                                      backgroundColor: Colors.transparent,
-                                      shape: RoundedRectangleBorder(
-                                          borderRadius: BorderRadius.circular(10.0),
-                                          side: BorderSide(color: theme.hintColor))),
-                                  child: Row(
-                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                    children: [
-                                      Expanded(
-                                        child: Text(
-                                          _newSchedule.endTime?.format(context) ?? "__:__:__",
-                                          style: TextStyle(color: theme.hintColor, fontSize: 23),
-                                        ),
-                                      ),
-                                      Icon(Icons.access_time, color: theme.hintColor),
-                                    ],
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 26),
-                    Divider(
-                      color: theme.colorScheme.onPrimary,
-                      thickness: 1,
-                    ),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Expanded(
-                          child: SizedBox(
-                            height: 45,
-                            child: ElevatedButton(
-                                onPressed: _isSubmitting ? null : () => Navigator.of(context).pop(),
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: theme.colorScheme.onPrimary.withAlpha(25),
-                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10.0)),
-                                ),
-                                child: Text("Cancel", style: TextStyle(fontSize: 18, color: theme.colorScheme.onPrimary))),
-                          ),
-                        ),
-                        const SizedBox(width: 16),
-                        Expanded(
-                          child: SizedBox(
-                            height: 45,
-                            child: ElevatedButton(
-                                onPressed: _isSubmitting ? null : _submitForm,
-                                style: ElevatedButton.styleFrom(
-                                    backgroundColor: Colors.blue,
-                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10.0))),
-                                child: _isSubmitting
-                                    ? const Center(child: CircularProgressIndicator(valueColor: AlwaysStoppedAnimation(Colors.white)))
-                                    : Row(
-                                        mainAxisAlignment: MainAxisAlignment.center,
-                                        children: [
-                                          Icon(
-                                            Icons.add,
-                                            color: theme.colorScheme.onPrimary,
-                                          ),
-                                          const SizedBox(width: 8),
-                                          const Flexible(
-                                            child: Text(
-                                              "Add Schedule",
-                                              overflow: TextOverflow.ellipsis,
-                                              style: TextStyle(fontSize: 18, color: Colors.white),
-                                            ),
-                                          ),
-                                        ],
-                                      )),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ));
-        } else {
-          return const Center(child: Text('No schedule data available'));
-        }
-      },
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Add New Schedule'),
+        centerTitle: true,
+      ),
+      backgroundColor: theme.scaffoldBackgroundColor,
+      floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
+      floatingActionButton: FutureBuilder<ScheduleFormData>(
+        future: _formDataFuture,
+        builder: (context, snapshot) {
+          if (snapshot.hasData) {
+            return _buildActionButtons(theme);
+          }
+          return const SizedBox.shrink();
+        },
+      ),
+      body: FutureBuilder<ScheduleFormData>(
+        future: _formDataFuture,
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return const Center(child: CircularProgressIndicator());
+          } else if (snapshot.hasError) {
+            return Center(child: Text("Error loading data: ${snapshot.error}"));
+          } else if (snapshot.hasData) {
+            final formData = snapshot.data!;
+            return _buildForm(theme, formData);
+          } else {
+            return const Center(child: Text('No schedule data available'));
+          }
+        },
+      ),
     );
   }
-}
 
-class DropDownBox extends StatelessWidget {
-  final String? value;
-  final List<String> items;
-  final ValueChanged<String?> onChanged;
-  final String? hintText;
-
-  const DropDownBox({
-    super.key,
-    required this.value,
-    required this.items,
-    required this.onChanged,
-    this.hintText,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return DropdownButtonFormField<String>(
-        initialValue: value,
-        isExpanded: true,
-        items: items.map((e) => DropdownMenuItem(value: e, child: Text(e))).toList(),
-        onChanged: onChanged,
-        decoration: InputDecoration(
-          hintText: hintText,
-          border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(10.0),
+  Widget _buildForm(ThemeData theme, ScheduleFormData formData) {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 120),
+      child: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 800),
+          child: Form(
+            key: _formKey,
+            child: Container(
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(10),
+                color: theme.primaryColor,
+              ),
+              padding: const EdgeInsets.all(16),
+              child: LayoutBuilder(builder: (context, constraints) {
+                if (constraints.maxWidth > 600) {
+                  return _buildWideLayout(theme, formData);
+                } else {
+                  return _buildNarrowLayout(theme, formData);
+                }
+              }),
+            ),
           ),
-        ));
+        ),
+      ),
+    );
+  }
+
+  Widget _buildNarrowLayout(ThemeData theme, ScheduleFormData formData) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _buildDropdownField(theme, "Class", _newSchedule.aClass, formData.classes,
+            (val) => setState(() => _newSchedule.aClass = val)),
+        const SizedBox(height: 16),
+        _buildDropdownField(theme, "Section", _newSchedule.section, formData.sections,
+            (val) => setState(() => _newSchedule.section = val)),
+        const SizedBox(height: 16),
+        _buildDropdownField(theme, "Subject", _newSchedule.subject, formData.subjects,
+            (val) => setState(() => _newSchedule.subject = val)),
+        const SizedBox(height: 16),
+        _buildDropdownField(theme, "Teacher", _newSchedule.teacher, formData.teachers,
+            (val) => setState(() => _newSchedule.teacher = val)),
+        const SizedBox(height: 16),
+        _buildDropdownField(theme, "Weekday", _newSchedule.weekday, formData.weekdays,
+            (val) => setState(() => _newSchedule.weekday = val)),
+        const SizedBox(height: 16),
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(child: _buildTimeField(theme, "Start Time", _newSchedule.startTime, isStartTime: true)),
+            const SizedBox(width: 16),
+            Expanded(child: _buildTimeField(theme, "End Time", _newSchedule.endTime, isStartTime: false)),
+          ],
+        ),
+        const SizedBox(height: 80), // For FAB
+      ],
+    );
+  }
+
+  Widget _buildWideLayout(ThemeData theme, ScheduleFormData formData) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(child: _buildDropdownField(theme, "Class", _newSchedule.aClass, formData.classes, (val) => setState(() => _newSchedule.aClass = val))),
+            const SizedBox(width: 16),
+            Expanded(child: _buildDropdownField(theme, "Section", _newSchedule.section, formData.sections, (val) => setState(() => _newSchedule.section = val))),
+            const SizedBox(width: 16),
+            Expanded(child: _buildDropdownField(theme, "Weekday", _newSchedule.weekday, formData.weekdays, (val) => setState(() => _newSchedule.weekday = val))),
+          ],
+        ),
+        const SizedBox(height: 16),
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(child: _buildDropdownField(theme, "Subject", _newSchedule.subject, formData.subjects, (val) => setState(() => _newSchedule.subject = val))),
+            const SizedBox(width: 16),
+            Expanded(child: _buildDropdownField(theme, "Teacher", _newSchedule.teacher, formData.teachers, (val) => setState(() => _newSchedule.teacher = val))),
+          ],
+        ),
+        const SizedBox(height: 16),
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(child: _buildTimeField(theme, "Start Time", _newSchedule.startTime, isStartTime: true)),
+            const SizedBox(width: 16),
+            Expanded(child: _buildTimeField(theme, "End Time", _newSchedule.endTime, isStartTime: false)),
+          ],
+        ),
+        const SizedBox(height: 80), // For FAB
+      ],
+    );
+  }
+
+  Widget _buildDropdownField(ThemeData theme, String label, String? value, List<String> items, ValueChanged<String?> onChanged) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(label, style: theme.textTheme.titleMedium?.copyWith(color: theme.colorScheme.onPrimary)),
+        const SizedBox(height: 8),
+        DropdownButtonFormField<String>(
+          initialValue: value,
+          items: items.map((e) => DropdownMenuItem(value: e, child: Text(e))).toList(),
+          onChanged: onChanged,
+          decoration: InputDecoration(
+            hintText: "--Select $label",
+            filled: true,
+            fillColor: theme.scaffoldBackgroundColor,
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide.none),
+          ),
+          validator: (val) => val == null ? "Please select a $label" : null,
+        ),
+      ],
+    );
+  }
+
+  Widget _buildTimeField(ThemeData theme, String label, TimeOfDay? time, {required bool isStartTime}) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(label, style: theme.textTheme.titleMedium?.copyWith(color: theme.colorScheme.onPrimary)),
+        const SizedBox(height: 8),
+        FormField<TimeOfDay>(
+          initialValue: time,
+          validator: (val) => val == null ? "Please select a time" : null,
+          builder: (field) {
+            return InkWell(
+              onTap: () => _selectTime(context, isStartTime: isStartTime),
+              child: Container(
+                padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 12),
+                decoration: BoxDecoration(
+                  color: theme.scaffoldBackgroundColor,
+                  borderRadius: BorderRadius.circular(10),
+                  border: field.hasError ? Border.all(color: theme.colorScheme.error, width: 1) : null,
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      time?.format(context) ?? "--:--",
+                      style: theme.textTheme.bodyLarge,
+                    ),
+                    Icon(Icons.access_time, color: theme.hintColor),
+                  ],
+                ),
+              ),
+            );
+          },
+        ),
+      ],
+    );
+  }
+
+  Widget _buildActionButtons(ThemeData theme) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16.0),
+      child: Row(
+        children: [
+          Expanded(
+            child: OutlinedButton(
+              onPressed: () => Navigator.of(context).pop(),
+              style: OutlinedButton.styleFrom(
+                padding: const EdgeInsets.symmetric(vertical: 16),
+                foregroundColor: theme.colorScheme.onSurface,
+                side: BorderSide(color: theme.dividerColor),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+              child: const Text("Cancel"),
+            ),
+          ),
+          const SizedBox(width: 16),
+          Expanded(
+            child: ElevatedButton.icon(
+              onPressed: _isSubmitting ? null : _submitForm,
+              style: ElevatedButton.styleFrom(
+                padding: const EdgeInsets.symmetric(vertical: 16),
+                backgroundColor: theme.colorScheme.primary,
+                foregroundColor: theme.colorScheme.onPrimary,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+              icon: _isSubmitting ? Container() : const Icon(Icons.add),
+              label: _isSubmitting
+                  ? const SizedBox(
+                      height: 24,
+                      width: 24,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 3,
+                        valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                      ),
+                    )
+                  : const Text("Add Schedule"),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }

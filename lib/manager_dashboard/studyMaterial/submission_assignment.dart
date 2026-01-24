@@ -117,35 +117,71 @@ class _AssignmentSubmissionsScreenState
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     return Scaffold(
-      backgroundColor: const Color(0xff0B1220),
+      backgroundColor: theme.scaffoldBackgroundColor,
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
-        leading: const BackButton(color: Colors.white),
-        title: const Text(
+        leading: BackButton(color: theme.colorScheme.onSurface),
+        title: Text(
           "Submissions for Assignment 1", // This can be dynamic too if passed to the widget
-          style: TextStyle(color: Colors.white),
+          style: TextStyle(color: theme.colorScheme.onSurface),
         ),
       ),
       body: isLoading
           ? const Center(child: CircularProgressIndicator())
-          : ListView.builder(
-        padding: const EdgeInsets.fromLTRB(16, 16, 16, 50),
-        itemCount: submissions.length,
-        itemBuilder: (context, index) {
-          return buildSubmissionCard(submissions[index]);
-        },
-      ),
+          : LayoutBuilder(builder: (context, constraints) {
+              if (constraints.maxWidth > 700) {
+                return _buildGridView();
+              } else {
+                return _buildListView();
+              }
+            }),
     );
   }
 
-  Widget buildSubmissionCard(AssignmentSubmission s) {
+  Widget _buildListView() {
+    return ListView.separated(
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 50),
+      itemCount: submissions.length,
+      itemBuilder: (context, index) {
+        return _SubmissionCard(submission: submissions[index]);
+      },
+      separatorBuilder: (context, index) => const SizedBox(height: 16),
+    );
+  }
+
+  Widget _buildGridView() {
+    return GridView.builder(
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 50),
+      itemCount: submissions.length,
+      gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
+        maxCrossAxisExtent: 600, // Max width of each item
+        mainAxisSpacing: 16,
+        crossAxisSpacing: 16,
+        childAspectRatio: 1.2, // Adjust aspect ratio for content
+      ),
+      itemBuilder: (context, index) {
+        return _SubmissionCard(submission: submissions[index]);
+      },
+    );
+  }
+}
+
+// A refactored card widget for displaying a single submission
+class _SubmissionCard extends StatelessWidget {
+  final AssignmentSubmission submission;
+
+  const _SubmissionCard({required this.submission});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     return Container(
-      margin: const EdgeInsets.only(bottom: 16),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: const Color(0xff0F1A2B),
+        color: theme.cardColor,
         borderRadius: BorderRadius.circular(18),
       ),
       child: Column(
@@ -153,11 +189,10 @@ class _AssignmentSubmissionsScreenState
         children: [
           // Student Name
           Text(
-            s.name,
-            style: const TextStyle(
-              color: Colors.white,
+            submission.name,
+            style: theme.textTheme.titleLarge?.copyWith(
+              color: theme.colorScheme.onSurface,
               fontWeight: FontWeight.w700,
-              fontSize: 16,
             ),
           ),
 
@@ -167,27 +202,33 @@ class _AssignmentSubmissionsScreenState
           Container(
             padding: const EdgeInsets.all(14),
             decoration: BoxDecoration(
-              color: const Color(0xff162238),
+              color: theme.scaffoldBackgroundColor,
               borderRadius: BorderRadius.circular(14),
             ),
             child: Row(
               children: [
                 Icon(
-                  s.hasFile ? Icons.insert_drive_file : Icons.close,
-                  color: s.hasFile ? Colors.blueAccent : Colors.grey,
+                  submission.hasFile ? Icons.insert_drive_file : Icons.close,
+                  color: submission.hasFile
+                      ? theme.colorScheme.primary
+                      : theme.hintColor,
                 ),
                 const SizedBox(width: 12),
                 Expanded(
                   child: Text(
-                    s.fileName,
-                    style: TextStyle(
-                      color: s.hasFile ? Colors.white : Colors.white60,
+                    submission.fileName,
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      color: submission.hasFile
+                          ? theme.colorScheme.onSurface
+                          : theme.hintColor,
                     ),
                   ),
                 ),
                 Icon(
                   Icons.download_outlined,
-                  color: s.hasFile ? Colors.white : Colors.transparent,
+                  color: submission.hasFile
+                      ? theme.colorScheme.onSurface
+                      : Colors.transparent,
                 )
               ],
             ),
@@ -195,35 +236,54 @@ class _AssignmentSubmissionsScreenState
 
           const SizedBox(height: 14),
 
-          const Text("Typed Answer",
-              style: TextStyle(color: Colors.white54, fontSize: 12)),
+          Text("Typed Answer",
+              style: theme.textTheme.labelMedium?.copyWith(color: theme.hintColor)),
 
           const SizedBox(height: 6),
 
           Text(
-            s.typedAnswer,
-            style: const TextStyle(color: Colors.white, fontSize: 13),
+            submission.typedAnswer,
+            style: theme.textTheme.bodyMedium,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
           ),
 
-          if (s.typedAnswer.length > 50)
-            const Text(
-              "Read more",
-              style: TextStyle(color: Colors.lightBlueAccent, fontSize: 12),
+          if (submission.typedAnswer.length > 50)
+            Padding(
+              padding: const EdgeInsets.only(top: 4.0),
+              child: InkWell(
+                onTap: () {
+                  // TODO: Implement a dialog or navigation to show full text
+                },
+                child: Text(
+                  "Read more",
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: theme.colorScheme.secondary,
+                  ),
+                ),
+              ),
             ),
 
           const SizedBox(height: 14),
 
           Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Expanded(
-                child: info("Submitted On", s.submittedOn),
+                child: _buildInfoField(
+                  theme,
+                  label: "Submitted On",
+                  value: submission.submittedOn,
+                ),
               ),
+              const SizedBox(width: 16),
               Expanded(
-                child: info(
-                  "Grade",
-                  s.grade,
-                  isGraded: s.graded,
-                  didFail: s.fail,
+                child: _buildInfoField(
+                  theme,
+                  label: "Grade",
+                  value: submission.grade,
+                  isGraded: submission.graded,
+                  didFail: submission.fail,
                 ),
               ),
             ],
@@ -231,36 +291,39 @@ class _AssignmentSubmissionsScreenState
 
           const SizedBox(height: 6),
 
-          info("Remarks", s.remarks),
+          _buildInfoField(theme, label: "Remarks", value: submission.remarks),
         ],
       ),
     );
   }
 
-  Widget info(String label, String value,
-      {bool isGraded = false, bool didFail = false}) {
+  Widget _buildInfoField(ThemeData theme, 
+      {required String label, required String value, bool isGraded = false, bool didFail = false}) {
+        
+    Color valueColor;
+    if (isGraded) {
+      valueColor = didFail ? theme.colorScheme.error : Colors.green.shade400;
+    } else {
+      valueColor = theme.hintColor;
+    }
+
     return Padding(
       padding: const EdgeInsets.only(bottom: 8),
-      child: RichText(
-        text: TextSpan(
-          children: [
-            TextSpan(
-              text: "$label\n",
-              style: const TextStyle(color: Colors.white54, fontSize: 12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            label,
+            style: theme.textTheme.labelMedium?.copyWith(color: theme.hintColor),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            value,
+            style: theme.textTheme.bodyMedium?.copyWith(
+              color: valueColor,
             ),
-            TextSpan(
-              text: value,
-              style: TextStyle(
-                color: isGraded
-                    ? didFail
-                    ? Colors.redAccent
-                    : Colors.greenAccent
-                    : Colors.white70,
-                fontSize: 13,
-              ),
-            ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }

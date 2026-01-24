@@ -11,6 +11,7 @@ class TimeTableClassesPage extends StatefulWidget {
 }
 
 class _TimeTableClassesPageState extends State<TimeTableClassesPage> {
+  final _formKey = GlobalKey<FormState>();
   bool _isLoading = true;
   String? _selectedClass;
   String? _selectedSection;
@@ -25,16 +26,10 @@ class _TimeTableClassesPageState extends State<TimeTableClassesPage> {
 
   Future<void> _fetchDropdownData() async {
     // Simulate API call to fetch dropdown data.
-    // Replace this with your actual API call.
-    await Future.delayed(const Duration(seconds: 2));
+    await Future.delayed(const Duration(seconds: 1));
 
     final List<String> fetchedClasses = [
-      "Class 1",
-      "Class 2",
-      "Class 3",
-      "Class 4",
-      "Class 5",
-      "Class 6",
+      "Class 1", "Class 2", "Class 3", "Class 4", "Class 5", "Class 6",
     ];
     final List<String> fetchedSections = ["A", "B", "C", "D"];
 
@@ -42,10 +37,25 @@ class _TimeTableClassesPageState extends State<TimeTableClassesPage> {
       setState(() {
         _classList = fetchedClasses;
         _sectionList = fetchedSections;
-        _selectedClass = fetchedClasses.first;
-        _selectedSection = fetchedSections.first;
+        // Set initial value only if lists are not empty
+        if (_classList.isNotEmpty) _selectedClass = _classList.first;
+        if (_sectionList.isNotEmpty) _selectedSection = _sectionList.first;
         _isLoading = false;
       });
+    }
+  }
+
+  void _showSchedule() {
+    if (_formKey.currentState!.validate()) {
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => ShowSchedulePage(
+            className: _selectedClass!,
+            section: _selectedSection!,
+          ),
+        ),
+      );
     }
   }
 
@@ -58,123 +68,126 @@ class _TimeTableClassesPageState extends State<TimeTableClassesPage> {
         title: const Text("Time Table"),
         centerTitle: true,
       ),
-      body: Padding(
-        padding: const EdgeInsets.fromLTRB(16, 16, 16, 115),
-        child: SingleChildScrollView(
-          child: Column(
-            children: [
-              SizedBox(
-                width: double.infinity,
-                height: 50,
-                child: ElevatedButton(
-                  onPressed: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                          builder: (context) => const AddNewSchedulePage()),
-                    );
-                  },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.blue.shade900,
-                  ),
-                  child: const Text("Add New Schedule",
-                      style: TextStyle(color: Colors.white, fontSize: 20)),
-                ),
-              ),
-              const SizedBox(height: 16),
-              _isLoading
-                  ? const Center(child: CircularProgressIndicator())
-                  : Row(
-                      children: [
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                "Class",
-                                style: TextStyle(
-                                    fontSize: 16,
-                                    color: theme.colorScheme.onPrimary),
-                              ),
-                              const SizedBox(height: 8),
-                              if (_selectedClass != null)
-                                DropDownBox(
-                                  key: ValueKey(_selectedClass),
-                                  initialValue: _selectedClass!,
-                                  items: _classList,
-                                  onChanged: (value) {
-                                    if (value != null) {
-                                      setState(() {
-                                        _selectedClass = value;
-                                        // Optional: You might want to fetch sections for the selected class here.
-                                      });
-                                    }
-                                  },
-                                  hintText: "--Select Class",
-                                ),
-                            ],
-                          ),
-                        ),
-                        const SizedBox(width: 16),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                "Section",
-                                style: TextStyle(
-                                    fontSize: 16,
-                                    color: theme.colorScheme.onPrimary),
-                              ),
-                              const SizedBox(height: 8),
-                              if (_selectedSection != null)
-                                DropDownBox(
-                                  key: ValueKey(_selectedSection),
-                                  initialValue: _selectedSection!,
-                                  items: _sectionList,
-                                  onChanged: (value) {
-                                    if (value != null) {
-                                      setState(() {
-                                        _selectedSection = value;
-                                      });
-                                    }
-                                  },
-                                  hintText: "--Select Section",
-                                ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-            ],
-          ),
-        ),
-      ),
-      bottomNavigationBar: Padding(
-        padding: const EdgeInsets.only(bottom: 60, left: 16, right: 16),
+      floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
+      floatingActionButton: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16.0),
         child: SizedBox(
           width: double.infinity,
-          height: 50,
           child: ElevatedButton(
-            onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                    builder: (context) => const ShowSchedulePage()),
-              );
-            },
+            onPressed: _showSchedule,
             style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.blue,
+              padding: const EdgeInsets.symmetric(vertical: 16),
+              backgroundColor: theme.colorScheme.primary,
+              foregroundColor: theme.colorScheme.onPrimary,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
             ),
-            child: const Text("Show Schedule",
-                style: TextStyle(color: Colors.white, fontSize: 20)),
+            child: const Text("Show Schedule"),
           ),
         ),
       ),
+      body: _isLoading
+          ? const Center(child: CircularProgressIndicator())
+          : SingleChildScrollView(
+              padding: const EdgeInsets.fromLTRB(16, 16, 16, 50),
+              child: Center(
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 500),
+                  child: Form(
+                    key: _formKey,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        SizedBox(
+                          width: double.infinity,
+                          child: OutlinedButton.icon(
+                            onPressed: () {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                    builder: (context) => const AddNewSchedulePage()),
+                              );
+                            },
+                            icon: const Icon(Icons.add),
+                            label: const Text("Add New Schedule"),
+                            style: OutlinedButton.styleFrom(
+                              padding: const EdgeInsets.symmetric(vertical: 16),
+                              foregroundColor: theme.colorScheme.onSurface,
+                              side: BorderSide(color: theme.dividerColor),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 24),
+                        Text("Select Class and Section to view Time Table", style: theme.textTheme.titleMedium),
+                        const SizedBox(height: 16),
+                        _buildDropdown(
+                          theme,
+                          label: "Class",
+                          value: _selectedClass,
+                          items: _classList,
+                          onChanged: (value) => setState(() => _selectedClass = value),
+                          hint: "--Select Class",
+                        ),
+                        const SizedBox(height: 16),
+                        _buildDropdown(
+                          theme,
+                          label: "Section",
+                          value: _selectedSection,
+                          items: _sectionList,
+                          onChanged: (value) => setState(() => _selectedSection = value),
+                          hint: "--Select Section",
+                        ),
+                        const SizedBox(height: 80), // Padding for FAB
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+    );
+  }
+
+  Widget _buildDropdown(
+    ThemeData theme,
+      {required String label,
+      String? value,
+      required List<String> items,
+      required ValueChanged<String?> onChanged,
+      required String hint}) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: theme.textTheme.labelLarge?.copyWith(fontWeight: FontWeight.bold),
+        ),
+        const SizedBox(height: 8),
+        DropdownButtonFormField<String>(
+          value: value,
+          items: items.map((e) => DropdownMenuItem(value: e, child: Text(e))).toList(),
+          onChanged: onChanged,
+          decoration: InputDecoration(
+            filled: true,
+            fillColor: theme.colorScheme.surface,
+            hintText: hint,
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide.none,
+            ),
+          ),
+          validator: (value) => value == null ? 'Please make a selection' : null,
+        ),
+      ],
     );
   }
 }
 
+
+// Kept original DropDownBox but it is no longer used. Can be removed.
 class DropDownBox extends StatelessWidget {
   final String initialValue;
   final List<String> items;

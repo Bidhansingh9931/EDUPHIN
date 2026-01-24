@@ -20,50 +20,72 @@ class _LibrarianListPageState extends State<LibrarianListPage> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final textTheme = theme.textTheme;
     return Scaffold(
-        floatingActionButton: Padding(
-          padding: const EdgeInsets.only(left: 32),
-          child: SizedBox(
-              width: double.infinity,
-              height: 50,
-              child: FloatingActionButton(onPressed: (){
-                Navigator.push(context, MaterialPageRoute(builder: (context)=>const AddLibrarianPage()));
-              },child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
+      floatingActionButton: Padding(
+        padding: const EdgeInsets.only(left: 32),
+        child: SizedBox(
+          width: double.infinity,
+          height: 50,
+          child: FloatingActionButton(
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const AddLibrarianPage(),
+                ),
+              );
+            },
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(
+                  Icons.add,
+                  color: theme.colorScheme.onSurface,
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  "Add Librarian",
+                  style: textTheme.titleMedium
+                      ?.copyWith(color: theme.colorScheme.onSurface),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+      backgroundColor: theme.scaffoldBackgroundColor,
+      appBar: AppBar(
+        title: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(
+              "Librarian List",
+              style: textTheme.titleLarge
+                  ?.copyWith(fontWeight: FontWeight.bold),
+            ),
+            Icon(
+              Icons.download,
+              color: theme.colorScheme.onSurface,
+            ),
+          ],
+        ),
+      ),
+      body: LayoutBuilder(
+        builder: (context, constraints) {
+          return const Padding(
+            padding: EdgeInsets.only(bottom: 50.0, left: 16, right: 16, top: 16),
+            child: SingleChildScrollView(
+              child: Column(
                 children: [
-                  Icon(Icons.add,color: theme.colorScheme.onSurface,),
-                  const SizedBox(width: 2,),
-                  Text("Add Librarian",style: TextStyle(color: theme.colorScheme.onSurface,fontSize: 20),),
+                  CustomLibrarianListBox(),
                 ],
-              ),)),
-        ),
-        backgroundColor: theme.scaffoldBackgroundColor,
-        appBar: AppBar(
-          title: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                "Librarian List",
-                style: TextStyle(
-                    color: theme.colorScheme.onSurface,
-                    fontSize: 20,
-                    fontWeight: FontWeight.bold),
               ),
-              Icon(
-                Icons.download,
-                color: theme.colorScheme.onSurface,
-              ),
-            ],
-          ),
-        ),
-        body: const Padding(
-          padding: EdgeInsets.only(bottom: 115),
-          child: SingleChildScrollView(
-            child: Column(children: [
-              CustomLibrarianListBox(),
-            ]),
-          ),
-        ));
+            ),
+          );
+        },
+      ),
+    );
   }
 }
 
@@ -119,6 +141,8 @@ class _CustomLibrarianListBoxState extends State<CustomLibrarianListBox> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final textTheme = theme.textTheme;
+
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(16.0),
@@ -148,13 +172,14 @@ class _CustomLibrarianListBoxState extends State<CustomLibrarianListBox> {
               items: _librarianTypes.map<DropdownMenuItem<String>>((String value) {
                 return DropdownMenuItem<String>(
                   value: value,
-                  child: Row(
+                  child: Wrap(
+                    crossAxisAlignment: WrapCrossAlignment.center,
                     children: [
-                      Icon(Icons.person_outline, color: theme.colorScheme.onPrimary), // Prefix icon
+                      Icon(Icons.person_outline, color: theme.colorScheme.onPrimary),
                       const SizedBox(width: 8),
                       Text(
                         value,
-                        style: TextStyle(color: theme.colorScheme.onPrimary),
+                        style: textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onPrimary),
                       ),
                     ],
                   ),
@@ -165,43 +190,44 @@ class _CustomLibrarianListBoxState extends State<CustomLibrarianListBox> {
           const SizedBox(height: 16),
           _isLoading
               ? const Center(child: CircularProgressIndicator())
-              : ListView.separated(
-                  shrinkWrap: true,
-                  physics: const NeverScrollableScrollPhysics(),
-                  itemCount: _librarians.length,
-                  separatorBuilder: (context, index) => const SizedBox(height: 16),
-                  itemBuilder: (context, index) {
-                    final librarian = _librarians[index];
-                    return Container(
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: theme.colorScheme.onPrimary.withAlpha(25),
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Row(
-                        children: [
-                          const SizedBox(width: 16),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  librarian.name,
-                                  style: TextStyle(
-                                      fontSize: 16, color: theme.colorScheme.onPrimary),
+              : LayoutBuilder(
+                  builder: (context, constraints) {
+                    return ListView.separated(
+                      shrinkWrap: true,
+                      physics: const NeverScrollableScrollPhysics(),
+                      itemCount: _librarians.length,
+                      separatorBuilder: (context, index) => const SizedBox(height: 16),
+                      itemBuilder: (context, index) {
+                        final librarian = _librarians[index];
+                        return Container(
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: theme.colorScheme.onPrimary.withAlpha(25),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Row(
+                            children: [
+                              const SizedBox(width: 16),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      librarian.name,
+                                      style: textTheme.titleMedium?.copyWith(color: theme.colorScheme.onPrimary),
+                                    ),
+                                    const SizedBox(height: 4),
+                                    Text(
+                                      librarian.designation,
+                                      style: textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onPrimary.withAlpha(180)),
+                                    )
+                                  ],
                                 ),
-                                const SizedBox(height: 4),
-                                Text(
-                                  librarian.designation,
-                                  style: TextStyle(
-                                      fontSize: 14,
-                                      color: theme.colorScheme.onPrimary.withAlpha(180)),
-                                )
-                              ],
-                            ),
-                          )
-                        ],
-                      ),
+                              )
+                            ],
+                          ),
+                        );
+                      },
                     );
                   },
                 ),

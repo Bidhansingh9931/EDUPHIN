@@ -8,6 +8,7 @@ class AddNewRemarksPage extends StatefulWidget {
 }
 
 class _AddNewRemarksPageState extends State<AddNewRemarksPage> {
+  final _formKey = GlobalKey<FormState>();
   String? _selectedRemarkType = 'Positive';
   final _descriptionController = TextEditingController();
   final _fromDateController = TextEditingController();
@@ -15,13 +16,8 @@ class _AddNewRemarksPageState extends State<AddNewRemarksPage> {
   bool _isLoading = false;
 
   Future<void> _addRemark() async {
-    if (_selectedRemarkType == null ||
-        _descriptionController.text.isEmpty ||
-        _fromDateController.text.isEmpty ||
-        _toDateController.text.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please fill all fields.')),
-      );
+    // Validate the form before proceeding
+    if (!_formKey.currentState!.validate()) {
       return;
     }
 
@@ -60,95 +56,196 @@ class _AddNewRemarksPageState extends State<AddNewRemarksPage> {
     super.dispose();
   }
 
-
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     return Scaffold(
+      backgroundColor: theme.scaffoldBackgroundColor,
       appBar: AppBar(
         title: const Text("Add New Remark"),
       ),
+      // Using a responsive FAB for the primary action
+      floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
+      floatingActionButton: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16.0),
+        child: SizedBox(
+          width: double.infinity,
+          child: ElevatedButton(
+            onPressed: _isLoading ? null : _addRemark,
+            style: ElevatedButton.styleFrom(
+              padding: const EdgeInsets.symmetric(vertical: 16),
+              backgroundColor: theme.colorScheme.primary,
+              foregroundColor: theme.colorScheme.onPrimary,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+            ),
+            child: _isLoading
+                ? const SizedBox(
+                    height: 24,
+                    width: 24,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 3,
+                      valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                    ),
+                  )
+                : const Text("Add Remark"),
+          ),
+        ),
+      ),
       body: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: SingleChildScrollView(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text("Remark Type"),
-              const SizedBox(height: 8),
-              DropdownButtonFormField<String>(
-                value: _selectedRemarkType,
-                items: ['Positive', 'Negative'].map((String value) {
-                  return DropdownMenuItem<String>(
-                    value: value,
-                    child: Text(value),
-                  );
-                }).toList(),
-                onChanged: (newValue) {
-                  setState(() {
-                    _selectedRemarkType = newValue;
-                  });
-                },
-                decoration: const InputDecoration(
-                  border: OutlineInputBorder(),
-                ),
-              ),
-              const SizedBox(height: 16),
-              const Text("Description"),
-              const SizedBox(height: 8),
-              TextField(
-                controller: _descriptionController,
-                maxLines: 5,
-                decoration: const InputDecoration(
-                  hintText: "Enter remark description...",
-                  border: OutlineInputBorder(),
-                ),
-              ),
-              const SizedBox(height: 16),
-              const Text("From Date"),
-              const SizedBox(height: 8),
-              TextField(
-                controller: _fromDateController,
-                readOnly: true,
-                onTap: () => _selectDate(context, _fromDateController),
-                decoration: const InputDecoration(
-                  hintText: "Select From Date",
-                  border: OutlineInputBorder(),
-                  suffixIcon: Icon(Icons.calendar_today),
-                ),
-              ),
-              const SizedBox(height: 16),
-              const Text("To Date"),
-              const SizedBox(height: 8),
-              TextField(
-                controller: _toDateController,
-                readOnly: true,
-                onTap: () => _selectDate(context, _toDateController),
-                decoration: const InputDecoration(
-                  hintText: "Select To Date",
-                  border: OutlineInputBorder(),
-                  suffixIcon: Icon(Icons.calendar_today),
-                ),
-              ),
-              const SizedBox(height: 24),
-              SizedBox(
-                width: double.infinity,
-                height: 50,
-                child: ElevatedButton(
-                  onPressed: _isLoading ? null : _addRemark,
-                  child: _isLoading
-                      ? const CircularProgressIndicator(valueColor: AlwaysStoppedAnimation<Color>(Colors.white))
-                      : const Text("Add Remark"),
-                ),
-              ),
-            ],
+        // Added bottom padding as requested
+        padding: const EdgeInsets.fromLTRB(16.0, 16.0, 16.0, 50.0),
+        child: Form(
+          key: _formKey,
+          // Using LayoutBuilder for a responsive layout
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              final isWide = constraints.maxWidth > 600;
+              return SingleChildScrollView(
+                child: isWide ? _buildWideLayout(theme) : _buildNarrowLayout(theme),
+              );
+            },
           ),
         ),
       ),
     );
   }
 
-  Future<void> _selectDate(BuildContext context, TextEditingController controller) async {
+  // Layout for narrow screens (e.g., phones)
+  Widget _buildNarrowLayout(ThemeData theme) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _buildDropdownField(theme),
+        const SizedBox(height: 16),
+        _buildDescriptionField(theme),
+        const SizedBox(height: 16),
+        _buildDateField(theme, "From Date", _fromDateController),
+        const SizedBox(height: 16),
+        _buildDateField(theme, "To Date", _toDateController),
+        const SizedBox(height: 80), // Extra padding for the FAB
+      ],
+    );
+  }
+
+  // Layout for wide screens (e.g., tablets)
+  Widget _buildWideLayout(ThemeData theme) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(
+              child: _buildDropdownField(theme),
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: _buildDateField(theme, "From Date", _fromDateController),
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: _buildDateField(theme, "To Date", _toDateController),
+            ),
+          ],
+        ),
+        const SizedBox(height: 16),
+        _buildDescriptionField(theme),
+        const SizedBox(height: 80), // Extra padding for the FAB
+      ],
+    );
+  }
+
+  Widget _buildDropdownField(ThemeData theme) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text("Remark Type", style: theme.textTheme.titleMedium),
+        const SizedBox(height: 8),
+        DropdownButtonFormField<String>(
+          initialValue: _selectedRemarkType,
+          items: ['Positive', 'Negative'].map((String value) {
+            return DropdownMenuItem<String>(
+              value: value,
+              child: Text(value),
+            );
+          }).toList(),
+          onChanged: (newValue) {
+            setState(() {
+              _selectedRemarkType = newValue;
+            });
+          },
+          decoration: InputDecoration(
+            filled: true,
+            fillColor: theme.colorScheme.surface,
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide.none,
+            ),
+          ),
+          validator: (value) => value == null ? 'Please select a remark type' : null,
+        ),
+      ],
+    );
+  }
+
+  Widget _buildDescriptionField(ThemeData theme) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text("Description", style: theme.textTheme.titleMedium),
+        const SizedBox(height: 8),
+        TextFormField(
+          controller: _descriptionController,
+          maxLines: 5,
+          decoration: InputDecoration(
+            hintText: "Enter remark description...",
+            hintStyle: TextStyle(color: theme.hintColor),
+            filled: true,
+            fillColor: theme.colorScheme.surface,
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide.none,
+            ),
+          ),
+          validator: (value) =>
+              value == null || value.isEmpty ? 'Please enter a description' : null,
+        ),
+      ],
+    );
+  }
+
+  Widget _buildDateField(ThemeData theme, String label, TextEditingController controller) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(label, style: theme.textTheme.titleMedium),
+        const SizedBox(height: 8),
+        TextFormField(
+          controller: controller,
+          readOnly: true,
+          onTap: () => _selectDate(context, controller),
+          decoration: InputDecoration(
+            hintText: "Select Date",
+            hintStyle: TextStyle(color: theme.hintColor),
+            filled: true,
+            fillColor: theme.colorScheme.surface,
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide.none,
+            ),
+            suffixIcon: Icon(Icons.calendar_today, color: theme.hintColor),
+          ),
+          validator: (value) =>
+              value == null || value.isEmpty ? 'Please select a date' : null,
+        ),
+      ],
+    );
+  }
+
+  Future<void> _selectDate(
+      BuildContext context, TextEditingController controller) async {
     final DateTime? picked = await showDatePicker(
       context: context,
       initialDate: DateTime.now(),
@@ -157,7 +254,8 @@ class _AddNewRemarksPageState extends State<AddNewRemarksPage> {
     );
     if (picked != null) {
       setState(() {
-        controller.text = "${picked.day}-${picked.month}-${picked.year}";
+        // Format date to DD-MM-YYYY
+        controller.text = "${picked.day.toString().padLeft(2, '0')}-${picked.month.toString().padLeft(2, '0')}-${picked.year}";
       });
     }
   }

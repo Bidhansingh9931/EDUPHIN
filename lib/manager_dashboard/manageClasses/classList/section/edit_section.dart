@@ -17,6 +17,7 @@ class EditSectionPage extends StatefulWidget {
 }
 
 class _EditSectionPageState extends State<EditSectionPage> {
+  final _formKey = GlobalKey<FormState>(); // Key for form validation
   final _nameController = TextEditingController();
   final _limitController = TextEditingController();
   final _mentorController = TextEditingController();
@@ -31,10 +32,8 @@ class _EditSectionPageState extends State<EditSectionPage> {
   }
 
   Future<void> _fetchSectionDetails() async {
-    // Simulate API call to fetch current section data
+    // Simulate API call
     await Future.delayed(const Duration(seconds: 1));
-
-    // Mock data for an existing section
     final section = Section(name: "Section A", limit: 30, mentor: "Dr. Emily Carter");
 
     if (mounted) {
@@ -48,12 +47,8 @@ class _EditSectionPageState extends State<EditSectionPage> {
   }
 
   Future<void> _updateSection() async {
-    if (_nameController.text.isEmpty ||
-        _limitController.text.isEmpty ||
-        _mentorController.text.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please fill all fields.')),
-      );
+    // Validate form before proceeding
+    if (!_formKey.currentState!.validate()) {
       return;
     }
 
@@ -61,7 +56,7 @@ class _EditSectionPageState extends State<EditSectionPage> {
       _isSaving = true;
     });
 
-    // Simulate API call to update data
+    // Simulate API call
     await Future.delayed(const Duration(seconds: 2));
 
     final updatedData = {
@@ -102,87 +97,89 @@ class _EditSectionPageState extends State<EditSectionPage> {
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
-          : Padding(
+          : SingleChildScrollView(
               padding: const EdgeInsets.fromLTRB(16, 16, 16, 50),
-              child: Column(
-                children: [
-                  Container(
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(10),
-                      color: theme.primaryColor,
-                    ),
-                    child: Padding(
+              child: Center(
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 500), // Limit form width
+                  child: Form(
+                    key: _formKey,
+                    child: Container(
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(10),
+                        color: theme.primaryColor,
+                      ),
                       padding: const EdgeInsets.all(16),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const Text("Section Name"),
-                          const SizedBox(height: 8),
-                          TextField(
+                          _buildTextField(
+                            theme: theme,
                             controller: _nameController,
-                            decoration: InputDecoration(
-                              hintText: "Section A",
-                              hintStyle: TextStyle(color: Colors.grey.shade700),
-                              border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(10),
-                              ),
-                            ),
+                            label: "Section Name",
+                            hint: "e.g., Section A",
+                            validator: (value) =>
+                                value!.isEmpty ? 'Please enter a section name' : null,
                           ),
                           const SizedBox(height: 16),
-                          const Text("Section Limit"),
-                          const SizedBox(height: 8),
-                          TextField(
+                          _buildTextField(
+                            theme: theme,
                             controller: _limitController,
+                            label: "Class Limit",
+                            hint: "e.g., 30",
                             keyboardType: TextInputType.number,
-                            decoration: InputDecoration(
-                              hintText: "30",
-                              hintStyle: TextStyle(color: Colors.grey.shade700),
-                              border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(10),
-                              ),
-                            ),
+                            validator: (value) =>
+                                value!.isEmpty ? 'Please set a class limit' : null,
                           ),
                           const SizedBox(height: 16),
-                          const Text("Mentor Name"),
-                          const SizedBox(height: 8),
-                          TextField(
+                          _buildTextField(
+                            theme: theme,
                             controller: _mentorController,
-                            decoration: InputDecoration(
-                              suffixIcon: const Icon(Icons.person_search),
-                              hintText: "Dr. Emily Carter",
-                              hintStyle: TextStyle(color: Colors.grey.shade700),
-                              border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(10),
-                              ),
-                            ),
+                            label: "Mentor Name",
+                            hint: "e.g., Dr. Emily Carter",
+                            validator: (value) =>
+                                value!.isEmpty ? 'Please assign a mentor' : null,
                           ),
-                          const SizedBox(height: 16),
+                          const SizedBox(height: 24),
+                          // --- Responsive Button Row ---
                           Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
                               Expanded(
-                                child: SizedBox(
-                                  height: 50,
-                                  child: ElevatedButton(
-                                    onPressed: _isSaving ? null : _updateSection,
-                                    style: ElevatedButton.styleFrom(
-                                        backgroundColor: Colors.blue.withAlpha(65)),
-                                    child: _isSaving
-                                        ? const CircularProgressIndicator(valueColor: AlwaysStoppedAnimation<Color>(Colors.white),)
-                                        : Text("Update Section",
-                                            style: TextStyle(
-                                                color: theme.colorScheme.onPrimary,
-                                                fontSize: 16)),
+                                child: OutlinedButton(
+                                  onPressed: () => Navigator.of(context).pop(),
+                                  style: OutlinedButton.styleFrom(
+                                    padding: const EdgeInsets.symmetric(vertical: 16),
+                                    foregroundColor: theme.colorScheme.onPrimary,
+                                    side: BorderSide(color: theme.dividerColor),
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(12),
+                                    ),
                                   ),
+                                  child: const Text("Cancel"),
                                 ),
                               ),
                               const SizedBox(width: 16),
                               Expanded(
-                                child: SizedBox(
-                                  height: 50,
-                                  child: ElevatedButton(onPressed: () {
-                                    Navigator.of(context).pop();
-                                  }, child: Text("Cancel",style: TextStyle(color: theme.colorScheme.onPrimary,fontSize: 16))),
+                                child: ElevatedButton(
+                                  onPressed: _isSaving ? null : _updateSection,
+                                  style: ElevatedButton.styleFrom(
+                                    padding: const EdgeInsets.symmetric(vertical: 16),
+                                    backgroundColor: theme.colorScheme.primaryContainer,
+                                    foregroundColor:
+                                        theme.colorScheme.onPrimaryContainer,
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(12),
+                                    ),
+                                  ),
+                                  child: _isSaving
+                                      ? const SizedBox(
+                                          height: 24,
+                                          width: 24,
+                                          child: CircularProgressIndicator(
+                                            strokeWidth: 3,
+                                          ),
+                                        )
+                                      : const Text("Update Section"),
                                 ),
                               ),
                             ],
@@ -191,9 +188,52 @@ class _EditSectionPageState extends State<EditSectionPage> {
                       ),
                     ),
                   ),
-                ],
+                ),
               ),
             ),
+    );
+  }
+
+  // --- Reusable TextField Widget ---
+  Widget _buildTextField({
+    required ThemeData theme,
+    required TextEditingController controller,
+    required String label,
+    required String hint,
+    TextInputType? keyboardType,
+    String? Function(String?)? validator,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(label,
+            style: theme.textTheme.titleMedium
+                ?.copyWith(color: theme.colorScheme.onPrimary)),
+        const SizedBox(height: 8),
+        TextFormField(
+          controller: controller,
+          keyboardType: keyboardType,
+          decoration: InputDecoration(
+            hintText: hint,
+            hintStyle: TextStyle(color: theme.hintColor),
+            filled: true,
+            fillColor: theme.scaffoldBackgroundColor,
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(10),
+              borderSide: BorderSide.none,
+            ),
+            errorBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(10),
+              borderSide: BorderSide(color: theme.colorScheme.error, width: 1),
+            ),
+            focusedErrorBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(10),
+              borderSide: BorderSide(color: theme.colorScheme.error, width: 2),
+            ),
+          ),
+          validator: validator,
+        ),
+      ],
     );
   }
 }

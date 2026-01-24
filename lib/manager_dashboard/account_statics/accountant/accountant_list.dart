@@ -20,21 +20,13 @@ class _AccountantListPageState extends State<AccountantListPage> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     return Scaffold(
-        floatingActionButton: Padding(
-          padding: const EdgeInsets.only(left: 32),
-          child: SizedBox(
-              width: double.infinity,
-              height: 50,
-              child: FloatingActionButton(onPressed: (){
-                Navigator.push(context, MaterialPageRoute(builder: (context)=>const AddAccountantPage()));
-              },child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(Icons.add,color: theme.colorScheme.onSurface,),
-                  const SizedBox(width: 2,),
-                  Text("Add Accountant",style: TextStyle(color: theme.colorScheme.onSurface,fontSize: 20),),
-                ],
-              ),)),
+        floatingActionButton: FloatingActionButton.extended(
+          onPressed: () {
+            Navigator.push(context,
+                MaterialPageRoute(builder: (context) => const AddAccountantPage()));
+          },
+          label: const Text("Add Accountant"),
+          icon: const Icon(Icons.add),
         ),
         backgroundColor: theme.scaffoldBackgroundColor,
         appBar: AppBar(
@@ -43,9 +35,8 @@ class _AccountantListPageState extends State<AccountantListPage> {
             children: [
               Text(
                 "Accountant List",
-                style: TextStyle(
+                style: theme.textTheme.titleLarge?.copyWith(
                     color: theme.colorScheme.onSurface,
-                    fontSize: 20,
                     fontWeight: FontWeight.bold),
               ),
               Icon(
@@ -55,12 +46,10 @@ class _AccountantListPageState extends State<AccountantListPage> {
             ],
           ),
         ),
-        body: const Padding(
-          padding: EdgeInsets.only(bottom: 115),
-          child: SingleChildScrollView(
-            child: Column(children: [
-              CustomAccountantListBox(),
-            ]),
+        body: const SingleChildScrollView(
+          child: Padding(
+            padding: EdgeInsets.fromLTRB(16, 16, 16, 50),
+            child: CustomAccountantListBox(),
           ),
         ));
   }
@@ -70,7 +59,8 @@ class CustomAccountantListBox extends StatefulWidget {
   const CustomAccountantListBox({super.key});
 
   @override
-  State<CustomAccountantListBox> createState() => _CustomAccountantListBoxState();
+  State<CustomAccountantListBox> createState() =>
+      _CustomAccountantListBoxState();
 }
 
 class _CustomAccountantListBoxState extends State<CustomAccountantListBox> {
@@ -115,96 +105,138 @@ class _CustomAccountantListBoxState extends State<CustomAccountantListBox> {
     }
   }
 
+  Widget _buildAccountantItem(BuildContext context, Accountant accountant) {
+    final theme = Theme.of(context);
+    final textTheme = theme.textTheme;
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.onPrimary.withAlpha(25),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Row(
+        children: [
+          CircleAvatar(
+            backgroundColor: theme.colorScheme.primaryContainer,
+            child:
+                Icon(Icons.person, color: theme.colorScheme.onPrimaryContainer),
+          ),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Text(
+                  accountant.name,
+                  style: textTheme.titleMedium
+                      ?.copyWith(color: theme.colorScheme.onPrimary),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  accountant.designation,
+                  style: textTheme.bodyMedium
+                      ?.copyWith(color: theme.colorScheme.onPrimary.withAlpha(180)),
+                )
+              ],
+            ),
+          )
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(16.0),
       decoration: BoxDecoration(
         color: theme.primaryColor,
         borderRadius: BorderRadius.circular(12),
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12),
-            decoration: BoxDecoration(
-              color: theme.colorScheme.onPrimary.withAlpha(25),
-              borderRadius: BorderRadius.circular(12),
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12),
+              decoration: BoxDecoration(
+                color: theme.colorScheme.onPrimary.withAlpha(25),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: DropdownButton<String>(
+                value: _selectedAccountant,
+                underline: const SizedBox(),
+                isExpanded: true,
+                icon: Icon(Icons.arrow_drop_down,
+                    color: theme.colorScheme.onPrimary),
+                onChanged: (String? newValue) {
+                  setState(() {
+                    _selectedAccountant = newValue;
+                  });
+                },
+                items:
+                    _accountantTypes.map<DropdownMenuItem<String>>((String value) {
+                  return DropdownMenuItem<String>(
+                    value: value,
+                    child: Row(
+                      children: [
+                        Icon(Icons.person_outline,
+                            color: theme.colorScheme.onPrimary), // Prefix icon
+                        const SizedBox(width: 8),
+                        Text(
+                          value,
+                          style:
+                              theme.textTheme.bodyLarge?.copyWith(color: theme.colorScheme.onPrimary),
+                        ),
+                      ],
+                    ),
+                  );
+                }).toList(),
+              ),
             ),
-            child: DropdownButton<String>(
-              value: _selectedAccountant,
-              underline: const SizedBox(),
-              isExpanded: true,
-              icon: Icon(Icons.arrow_drop_down, color: theme.colorScheme.onPrimary),
-              onChanged: (String? newValue) {
-                setState(() {
-                  _selectedAccountant = newValue;
-                });
-              },
-              items: _accountantTypes.map<DropdownMenuItem<String>>((String value) {
-                return DropdownMenuItem<String>(
-                  value: value,
-                  child: Row(
-                    children: [
-                      Icon(Icons.person_outline, color: theme.colorScheme.onPrimary), // Prefix icon
-                      const SizedBox(width: 8),
-                      Text(
-                        value,
-                        style: TextStyle(color: theme.colorScheme.onPrimary),
-                      ),
-                    ],
+            const SizedBox(height: 16),
+            _isLoading
+                ? const Center(child: CircularProgressIndicator())
+                : LayoutBuilder(
+                    builder: (context, constraints) {
+                      final isLargeScreen = constraints.maxWidth > 600;
+                      if (isLargeScreen) {
+                        return GridView.builder(
+                          shrinkWrap: true,
+                          physics: const NeverScrollableScrollPhysics(),
+                          itemCount: _accountants.length,
+                          gridDelegate:
+                              const SliverGridDelegateWithFixedCrossAxisCount(
+                            crossAxisCount: 2,
+                            crossAxisSpacing: 16,
+                            mainAxisSpacing: 16,
+                            childAspectRatio: 3.5,
+                          ),
+                          itemBuilder: (context, index) {
+                            return _buildAccountantItem(
+                                context, _accountants[index]);
+                          },
+                        );
+                      } else {
+                        return ListView.separated(
+                          shrinkWrap: true,
+                          physics: const NeverScrollableScrollPhysics(),
+                          itemCount: _accountants.length,
+                          separatorBuilder: (context, index) =>
+                              const SizedBox(height: 16),
+                          itemBuilder: (context, index) {
+                            return _buildAccountantItem(
+                                context, _accountants[index]);
+                          },
+                        );
+                      }
+                    },
                   ),
-                );
-              }).toList(),
-            ),
-          ),
-          const SizedBox(height: 16),
-          _isLoading
-              ? const Center(child: CircularProgressIndicator())
-              : ListView.separated(
-                  shrinkWrap: true,
-                  physics: const NeverScrollableScrollPhysics(),
-                  itemCount: _accountants.length,
-                  separatorBuilder: (context, index) => const SizedBox(height: 16),
-                  itemBuilder: (context, index) {
-                    final accountant = _accountants[index];
-                    return Container(
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: theme.colorScheme.onPrimary.withAlpha(25),
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Row(
-                        children: [
-                          const SizedBox(width: 16),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  accountant.name,
-                                  style: TextStyle(
-                                      fontSize: 16, color: theme.colorScheme.onPrimary),
-                                ),
-                                const SizedBox(height: 4),
-                                Text(
-                                  accountant.designation,
-                                  style: TextStyle(
-                                      fontSize: 14,
-                                      color: theme.colorScheme.onPrimary.withAlpha(180)),
-                                )
-                              ],
-                            ),
-                          )
-                        ],
-                      ),
-                    );
-                  },
-                ),
-        ],
+          ],
+        ),
       ),
     );
   }

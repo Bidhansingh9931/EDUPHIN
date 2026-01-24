@@ -1,8 +1,77 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_datetime_picker_plus/flutter_datetime_picker_plus.dart' as picker;
 import 'package:intl/intl.dart';
-import '../../../../login_logout/ui_helper.dart';
 import '../../../moderator_dashboard.dart';
+
+// 1. Data Model for the new employee
+class NewEmployee {
+  final String fullName;
+  final String email;
+  final String? role;
+  final String gender;
+  final DateTime? dateOfBirth;
+  final String? relationshipStatus;
+  final String phoneNumber;
+  final String? alternateNumber;
+  final String address;
+  final String city;
+  final String state;
+  final String pinCode;
+  final String position;
+  final String? employmentType;
+  final DateTime? joiningDate;
+  final String experience;
+  final String status;
+  final String? reference;
+  final String qualification;
+  final String matriculationMarks;
+  final String intermediateMarks;
+  final String bankAccountNumber;
+  final String ifscCode;
+  final String bankName;
+  final String branch;
+  final String emergencyContactName;
+  final String emergencyContactNumber;
+
+  NewEmployee({
+    required this.fullName,
+    required this.email,
+    this.role,
+    required this.gender,
+    this.dateOfBirth,
+    this.relationshipStatus,
+    required this.phoneNumber,
+    this.alternateNumber,
+    required this.address,
+    required this.city,
+    required this.state,
+    required this.pinCode,
+    required this.position,
+    this.employmentType,
+    this.joiningDate,
+    required this.experience,
+    required this.status,
+    this.reference,
+    required this.qualification,
+    required this.matriculationMarks,
+    required this.intermediateMarks,
+    required this.bankAccountNumber,
+    required this.ifscCode,
+    required this.bankName,
+    required this.branch,
+    required this.emergencyContactName,
+    required this.emergencyContactNumber,
+  });
+}
+
+// 2. Provider class to handle data submission
+class AddEmployeeProvider {
+  Future<void> addEmployee(NewEmployee employee) async {
+    debugPrint('Submitting new employee: ${employee.fullName}');
+    await Future.delayed(const Duration(seconds: 2));
+  }
+}
 
 class AddEmployeePage extends StatefulWidget {
   const AddEmployeePage({super.key});
@@ -12,11 +81,18 @@ class AddEmployeePage extends StatefulWidget {
 }
 
 class _AddEmployeePageState extends State<AddEmployeePage> {
+  final AddEmployeeProvider _provider = AddEmployeeProvider();
+  bool _isLoading = false;
+
+  // State variables
   String selectedGender = "Male";
   String? selectedRole;
   String? selectedEmploymentType;
   String? selectedRelationshipStatus;
-  DateTime? selectedDate;
+  DateTime? selectedBirthDate;
+  DateTime? selectedJoiningDate;
+
+  // Controllers
   final fullNameController = TextEditingController();
   final emailController = TextEditingController();
   final phoneController = TextEditingController();
@@ -39,534 +115,405 @@ class _AddEmployeePageState extends State<AddEmployeePage> {
   final emergencyContactNameController = TextEditingController();
   final emergencyContactNumberController = TextEditingController();
 
+  @override
+  void dispose() {
+    fullNameController.dispose();
+    emailController.dispose();
+    phoneController.dispose();
+    alternatePhoneController.dispose();
+    addressController.dispose();
+    cityController.dispose();
+    stateController.dispose();
+    pinController.dispose();
+    positionController.dispose();
+    experienceController.dispose();
+    statusController.dispose();
+    referenceController.dispose();
+    qualificationController.dispose();
+    matriculationController.dispose();
+    intermediateController.dispose();
+    accountNumberController.dispose();
+    ifscCodeController.dispose();
+    bankNameController.dispose();
+    branchController.dispose();
+    emergencyContactNameController.dispose();
+    emergencyContactNumberController.dispose();
+    super.dispose();
+  }
 
+  Future<void> _submitEmployeeData() async {
+    if (fullNameController.text.isEmpty || emailController.text.isEmpty || selectedRole == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please fill all required fields (Full Name, Email, Role).'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+
+    setState(() {
+      _isLoading = true;
+    });
+
+    final newEmployee = NewEmployee(
+      fullName: fullNameController.text,
+      email: emailController.text,
+      role: selectedRole,
+      gender: selectedGender,
+      dateOfBirth: selectedBirthDate,
+      relationshipStatus: selectedRelationshipStatus,
+      phoneNumber: phoneController.text,
+      alternateNumber: alternatePhoneController.text,
+      address: addressController.text,
+      city: cityController.text,
+      state: stateController.text,
+      pinCode: pinController.text,
+      position: positionController.text,
+      employmentType: selectedEmploymentType,
+      joiningDate: selectedJoiningDate,
+      experience: experienceController.text,
+      status: statusController.text,
+      reference: referenceController.text,
+      qualification: qualificationController.text,
+      matriculationMarks: matriculationController.text,
+      intermediateMarks: intermediateController.text,
+      bankAccountNumber: accountNumberController.text,
+      ifscCode: ifscCodeController.text,
+      bankName: bankNameController.text,
+      branch: branchController.text,
+      emergencyContactName: emergencyContactNameController.text,
+      emergencyContactNumber: emergencyContactNumberController.text,
+    );
+
+    try {
+      await _provider.addEmployee(newEmployee);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Employee added successfully!'),
+            backgroundColor: Colors.green,
+          ),
+        );
+        Navigator.of(context).pop();
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to add employee: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
+    final screenWidth = MediaQuery.of(context).size.width;
+    double responsiveFontSize(double baseSize) {
+      if (screenWidth > 1200) return baseSize * 1.2;
+      if (screenWidth > 600) return baseSize * 1.1;
+      return baseSize;
+    }
+
     return Scaffold(
-      backgroundColor: theme.scaffoldBackgroundColor,
+      backgroundColor: const Color(0xFF0D1B2A),
       appBar: AppBar(
+        backgroundColor: const Color(0xFF0D1B2A),
+        iconTheme: const IconThemeData(color: Colors.white),
         title: Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            const Text(
+            Text(
               'Add Employee',
+              style: TextStyle(color: Colors.white, fontSize: responsiveFontSize(18)),
             ),
             InkWell(
-                onTap: () => Navigator.pushReplacement(
-                    context,
-                    MaterialPageRoute(
-                        builder: (context) => const ModeratorDashboardPage())),
-                child: Icon(
-                  Icons.home_sharp,
-                  size: 30,
-                )),
+              onTap: () => Navigator.pushReplacement(
+                  context, MaterialPageRoute(builder: (context) => const ModeratorDashboardPage())),
+              child: const Icon(
+                Icons.home_sharp,
+                size: 30,
+                color: Colors.white,
+              ),
+            ),
           ],
         ),
-        backgroundColor: theme.appBarTheme.backgroundColor,
       ),
-      body: Padding(
-        padding: const EdgeInsets.fromLTRB(16, 16, 16, 80),
-        child: SingleChildScrollView(
-          child: Column(
-            children: [
-              _buildProfileImage(context),
-              const SizedBox(height: 10),
-              UiHelper.customTextField(context, fullNameController, "Full Name",
-                  Icons.person_outline_sharp, false),
-              UiHelper.customTextField(context, emailController, "Email",
-                  Icons.email_outlined, false),
-              TextButton(
-                  onPressed: () {},
-                  child: const Text("Change Password")),
-              const SizedBox(height: 20),
-              _buildPersonalDetailsSection(context),
-              const SizedBox(height: 20),
-              _buildContactDetailsSection(context),
-              const SizedBox(height: 20),
-              _buildAddressDetailsSection(context),
-              const SizedBox(height: 20),
-              _buildProfessionalInformationSection(context),
-              const SizedBox(height: 20),
-              _buildEducationDetailsSection(context),
-              const SizedBox(height: 20),
-              _buildBankingDetailsSection(context),
-              const SizedBox(height: 20),
-              _buildEmergencyContactDetailsSection(context),
-              const SizedBox(height: 20),
-              _buildUpdateAccountButtonSection(context),
-            ],
-          ),
+      body: SingleChildScrollView(
+        padding: EdgeInsets.fromLTRB(screenWidth * 0.04, 16, screenWidth * 0.04, 80),
+        child: Column(
+          children: [
+            _buildProfileImage(context),
+            const SizedBox(height: 24),
+            _buildSection(
+              context: context,
+              title: "Personal Details",
+              children: [
+                _buildTextField(context: context, controller: fullNameController, label: "Full Name", icon: Icons.person_outline_sharp),
+                _buildTextField(context: context, controller: emailController, label: "Email", icon: Icons.email_outlined),
+                _buildDropdown(context: context, title: "Select Role", value: selectedRole, hint: "Assign a Role", items: ["Teacher", "Student", "Staff", "Accountant"], onChanged: (value) => setState(() => selectedRole = value)),
+                _buildDropdown(context: context, title: "Select Gender", value: selectedGender, hint: "Select Gender", items: ["Male", "Female", "Other"], onChanged: (value) => setState(() => selectedGender = value ?? "Male")),
+                _buildDatePickerField(context: context, hint: 'Select birth date', title: "Date of Birth", currentValue: selectedBirthDate, onConfirm: (date) => setState(() => selectedBirthDate = date)),
+                _buildDropdown(context: context, title: "Relationship Status", value: selectedRelationshipStatus, hint: "Select Relationship Status", items: ["Single", "Married", "Couple"], onChanged: (value) => setState(() => selectedRelationshipStatus = value)),
+              ],
+            ),
+            _buildSection(
+              context: context,
+              title: "Contact Details",
+              children: [
+                _buildTextField(context: context, controller: phoneController, label: "Phone Number", icon: Icons.phone_android, isNumeric: true),
+                _buildTextField(context: context, controller: alternatePhoneController, label: "Alternate Number", icon: Icons.phone, isNumeric: true),
+              ],
+            ),
+            _buildSection(
+              context: context,
+              title: "Address Details",
+              children: [
+                 _buildTextField(context: context, controller: addressController, label: "Address", icon: Icons.location_on_outlined),
+                 _buildTextField(context: context, controller: cityController, label: "City", icon: Icons.location_city),
+                 _buildTextField(context: context, controller: stateController, label: "State", icon: Icons.location_history),
+                 _buildTextField(context: context, controller: pinController, label: "Pin code", icon: Icons.pin, isNumeric: true),
+              ],
+            ),
+            _buildSection(
+              context: context,
+              title: "Professional Information",
+              children: [
+                _buildTextField(context: context, controller: positionController, label: "Position", icon: Icons.school_outlined),
+                _buildDropdown(context: context, title: "Employment Type", value: selectedEmploymentType, hint: "Select Employment Type", items: ["Full-Time", "Part-Time", "Contractual", "Freelance"], onChanged: (value) => setState(() => selectedEmploymentType = value)),
+                _buildDatePickerField(context: context, hint: 'Select joining date', title: "Joining Date", currentValue: selectedJoiningDate, onConfirm: (date) => setState(() => selectedJoiningDate = date)),
+                _buildTextField(context: context, controller: experienceController, label: "Experience (Years)", icon: Icons.work_history_outlined, isNumeric: true),
+                _buildTextField(context: context, controller: statusController, label: "Status", icon: Icons.check_circle_outline),
+                 _buildTextField(context: context, controller: referenceController, label: "Reference", icon: Icons.group_outlined),
+              ],
+            ),
+            _buildSection(
+              context: context,
+              title: "Education Details",
+              children: [
+                _buildTextField(context: context, controller: qualificationController, label: "Qualification", icon: Icons.book_outlined),
+                _buildTextField(context: context, controller: matriculationController, label: "Matriculation Marks (%)", icon: Icons.percent_outlined, isNumeric: true),
+                _buildTextField(context: context, controller: intermediateController, label: "Intermediate Marks (%)", icon: Icons.percent_outlined, isNumeric: true),
+              ],
+            ),
+            _buildSection(
+              context: context,
+              title: "Banking Details",
+              children: [
+                _buildTextField(context: context, controller: accountNumberController, label: "Bank Account Number", icon: Icons.account_balance_wallet_outlined, isNumeric: true),
+                _buildTextField(context: context, controller: ifscCodeController, label: "IFSC Code", icon: Icons.qr_code_outlined),
+                _buildTextField(context: context, controller: bankNameController, label: "Bank Name", icon: Icons.account_balance_outlined),
+                _buildTextField(context: context, controller: branchController, label: "Branch", icon: Icons.location_on_outlined),
+              ],
+            ),
+            _buildSection(
+              context: context,
+              title: "Emergency Contact",
+              children: [
+                _buildTextField(context: context, controller: emergencyContactNameController, label: "Contact Name", icon: Icons.person_outline),
+                _buildTextField(context: context, controller: emergencyContactNumberController, label: "Contact Number", icon: Icons.phone_outlined, isNumeric: true),
+              ],
+            ),
+            const SizedBox(height: 24),
+            SizedBox(
+              width: double.infinity,
+              height: 50,
+              child: ElevatedButton(
+                onPressed: _isLoading ? null : _submitEmployeeData,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF0E86D4),
+                  disabledBackgroundColor: const Color(0xFF0E86D4).withOpacity(0.5),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+                ),
+                child: _isLoading
+                    ? const CircularProgressIndicator(valueColor: AlwaysStoppedAnimation<Color>(Colors.white))
+                    : Text('Add Employee', style: TextStyle(color: Colors.white, fontSize: responsiveFontSize(16), fontWeight: FontWeight.bold)),
+              ),
+            )
+          ],
         ),
       ),
     );
   }
 
   Widget _buildProfileImage(BuildContext context) {
+    final screenWidth = MediaQuery.of(context).size.width;
     return Center(
       child: Stack(
         children: [
-          ClipRRect(
-            borderRadius: BorderRadius.circular(60),
-            child: Image.asset(
-              "assets/images/girl_image.webp",
-              width: 120,
-              height: 120,
-              fit: BoxFit.cover,
-            ),
+          CircleAvatar(
+            radius: screenWidth * 0.15,
+            backgroundImage: const AssetImage("assets/images/girl_image.webp"),
           ),
           Positioned(
-            bottom: 1,
-            right: 1,
+            bottom: 4,
+            right: 4,
             child: InkWell(
               onTap: () {},
               child: Container(
-                padding: const EdgeInsets.all(4),
-                decoration: BoxDecoration(
-                  color: Theme.of(context).primaryColor,
+                padding: const EdgeInsets.all(6),
+                decoration: const BoxDecoration(
+                  color: Color(0xFF0E86D4),
                   shape: BoxShape.circle,
                 ),
-                child: const Icon(
-                  Icons.edit,
-                  color: Colors.white,
-                  size: 30,
+                child: const Icon(Icons.edit, color: Colors.white, size: 24),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSection({required BuildContext context, required String title, required List<Widget> children}) {
+    final screenWidth = MediaQuery.of(context).size.width;
+    double responsiveFontSize(double baseSize) {
+      if (screenWidth > 1200) return baseSize * 1.2;
+      if (screenWidth > 600) return baseSize * 1.1;
+      return baseSize;
+    }
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 16),
+      padding: const EdgeInsets.all(16.0),
+      decoration: BoxDecoration(
+        color: const Color(0xFF1B263B),
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(title, style: TextStyle(color: Colors.white, fontSize: responsiveFontSize(18), fontWeight: FontWeight.bold)),
+          const SizedBox(height: 16),
+          LayoutBuilder(builder: (context, constraints) {
+            if (constraints.maxWidth > 700) {
+              return GridView.builder(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                itemCount: children.length,
+                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: 2,
+                  crossAxisSpacing: 16,
+                  mainAxisSpacing: 16,
+                  childAspectRatio: 4,
                 ),
-              ),
-            ),
-          ),
+                itemBuilder: (context, index) => children[index],
+              );
+            } else {
+              return Column(
+                children: children.map((widget) => Padding(padding: const EdgeInsets.only(bottom: 12), child: widget)).toList(),
+              );
+            }
+          }),
         ],
       ),
     );
   }
 
-  Widget _buildPersonalDetailsSection(BuildContext context) {
-    final theme = Theme.of(context);
-    return Container(
-      padding: const EdgeInsets.all(16.0),
-      decoration: BoxDecoration(
-        color: theme.cardColor,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: theme.dividerColor),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text("Personal Details",
-              style: theme.textTheme.titleLarge
-                  ?.copyWith(fontWeight: FontWeight.bold)),
-          const SizedBox(height: 16),
-          _buildDropdown(
-            context: context,
-            title: "Select Role",
-            value: selectedRole,
-            hint: "Assign a Role",
-            items: ["Teacher", "Student", "Staff", "Accountant"],
-            onChanged: (value) {
-              setState(() {
-                selectedRole = value;
-              });
-            },
-          ),
-          const SizedBox(height: 16),
-          _buildDropdown(
-            context: context,
-            title: "Select Gender",
-            value: selectedGender,
-            items: ["Male", "Female", "Other"],
-            onChanged: (value) {
-              if (value != null) {
-                setState(() {
-                  selectedGender = value;
-                });
-              }
-            },
-          ),
-          const SizedBox(height: 16),
-          Text("Date of Birth",
-              style:
-              theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold)),
-          const SizedBox(height: 8),
-          _buildDatePickerField(context),
-          const SizedBox(height: 16),
-          _buildDropdown(
-            context: context,
-            title: "Relationship Status",
-            value: selectedRelationshipStatus,
-            hint: "Select Relationship Status",
-            items: ["Single", "Married", "Couple"],
-            onChanged: (value) {
-              setState(() {
-                selectedRelationshipStatus = value;
-              });
-            },
-          ),
-        ],
-      ),
-    );
-  }
+  Widget _buildTextField({required BuildContext context, required TextEditingController controller, required String label, required IconData icon, bool isNumeric = false}) {
+    final screenWidth = MediaQuery.of(context).size.width;
+    double responsiveFontSize(double baseSize) {
+      if (screenWidth > 1200) return baseSize * 1.2;
+      if (screenWidth > 600) return baseSize * 1.1;
+      return baseSize;
+    }
 
-  Widget _buildContactDetailsSection(BuildContext context) {
-    final theme = Theme.of(context);
-    return Container(
-      padding: const EdgeInsets.all(16.0),
-      decoration: BoxDecoration(
-        color: theme.cardColor,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: theme.dividerColor),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text("Contact Details",
-              style: theme.textTheme.titleLarge
-                  ?.copyWith(fontWeight: FontWeight.bold)),
-          const SizedBox(height: 8),
-          Text("Phone Number",
-              style:
-              theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold)),
-          UiHelper.customTextField(context, phoneController, "+91 1234567890",
-              Icons.phone_android, false),
-          Text("Alternate Number",
-              style: theme.textTheme.titleSmall
-                  ?.copyWith(fontWeight: FontWeight.bold)),
-          UiHelper.customTextField(context, alternatePhoneController,
-              "Alternate Number", Icons.phone, false),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildAddressDetailsSection(BuildContext context) {
-    final theme = Theme.of(context);
-    return Container(
-      padding: const EdgeInsets.all(16.0),
-      decoration: BoxDecoration(
-        color: theme.cardColor,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: theme.dividerColor),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text("Address Details",
-              style: theme.textTheme.titleLarge
-                  ?.copyWith(fontWeight: FontWeight.bold)),
-          const SizedBox(height: 8),
-          Text("Address",
-              style:
-              theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold)),
-          UiHelper.customTextField(context, addressController, "123, Tech Park Road",
-              Icons.location_on_outlined, false),
-          Text("City",
-              style:
-              theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold)),
-          UiHelper.customTextField(
-              context, cityController, "Bengaluru", Icons.location_city, false),
-          Text("State",
-              style:
-              theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold)),
-          UiHelper.customTextField(
-              context, stateController, "Karnataka", Icons.location_history, false),
-          Text("Pin code",
-              style:
-              theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold)),
-          UiHelper.customTextField(
-              context, pinController, "560001", Icons.pin, false),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildProfessionalInformationSection(BuildContext context) {
-    final theme = Theme.of(context);
-    return Container(
-      padding: const EdgeInsets.all(16.0),
-      decoration: BoxDecoration(
-        color: theme.cardColor,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: theme.dividerColor),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text("Professional Information",
-              style: theme.textTheme.titleLarge
-                  ?.copyWith(fontWeight: FontWeight.bold)),
-          const SizedBox(height: 16),
-          Text("Position",
-              style:
-              theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold)),
-          UiHelper.customTextField(context, positionController, "Senior Teacher",
-              Icons.school_outlined, false),
-          const SizedBox(height: 16),
-          _buildDropdown(
-            context: context,
-            title: "Employment Type",
-            value: selectedEmploymentType,
-            hint: "Select Employment Type",
-            items: ["Full-Time", "Part-Time", "Contractual", "Freelance"],
-            onChanged: (value) {
-              setState(() {
-                selectedEmploymentType = value;
-              });
-            },
-          ),
-          const SizedBox(height: 16),
-          Text("Joining Date",
-              style:
-              theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold)),
-          const SizedBox(height: 8),
-          _buildDatePickerField(context),
-          const SizedBox(height: 16),
-          Text("Experience (Years)",
-              style:
-              theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold)),
-          UiHelper.customTextField(
-              context, experienceController, "e.g., 5", Icons.work_history, false),
-          const SizedBox(height: 16),
-          Text("Status",
-              style:
-              theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold)),
-          UiHelper.customTextField(
-              context, statusController, "e.g., Active", Icons.toggle_on_outlined, false),
-          const SizedBox(height: 16),
-          Text("Reference (Optional)",
-              style:
-              theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold)),
-          UiHelper.customTextField(
-              context, referenceController, "Add a reference", Icons.room_preferences, false),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildDatePickerField(BuildContext context) {
-    final theme = Theme.of(context);
-    return InkWell(
-      onTap: () {
-        picker.DatePicker.showDatePicker(
-          context,
-          showTitleActions: true,
-          minTime: DateTime(1950, 1, 1),
-          maxTime: DateTime.now(),
-          onConfirm: (date) {
-            setState(() {
-              selectedDate = date;
-            });
-          },
-          currentTime: selectedDate ?? DateTime.now(),
-          locale: picker.LocaleType.en,
-        );
-      },
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 16.0, horizontal: 12.0),
-        decoration: BoxDecoration(
-          color: theme.cardColor,
-          borderRadius: BorderRadius.circular(8),
-          border: Border.all(color: theme.dividerColor, width: 1.0),
-        ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Text(
-              selectedDate == null
-                  ? 'Select joining date'
-                  : DateFormat('yyyy-MM-dd').format(selectedDate!),
-              style: theme.textTheme.bodyLarge?.copyWith(
-                color: selectedDate == null ? theme.hintColor : null,
-              ),
-            ),
-            Icon(Icons.calendar_today, color: theme.hintColor),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildEducationDetailsSection(BuildContext context) {
-    final theme = Theme.of(context);
-    return Container(
-      padding: const EdgeInsets.all(16.0),
-      decoration: BoxDecoration(
-        color: theme.cardColor,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: theme.dividerColor),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text("Education & Documents",
-              style: theme.textTheme.titleLarge
-                  ?.copyWith(fontWeight: FontWeight.bold)),
-          const SizedBox(height: 8),
-          Text("Qualification",
-              style:
-              theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold)),
-          UiHelper.customTextField(context, qualificationController, "M.Sc. Physics",
-              Icons.school_sharp, false),
-          Text("Matriculation Marks (%)",
-              style: theme.textTheme.titleSmall
-                  ?.copyWith(fontWeight: FontWeight.bold)),
-          UiHelper.customTextField(context, matriculationController,
-              "92", Icons.percent_sharp, false),
-          Text("Intermediate Marks (%)",
-              style: theme.textTheme.titleSmall
-                  ?.copyWith(fontWeight: FontWeight.bold)),
-          UiHelper.customTextField(context, intermediateController,
-              "88", Icons.percent_sharp, false),
-          const SizedBox(height: 8),
-          UiHelper.customButton(context, () {}, "Upload Matriculation Marksheet"),
-          const SizedBox(height: 8),
-          UiHelper.customButton(context, (){}, "Upload Intermediate Marksheet"),
-          const SizedBox(height: 8),
-          UiHelper.customButton(context, (){}, "Upload Resume"),
-
-        ],
-      ),
-    );
-  }
-  Widget _buildBankingDetailsSection(BuildContext context) {
-    final theme = Theme.of(context);
-    return Container(
-      padding: const EdgeInsets.all(16.0),
-      decoration: BoxDecoration(
-        color: theme.cardColor,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: theme.dividerColor),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text("Banking Details",
-              style: theme.textTheme.titleLarge
-                  ?.copyWith(fontWeight: FontWeight.bold)),
-          const SizedBox(height: 8),
-          Text("Bank Account Number",
-              style:
-              theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold)),
-          UiHelper.customTextField(context, accountNumberController, "123456789012",
-              Icons.account_balance_wallet_outlined,false),
-          Text("IFSC Code",
-              style: theme.textTheme.titleSmall
-                  ?.copyWith(fontWeight: FontWeight.bold)),
-          UiHelper.customTextField(context, ifscCodeController,
-              "BANK0001234", Icons.code, false),
-          Text("Bank Name",
-              style: theme.textTheme.titleSmall
-                  ?.copyWith(fontWeight: FontWeight.bold)),
-          UiHelper.customTextField(context, bankNameController,
-              "Example Bank", Icons.account_balance, false),
-          Text("Branch",
-              style: theme.textTheme.titleSmall
-                  ?.copyWith(fontWeight: FontWeight.bold)),
-          UiHelper.customTextField(context, branchController,
-              "Tech Park Branch", Icons.account_balance_outlined, false),
-        ],
-      ),
-    );
-  }
-  Widget _buildEmergencyContactDetailsSection(BuildContext context) {
-    final theme = Theme.of(context);
-    return Container(
-      padding: const EdgeInsets.all(16.0),
-      decoration: BoxDecoration(
-        color: theme.cardColor,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: theme.dividerColor),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text("Emergency Contact",
-              style: theme.textTheme.titleLarge
-                  ?.copyWith(fontWeight: FontWeight.bold)),
-          const SizedBox(height: 8),
-          Text("Contact Name",
-              style:
-              theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold)),
-          UiHelper.customTextField(context, emergencyContactNameController, "John Doe",
-              Icons.person_outline_sharp, false),
-          Text("Contact Number",
-              style: theme.textTheme.titleSmall
-                  ?.copyWith(fontWeight: FontWeight.bold)),
-          UiHelper.customTextField(context, emergencyContactNumberController,
-              "+91 0987654321", Icons.phone, false),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildUpdateAccountButtonSection(BuildContext context) {
-    final theme = Theme.of(context);
-    return Container(
-      padding: const EdgeInsets.all(16.0),
-      decoration: BoxDecoration(
-        color: theme.cardColor,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: theme.dividerColor),
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Container(
-              height: 50,
-              width: 150,
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: ElevatedButton(onPressed: (){}, child: Text("cancel",style: TextStyle(fontWeight: FontWeight.bold,fontSize: 15),))),
-          Container(
-              height: 50,
-              width: 160,
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: ElevatedButton(onPressed: (){}, child: Text("Add Employee",style: TextStyle(fontWeight: FontWeight.bold,fontSize: 15)))),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildDropdown({
-    required BuildContext context,
-    required String title,
-    required String? value,
-    String? hint,
-    required List<String> items,
-    required void Function(String?) onChanged,
-  }) {
-    final theme = Theme.of(context);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          title,
-          style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold),
+        Text(label, style: TextStyle(color: Colors.white54, fontSize: responsiveFontSize(13))),
+        const SizedBox(height: 8),
+        TextField(
+          controller: controller,
+          style: TextStyle(color: Colors.white, fontSize: responsiveFontSize(14)),
+          keyboardType: isNumeric ? TextInputType.number : TextInputType.text,
+          decoration: InputDecoration(
+            prefixIcon: Icon(icon, color: Colors.white54),
+            filled: true,
+            fillColor: const Color(0xFF0D1B2A),
+            contentPadding: const EdgeInsets.symmetric(vertical: 16.0, horizontal: 12.0),
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide.none),
+            enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide.none),
+            focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: Color(0xFF0E86D4), width: 1.5)),
+          ),
         ),
+      ],
+    );
+  }
+
+  Widget _buildDropdown({required BuildContext context, required String title, required String? value, String? hint, required List<String> items, required void Function(String?) onChanged}) {
+    final screenWidth = MediaQuery.of(context).size.width;
+    double responsiveFontSize(double baseSize) {
+      if (screenWidth > 1200) return baseSize * 1.2;
+      if (screenWidth > 600) return baseSize * 1.1;
+      return baseSize;
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(title, style: TextStyle(color: Colors.white54, fontSize: responsiveFontSize(13))),
         const SizedBox(height: 8),
         Container(
-          padding: const EdgeInsets.symmetric(horizontal: 12.0),
-          decoration: BoxDecoration(
-            color: theme.cardColor,
-            borderRadius: BorderRadius.circular(8),
-            border: Border.all(color: theme.dividerColor, width: 1.0),
-          ),
+          padding: const EdgeInsets.symmetric(horizontal: 12),
+          decoration: BoxDecoration(color: const Color(0xFF0D1B2A), borderRadius: BorderRadius.circular(8)),
           child: DropdownButtonHideUnderline(
             child: DropdownButton<String>(
               value: value,
+              hint: Text(hint ?? '', style: TextStyle(color: Colors.white54, fontSize: responsiveFontSize(14))),
               isExpanded: true,
-              hint: hint != null ? Text(hint, style: TextStyle(color: theme.hintColor)) : null,
-              items: items.map((String item) {
-                return DropdownMenuItem<String>(
-                  value: item,
-                  child: Text(item),
-                );
-              }).toList(),
+              dropdownColor: const Color(0xFF1B263B),
+              style: TextStyle(color: Colors.white, fontSize: responsiveFontSize(14)),
               onChanged: onChanged,
-              style: theme.textTheme.bodyLarge,
-              dropdownColor: theme.cardColor,
+              items: items.map<DropdownMenuItem<String>>((String value) {
+                return DropdownMenuItem<String>(value: value, child: Text(value));
+              }).toList(),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildDatePickerField({required BuildContext context, required String hint, required String title, DateTime? currentValue, required Function(DateTime) onConfirm}) {
+    final screenWidth = MediaQuery.of(context).size.width;
+    double responsiveFontSize(double baseSize) {
+      if (screenWidth > 1200) return baseSize * 1.2;
+      if (screenWidth > 600) return baseSize * 1.1;
+      return baseSize;
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(title, style: TextStyle(color: Colors.white54, fontSize: responsiveFontSize(13))),
+        const SizedBox(height: 8),
+        GestureDetector(
+          onTap: () {
+            picker.DatePicker.showDatePicker(context, showTitleActions: true, onConfirm: onConfirm, currentTime: currentValue ?? DateTime.now());
+          },
+          child: Container(
+            height: 55,
+            padding: const EdgeInsets.symmetric(horizontal: 12.0),
+            decoration: BoxDecoration(color: const Color(0xFF0D1B2A), borderRadius: BorderRadius.circular(8)),
+            child: Row(
+              children: [
+                const Icon(Icons.calendar_month_outlined, color: Colors.white54),
+                const SizedBox(width: 12),
+                Text(
+                  currentValue != null ? DateFormat('yyyy-MM-dd').format(currentValue!) : hint,
+                  style: TextStyle(color: currentValue != null ? Colors.white : Colors.white54, fontSize: responsiveFontSize(14)),
+                ),
+              ],
             ),
           ),
         ),

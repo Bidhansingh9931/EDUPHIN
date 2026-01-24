@@ -72,169 +72,138 @@ class _EventManagementPageState extends State<EventManagementPage> {
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
           Text("Event Management",
-              style: TextStyle(color: theme.colorScheme.onSurface),
+              style: theme.textTheme.titleLarge?.copyWith(color: theme.colorScheme.onSurface),
               textAlign: TextAlign.center),
           Icon(Icons.download, color: theme.colorScheme.onSurface),
         ],
       )),
-      body: SingleChildScrollView(
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(16, 16, 16, 50),
-          child: Column(
-            children: [
-              SizedBox(
-                width: double.infinity,
-                height: 50,
-                child: ElevatedButton(
-                  onPressed: () {
-                    Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                            builder: (context) => const UpcomingEvents()));
-                  },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: theme.colorScheme.surface,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                  ),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    crossAxisAlignment: CrossAxisAlignment.center,
-                    children: [
-                      Icon(Icons.add, size: 30, color: theme.colorScheme.onPrimary),
-                      const SizedBox(width: 8),
-                      Text("Generate New Event",
-                          style: TextStyle(
-                              fontSize: 20, color: theme.colorScheme.onPrimary)),
-                    ],
+      body: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 16, 16, 50),
+        child: Column(
+          children: [
+            SizedBox(
+              width: double.infinity,
+              height: 50,
+              child: ElevatedButton.icon(
+                onPressed: () {
+                  Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                          builder: (context) => const UpcomingEvents()));
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: theme.colorScheme.surface,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
                   ),
                 ),
+                icon: Icon(Icons.add, size: 30, color: theme.colorScheme.onPrimary),
+                label: Text("Generate New Event",
+                    style: theme.textTheme.titleMedium?.copyWith(color: theme.colorScheme.onPrimary)),
               ),
-              const SizedBox(height: 16),
-              Divider(
-                color: theme.colorScheme.onSurface.withAlpha(50),
-                thickness: 1,
-              ),
-              const SizedBox(height: 16),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Expanded(
-                    child: Container(
-                      height: 60,
-                      padding: const EdgeInsets.symmetric(horizontal: 12.0),
-                      decoration: BoxDecoration(
-                        color: theme.primaryColor,
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: DropdownButton<String>(
-                        isExpanded: true,
-                        value: selectedValue,
-                        items: <String>['Status', 'Upcoming', 'Past'].map((String value) {
-                          return DropdownMenuItem<String>(
-                            value: value,
-                            child: Text(
-                              value,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          );
-                        }).toList(),
-                        onChanged: (String? newValue) {
-                          setState(() {
-                            selectedValue = newValue!;
-                          });
-                        },
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Container(
-                      height: 60,
-                      padding: const EdgeInsets.symmetric(horizontal: 12.0),
-                      decoration: BoxDecoration(
-                        color: theme.primaryColor,
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: DropdownButton<String>(
-                        isExpanded: true,
-                        value: selectedValue1,
-                        items: <String>[
-                          'Type',
-                          'Event',
-                          'Meeting',
-                          'Party',
-                        ].map((String value) {
-                          return DropdownMenuItem<String>(
-                            value: value,
-                            child: Text(
-                              value,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          );
-                        }).toList(),
-                        onChanged: (String? newValue) {
-                          setState(() {
-                            selectedValue1 = newValue!;
-                          });
-                        },
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Container(
-                      height: 60,
-                      padding: const EdgeInsets.symmetric(horizontal: 12.0),
-                      decoration: BoxDecoration(
-                        color: theme.primaryColor,
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: DropdownButton<String>(
-                        isExpanded: true,
-                        value: selectedValue2,
-                        items: <String>[
-                          'Audience',
-                          'Student',
-                          'Teacher',
-                          'Staff',
-                          'Librarian',
-                          'Counselor'
-                        ].map((String value) {
-                          return DropdownMenuItem<String>(
-                            value: value,
-                            child: Text(
-                              value,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          );
-                        }).toList(),
-                        onChanged: (String? newValue) {
-                          setState(() {
-                            selectedValue2 = newValue!;
-                          });
-                        },
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 16),
-              _isLoading
+            ),
+            const SizedBox(height: 16),
+            Divider(
+              color: theme.colorScheme.onSurface.withAlpha(50),
+              thickness: 1,
+            ),
+            const SizedBox(height: 16),
+            _buildFilters(theme),
+            const SizedBox(height: 16),
+            Expanded(
+              child: _isLoading
                   ? const Center(child: CircularProgressIndicator())
-                  : Column(
-                      children: [
-                        _buildEventSection(context, "Upcoming Events", _upcomingEvents),
-                        const SizedBox(height: 16),
-                        _buildEventSection(context, "Past Events", _pastEvents),
-                      ],
-                    ),
-            ],
-          ),
+                  : LayoutBuilder(builder: (context, constraints) {
+                      if (constraints.maxWidth > 600) {
+                        return _buildWideLayout(context);
+                      } else {
+                        return _buildNarrowLayout(context);
+                      }
+                    }),
+            ),
+          ],
         ),
       ),
+    );
+  }
+
+  Widget _buildFilters(ThemeData theme) {
+    return Wrap(
+      spacing: 10.0,
+      runSpacing: 10.0,
+      children: [
+        _buildDropdown(theme, selectedValue, ['Status', 'Upcoming', 'Past'], (newValue) {
+          setState(() {
+            selectedValue = newValue!;
+          });
+        }),
+        _buildDropdown(theme, selectedValue1, ['Type', 'Event', 'Meeting', 'Party'], (newValue) {
+          setState(() {
+            selectedValue1 = newValue!;
+          });
+        }),
+        _buildDropdown(theme, selectedValue2, ['Audience', 'Student', 'Teacher', 'Staff', 'Librarian', 'Counselor'], (newValue) {
+          setState(() {
+            selectedValue2 = newValue!;
+          });
+        }),
+      ],
+    );
+  }
+
+  Widget _buildDropdown(ThemeData theme, String value, List<String> items, ValueChanged<String?> onChanged) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10.0),
+      decoration: BoxDecoration(
+        color: theme.primaryColor,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: DropdownButtonHideUnderline(
+        child: DropdownButton<String>(
+          value: value,
+          items: items.map((String value) {
+            return DropdownMenuItem<String>(
+              value: value,
+              child: Text(
+                value,
+                overflow: TextOverflow.ellipsis,
+              ),
+            );
+          }).toList(),
+          onChanged: onChanged,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildNarrowLayout(BuildContext context) {
+    return SingleChildScrollView(
+      child: Column(
+        children: [
+          _buildEventSection(context, "Upcoming Events", _upcomingEvents),
+          const SizedBox(height: 16),
+          _buildEventSection(context, "Past Events", _pastEvents),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildWideLayout(BuildContext context) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Expanded(
+          child: SingleChildScrollView(
+            child: _buildEventSection(context, "Upcoming Events", _upcomingEvents),
+          ),
+        ),
+        const SizedBox(width: 16),
+        Expanded(
+          child: SingleChildScrollView(
+            child: _buildEventSection(context, "Past Events", _pastEvents),
+          ),
+        ),
+      ],
     );
   }
 
@@ -260,8 +229,7 @@ class _EventManagementPageState extends State<EventManagementPage> {
                 Icon(Icons.event, size: 30, color: theme.colorScheme.onPrimary),
                 const SizedBox(width: 8),
                 Text(title,
-                    style: TextStyle(
-                        fontSize: 20, color: theme.colorScheme.onPrimary)),
+                    style: theme.textTheme.titleLarge?.copyWith(color: theme.colorScheme.onPrimary)),
               ],
             ),
             const SizedBox(height: 16),
@@ -294,11 +262,9 @@ class _EventManagementPageState extends State<EventManagementPage> {
           Column(
             children: [
               Text(event.day,
-                  style: TextStyle(
-                      fontSize: 20, color: theme.colorScheme.onPrimary)),
+                  style: theme.textTheme.headlineSmall?.copyWith(color: theme.colorScheme.onPrimary)),
               Text(event.month,
-                  style: TextStyle(
-                      fontSize: 16,
+                  style: theme.textTheme.titleMedium?.copyWith(
                       color: theme.colorScheme.onPrimary.withAlpha(180))),
             ],
           ),
@@ -309,14 +275,12 @@ class _EventManagementPageState extends State<EventManagementPage> {
               children: [
                 Text(
                   event.title,
-                  style: TextStyle(
-                      fontSize: 16, color: theme.colorScheme.onPrimary),
+                  style: theme.textTheme.titleMedium?.copyWith(color: theme.colorScheme.onPrimary),
                 ),
                 const SizedBox(height: 4),
                 Text(
                   event.fullDate,
-                  style: TextStyle(
-                      fontSize: 14,
+                  style: theme.textTheme.bodyMedium?.copyWith(
                       color: theme.colorScheme.onPrimary.withAlpha(180)),
                 )
               ],

@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 
+import 'notification_model.dart';
+import 'notification_provider.dart';
+
 class NotificationPage extends StatefulWidget {
   const NotificationPage({super.key});
 
@@ -9,54 +12,28 @@ class NotificationPage extends StatefulWidget {
 
 class _NotificationPageState extends State<NotificationPage> {
   late Future<List<Message>> _messagesFuture;
+  final NotificationProvider _provider = NotificationProvider();
 
   @override
   void initState() {
     super.initState();
-    _messagesFuture = _fetchMessages();
-  }
-
-  Future<List<Message>> _fetchMessages() async {
-    // Simulate network delay to mimic fetching data from an API
-    await Future.delayed(const Duration(seconds: 1));
-
-    // In a real app, this data would be fetched from a server
-    return [
-      Message(
-        name: "Liam Johnson",
-        title: "Inquiry about school admissions",
-        preview: "Hello, I would like to inquire about the a...",
-        time: "10:45 AM",
-      ),
-      Message(
-        name: "Sophia Martinez",
-        title: "Feedback on recent parent-teacher me...",
-        preview: "I wanted to provide some feedback reg...",
-        time: "Yesterday",
-      ),
-      Message(
-        name: "Noah Brown",
-        title: "Question about the sports event",
-        preview: "Could you please provide the schedule ...",
-        time: "3 days ago",
-      ),
-      Message(
-        name: "Emma Wilson",
-        title: "Regarding bus transportation fee",
-        preview: "I have a query regarding the new fee st...",
-        time: "12/05/2024",
-      ),
-      Message(
-        name: "Olivia Garcia",
-        title: "Suggestion for the annual day",
-        preview: "I have a few suggestions for the upcomi...",
-        time: "10/05/2024",
-      ),
-    ];
+    _messagesFuture = _provider.fetchMessages();
   }
 
   @override
   Widget build(BuildContext context) {
+    final screenWidth = MediaQuery.of(context).size.width;
+
+    double responsiveFontSize(double baseFontSize) {
+      // Adjust font size based on screen width
+      if (screenWidth > 600) {
+        return baseFontSize * 1.2; // Larger screens
+      } else if (screenWidth < 360) {
+        return baseFontSize * 0.9; // Smaller screens
+      }
+      return baseFontSize;
+    }
+
     return Scaffold(
       backgroundColor: const Color(0xFF0D1B2A),
       body: SafeArea(
@@ -65,7 +42,7 @@ class _NotificationPageState extends State<NotificationPage> {
           children: [
             // ---------------- Top Bar ----------------
             Padding(
-              padding: const EdgeInsets.all(16),
+              padding: EdgeInsets.all(screenWidth * 0.04), // Responsive padding
               child: Row(
                 children: [
                   GestureDetector(
@@ -73,11 +50,11 @@ class _NotificationPageState extends State<NotificationPage> {
                     child: const Icon(Icons.arrow_back, color: Colors.white),
                   ),
                   const SizedBox(width: 12),
-                  const Text(
+                  Text(
                     "Messages",
                     style: TextStyle(
                       color: Colors.white,
-                      fontSize: 22,
+                      fontSize: responsiveFontSize(22),
                       fontWeight: FontWeight.bold,
                     ),
                   ),
@@ -102,7 +79,8 @@ class _NotificationPageState extends State<NotificationPage> {
                   } else if (snapshot.hasData) {
                     final messageList = snapshot.data!;
                     return ListView.builder(
-                      padding: const EdgeInsets.all(16),
+                      padding: EdgeInsets.symmetric(
+                          horizontal: screenWidth * 0.04), // Responsive padding
                       itemCount: messageList.length,
                       itemBuilder: (context, index) {
                         return MessageCard(messageList[index]);
@@ -127,23 +105,6 @@ class _NotificationPageState extends State<NotificationPage> {
 }
 
 //
-// ---------------- Message Model ----------------
-//
-class Message {
-  final String name;
-  final String title;
-  final String preview;
-  final String time;
-
-  Message({
-    required this.name,
-    required this.title,
-    required this.preview,
-    required this.time,
-  });
-}
-
-//
 // ---------------- Message Card Widget ----------------
 //
 class MessageCard extends StatelessWidget {
@@ -153,9 +114,21 @@ class MessageCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final screenWidth = MediaQuery.of(context).size.width;
+
+    double responsiveFontSize(double baseFontSize) {
+      if (screenWidth > 600) {
+        return baseFontSize * 1.2;
+      } else if (screenWidth < 360) {
+        return baseFontSize * 0.9;
+      }
+      return baseFontSize;
+    }
+
     return Container(
-      margin: const EdgeInsets.only(bottom: 16),
-      padding: const EdgeInsets.all(16),
+      margin: EdgeInsets.only(
+          bottom: screenWidth * 0.04), // Responsive margin
+      padding: EdgeInsets.all(screenWidth * 0.04), // Responsive padding
       decoration: BoxDecoration(
         color: const Color(0xFF1B263B),
         borderRadius: BorderRadius.circular(16),
@@ -168,11 +141,12 @@ class MessageCard extends StatelessWidget {
             children: [
               // Profile Initial
               CircleAvatar(
-                radius: 22,
+                radius: screenWidth * 0.06, // Responsive radius
                 backgroundColor: Colors.blue,
                 child: Text(
-                  msg.name[0].toUpperCase(),
-                  style: const TextStyle(color: Colors.white, fontSize: 20),
+                  msg.name.isNotEmpty ? msg.name[0].toUpperCase() : '',
+                  style: TextStyle(
+                      color: Colors.white, fontSize: responsiveFontSize(20)),
                 ),
               ),
 
@@ -185,18 +159,18 @@ class MessageCard extends StatelessWidget {
                   children: [
                     Text(
                       msg.name,
-                      style: const TextStyle(
+                      style: TextStyle(
                         color: Colors.white,
-                        fontSize: 16,
+                        fontSize: responsiveFontSize(16),
                         fontWeight: FontWeight.bold,
                       ),
                     ),
                     const SizedBox(height: 4),
                     Text(
                       msg.title,
-                      style: const TextStyle(
+                      style: TextStyle(
                         color: Colors.white70,
-                        fontSize: 13,
+                        fontSize: responsiveFontSize(13),
                       ),
                       overflow: TextOverflow.ellipsis,
                     ),
@@ -207,7 +181,8 @@ class MessageCard extends StatelessWidget {
               // Time
               Text(
                 msg.time,
-                style: const TextStyle(color: Colors.white54, fontSize: 12),
+                style: TextStyle(
+                    color: Colors.white54, fontSize: responsiveFontSize(12)),
               ),
             ],
           ),
@@ -217,9 +192,9 @@ class MessageCard extends StatelessWidget {
           // ----------- Preview Text -----------
           Text(
             msg.preview,
-            style: const TextStyle(
+            style: TextStyle(
               color: Colors.white54,
-              fontSize: 13,
+              fontSize: responsiveFontSize(13),
             ),
             overflow: TextOverflow.ellipsis,
             maxLines: 1,

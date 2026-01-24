@@ -208,10 +208,10 @@ class MockDashboardApiService {
         imageUrl: "assets/images/random_boy.jpg",
       ),
       quickActions: [
-        QuickAction(label: "Students", icon: Icons.person_outline_sharp, onTap: () => Navigator.push(context, MaterialPageRoute(builder: (context) => AddNewStudent()))),
+        QuickAction(label: "Students", icon: Icons.person_outline_sharp, onTap: () => Navigator.push(context, MaterialPageRoute(builder: (context) => AddNewStudentPage()))),
         QuickAction(label: "Add New Class", icon: Icons.book_outlined, onTap: () => Navigator.push(context, MaterialPageRoute(builder: (context) => AddNewClassPage()))),
-        QuickAction(label: "Add New Subject", icon: Icons.book_rounded, onTap: () => Navigator.push(context, MaterialPageRoute(builder: (context) => AddNewSubject()))),
-        QuickAction(label: "Add Class Schedule", icon: Icons.calendar_month, onTap: () => Navigator.push(context, MaterialPageRoute(builder: (context) => AddNewSchedule()))),
+        QuickAction(label: "Add New Subject", icon: Icons.book_rounded, onTap: () => Navigator.push(context, MaterialPageRoute(builder: (context) => AddNewSubjectPage()))),
+        QuickAction(label: "Add Class Schedule", icon: Icons.calendar_month, onTap: () => Navigator.push(context, MaterialPageRoute(builder: (context) => AddNewSchedulePage()))),
       ],
       accountStatistics: [
         AccountStatistic(label: "Institute Manager", value: "1", icon: Icons.person_outline_sharp, onTap: () => Navigator.push(context, MaterialPageRoute(builder: (context) => ManagerListPage()))),
@@ -309,12 +309,15 @@ class _ManagerDashboardPageState extends State<ManagerDashboardPage> {
             final data = snapshot.data!;
             return SingleChildScrollView(
               child: Padding(
-                padding: const EdgeInsets.fromLTRB(16, 16, 16, 80),
+                padding: const EdgeInsets.fromLTRB(16, 16, 16, 50),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text("Welcome back, ${data.profile.name.split(' ').first}",
-                        style: TextStyle(color: theme.colorScheme.onSurface, fontSize: 20, fontWeight: FontWeight.bold)),
+                        style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                          color: theme.colorScheme.onSurface,
+                          fontWeight: FontWeight.bold,
+                        )),
                     const SizedBox(height: 10),
                     SearchBar(
                       leading:
@@ -376,6 +379,7 @@ class CustomProfileBox extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final textTheme = theme.textTheme;
     return InkWell(
       onTap: () => Navigator.push(context, MaterialPageRoute(builder: (context)=>ManagerProfilePage())),
       child: Container(
@@ -392,7 +396,9 @@ class CustomProfileBox extends StatelessWidget {
                 Icon(Icons.person, color: theme.colorScheme.onPrimary, size: 30),
                 const SizedBox(width: 8),
                 Text("Profile Overview",
-                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 20, color: theme.colorScheme.onPrimary))
+                    style: textTheme.titleLarge?.copyWith(
+                        fontWeight: FontWeight.bold,
+                        color: theme.colorScheme.onPrimary))
               ],
             ),
             const SizedBox(height: 16),
@@ -402,34 +408,40 @@ class CustomProfileBox extends StatelessWidget {
             ),
             const SizedBox(height: 8),
             Text(profile.name,
-                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 20, color: theme.colorScheme.onPrimary)),
-            Text(profile.role, style: TextStyle(fontSize: 16, color: theme.colorScheme.onPrimary.withAlpha(180))),
+                style: textTheme.titleLarge?.copyWith(
+                    fontWeight: FontWeight.bold,
+                    color: theme.colorScheme.onPrimary)),
+            Text(profile.role, style: textTheme.titleMedium?.copyWith(color: theme.colorScheme.onPrimary.withAlpha(180))),
             const SizedBox(height: 16),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceAround,
+            Wrap(
+              spacing: 16,
+              runSpacing: 16,
+              alignment: WrapAlignment.spaceAround,
               children: [
                 Row(
+                  mainAxisSize: MainAxisSize.min,
                   children: [
                     Icon(Icons.email, color: theme.colorScheme.onPrimary),
                     const SizedBox(width: 8),
                     Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(profile.email, style: TextStyle(color: theme.colorScheme.onPrimary)),
-                        Text("Email", style: TextStyle(color: theme.colorScheme.onPrimary.withAlpha(180))),
+                        Text(profile.email, style: textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onPrimary)),
+                        Text("Email", style: textTheme.bodySmall?.copyWith(color: theme.colorScheme.onPrimary.withAlpha(180))),
                       ],
                     ),
                   ],
                 ),
                 Row(
+                  mainAxisSize: MainAxisSize.min,
                   children: [
                     Icon(Icons.phone, color: theme.colorScheme.onPrimary),
                     const SizedBox(width: 8),
                     Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(profile.phone, style: TextStyle(color: theme.colorScheme.onPrimary)),
-                        Text("Phone", style: TextStyle(color: theme.colorScheme.onPrimary.withAlpha(180))),
+                        Text(profile.phone, style: textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onPrimary)),
+                        Text("Phone", style: textTheme.bodySmall?.copyWith(color: theme.colorScheme.onPrimary.withAlpha(180))),
                       ],
                     ),
                   ],
@@ -460,7 +472,7 @@ class CustomQuickActionBox extends StatelessWidget {
         children: [
           Icon(icon, size: 20, color: theme.colorScheme.onPrimary),
           const SizedBox(height: 8),
-          Text(label, style: TextStyle(fontSize: 14, color: theme.colorScheme.onPrimary), textAlign: TextAlign.center),
+          Text(label, style: Theme.of(context).textTheme.bodySmall?.copyWith(color: theme.colorScheme.onPrimary), textAlign: TextAlign.center),
         ],
       ),
     );
@@ -486,52 +498,35 @@ class CustomQuickActionBox extends StatelessWidget {
               const SizedBox(width: 8),
               Text(
                 "Quick Actions",
-                style: TextStyle(
-                    fontSize: 20,
+                style: Theme.of(context).textTheme.titleLarge?.copyWith(
                     fontWeight: FontWeight.bold,
                     color: theme.colorScheme.onPrimary),
               )
             ],
           ),
           const SizedBox(height: 16),
-          Column(
-            children: [
-              Row(
-                children: [
-                  Expanded(
-                      child: InkWell(
-                        onTap: actions[0].onTap,
-                        child: _buildActionItem(
-                            context, actions[0].icon, actions[0].label),
-                      )),
-                  const SizedBox(width: 12),
-                  Expanded(
-                      child: InkWell(
-                        onTap: actions[1].onTap,
-                        child: _buildActionItem(
-                            context, actions[1].icon, actions[1].label),
-                      )),
-                ],
-              ),
-              const SizedBox(height: 12),
-              Row(
-                children: [
-                  Expanded(
-                      child: InkWell(
-                        onTap: actions[2].onTap,
-                        child: _buildActionItem(
-                            context, actions[2].icon, actions[2].label),
-                      )),
-                  const SizedBox(width: 12),
-                  Expanded(
-                      child: InkWell(
-                        onTap: actions[3].onTap,
-                        child: _buildActionItem(context,
-                            actions[3].icon, actions[3].label),
-                      )),
-                ],
-              ),
-            ],
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final crossAxisCount = constraints.maxWidth > 600 ? 4 : 2;
+              return GridView.builder(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                itemCount: actions.length,
+                gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: crossAxisCount,
+                  crossAxisSpacing: 12,
+                  mainAxisSpacing: 12,
+                  childAspectRatio: 2.0,
+                ),
+                itemBuilder: (context, index) {
+                  final action = actions[index];
+                  return InkWell(
+                    onTap: action.onTap,
+                    child: _buildActionItem(context, action.icon, action.label),
+                  );
+                },
+              );
+            },
           )
         ],
       ),
@@ -546,6 +541,7 @@ class CustomAccountStaticsBox extends StatelessWidget {
   Widget _buildStatisticItem(
       BuildContext context, IconData icon, String value, String label) {
     final theme = Theme.of(context);
+    final textTheme = theme.textTheme;
     return Container(
       padding: const EdgeInsets.all(8),
       decoration: BoxDecoration(
@@ -556,11 +552,11 @@ class CustomAccountStaticsBox extends StatelessWidget {
         children: [
           Icon(icon, size: 30, color: theme.colorScheme.onPrimary),
           const SizedBox(height: 4),
-          Text(value, style: TextStyle(fontSize: 20, color: theme.colorScheme.onPrimary)),
+          Text(value, style: textTheme.titleLarge?.copyWith(color: theme.colorScheme.onPrimary)),
           const SizedBox(height: 4),
           Text(
             label,
-            style: TextStyle(fontSize: 16, color: theme.colorScheme.onPrimary.withAlpha(180)),
+            style: textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onPrimary.withAlpha(180)),
             textAlign: TextAlign.center,
             softWrap: true,
           ),
@@ -589,72 +585,33 @@ class CustomAccountStaticsBox extends StatelessWidget {
               ),
               Text(
                 "Account Statics",
-                style: TextStyle(fontSize: 20, color: theme.colorScheme.onPrimary),
+                style: Theme.of(context).textTheme.titleLarge?.copyWith(color: theme.colorScheme.onPrimary),
               ),
             ],
           ),
           const SizedBox(height: 8),
-          Column(
-            children: [
-              Row(
-                children: [
-                  Expanded(
-                    child: InkWell(
-                      onTap: statistics[0].onTap,
-                      child: _buildStatisticItem(
-                          context, statistics[0].icon, statistics[0].value, statistics[0].label),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: InkWell(
-                      onTap: statistics[1].onTap,
-                      child: _buildStatisticItem(
-                          context, statistics[1].icon, statistics[1].value, statistics[1].label),
-                    ),
-                  ),
-                ],
+          LayoutBuilder(builder: (context, constraints) {
+            final crossAxisCount = constraints.maxWidth > 600 ? 3 : 2;
+            return GridView.builder(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              itemCount: statistics.length,
+              gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: crossAxisCount,
+                crossAxisSpacing: 12,
+                mainAxisSpacing: 12,
+                childAspectRatio: 1.5,
               ),
-              const SizedBox(height: 12),
-              Row(
-                children: [
-                  Expanded(
-                    child: InkWell(
-                      onTap: statistics[2].onTap,
-                      child: _buildStatisticItem(
-                          context, statistics[2].icon, statistics[2].value, statistics[2].label),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: InkWell(
-                      onTap: statistics[3].onTap,
-                      child: _buildStatisticItem(
-                          context, statistics[3].icon, statistics[3].value, statistics[3].label),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 12),
-              Row(
-                children: [
-                  Expanded(
-                    child: InkWell(
-                      onTap: statistics[4].onTap,
-                      child: _buildStatisticItem(
-                          context, statistics[4].icon, statistics[4].value, statistics[4].label),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: InkWell(
-                      onTap: statistics[5].onTap,
-                        child: _buildStatisticItem(context, statistics[5].icon, statistics[5].value, statistics[5].label)),
-                  ),
-                ],
-              ),
-            ],
-          )
+              itemBuilder: (context, index) {
+                final statistic = statistics[index];
+                return InkWell(
+                  onTap: statistic.onTap,
+                  child: _buildStatisticItem(
+                      context, statistic.icon, statistic.value, statistic.label),
+                );
+              },
+            );
+          }),
         ],
       ),
     );
@@ -668,6 +625,7 @@ class CustomUpcomingEventsBox extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final textTheme = theme.textTheme;
     return InkWell(
       onTap: ()=>Navigator.push(context, MaterialPageRoute(builder: (context)=>EventManagementPage())),
       child: Container(
@@ -685,7 +643,7 @@ class CustomUpcomingEventsBox extends StatelessWidget {
                 Icon(Icons.event, size: 30, color: theme.colorScheme.onPrimary),
                 const SizedBox(width: 8),
                 Text("Upcoming Events",
-                    style: TextStyle(fontSize: 20, color: theme.colorScheme.onPrimary)),
+                    style: textTheme.titleLarge?.copyWith(color: theme.colorScheme.onPrimary)),
               ],
             ),
             const SizedBox(height: 16),
@@ -707,9 +665,9 @@ class CustomUpcomingEventsBox extends StatelessWidget {
                       Column(
                         children: [
                           Text(event.date,
-                              style: TextStyle(fontSize: 20, color: theme.colorScheme.onPrimary)),
+                              style: textTheme.titleLarge?.copyWith(color: theme.colorScheme.onPrimary)),
                           Text(event.day,
-                              style: TextStyle(fontSize: 16, color: theme.colorScheme.onPrimary.withAlpha(180))),
+                              style: textTheme.titleMedium?.copyWith(color: theme.colorScheme.onPrimary.withAlpha(180))),
                         ],
                       ),
                       const SizedBox(width: 16),
@@ -719,12 +677,12 @@ class CustomUpcomingEventsBox extends StatelessWidget {
                           children: [
                             Text(
                               event.title,
-                              style: TextStyle(fontSize: 16, color: theme.colorScheme.onPrimary),
+                              style: textTheme.titleMedium?.copyWith(color: theme.colorScheme.onPrimary),
                             ),
                             const SizedBox(height: 4),
                             Text(
                               "Friday, December 12", // This should be dynamic
-                              style: TextStyle(fontSize: 14, color: theme.colorScheme.onPrimary.withAlpha(180)),
+                              style: textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onPrimary.withAlpha(180)),
                             )
                           ],
                         ),
@@ -748,6 +706,7 @@ class CustomSalaryInformationBox extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final textTheme = theme.textTheme;
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(16.0),
@@ -763,7 +722,7 @@ class CustomSalaryInformationBox extends StatelessWidget {
               Icon(Icons.money, size: 30, color: theme.colorScheme.onPrimary),
               const SizedBox(width: 8),
               Text("Salary Information",
-                  style: TextStyle(fontSize: 20, color: theme.colorScheme.onPrimary)),
+                  style: textTheme.titleLarge?.copyWith(color: theme.colorScheme.onPrimary)),
             ],
           ),
           const SizedBox(
@@ -788,7 +747,7 @@ class CustomSalaryInformationBox extends StatelessWidget {
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       Text(item.title,
-                          style: TextStyle(fontSize: 20, color: theme.colorScheme.onPrimary)),
+                          style: textTheme.titleMedium?.copyWith(color: theme.colorScheme.onPrimary)),
                       Icon(Icons.arrow_forward_ios_sharp,size: 20,color: theme.colorScheme.onPrimary,),
                     ],
                   ),
@@ -810,6 +769,7 @@ class CustomManageClassesSectionBox extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final textTheme = theme.textTheme;
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(16.0),
@@ -825,7 +785,7 @@ class CustomManageClassesSectionBox extends StatelessWidget {
               Icon(Icons.home_work_outlined, size: 30, color: theme.colorScheme.onPrimary),
               const SizedBox(width: 8),
               Text("Manage Classes",
-                  style: TextStyle(fontSize: 20, color: theme.colorScheme.onPrimary)),
+                  style: textTheme.titleLarge?.copyWith(color: theme.colorScheme.onPrimary)),
             ],
           ),
           const SizedBox(
@@ -850,7 +810,7 @@ class CustomManageClassesSectionBox extends StatelessWidget {
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       Text(item.title,
-                          style: TextStyle(fontSize: 20, color: theme.colorScheme.onPrimary)),
+                          style: textTheme.titleMedium?.copyWith(color: theme.colorScheme.onPrimary)),
                       Icon(Icons.arrow_forward_ios_sharp,size: 20,color: theme.colorScheme.onPrimary,),
                     ],
                   ),
@@ -871,6 +831,7 @@ class CustomFeeStructureBox extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final textTheme = theme.textTheme;
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(16.0),
@@ -886,7 +847,7 @@ class CustomFeeStructureBox extends StatelessWidget {
               Icon(Icons.receipt_long_sharp, size: 30, color: theme.colorScheme.onPrimary),
               const SizedBox(width: 8),
               Text("Fee Structure",
-                  style: TextStyle(fontSize: 20, color: theme.colorScheme.onPrimary)),
+                  style: textTheme.titleLarge?.copyWith(color: theme.colorScheme.onPrimary)),
             ],
           ),
           const SizedBox(
@@ -911,7 +872,7 @@ class CustomFeeStructureBox extends StatelessWidget {
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       Text(item.title,
-                          style: TextStyle(fontSize: 20, color: theme.colorScheme.onPrimary)),
+                          style: textTheme.titleMedium?.copyWith(color: theme.colorScheme.onPrimary)),
                       Icon(Icons.arrow_forward_ios_sharp,size: 20,color: theme.colorScheme.onPrimary,),
                     ],
                   ),
@@ -932,6 +893,7 @@ class CustomExaminationsBox extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final textTheme = theme.textTheme;
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(16.0),
@@ -947,7 +909,7 @@ class CustomExaminationsBox extends StatelessWidget {
               Icon(Icons.app_registration, size: 30, color: theme.colorScheme.onPrimary),
               const SizedBox(width: 8),
               Text("Examinations",
-                  style: TextStyle(fontSize: 20, color: theme.colorScheme.onPrimary)),
+                  style: textTheme.titleLarge?.copyWith(color: theme.colorScheme.onPrimary)),
             ],
           ),
           const SizedBox(
@@ -972,7 +934,7 @@ class CustomExaminationsBox extends StatelessWidget {
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       Text(item.title,
-                          style: TextStyle(fontSize: 20, color: theme.colorScheme.onPrimary)),
+                          style: textTheme.titleMedium?.copyWith(color: theme.colorScheme.onPrimary)),
                       Icon(Icons.arrow_forward_ios_sharp,size: 20,color: theme.colorScheme.onPrimary,),
                     ],
                   ),
@@ -993,6 +955,7 @@ class CustomLibraryBox extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final textTheme = theme.textTheme;
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(16.0),
@@ -1008,7 +971,7 @@ class CustomLibraryBox extends StatelessWidget {
               Icon(Icons.local_library, size: 30, color: theme.colorScheme.onPrimary),
               const SizedBox(width: 8),
               Text("Library",
-                  style: TextStyle(fontSize: 20, color: theme.colorScheme.onPrimary)),
+                  style: textTheme.titleLarge?.copyWith(color: theme.colorScheme.onPrimary)),
             ],
           ),
           const SizedBox(
@@ -1033,7 +996,7 @@ class CustomLibraryBox extends StatelessWidget {
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       Text(item.title,
-                          style: TextStyle(fontSize: 20, color: theme.colorScheme.onPrimary)),
+                          style: textTheme.titleMedium?.copyWith(color: theme.colorScheme.onPrimary)),
                       Icon(Icons.arrow_forward_ios_sharp,size: 20,color: theme.colorScheme.onPrimary,),
                     ],
                   ),
@@ -1054,6 +1017,7 @@ class CustomStudyMaterialBox extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final textTheme = theme.textTheme;
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(16.0),
@@ -1069,7 +1033,7 @@ class CustomStudyMaterialBox extends StatelessWidget {
               Icon(Icons.menu_book_sharp, size: 30, color: theme.colorScheme.onPrimary),
               const SizedBox(width: 8),
               Text("Study Material",
-                  style: TextStyle(fontSize: 20, color: theme.colorScheme.onPrimary)),
+                  style: textTheme.titleLarge?.copyWith(color: theme.colorScheme.onPrimary)),
             ],
           ),
           const SizedBox(
@@ -1094,7 +1058,7 @@ class CustomStudyMaterialBox extends StatelessWidget {
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       Text(item.title,
-                          style: TextStyle(fontSize: 20, color: theme.colorScheme.onPrimary)),
+                          style: textTheme.titleMedium?.copyWith(color: theme.colorScheme.onPrimary)),
                       Icon(Icons.arrow_forward_ios_sharp,size: 20,color: theme.colorScheme.onPrimary,),
                     ],
                   ),
@@ -1157,17 +1121,6 @@ class CustomStudyMaterialBox extends StatelessWidget {
 //                       Text(item.title,
 //                           style: TextStyle(fontSize: 20, color: theme.colorScheme.onPrimary)),
 //                       Icon(Icons.arrow_forward_ios_sharp,size: 20,color: theme.colorScheme.onPrimary,),
-//                     ],
-//                   ),
-//                 ),
-//               );
-//             },
-//           ),
-//         ],
-//       ),
-//     );
-//   }
-// }
 
 class CustomRecentSupportTicketsBox extends StatelessWidget {
   final List<RecentSupportTicket> tickets;
@@ -1176,6 +1129,7 @@ class CustomRecentSupportTicketsBox extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final textTheme = theme.textTheme;
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(16.0),
@@ -1191,7 +1145,7 @@ class CustomRecentSupportTicketsBox extends StatelessWidget {
               Icon(Icons.support, size: 30, color: theme.colorScheme.onPrimary),
               const SizedBox(width: 8),
               Text("Recent Support Tickets",
-                  style: TextStyle(fontSize: 20, color: theme.colorScheme.onPrimary)),
+                  style: textTheme.titleLarge?.copyWith(color: theme.colorScheme.onPrimary)),
             ],
           ),
           const SizedBox(
@@ -1216,7 +1170,7 @@ class CustomRecentSupportTicketsBox extends StatelessWidget {
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       Text(item.title,
-                          style: TextStyle(fontSize: 20, color: theme.colorScheme.onPrimary)),
+                          style: textTheme.titleMedium?.copyWith(color: theme.colorScheme.onPrimary)),
                       Icon(Icons.arrow_forward_ios_sharp,size: 20,color: theme.colorScheme.onPrimary,),
                     ],
                   ),

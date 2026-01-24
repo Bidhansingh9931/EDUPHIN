@@ -13,34 +13,62 @@ class AddTeacherPage extends StatefulWidget {
 
 class _AddTeacherPageState extends State<AddTeacherPage> {
   bool _isLoading = false;
-  final TextEditingController _fullNameController = TextEditingController(text: "Rajveer K.Malhotra");
-  final TextEditingController _emailController = TextEditingController(text: "raj@iias.com");
-  final TextEditingController _newPasswordController = TextEditingController(text: "");
-  final TextEditingController _roleController = TextEditingController(text: "Teacher");
-  final TextEditingController _genderController = TextEditingController(text: "Male");
-  final TextEditingController _dateOfBirthController = TextEditingController(text: "01-07-2020");
-  final TextEditingController _relationshipStatusController = TextEditingController(text: "Single");
-  final TextEditingController _phoneNumberController = TextEditingController(text: "+91 1234567890");
-  final TextEditingController _alternateNumberController = TextEditingController(text: "+91 0987654321");
-  final TextEditingController _addressController = TextEditingController(text: "123, Tech Park Road");
-  final TextEditingController _cityController = TextEditingController(text: "Bengaluru");
-  final TextEditingController _stateController = TextEditingController(text: "Karnataka");
-  final TextEditingController _pinCodeController = TextEditingController(text: "560001");
-  final TextEditingController _positionController = TextEditingController(text: "Senior Teacher");
-  final TextEditingController _employmentTypeController = TextEditingController(text: "Full-Time");
-  final TextEditingController _joiningDateController = TextEditingController(text: "01-07-2020");
-  final TextEditingController _experienceController = TextEditingController(text: "5");
-  final TextEditingController _statusController = TextEditingController(text: "Active");
-  final TextEditingController _referenceController = TextEditingController(text: "N/A");
-  final TextEditingController _qualificationController = TextEditingController(text: "M.Sc. Physics");
-  final TextEditingController _matriculationMarksController = TextEditingController(text: "92%");
-  final TextEditingController _intermediateMarksController = TextEditingController(text: "88%");
-  final TextEditingController _bankAccountNumberController = TextEditingController(text: "123456789012");
-  final TextEditingController _ifscCodeController = TextEditingController(text: "BANK0001234");
-  final TextEditingController _bankNameController = TextEditingController(text: "Example Bank");
-  final TextEditingController _branchController = TextEditingController(text: "Tech Park Branch");
-  final TextEditingController _emergencyContactNameController = TextEditingController(text: "John Doe");
-  final TextEditingController _emergencyContactNumberController = TextEditingController(text: "+91 0987654321");
+  final TextEditingController _fullNameController =
+      TextEditingController(text: "Rajveer K.Malhotra");
+  final TextEditingController _emailController =
+      TextEditingController(text: "raj@iias.com");
+  final TextEditingController _newPasswordController =
+      TextEditingController(text: "");
+  final TextEditingController _roleController =
+      TextEditingController(text: "Teacher");
+  final TextEditingController _genderController =
+      TextEditingController(text: "Male");
+  final TextEditingController _dateOfBirthController =
+      TextEditingController(text: "01-07-2020");
+  final TextEditingController _relationshipStatusController =
+      TextEditingController(text: "Single");
+  final TextEditingController _phoneNumberController =
+      TextEditingController(text: "+91 1234567890");
+  final TextEditingController _alternateNumberController =
+      TextEditingController(text: "+91 0987654321");
+  final TextEditingController _addressController =
+      TextEditingController(text: "123, Tech Park Road");
+  final TextEditingController _cityController =
+      TextEditingController(text: "Bengaluru");
+  final TextEditingController _stateController =
+      TextEditingController(text: "Karnataka");
+  final TextEditingController _pinCodeController =
+      TextEditingController(text: "560001");
+  final TextEditingController _positionController =
+      TextEditingController(text: "Senior Teacher");
+  final TextEditingController _employmentTypeController =
+      TextEditingController(text: "Full-Time");
+  final TextEditingController _joiningDateController =
+      TextEditingController(text: "01-07-2020");
+  final TextEditingController _experienceController =
+      TextEditingController(text: "5");
+  final TextEditingController _statusController =
+      TextEditingController(text: "Active");
+  final TextEditingController _referenceController =
+      TextEditingController(text: "N/A");
+  final TextEditingController _qualificationController =
+      TextEditingController(text: "M.Sc. Physics");
+  final TextEditingController _matriculationMarksController =
+      TextEditingController(text: "92%");
+  final TextEditingController _intermediateMarksController =
+      TextEditingController(text: "88%");
+  final TextEditingController _bankAccountNumberController =
+      TextEditingController(text: "123456789012");
+  final TextEditingController _ifscCodeController =
+      TextEditingController(text: "BANK0001234");
+  final TextEditingController _bankNameController =
+      TextEditingController(text: "Example Bank");
+  final TextEditingController _branchController =
+      TextEditingController(text: "Tech Park Branch");
+  final TextEditingController _emergencyContactNameController =
+      TextEditingController(text: "John Doe");
+  final TextEditingController _emergencyContactNumberController =
+      TextEditingController(text: "+91 0987654321");
 
   void _addTeacher() async {
     setState(() {
@@ -98,59 +126,55 @@ class _AddTeacherPageState extends State<AddTeacherPage> {
     }
   }
 
-
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     return Scaffold(
       floatingActionButton: Padding(
-        padding: const EdgeInsets.only(left: 32),
+        padding: const EdgeInsets.symmetric(horizontal: 16.0),
         child: Row(
           children: [
-            SizedBox(
-              width: 200,
-              height: 50,
-              child: FloatingActionButton(
+            Expanded(
+              flex: 2,
+              child: FloatingActionButton.extended(
+                heroTag: 'addTeacherBtn',
                 onPressed: _isLoading ? null : _addTeacher,
-                child: _isLoading
+                label: _isLoading
                     ? CircularProgressIndicator(
-                  valueColor: AlwaysStoppedAnimation<Color>(
-                      theme.colorScheme.onSurface),
-                )
-                    : Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(
-                      Icons.add,
-                      color: theme.colorScheme.onSurface,
-                    ),
-                    const SizedBox(
-                      width: 2,
-                    ),
-                    Text(
-                      "Add Teacher",
-                      style: TextStyle(
-                          color: theme.colorScheme.onSurface,
-                          fontSize: 20),
-                    ),
-                  ],
+                        valueColor: AlwaysStoppedAnimation<Color>(
+                            theme.colorScheme.onSurface),
+                      )
+                    : Text(
+                        "Add Teacher",
+                        style: theme.textTheme.labelLarge
+                            ?.copyWith(color: theme.colorScheme.onSurface),
+                      ),
+                icon: _isLoading
+                    ? null
+                    : Icon(
+                        Icons.add,
+                        color: theme.colorScheme.onSurface,
+                      ),
+              ),
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              flex: 1,
+              child: FloatingActionButton.extended(
+                heroTag: 'deleteBtn',
+                onPressed: () => showDeleteDialog(context),
+                backgroundColor: Colors.redAccent,
+                label: Text(
+                  "Delete",
+                  style: theme.textTheme.labelLarge
+                      ?.copyWith(color: theme.colorScheme.onSurface),
+                ),
+                icon: Icon(
+                  Icons.delete,
+                  color: theme.colorScheme.onSurface,
                 ),
               ),
             ),
-            Spacer(),
-            SizedBox(
-                width: 150,
-                height: 50,
-                child: FloatingActionButton(onPressed: ()=>showDeleteDialog(context),
-                  backgroundColor: Colors.redAccent,
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(Icons.delete,color: theme.colorScheme.onSurface,),
-                      const SizedBox(width: 2,),
-                      Text("Delete",style: TextStyle(color: theme.colorScheme.onSurface,fontSize: 20),),
-                    ],
-                  ),)),
           ],
         ),
       ),
@@ -159,11 +183,13 @@ class _AddTeacherPageState extends State<AddTeacherPage> {
         title: Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            const Text('Edit Manager Profile'),
+            const Text('Add Teacher'),
             InkWell(
-                onTap: () => Navigator.pushReplacement(context,
-                    MaterialPageRoute(builder: (context) => const ManagerDashboardPage())),
-                child: Icon(
+                onTap: () => Navigator.pushReplacement(
+                    context,
+                    MaterialPageRoute(
+                        builder: (context) => const ManagerDashboardPage())),
+                child: const Icon(
                   Icons.home_sharp,
                   size: 30,
                 )),
@@ -172,41 +198,114 @@ class _AddTeacherPageState extends State<AddTeacherPage> {
         backgroundColor: theme.appBarTheme.backgroundColor,
       ),
       body: Padding(
-        padding: const EdgeInsets.fromLTRB(16, 16, 16, 110),
-        child: SingleChildScrollView(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // _buildProfileImage(context),
-              CustomProfileBox(),
-              const SizedBox(height: 20),
-              _buildEditableInfoTile(context, "Full Name", _fullNameController),
-              _buildEditableInfoTile(context, "Email", _emailController),
-              _buildEditableInfoTile(context, "New Password", _newPasswordController),
-              Text("Leave blank to keep existing's password"),
-              const SizedBox(height: 20),
-              _buildPersonalDetailsSection(context),
-              const SizedBox(height: 20),
-              _buildContactDetailsSection(context),
-              const SizedBox(height: 20),
-              _buildAddressDetailsSection(context),
-              const SizedBox(height: 20),
-              _buildProfessionalInformationSection(context),
-              const SizedBox(height: 20),
-              _buildEducationDetailsSection(context),
-              const SizedBox(height: 20),
-              _buildBankingDetailsSection(context),
-              const SizedBox(height: 20),
-              _buildEmergencyContactDetailsSection(context),
-            ],
-          ),
+        padding: const EdgeInsets.fromLTRB(16, 16, 16, 120),
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            if (constraints.maxWidth > 800) {
+              return _buildWideLayout();
+            } else {
+              return _buildNarrowLayout();
+            }
+          },
         ),
       ),
     );
   }
 
+  Widget _buildNarrowLayout() {
+    return SingleChildScrollView(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const CustomProfileBox(),
+          const SizedBox(height: 20),
+          _buildEditableInfoTile(context, "Full Name", _fullNameController),
+          _buildEditableInfoTile(context, "Email", _emailController),
+          _buildEditableInfoTile(
+              context, "New Password", _newPasswordController),
+          const Text("Leave blank to keep existing's password"),
+          const SizedBox(height: 20),
+          _buildPersonalDetailsSection(context),
+          const SizedBox(height: 20),
+          _buildContactDetailsSection(context),
+          const SizedBox(height: 20),
+          _buildAddressDetailsSection(context),
+          const SizedBox(height: 20),
+          _buildProfessionalInformationSection(context),
+          const SizedBox(height: 20),
+          _buildEducationDetailsSection(context),
+          const SizedBox(height: 20),
+          _buildBankingDetailsSection(context),
+          const SizedBox(height: 20),
+          _buildEmergencyContactDetailsSection(context),
+        ],
+      ),
+    );
+  }
 
-  Widget _buildEditableInfoTile(BuildContext context, String title, TextEditingController controller, {bool readOnly = false}) {
+  Widget _buildWideLayout() {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Expanded(
+          child: SingleChildScrollView(
+            child: Padding(
+              padding: const EdgeInsets.only(right: 8.0),
+              child: _buildLeftColumn(),
+            ),
+          ),
+        ),
+        Expanded(
+          child: SingleChildScrollView(
+            child: Padding(
+              padding: const EdgeInsets.only(left: 8.0),
+              child: _buildRightColumn(),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildLeftColumn() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const CustomProfileBox(),
+        const SizedBox(height: 20),
+        _buildEditableInfoTile(context, "Full Name", _fullNameController),
+        _buildEditableInfoTile(context, "Email", _emailController),
+        _buildEditableInfoTile(
+            context, "New Password", _newPasswordController),
+        const Text("Leave blank to keep existing's password"),
+        const SizedBox(height: 20),
+        _buildPersonalDetailsSection(context),
+        const SizedBox(height: 20),
+        _buildContactDetailsSection(context),
+        const SizedBox(height: 20),
+        _buildAddressDetailsSection(context),
+      ],
+    );
+  }
+
+  Widget _buildRightColumn() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _buildProfessionalInformationSection(context),
+        const SizedBox(height: 20),
+        _buildEducationDetailsSection(context),
+        const SizedBox(height: 20),
+        _buildBankingDetailsSection(context),
+        const SizedBox(height: 20),
+        _buildEmergencyContactDetailsSection(context),
+      ],
+    );
+  }
+
+  Widget _buildEditableInfoTile(
+      BuildContext context, String title, TextEditingController controller,
+      {bool readOnly = false}) {
     final theme = Theme.of(context);
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 8.0),
@@ -216,10 +315,14 @@ class _AddTeacherPageState extends State<AddTeacherPage> {
         style: theme.textTheme.bodyLarge,
         decoration: InputDecoration(
           labelText: title,
-          labelStyle: theme.textTheme.bodyMedium?.copyWith(color: theme.hintColor),
+          labelStyle:
+              theme.textTheme.bodyMedium?.copyWith(color: theme.hintColor),
           filled: true,
-          fillColor: readOnly ? theme.dividerColor.withValues() : theme.cardColor,
-          contentPadding: const EdgeInsets.symmetric(vertical: 16.0, horizontal: 12.0),
+          fillColor: readOnly
+              ? theme.dividerColor.withAlpha(35)
+              : theme.cardColor,
+          contentPadding:
+              const EdgeInsets.symmetric(vertical: 16.0, horizontal: 12.0),
           border: OutlineInputBorder(
             borderRadius: BorderRadius.circular(8),
             borderSide: BorderSide(color: theme.dividerColor, width: 1.0),
@@ -242,12 +345,15 @@ class _AddTeacherPageState extends State<AddTeacherPage> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text("Personal Details", style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold)),
+        Text("Personal Details",
+            style:
+                theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold)),
         const SizedBox(height: 12),
         _buildEditableInfoTile(context, "Role", _roleController),
         _buildEditableInfoTile(context, "Gender", _genderController),
         _buildEditableInfoTile(context, "Date of Birth", _dateOfBirthController),
-        _buildEditableInfoTile(context, "Relationship Status", _relationshipStatusController),
+        _buildEditableInfoTile(
+            context, "Relationship Status", _relationshipStatusController),
       ],
     );
   }
@@ -257,10 +363,14 @@ class _AddTeacherPageState extends State<AddTeacherPage> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text("Contact Details", style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold)),
+        Text("Contact Details",
+            style:
+                theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold)),
         const SizedBox(height: 12),
-        _buildEditableInfoTile(context, "Phone Number", _phoneNumberController),
-        _buildEditableInfoTile(context, "Alternate Number", _alternateNumberController),
+        _buildEditableInfoTile(
+            context, "Phone Number", _phoneNumberController),
+        _buildEditableInfoTile(
+            context, "Alternate Number", _alternateNumberController),
       ],
     );
   }
@@ -270,7 +380,9 @@ class _AddTeacherPageState extends State<AddTeacherPage> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text("Address Details", style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold)),
+        Text("Address Details",
+            style:
+                theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold)),
         const SizedBox(height: 12),
         _buildEditableInfoTile(context, "Address", _addressController),
         _buildEditableInfoTile(context, "City", _cityController),
@@ -285,12 +397,17 @@ class _AddTeacherPageState extends State<AddTeacherPage> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text("Professional Information", style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold)),
+        Text("Professional Information",
+            style:
+                theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold)),
         const SizedBox(height: 12),
         _buildEditableInfoTile(context, "Position", _positionController),
-        _buildEditableInfoTile(context, "Employment Type", _employmentTypeController),
-        _buildEditableInfoTile(context, "Joining Date", _joiningDateController),
-        _buildEditableInfoTile(context, "Experience (Years)", _experienceController),
+        _buildEditableInfoTile(
+            context, "Employment Type", _employmentTypeController),
+        _buildEditableInfoTile(
+            context, "Joining Date", _joiningDateController),
+        _buildEditableInfoTile(
+            context, "Experience (Years)", _experienceController),
         _buildEditableInfoTile(context, "Status", _statusController),
         _buildEditableInfoTile(context, "Reference", _referenceController),
       ],
@@ -302,14 +419,25 @@ class _AddTeacherPageState extends State<AddTeacherPage> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text("Education & Documents", style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold)),
+        Text("Education & Documents",
+            style:
+                theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold)),
         const SizedBox(height: 12),
-        _buildEditableInfoTile(context, "Qualification", _qualificationController),
-        _buildEditableInfoTile(context, "Matriculation Marks (%)", _matriculationMarksController),
-        _buildEditableInfoTile(context, "Intermediate Marks (%)", _intermediateMarksController),
-        _buildEditableInfoTile(context, "Matriculation Marksheet", TextEditingController(text: "View Document"), readOnly: true),
-        _buildEditableInfoTile(context, "Intermediate Marksheet", TextEditingController(text: "View Document"), readOnly: true),
-        _buildEditableInfoTile(context, "Resume", TextEditingController(text: "View Document"), readOnly: true),
+        _buildEditableInfoTile(
+            context, "Qualification", _qualificationController),
+        _buildEditableInfoTile(
+            context, "Matriculation Marks (%)", _matriculationMarksController),
+        _buildEditableInfoTile(
+            context, "Intermediate Marks (%)", _intermediateMarksController),
+        _buildEditableInfoTile(
+            context, "Matriculation Marksheet", TextEditingController(text: "View Document"),
+            readOnly: true),
+        _buildEditableInfoTile(
+            context, "Intermediate Marksheet", TextEditingController(text: "View Document"),
+            readOnly: true),
+        _buildEditableInfoTile(
+            context, "Resume", TextEditingController(text: "View Document"),
+            readOnly: true),
       ],
     );
   }
@@ -319,9 +447,12 @@ class _AddTeacherPageState extends State<AddTeacherPage> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text("Banking Details", style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold)),
+        Text("Banking Details",
+            style:
+                theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold)),
         const SizedBox(height: 12),
-        _buildEditableInfoTile(context, "Bank Account Number", _bankAccountNumberController),
+        _buildEditableInfoTile(
+            context, "Bank Account Number", _bankAccountNumberController),
         _buildEditableInfoTile(context, "IFSC Code", _ifscCodeController),
         _buildEditableInfoTile(context, "Bank Name", _bankNameController),
         _buildEditableInfoTile(context, "Branch", _branchController),
@@ -334,10 +465,14 @@ class _AddTeacherPageState extends State<AddTeacherPage> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text("Emergency Contact", style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold)),
+        Text("Emergency Contact",
+            style:
+                theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold)),
         const SizedBox(height: 12),
-        _buildEditableInfoTile(context, "Contact Name", _emergencyContactNameController),
-        _buildEditableInfoTile(context, "Contact Number", _emergencyContactNumberController),
+        _buildEditableInfoTile(
+            context, "Contact Name", _emergencyContactNameController),
+        _buildEditableInfoTile(
+            context, "Contact Number", _emergencyContactNumberController),
       ],
     );
   }
@@ -350,7 +485,10 @@ class CustomProfileBox extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     return InkWell(
-      onTap: () => Navigator.push(context, MaterialPageRoute(builder: (context)=>ManagerProfilePage())),
+      onTap: () => Navigator.push(
+          context,
+          MaterialPageRoute(
+              builder: (context) => const ManagerProfilePage())),
       child: Container(
         width: double.infinity,
         padding: const EdgeInsets.all(16.0),
@@ -362,38 +500,57 @@ class CustomProfileBox extends StatelessWidget {
           children: [
             Row(
               children: [
-                Icon(Icons.person, color: theme.colorScheme.onPrimary, size: 30),
+                Icon(Icons.person,
+                    color: theme.colorScheme.onPrimary, size: 30),
                 const SizedBox(width: 8),
-                Text("Profile Overview",
-                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 20, color: theme.colorScheme.onPrimary))
+                Text(
+                  "Profile Overview",
+                  style: theme.textTheme.titleLarge
+                      ?.copyWith(color: theme.colorScheme.onPrimary),
+                )
               ],
             ),
             const SizedBox(height: 16),
             const CircleAvatar(
               radius: 40,
-              backgroundImage: AssetImage("assets/images/random_boy.jpg"),
+              backgroundImage:
+                  AssetImage("assets/images/random_boy.jpg"),
             ),
             const SizedBox(height: 8),
-            Text("Rajeev K.Malhotra",
-                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 20, color: theme.colorScheme.onPrimary)),
-            Text("Teacher", style: TextStyle(fontSize: 16, color: theme.colorScheme.onPrimary.withAlpha(180))),
+            Text(
+              "Rajveer K.Malhotra",
+              style: theme.textTheme.titleLarge
+                  ?.copyWith(color: theme.colorScheme.onPrimary),
+            ),
+            Text("Senior Teacher",
+                style: theme.textTheme.bodyLarge?.copyWith(
+                    color: theme.colorScheme.onPrimary.withAlpha(180))),
             const SizedBox(height: 16),
             Container(
               height: 50,
               width: double.infinity,
               decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(10),
-                color: Color(0xFF2A3F5F),
+                color: const Color(0xFF2A3F5F),
               ),
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.center,
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Padding(
-                    padding: const EdgeInsets.only(right: 10),
-                    child: Icon(Icons.camera_alt_outlined,size: 30,color: Color(0xFF9FB4CC),),
+                  const Padding(
+                    padding: EdgeInsets.only(right: 10),
+                    child: Icon(
+                      Icons.camera_alt_outlined,
+                      size: 30,
+                      color: Color(0xFF9FB4CC),
+                    ),
                   ),
-                  Text("Update Profile Image",style: TextStyle(color: Color(0xFF9FB4CC),fontSize: 16,fontWeight: FontWeight.bold),),
+                  Text(
+                    "Update Profile Image",
+                    style: theme.textTheme.labelLarge?.copyWith(
+                        color: const Color(0xFF9FB4CC),
+                        fontWeight: FontWeight.bold),
+                  ),
                 ],
               ),
             )
@@ -403,12 +560,13 @@ class CustomProfileBox extends StatelessWidget {
     );
   }
 }
+
 void showDeleteDialog(BuildContext context) {
   showGeneralDialog(
     context: context,
     barrierDismissible: true,
     barrierLabel: "Delete",
-    barrierColor: Color.fromRGBO(0, 0, 0, 0.6),
+    barrierColor: const Color.fromRGBO(0, 0, 0, 0.6),
     transitionDuration: const Duration(milliseconds: 200),
     pageBuilder: (_, __, ___) {
       return const DeleteTeacherDialog(
@@ -417,6 +575,7 @@ void showDeleteDialog(BuildContext context) {
     },
   );
 }
+
 class DeleteTeacherDialog extends StatelessWidget {
   final String teacherName;
 
@@ -427,79 +586,71 @@ class DeleteTeacherDialog extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     return Scaffold(
-        backgroundColor: Colors.transparent,
-        body: Stack(
-            children: [
-              // 🔹 Blur Background
-              BackdropFilter(
-                filter: ImageFilter.blur(sigmaX: 6, sigmaY: 6),
-                child: Container(color: Colors.transparent),
+      backgroundColor: Colors.transparent,
+      body: Stack(
+        children: [
+          // 🔹 Blur Background
+          BackdropFilter(
+            filter: ImageFilter.blur(sigmaX: 6, sigmaY: 6),
+            child: Container(color: Colors.transparent),
+          ),
+
+          // 🔹 Center Card
+          Center(
+            child: Container(
+              margin: const EdgeInsets.symmetric(horizontal: 24),
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                color: const Color(0xFF1F2937),
+                borderRadius: BorderRadius.circular(20),
               ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    "Delete Teacher",
+                    style: theme.textTheme.titleLarge
+                        ?.copyWith(color: Colors.white),
+                  ),
+                  const SizedBox(height: 12),
+                  Text(
+                    "Are you sure you want to delete this Teacher: "
+                    "'$teacherName'? This action cannot be undone.",
+                    textAlign: TextAlign.center,
+                    style: theme.textTheme.bodyMedium
+                        ?.copyWith(color: Colors.grey.shade400),
+                  ),
+                  const SizedBox(height: 24),
 
-              // 🔹 Center Card
-              Center(
-                  child: Container(
-                      margin: const EdgeInsets.symmetric(horizontal: 24),
-                      padding: const EdgeInsets.all(20),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF1F2937),
-                        borderRadius: BorderRadius.circular(20),
+                  // 🔴 Delete Button
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFFC5392A),
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
                       ),
-                      child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            const Text(
-                              "Delete Counselor",
-                              style: TextStyle(
-                                fontSize: 20,
-                                fontWeight: FontWeight.bold,
-                                color: Colors.white,
-                              ),
-                            ),
-
-                            const SizedBox(height: 12),
-
-                            Text(
-                              "Are you sure you want to delete this Teacher "
-                                  "$teacherName? This action cannot be undone.",
-                              textAlign: TextAlign.center,
-                              style: TextStyle(
-                                color: Colors.grey.shade400,
-                                fontSize: 14,
-                              ),
-                            ),
-
-                            const SizedBox(height: 24),
-
-                            // 🔴 Delete Button
-                            SizedBox(
-                                width: double.infinity,
-                                child: ElevatedButton(
-                                    style: ElevatedButton.styleFrom(
-                                      backgroundColor: const Color(0xFFC5392A),
-                                      padding: const EdgeInsets.symmetric(
-                                          vertical: 14),
-                                      shape: RoundedRectangleBorder(
-                                        borderRadius: BorderRadius.circular(12),
-                                      ),
-                                    ),
-                                    onPressed: () {
-                                      Navigator.pop(context);
-                                      // 🔥 delete logic here
-                                    },
-                                    child: const Text(
-                                        "Yes, Delete",
-                                        style: TextStyle(fontSize: 16)
-                                    )
-                                )
-                            )
-                          ]
-                      )
+                      onPressed: () {
+                        Navigator.pop(context);
+                        // 🔥 delete logic here
+                      },
+                      child: Text(
+                        "Yes, Delete",
+                        style: theme.textTheme.labelLarge,
+                      ),
+                    ),
                   )
-              )
-            ]
-        )
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
