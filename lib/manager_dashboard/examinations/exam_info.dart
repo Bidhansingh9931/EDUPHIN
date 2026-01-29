@@ -1,5 +1,6 @@
 import 'package:eduphin/manager_dashboard/examinations/create_new_exam.dart';
 import 'package:eduphin/manager_dashboard/examinations/edit_exam.dart';
+import 'package:eduphin/manager_dashboard/examinations/manage_schedule.dart';
 import 'package:flutter/material.dart';
 
 class Exam {
@@ -310,7 +311,9 @@ class CustomExamListContainerBox extends StatelessWidget {
                     ),
                     Expanded(
                       child: ElevatedButton(
-                        onPressed: () {},
+                        onPressed: () {
+                          Navigator.push(context, MaterialPageRoute(builder: (context)=>ManageSchedulePage()));
+                        },
                         style: ElevatedButton.styleFrom(
                           backgroundColor: Colors.blue.withAlpha(55),
                           shape: RoundedRectangleBorder(

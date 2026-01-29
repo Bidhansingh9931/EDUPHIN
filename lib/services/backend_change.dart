@@ -35,7 +35,7 @@ class ApiService {
     };
     final uri = Uri.parse(_baseUrl).replace(queryParameters: queryParameters);
     debugPrint("API Request (Generic): $uri");
-    
+
     final response = await http.get(uri);
     debugPrint("API Response Status: ${response.statusCode}");
     debugPrint("API Response Body: ${response.body}");
@@ -47,7 +47,7 @@ class ApiService {
       if (list == null) return [];
 
       List<UIComponent> components =
-          list.map((e) => UIComponent.fromJson(e)).toList();
+      list.map((e) => UIComponent.fromJson(e)).toList();
 
       components.sort((a, b) => a.position.compareTo(b.position));
       return components;
@@ -159,8 +159,8 @@ Widget buildComponent(UIComponent component, BuildContext context) {
         child: Text(
           component.value,
           style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                color: _parseColor(component.color, defaultColor: Theme.of(context).textTheme.bodyLarge?.color),
-              ),
+            color: _parseColor(component.color, defaultColor: Theme.of(context).textTheme.bodyLarge?.color),
+          ),
         ),
       );
 
@@ -205,7 +205,7 @@ Widget buildComponent(UIComponent component, BuildContext context) {
 Color _parseColor(String colorString, {Color? defaultColor}) {
   defaultColor ??= Colors.black;
   if (colorString.isEmpty || !colorString.startsWith('#')) return defaultColor;
-  
+
   try {
     return Color(int.parse(colorString.substring(1), radix: 16) + 0xFF000000);
   } catch (e) {

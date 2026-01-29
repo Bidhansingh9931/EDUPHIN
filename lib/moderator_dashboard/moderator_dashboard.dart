@@ -107,7 +107,7 @@ class _ModeratorDashboardPageState extends State<ModeratorDashboardPage> {
                             context,
                             MaterialPageRoute(
                                 builder: (context) =>
-                                    const ModeratorProfilePage())),
+                                const ModeratorProfilePage())),
                         child: ClipRRect(
                           borderRadius: BorderRadius.circular(40),
                           child: Image.asset(
@@ -197,26 +197,26 @@ class _ModeratorDashboardPageState extends State<ModeratorDashboardPage> {
                         children: [
                           Expanded(
                               child: _buildDropdown(selectedValue, (newValue) {
-                            setState(() {
-                              selectedValue = newValue;
-                            });
-                          }, [
-                            'Last 7 Days',
-                            'Last 30 Days',
-                            'Last 60 Days'
-                          ])),
+                                setState(() {
+                                  selectedValue = newValue;
+                                });
+                              }, [
+                                'Last 7 Days',
+                                'Last 30 Days',
+                                'Last 60 Days'
+                              ])),
                           const SizedBox(width: 10),
                           Expanded(
                               child: _buildDropdown(selectedValue2,
-                                  (newValue) {
-                            setState(() {
-                              selectedValue2 = newValue;
-                            });
-                          }, [
-                            'All Institutes',
-                            'Active Institutes',
-                            'Inactive Institutes'
-                          ])),
+                                      (newValue) {
+                                    setState(() {
+                                      selectedValue2 = newValue;
+                                    });
+                                  }, [
+                                    'All Institutes',
+                                    'Active Institutes',
+                                    'Inactive Institutes'
+                                  ])),
                         ],
                       );
                     }
@@ -487,7 +487,7 @@ class _ModeratorDashboardPageState extends State<ModeratorDashboardPage> {
             return DropdownMenuItem<String>(
               value: value,
               child:
-                  Text(value, style: const TextStyle(color: Colors.white)),
+              Text(value, style: const TextStyle(color: Colors.white)),
             );
           }).toList(),
           onChanged: onChanged,
@@ -698,9 +698,9 @@ class LegendRow extends StatelessWidget {
 
   const LegendRow(
       {super.key,
-      required this.title,
-      required this.value,
-      required this.color});
+        required this.title,
+        required this.value,
+        required this.color});
 
   @override
   Widget build(BuildContext context) {
@@ -712,7 +712,7 @@ class LegendRow extends StatelessWidget {
               width: 14,
               height: 14,
               decoration:
-                  BoxDecoration(color: color, shape: BoxShape.circle)),
+              BoxDecoration(color: color, shape: BoxShape.circle)),
           const SizedBox(width: 10),
           Text(title, style: const TextStyle(color: Colors.white)),
           const Spacer(),

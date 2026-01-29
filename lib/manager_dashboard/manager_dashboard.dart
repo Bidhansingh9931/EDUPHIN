@@ -20,6 +20,7 @@ import 'account_statics/librarian/librarian_list.dart';
 import 'account_statics/staff/staff_list.dart';
 import 'account_statics/teacher/teacher_list.dart';
 import 'examinations/exam_info.dart';
+import 'examinations/exam_result.dart';
 import 'feeStructure/fee_Structure/fee_structure.dart';
 import 'feeStructure/studentFeeDetails/student_fee_details.dart';
 import 'library/available_books.dart';
@@ -241,7 +242,7 @@ class MockDashboardApiService {
       ],
       examinations: [
         Examination(title: "Exam Info", onTap: () => Navigator.push(context, MaterialPageRoute(builder: (context) => ExamInfoPage()))),
-        Examination(title: "Exam Result", onTap: () {}),
+        Examination(title: "Exam Result", onTap: () => Navigator.push(context, MaterialPageRoute(builder: (context) => ExamResultPage()))),
       ],
       library: [
         Library(title: "Available Books", onTap: () => Navigator.push(context, MaterialPageRoute(builder: (context) => AvailableBooksScreen()))),

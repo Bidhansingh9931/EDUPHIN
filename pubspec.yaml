@@ -33,12 +33,14 @@ dependencies:
   animated_text_kit: ^4.2.2
   simple_animations: ^5.0.2
   http: ^1.2.1
+  flutter_secure_storage: ^9.0.0
   fl_chart: ^1.1.1
   intl: ^0.20.2
   flutter_datetime_picker_plus: ^2.1.0
   dotted_border: ^2.1.0
   image_picker: ^1.0.4
   shared_preferences: ^2.2.2
+
 
 
   # The following adds the Cupertino Icons font to your application.
