@@ -1,7 +1,11 @@
+import 'dart:async';
+import 'dart:convert';
+
 import 'package:eduphin/login_logout/ui_helper.dart';
-import 'package:eduphin/manager_dashboard/manager_dashboard.dart';
 import 'package:eduphin/moderator_dashboard/moderator_dashboard.dart';
 import 'package:flutter/material.dart';
+import 'package:eduphin/services/api_service.dart';
+import 'package:http/http.dart' as http;
 
 import 'forgot_password.dart';
 
@@ -18,6 +22,7 @@ class _LoginPageState extends State<LoginPage> {
   bool isChecked = false;
   bool _isObscure = true;
   bool _isLoading = false;
+  String _error = '';
 
   @override
   void dispose() {
@@ -27,45 +32,79 @@ class _LoginPageState extends State<LoginPage> {
   }
 
   Future<void> _login() async {
+    if (!mounted) return;
     setState(() {
       _isLoading = true;
+      _error = '';
     });
 
-    // Simulate network delay for a better user experience
-    await Future.delayed(const Duration(seconds: 1));
+    try {
+      final response = await http
+          .post(
+            Uri.parse('${ApiService.baseUrl}/login'),
+            headers: {
+              'Content-Type': 'application/json',
+              'Accept': 'application/json',
+            },
+            body: jsonEncode({
+              'email': emailController.text.trim(),
+              'password': passwordController.text.trim(),
+            }),
+          )
+          .timeout(const Duration(seconds: 15));
 
-    final username = emailController.text.trim();
-    final password = passwordController.text.trim();
+      // For debugging
+      debugPrint('Login response status: ${response.statusCode}');
+      debugPrint('Login response body: ${response.body}');
 
-    // Navigate to the correct dashboard based on credentials
-    if (username == "priya@eduphin.com" && password == "eduphin@mod") {
       if (!mounted) return;
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(
-            builder: (_) =>
-            const ModeratorDashboardPage()), // Assuming this is the moderator dashboard
-      );
-    } else if (username == "raj@iias.com" && password == "87654321") {
-      if (!mounted) return;
-      // Assuming 'Raj' is a manager and should be directed to the ManagerDashboard.
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (_) => const ManagerDashboardPage()),
-      );
-    } else {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Invalid username or password")),
-      );
-    }
 
-    if (mounted) {
+      final data = jsonDecode(response.body);
+
+      if (response.statusCode == 200 && data['success'] == true) {
+        await ApiService.saveToken(data['token']);
+
+        if (data['user']['role_id'] == 2) {
+          // The lint `use_build_context_synchronously` is important here.
+          if (context.mounted) {
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(
+                builder: (_) => const ModeratorDashboardPage(),
+              ),
+            );
+          }
+        } else {
+          setState(() {
+            _error = 'Unauthorized role. Role ID: ${data['user']['role_id']}';
+          });
+        }
+      } else {
+        setState(() {
+          _error = data['message'] ?? 'Login failed. Please try again.';
+        });
+      }
+    } on TimeoutException {
+        if (!mounted) return;
+        setState(() {
+            _error = 'Connection timed out. Please check your network.';
+        });
+    } catch (e) {
+      debugPrint('An error occurred during login: $e');
+      if (!mounted) return;
       setState(() {
-        _isLoading = false;
+        _error = 'An unexpected error occurred. Please try again later.';
       });
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
     }
   }
+
+
 
   @override
   Widget build(BuildContext context) {
@@ -138,6 +177,13 @@ class _LoginPageState extends State<LoginPage> {
                               });
                             },
                           ),
+                           if (_error.isNotEmpty) ...[
+                            const SizedBox(height: 10),
+                            Text(
+                              _error,
+                              style: TextStyle(color: theme.colorScheme.error, fontSize: 12),
+                            ),
+                          ],
                           const SizedBox(height: 10),
                           Row(
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,

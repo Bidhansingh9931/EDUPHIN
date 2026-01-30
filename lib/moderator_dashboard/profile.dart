@@ -1,6 +1,6 @@
-
 import 'package:eduphin/login_logout/login.dart';
 import 'package:flutter/material.dart';
+import 'package:eduphin/services/api_service.dart';
 
 import 'profile_model.dart';
 import 'profile_provider.dart';
@@ -18,16 +18,17 @@ class _ModeratorProfilePageState extends State<ModeratorProfilePage> {
 
   final _phoneController = TextEditingController();
   final _altPhoneController = TextEditingController();
-  final _address1Controller = TextEditingController();
+  final _addressController = TextEditingController();
   final _cityController = TextEditingController();
-  final _districtController = TextEditingController();
   final _pincodeController = TextEditingController();
+  final _stateController = TextEditingController();
   final _newPasswordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
 
   String? _genderValue;
-  String? _marriageStatusValue;
-  bool _isLoading = false;
+  String? _relationshipStatusValue;
+  bool _isSaving = false;
+  bool _isLoggingOut = false;
 
   @override
   void initState() {
@@ -38,64 +39,83 @@ class _ModeratorProfilePageState extends State<ModeratorProfilePage> {
 
   void _initializeControllers(ProfileData data) {
     _phoneController.text = data.phone;
-    _altPhoneController.text = data.altPhone;
-    _address1Controller.text = data.address1;
+    _altPhoneController.text = data.alternatePhone ?? '';
+    _addressController.text = data.address;
     _cityController.text = data.city;
-    _districtController.text = data.district;
     _pincodeController.text = data.pincode;
+    _stateController.text = data.state;
     setState(() {
       _genderValue = data.gender;
-      _marriageStatusValue = data.marriageStatus;
+      _relationshipStatusValue = data.relationshipStatus;
     });
   }
 
   Future<void> _saveChanges() async {
     if (mounted) {
       setState(() {
-        _isLoading = true;
+        _isSaving = true;
       });
     }
 
     final currentData = await _profileDataFuture;
 
+    // Create a new ProfileData instance with updated values
     final updatedData = ProfileData(
+      id: currentData.id,
       name: currentData.name,
-      role: currentData.role,
       email: currentData.email,
-      avatar: currentData.avatar,
-      gender: _genderValue ?? currentData.gender,
-      dob: currentData.dob, // Assuming DOB is not editable
-      phone: _phoneController.text,
-      altPhone: _altPhoneController.text,
-      marriageStatus: _marriageStatusValue ?? currentData.marriageStatus,
-      address1: _address1Controller.text,
-      city: _cityController.text,
-      district: _districtController.text,
-      pincode: _pincodeController.text,
-      bankAccount: currentData.bankAccount,
-      ifsc: currentData.ifsc,
-      bankName: currentData.bankName,
-      employerBranch: currentData.employerBranch,
-      zone: currentData.zone,
-      emergencyContactName: currentData.emergencyContactName,
-      emergencyContactNumber: currentData.emergencyContactNumber,
-      userName: currentData.userName,
+      status: currentData.status,
+      emailVerifiedAt: currentData.emailVerifiedAt,
+      createdAt: currentData.createdAt,
+      updatedAt: currentData.updatedAt,
+      roleId: currentData.roleId,
+      instituteId: currentData.instituteId,
+      detailsId: currentData.detailsId,
       position: currentData.position,
       employmentType: currentData.employmentType,
+      userId: currentData.userId,
+      photo: currentData.photo,
+      gender: _genderValue ?? currentData.gender,
+      dateOfBirth: currentData.dateOfBirth,
+      aadharNumber: currentData.aadharNumber,
+      aadharPhoto: currentData.aadharPhoto,
+      address: _addressController.text,
+      city: _cityController.text,
+      state: _stateController.text,
+      pincode: _pincodeController.text,
+      phone: _phoneController.text,
+      xMarks: currentData.xMarks,
+      xMarksheetPhoto: currentData.xMarksheetPhoto,
+      xiiMarks: currentData.xiiMarks,
+      xiiMarksheetPhoto: currentData.xiiMarksheetPhoto,
+      qualification: currentData.qualification,
+      resume: currentData.resume,
+      alternatePhone: _altPhoneController.text,
+      relationshipStatus: _relationshipStatusValue ?? currentData.relationshipStatus,
+      bankAccountNumber: currentData.bankAccountNumber,
+      ifscCode: currentData.ifscCode,
+      bankName: currentData.bankName,
+      branchName: currentData.branchName,
+      salary: currentData.salary,
       joiningDate: currentData.joiningDate,
       experience: currentData.experience,
-      status: currentData.status,
+      reference: currentData.reference,
+      emergencyContactName: currentData.emergencyContactName,
+      emergencyContactNumber: currentData.emergencyContactNumber,
     );
+
 
     try {
       await _profileProvider.saveProfileData(updatedData);
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text("Changes saved successfully! (Simulated)"),
+          content: Text("Changes saved successfully!"),
           backgroundColor: Colors.green,
         ),
       );
     } catch (e) {
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text("Failed to save changes: $e"),
@@ -105,7 +125,46 @@ class _ModeratorProfilePageState extends State<ModeratorProfilePage> {
     } finally {
       if (mounted) {
         setState(() {
-          _isLoading = false;
+          _isSaving = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _logout() async {
+    if (!mounted) return;
+    setState(() {
+      _isLoggingOut = true;
+    });
+
+    try {
+      await _profileProvider.logout();
+
+      if (!mounted) return;
+      // Navigate to login page and remove all previous routes
+      Navigator.of(context).pushAndRemoveUntil(
+        MaterialPageRoute(builder: (context) => const LoginPage()),
+        (Route<dynamic> route) => false, // This predicate removes all routes
+      );
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text("You have been logged out."),
+          backgroundColor: Colors.green,
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text("Logout failed: $e"),
+          backgroundColor: Colors.red,
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoggingOut = false;
         });
       }
     }
@@ -115,9 +174,9 @@ class _ModeratorProfilePageState extends State<ModeratorProfilePage> {
   void dispose() {
     _phoneController.dispose();
     _altPhoneController.dispose();
-    _address1Controller.dispose();
+    _addressController.dispose();
     _cityController.dispose();
-    _districtController.dispose();
+    _stateController.dispose();
     _pincodeController.dispose();
     _newPasswordController.dispose();
     _confirmPasswordController.dispose();
@@ -143,7 +202,9 @@ class _ModeratorProfilePageState extends State<ModeratorProfilePage> {
         title: Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Text("Moderator Profile", style: TextStyle(color: Colors.white, fontSize: responsiveFontSize(20))),
+            Text("Moderator Profile",
+                style: TextStyle(
+                    color: Colors.white, fontSize: responsiveFontSize(20))),
             const Icon(Icons.download, color: Colors.white),
           ],
         ),
@@ -156,9 +217,16 @@ class _ModeratorProfilePageState extends State<ModeratorProfilePage> {
           if (snapshot.connectionState == ConnectionState.waiting) {
             return const Center(child: CircularProgressIndicator());
           } else if (snapshot.hasError) {
-            return Center(child: Text('Error: ${snapshot.error}', style: const TextStyle(color: Colors.white)));
+            return Center(
+                child: Text('Error: ${snapshot.error}',
+                    style: const TextStyle(color: Colors.white)));
           } else if (snapshot.hasData) {
             final data = snapshot.data!;
+            // Construct the full image URL
+            final imageUrl = data.photo.startsWith('http')
+                ? data.photo
+                : '${ApiService.baseUrl.replaceAll("/api", "")}/storage/${data.photo}';
+
 
             return SafeArea(
               child: SingleChildScrollView(
@@ -167,15 +235,27 @@ class _ModeratorProfilePageState extends State<ModeratorProfilePage> {
                   children: [
                     CircleAvatar(
                       radius: screenWidth * 0.12,
-                      backgroundImage: AssetImage(data.avatar),
+                      backgroundImage: NetworkImage(imageUrl),
+                      onBackgroundImageError: (exception, stackTrace) {
+                        // You can handle image loading errors here, maybe show a default avatar
+                      },
                     ),
                     const SizedBox(height: 12),
                     Text(
                       data.name,
-                      style: TextStyle(color: Colors.white, fontSize: responsiveFontSize(20), fontWeight: FontWeight.bold),
+                      style: TextStyle(
+                          color: Colors.white,
+                          fontSize: responsiveFontSize(20),
+                          fontWeight: FontWeight.bold),
                     ),
-                    Text(data.role, style: TextStyle(color: Colors.white54, fontSize: responsiveFontSize(14))),
-                    Text(data.email, style: TextStyle(color: Colors.white54, fontSize: responsiveFontSize(14))),
+                    Text(data.position,
+                        style: TextStyle(
+                            color: Colors.white54,
+                            fontSize: responsiveFontSize(14))),
+                    Text(data.email,
+                        style: TextStyle(
+                            color: Colors.white54,
+                            fontSize: responsiveFontSize(14))),
                     const SizedBox(height: 25),
                     SectionCard(
                       title: "Personal Information",
@@ -186,23 +266,36 @@ class _ModeratorProfilePageState extends State<ModeratorProfilePage> {
                             CustomDropdown(
                               label: "Gender",
                               value: _genderValue,
-                              items: const ["Male", "Female", "Others"],
+                              items: const ["Male", "Female", "Other"],
                               onChanged: (newValue) {
                                 setState(() {
                                   _genderValue = newValue;
                                 });
                               },
                             ),
-                            CustomTextField(label: "Date of Birth", controller: TextEditingController(text: data.dob), icon: Icons.calendar_month, editable: false),
-                            CustomTextField(label: "Phone", controller: _phoneController),
-                            CustomTextField(label: "Alternate Phone", controller: _altPhoneController),
+                            CustomTextField(
+                                label: "Date of Birth",
+                                controller: TextEditingController(
+                                    text: data.dateOfBirth),
+                                icon: Icons.calendar_month,
+                                editable: false),
+                            CustomTextField(
+                                label: "Phone", controller: _phoneController),
+                            CustomTextField(
+                                label: "Alternate Phone",
+                                controller: _altPhoneController),
                             CustomDropdown(
                               label: "Marriage Status",
-                              value: _marriageStatusValue,
-                              items: const ["Single", "Married", "Divorced", "Widowed"],
+                              value: _relationshipStatusValue,
+                              items: const [
+                                "Single",
+                                "Married",
+                                "Divorced",
+                                "Widowed"
+                              ],
                               onChanged: (newValue) {
                                 setState(() {
-                                  _marriageStatusValue = newValue;
+                                  _relationshipStatusValue = newValue;
                                 });
                               },
                             ),
@@ -216,25 +309,29 @@ class _ModeratorProfilePageState extends State<ModeratorProfilePage> {
                       icon: Icons.location_on,
                       children: [
                         _buildResponsiveGrid([
-                          CustomTextField(label: "Address Line 1", controller: _address1Controller),
-                          CustomTextField(label: "City", controller: _cityController),
-                          CustomTextField(label: "District", controller: _districtController),
-                          CustomTextField(label: "Pincode", controller: _pincodeController),
+                          CustomTextField(
+                              label: "Address",
+                              controller: _addressController),
+                          CustomTextField(
+                              label: "City", controller: _cityController),
+                          CustomTextField(
+                              label: "State", controller: _stateController),
+                          CustomTextField(
+                              label: "Pincode", controller: _pincodeController),
                         ])
                       ],
                     ),
                     const SizedBox(height: 20),
-                    SectionCard(
+                     SectionCard(
                       title: "Banking Information",
                       icon: Icons.account_balance,
                       children: [
-                        CustomTextField(label: "Bank Account Number", controller: TextEditingController(text: data.bankAccount), editable: false),
-                        CustomTextField(label: "IFSC Code", controller: TextEditingController(text: data.ifsc), editable: false),
-                        CustomTextField(label: "Bank Name", controller: TextEditingController(text: data.bankName), editable: false),
+                        CustomTextField(label: "Bank Account Number", controller: TextEditingController(text: data.bankAccountNumber ?? 'N/A'), editable: false),
+                        CustomTextField(label: "IFSC Code", controller: TextEditingController(text: data.ifscCode ?? 'N/A'), editable: false),
+                        CustomTextField(label: "Bank Name", controller: TextEditingController(text: data.bankName ?? 'N/A'), editable: false),
                         const SizedBox(height: 10),
                         const Divider(color: Colors.white24),
-                        CustomTextField(label: "Employer Branch", controller: TextEditingController(text: data.employerBranch), editable: false),
-                        CustomTextField(label: "Zone / Sector", controller: TextEditingController(text: data.zone), editable: false),
+                        CustomTextField(label: "Branch Name", controller: TextEditingController(text: data.branchName ?? 'N/A'), editable: false),
                       ],
                     ),
                     const SizedBox(height: 20),
@@ -242,8 +339,16 @@ class _ModeratorProfilePageState extends State<ModeratorProfilePage> {
                       title: "Emergency Contact",
                       icon: Icons.phone_in_talk,
                       children: [
-                        CustomTextField(label: "Contact Name", controller: TextEditingController(text: data.emergencyContactName), editable: false),
-                        CustomTextField(label: "Contact Number", controller: TextEditingController(text: data.emergencyContactNumber), editable: false),
+                        CustomTextField(
+                            label: "Contact Name",
+                            controller: TextEditingController(
+                                text: data.emergencyContactName ?? 'N/A'),
+                            editable: false),
+                        CustomTextField(
+                            label: "Contact Number",
+                            controller: TextEditingController(
+                                text: data.emergencyContactNumber ?? 'N/A'),
+                            editable: false),
                       ],
                     ),
                     const SizedBox(height: 20),
@@ -252,8 +357,14 @@ class _ModeratorProfilePageState extends State<ModeratorProfilePage> {
                       icon: Icons.lock,
                       children: [
                         _buildResponsiveGrid([
-                          CustomTextField(label: "New Password", controller: _newPasswordController, isPassword: true),
-                          CustomTextField(label: "Confirm Password", controller: _confirmPasswordController, isPassword: true),
+                          CustomTextField(
+                              label: "New Password",
+                              controller: _newPasswordController,
+                              isPassword: true),
+                          CustomTextField(
+                              label: "Confirm Password",
+                              controller: _confirmPasswordController,
+                              isPassword: true),
                         ])
                       ],
                     ),
@@ -262,8 +373,16 @@ class _ModeratorProfilePageState extends State<ModeratorProfilePage> {
                       title: "Account Details",
                       icon: Icons.person_pin,
                       children: [
-                        CustomTextField(label: "User Name", controller: TextEditingController(text: data.userName), editable: false),
-                        CustomTextField(label: "Email Address", controller: TextEditingController(text: data.email), editable: false),
+                        CustomTextField(
+                            label: "User Name",
+                            controller:
+                                TextEditingController(text: data.name),
+                            editable: false),
+                        CustomTextField(
+                            label: "Email Address",
+                            controller:
+                                TextEditingController(text: data.email),
+                            editable: false),
                       ],
                     ),
                     const SizedBox(height: 20),
@@ -271,37 +390,69 @@ class _ModeratorProfilePageState extends State<ModeratorProfilePage> {
                       title: "Employment Details",
                       icon: Icons.badge,
                       children: [
-                        CustomTextField(label: "Position", controller: TextEditingController(text: data.position), editable: false),
-                        CustomTextField(label: "Employment Type", controller: TextEditingController(text: data.employmentType), editable: false),
-                        CustomTextField(label: "Joining Date", controller: TextEditingController(text: data.joiningDate), editable: false),
-                        CustomTextField(label: "Experience", controller: TextEditingController(text: data.experience), editable: false),
-                        CustomTextField(label: "Status", controller: TextEditingController(text: data.status), editable: false),
+                        CustomTextField(
+                            label: "Position",
+                            controller:
+                                TextEditingController(text: data.position),
+                            editable: false),
+                        CustomTextField(
+                            label: "Employment Type",
+                            controller: TextEditingController(
+                                text: data.employmentType),
+                            editable: false),
+                        CustomTextField(
+                            label: "Joining Date",
+                            controller: TextEditingController(
+                                text: data.joiningDate ?? 'N/A'),
+                            editable: false),
+                        CustomTextField(
+                            label: "Experience",
+                            controller: TextEditingController(
+                                text: '${data.experience ?? 0} years'),
+                            editable: false),
+                        CustomTextField(
+                            label: "Status",
+                            controller:
+                                TextEditingController(text: data.status),
+                            editable: false),
                       ],
                     ),
                     const SizedBox(height: 30),
                     ElevatedButton(
                       style: ElevatedButton.styleFrom(
                         backgroundColor: const Color(0xFF0E86D4),
-                        minimumSize: Size(double.infinity, screenWidth * 0.12),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        minimumSize:
+                            Size(double.infinity, screenWidth * 0.12),
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12)),
                       ),
-                      onPressed: _isLoading ? null : _saveChanges,
-                      child: _isLoading
+                      onPressed: _isSaving || _isLoggingOut
+                          ? null
+                          : _saveChanges,
+                      child: _isSaving
                           ? const CircularProgressIndicator(color: Colors.white)
-                          : Text("SAVE CHANGES", style: TextStyle(color: Colors.white, fontSize: responsiveFontSize(16))),
+                          : Text("SAVE CHANGES",
+                              style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: responsiveFontSize(16))),
                     ),
                     const SizedBox(height: 20),
                     ElevatedButton(
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF0E86D4),
-                        minimumSize: Size(double.infinity, screenWidth * 0.12),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        backgroundColor: Colors.red.shade700,
+                        minimumSize:
+                            Size(double.infinity, screenWidth * 0.12),
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12)),
                       ),
-                      onPressed: () {
-                        Navigator.pushReplacement(
-                            context, MaterialPageRoute(builder: (context) => const LoginPage()));
-                      },
-                      child: Text("Log Out", style: TextStyle(color: Colors.white, fontSize: responsiveFontSize(16))),
+                      onPressed:
+                          _isSaving || _isLoggingOut ? null : _logout,
+                      child: _isLoggingOut
+                          ? const CircularProgressIndicator(color: Colors.white)
+                          : Text("Log Out",
+                              style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: responsiveFontSize(16))),
                     ),
                     const SizedBox(height: 30),
                   ],
@@ -309,7 +460,9 @@ class _ModeratorProfilePageState extends State<ModeratorProfilePage> {
               ),
             );
           } else {
-            return const Center(child: Text('No profile data found.', style: TextStyle(color: Colors.white)));
+            return const Center(
+                child: Text('No profile data found.',
+                    style: TextStyle(color: Colors.white)));
           }
         },
       ),
@@ -349,7 +502,11 @@ class SectionCard extends StatelessWidget {
   final IconData icon;
   final List<Widget> children;
 
-  const SectionCard({super.key, required this.title, required this.icon, required this.children});
+  const SectionCard(
+      {super.key,
+      required this.title,
+      required this.icon,
+      required this.children});
 
   @override
   Widget build(BuildContext context) {
@@ -373,7 +530,11 @@ class SectionCard extends StatelessWidget {
             children: [
               Icon(icon, color: Colors.blueAccent),
               const SizedBox(width: 8),
-              Text(title, style: TextStyle(color: Colors.white, fontSize: responsiveFontSize(18), fontWeight: FontWeight.bold)),
+              Text(title,
+                  style: TextStyle(
+                      color: Colors.white,
+                      fontSize: responsiveFontSize(18),
+                      fontWeight: FontWeight.bold)),
             ],
           ),
           const SizedBox(height: 20),
@@ -408,11 +569,13 @@ class CustomTextField extends StatelessWidget {
       if (screenWidth > 600) return baseFontSize * 1.1;
       return baseFontSize;
     }
-    
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(label, style: TextStyle(color: Colors.white54, fontSize: responsiveFontSize(13))),
+        Text(label,
+            style: TextStyle(
+                color: Colors.white54, fontSize: responsiveFontSize(13))),
         const SizedBox(height: 6),
         Container(
           decoration: BoxDecoration(
@@ -423,11 +586,14 @@ class CustomTextField extends StatelessWidget {
             enabled: editable,
             controller: controller,
             obscureText: isPassword,
-            style: TextStyle(color: Colors.white, fontSize: responsiveFontSize(14)),
+            style: TextStyle(
+                color: Colors.white, fontSize: responsiveFontSize(14)),
             decoration: InputDecoration(
               border: InputBorder.none,
-              prefixIcon: icon != null ? Icon(icon, color: Colors.white54) : null,
-              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+              prefixIcon:
+                  icon != null ? Icon(icon, color: Colors.white54) : null,
+              contentPadding:
+                  const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
             ),
           ),
         ),
@@ -463,7 +629,9 @@ class CustomDropdown extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(label, style: TextStyle(color: Colors.white54, fontSize: responsiveFontSize(13))),
+        Text(label,
+            style: TextStyle(
+                color: Colors.white54, fontSize: responsiveFontSize(13))),
         const SizedBox(height: 6),
         Container(
           width: double.infinity,
@@ -479,7 +647,8 @@ class CustomDropdown extends StatelessWidget {
               items: items.map((String item) {
                 return DropdownMenuItem(
                   value: item,
-                  child: Text(item, style: TextStyle(fontSize: responsiveFontSize(14))),
+                  child: Text(item,
+                      style: TextStyle(fontSize: responsiveFontSize(14))),
                 );
               }).toList(),
               dropdownColor: const Color(0xFF1B263B),
