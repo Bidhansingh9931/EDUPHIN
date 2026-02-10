@@ -1,64 +1,95 @@
-import 'package:eduphin/manager_dashboard/recentSupportTickets/ticket_details.dart';
+import 'dart:convert';
+import 'package:eduphin/services/api_service.dart';
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
+import 'ticket_details.dart';
 
-// --- ENUMS & MODELS ---
+// --- ENUMS ---
 
-enum TicketStatus { open, inProgress, resolved, closed }
+enum TicketStatus {
+  open,
+  inProgress,
+  onHold,
+  resolved,
+  closed;
 
-// Helper to get a string representation
-extension TicketStatusExtension on TicketStatus {
-  String get displayName {
-    switch (this) {
-      case TicketStatus.inProgress:
-        return "In-Progress";
-      default:
-        // Capitalizes the first letter (e.g., "open" -> "Open")
-        return name[0].toUpperCase() + name.substring(1);
-    }
-  }
+  String get displayName => toBeginningOfSentenceCase(name.replaceAll('InProgress', 'In Progress'))!;
 }
 
-enum TicketPriority { high, medium, low }
+enum TicketPriority {
+  low,
+  medium,
+  high;
 
-// Helper to get a string representation
-extension TicketPriorityExtension on TicketPriority {
-  String get displayName {
-    return name[0].toUpperCase() + name.substring(1);
+  String get displayName => toBeginningOfSentenceCase(name)!;
+}
+
+// --- DATA MODELS ---
+
+class AssignableUser {
+  final int id;
+  final String name;
+
+  AssignableUser({required this.id, required this.name});
+
+  factory AssignableUser.fromJson(Map<String, dynamic> json) {
+    return AssignableUser(
+      id: json['id'] ?? 0,
+      name: json['name']?.toString() ?? 'Unknown User',
+    );
   }
 }
 
 class Ticket {
   final String serial;
-  final String issuedBy;
   final String title;
   final String category;
-  final List<String> assignedUsers;
+  final String issuedBy;
   final String createdAt;
-  TicketStatus status;
-  TicketPriority priority;
+  final List<int> assignedUsers;
+  final TicketStatus status;
+  final TicketPriority priority;
 
   Ticket({
     required this.serial,
-    required this.issuedBy,
     required this.title,
-    required this.priority,
     required this.category,
-    required this.assignedUsers,
+    required this.issuedBy,
     required this.createdAt,
+    required this.assignedUsers,
     required this.status,
+    required this.priority,
   });
 
-  // Factory constructor for creating a new Ticket instance from a map.
   factory Ticket.fromJson(Map<String, dynamic> json) {
+    // Helper function for safe date parsing
+    String formatDate(String? dateStr) {
+      if (dateStr == null) return 'N/A';
+      try {
+        return DateFormat('dd MMM yyyy, hh:mm a').format(DateTime.parse(dateStr));
+      } catch (e) {
+        return 'Invalid Date';
+      }
+    }
+
+    final List<int> assignedUsersList = [];
+    if (json['assigned_users'] is List) {
+      for (final user in json['assigned_users']) {
+        if (user is Map<String, dynamic> && user['id'] is int) {
+          assignedUsersList.add(user['id']);
+        }
+      }
+    }
+
     return Ticket(
-      serial: json['serial'] as String,
-      issuedBy: json['issuedBy'] as String,
-      title: json['title'] as String,
-      priority: (json['priority'] as String).toTicketPriority(),
-      category: json['category'] as String,
-      assignedUsers: List<String>.from(json['assignedUsers']),
-      createdAt: json['createdAt'] as String,
-      status: (json['status'] as String).toTicketStatus(),
+      serial: json['serial']?.toString() ?? 'N/A',
+      title: json['title']?.toString() ?? 'No Title',
+      category: (json['category'] is Map<String, dynamic> ? json['category']['name']?.toString() : null) ?? 'Uncategorized',
+      issuedBy: (json['user'] is Map<String, dynamic> ? json['user']['name']?.toString() : null) ?? 'Unknown User',
+      createdAt: formatDate(json['created_at']?.toString()),
+      assignedUsers: assignedUsersList,
+      priority: (json['priority']?.toString() ?? 'medium').toTicketPriority(),
+      status: (json['status']?.toString() ?? 'open').toTicketStatus(),
     );
   }
 }
@@ -93,6 +124,7 @@ class TicketInfoPage extends StatefulWidget {
 class _TicketInfoPageState extends State<TicketInfoPage> {
   bool _isLoading = true;
   List<Ticket> _tickets = [];
+  List<AssignableUser> _assignableUsers = [];
 
   @override
   void initState() {
@@ -100,39 +132,43 @@ class _TicketInfoPageState extends State<TicketInfoPage> {
     _fetchTickets();
   }
 
-  // TODO: Replace this with your actual API call in the future
   Future<void> _fetchTickets() async {
-    // Simulate network delay
-    await Future.delayed(const Duration(seconds: 1));
+    if (!mounted) return;
+    setState(() {
+      _isLoading = true;
+    });
 
-    final List<Map<String, dynamic>> dummyData = [
-      {
-        "serial": "#001245",
-        "issuedBy": "Ananya Sharma",
-        "title": "Wi-Fi Connectivity Issue in Library",
-        "priority": "High",
-        "category": "IT Support",
-        "assignedUsers": ["RK", "SM", "PV"],
-        "createdAt": "24 Nov 2025, 10:30 AM",
-        "status": "open",
-      },
-      {
-        "serial": "#001244",
-        "issuedBy": "Rohan Verma",
-        "title": "Projector Malfunction in Room 301",
-        "priority": "Medium",
-        "category": "Classroom AV",
-        "assignedUsers": ["RK"],
-        "createdAt": "23 Nov 2025, 02:15 PM",
-        "status": "inProgress",
-      },
-    ];
+    try {
+      final response = await ApiService.get('manager/tickets');
 
-    if (mounted) {
-      setState(() {
-        _tickets = dummyData.map((data) => Ticket.fromJson(data)).toList();
-        _isLoading = false;
-      });
+      if (mounted) {
+        if (response.statusCode == 200) {
+          final data = jsonDecode(response.body);
+
+          final List<dynamic> ticketsList = data['tickets'] as List? ?? [];
+          final ticketsData = ticketsList.whereType<Map<String, dynamic>>().map(Ticket.fromJson).toList();
+
+          final List<dynamic> usersList = data['assignable_users'] as List? ?? [];
+          final usersData = usersList.whereType<Map<String, dynamic>>().map(AssignableUser.fromJson).toList();
+
+          setState(() {
+            _tickets = ticketsData;
+            _assignableUsers = usersData;
+            _isLoading = false;
+          });
+        } else {
+          throw Exception('Failed to load tickets');
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(e.toString())),
+        );
+      }
     }
   }
 
@@ -158,13 +194,10 @@ class _TicketInfoPageState extends State<TicketInfoPage> {
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
-          // Use LayoutBuilder for responsive UI
           : LayoutBuilder(builder: (context, constraints) {
               if (constraints.maxWidth > 700) {
-                // Use GridView for wider screens
                 return _buildGridView();
               } else {
-                // Use ListView for narrower screens
                 return _buildListView();
               }
             }),
@@ -177,8 +210,9 @@ class _TicketInfoPageState extends State<TicketInfoPage> {
       itemCount: _tickets.length,
       itemBuilder: (context, index) {
         return TicketCard(
-          key: ValueKey(_tickets[index].serial), // Use a unique key
+          key: ValueKey(_tickets[index].serial),
           ticket: _tickets[index],
+          assignableUsers: _assignableUsers,
         );
       },
       separatorBuilder: (context, index) => const SizedBox(height: 16),
@@ -190,15 +224,16 @@ class _TicketInfoPageState extends State<TicketInfoPage> {
       padding: const EdgeInsets.fromLTRB(16, 16, 16, 50),
       itemCount: _tickets.length,
       gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
-        maxCrossAxisExtent: 600, // Adjust as needed
+        maxCrossAxisExtent: 600,
         mainAxisSpacing: 16,
         crossAxisSpacing: 16,
-        childAspectRatio: 1.8, // Adjust for content
+        childAspectRatio: 1.8,
       ),
       itemBuilder: (context, index) {
         return TicketCard(
-          key: ValueKey(_tickets[index].serial), // Use a unique key
+          key: ValueKey(_tickets[index].serial),
           ticket: _tickets[index],
+          assignableUsers: _assignableUsers,
         );
       },
     );
@@ -209,10 +244,12 @@ class _TicketInfoPageState extends State<TicketInfoPage> {
 
 class TicketCard extends StatefulWidget {
   final Ticket ticket;
+  final List<AssignableUser> assignableUsers;
 
   const TicketCard({
     super.key,
     required this.ticket,
+    required this.assignableUsers,
   });
 
   @override
@@ -238,6 +275,46 @@ class _TicketCardState extends State<TicketCard> {
         return Colors.amber.shade700;
       case TicketPriority.low:
         return Colors.lightBlueAccent;
+    }
+  }
+
+  Future<void> _updateTicketStatus(TicketStatus newStatus) async {
+    try {
+      final response = await ApiService.post('manager/tickets/${widget.ticket.serial}/status', {'status': newStatus.name.replaceAll('InProgress', 'in_progress').toLowerCase()});
+      if(mounted) {
+        if (response.statusCode == 200) {
+          setState(() {
+            _selectedStatus = newStatus;
+          });
+          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Status updated!")));
+        } else {
+          throw Exception('Failed to update status');
+        }
+      }
+    } catch (e) {
+      if(mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString())));
+      }
+    }
+  }
+
+  Future<void> _updateTicketPriority(TicketPriority newPriority) async {
+    try {
+      final response = await ApiService.post('manager/tickets/${widget.ticket.serial}/priority', {'priority': newPriority.name.toLowerCase()});
+      if(mounted) {
+        if (response.statusCode == 200) {
+          setState(() {
+            _selectedPriority = newPriority;
+          });
+          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Priority updated!")));
+        } else {
+          throw Exception('Failed to update priority');
+        }
+      }
+    } catch (e) {
+      if(mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString())));
+      }
     }
   }
 
@@ -271,8 +348,7 @@ class _TicketCardState extends State<TicketCard> {
           Text("Assigned to", style: TextStyle(color: theme.hintColor)),
           const SizedBox(height: 6),
           Row(
-            children:
-                widget.ticket.assignedUsers.map((e) => _avatar(theme, e)).toList(),
+            children: widget.assignableUsers.where((user) => widget.ticket.assignedUsers.contains(user.id)).map((e) => _avatar(theme, e.name.substring(0, 2).toUpperCase())).toList(),
           ),
           const SizedBox(height: 12),
           Text("Created At", style: TextStyle(color: theme.hintColor)),
@@ -302,7 +378,7 @@ class _TicketCardState extends State<TicketCard> {
                    Navigator.push(
                       context,
                       MaterialPageRoute(
-                          builder: (context) => const TicketDetailsPage()));
+                          builder: (context) => TicketDetailsPage(ticketId: widget.ticket.serial,)));
                 },
                 isPrimary: true,
               ),
@@ -331,7 +407,7 @@ class _TicketCardState extends State<TicketCard> {
             .toList(),
       ),
       buttonText: "Update Status",
-      onConfirm: () => setState(() => _selectedStatus = tempSelection),
+      onConfirm: () => _updateTicketStatus(tempSelection),
     );
   }
 
@@ -351,7 +427,7 @@ class _TicketCardState extends State<TicketCard> {
             .toList(),
       ),
       buttonText: "Update Priority",
-      onConfirm: () => setState(() => _selectedPriority = tempSelection),
+      onConfirm: () => _updateTicketPriority(tempSelection),
     );
   }
 
@@ -395,7 +471,7 @@ class _TicketCardState extends State<TicketCard> {
                     shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(14)),
                   ),
-                  child: Text(buttonText,style: TextStyle(color: Colors.white,fontWeight: FontWeight.bold,fontSize: 16),),
+                  child: Text(buttonText,style: const TextStyle(color: Colors.white,fontWeight: FontWeight.bold,fontSize: 16),),
                 ),
               ),
             ]),
@@ -414,29 +490,15 @@ class _TicketCardState extends State<TicketCard> {
         color: theme.colorScheme.surface,
         borderRadius: BorderRadius.circular(12),
       ),
-       child: InkWell(
-        onTap: () {
-          if (value != groupValue) {
-            onChanged(value);
-          }
-        },
-        borderRadius: BorderRadius.circular(12),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-          child: Row(
-            children: [
-              Expanded(
-                child: Text(text, style: theme.textTheme.bodyLarge),
-              ),
-              Radio<T>(
-                value: value,
-                groupValue: groupValue,
-                onChanged: onChanged,
-                activeColor: theme.colorScheme.primary,
-              ),
-            ],
-          ),
+      child: ListTile(
+        title: Text(text, style: theme.textTheme.bodyLarge),
+        leading: Radio<T>(
+          value: value,
+          groupValue: groupValue,
+          onChanged: onChanged,
+          activeColor: theme.colorScheme.primary,
         ),
+        onTap: () => onChanged(value),
       ),
     );
   }
@@ -461,7 +523,7 @@ class _TicketCardState extends State<TicketCard> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
       decoration: BoxDecoration(
-        color: color.withAlpha(35),
+        color: color.withAlpha(38), // Replaced withAlpha
         borderRadius: BorderRadius.circular(20),
       ),
       child: Text(_selectedPriority.displayName,
@@ -492,8 +554,7 @@ class _TicketCardState extends State<TicketCard> {
           backgroundColor: isPrimary ? theme.colorScheme.primary : theme.colorScheme.secondaryContainer,
           foregroundColor: isPrimary ? theme.colorScheme.onPrimary : theme.colorScheme.onSecondaryContainer,
           padding: const EdgeInsets.symmetric(vertical: 16),
-          shape:
-              RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         ),
         child: Text(
           text,

@@ -1,64 +1,188 @@
-// import 'dart:ui';
+import 'dart:convert';
 
 import 'package:eduphin/manager_dashboard/feeStructure/studentFeeDetails/edit_fine.dart';
+import 'package:eduphin/services/api_service.dart';
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 
 import 'add_new_fine.dart';
 
-class FeeDetailsPage extends StatefulWidget {
-  final String studentName;
-  final String studentDetails;
+// ───────────────────────────────────────────────────────────
+//                          DATA MODELS
+// ───────────────────────────────────────────────────────────
 
-  const FeeDetailsPage(
-      {super.key, required this.studentName, required this.studentDetails});
+class StudentInfo {
+  final String name;
+  final String roll;
+  final String classes;
+  final String email;
+  final String feeFrequency;
+
+  StudentInfo({
+    required this.name,
+    required this.roll,
+    required this.classes,
+    required this.email,
+    required this.feeFrequency,
+  });
+
+  factory StudentInfo.fromJson(Map<String, dynamic> json) {
+    return StudentInfo(
+      name: json['name'] ?? 'N/A',
+      roll: json['student_roll_no'] ?? 'N/A',
+      classes: '${json['class']?['name'] ?? ''}-${json['section']?['section_name'] ?? ''}',
+      email: json['email'] ?? 'N/A',
+      feeFrequency: json['fee_frequency'] ?? 'N/A', // Assuming this field exists
+    );
+  }
+}
+
+class FinancialSummary {
+  final double totalFee;
+  final double totalFine;
+  final double totalPayable;
+  final double paid;
+  final double due;
+
+  FinancialSummary({
+    required this.totalFee,
+    required this.totalFine,
+    required this.totalPayable,
+    required this.paid,
+    required this.due,
+  });
+
+  factory FinancialSummary.fromJson(Map<String, dynamic> json) {
+    return FinancialSummary(
+      totalFee: double.tryParse(json['total_fees'].toString()) ?? 0.0,
+      totalFine: double.tryParse(json['total_fines'].toString()) ?? 0.0,
+      totalPayable: double.tryParse(json['total_payable'].toString()) ?? 0.0,
+      paid: double.tryParse(json['total_paid'].toString()) ?? 0.0,
+      due: double.tryParse(json['total_due'].toString()) ?? 0.0,
+    );
+  }
+}
+
+class FeeDetailItem {
+  final String title;
+  final double amount;
+  final String type;
+  final String details;
+
+  FeeDetailItem({required this.title, required this.amount, required this.type, required this.details});
+
+  factory FeeDetailItem.fromJson(Map<String, dynamic> json) {
+    return FeeDetailItem(
+      title: json['fees_type'] ?? 'N/A',
+      amount: double.tryParse(json['amount'].toString()) ?? 0.0,
+      type: json['type'] ?? 'N/A',
+      details: json['description'] ?? 'No details available',
+    );
+  }
+}
+
+class FineDetailItem {
+  final int id;
+  final String title;
+  final double amount;
+  final String issuedBy;
+  final String remark;
+
+  FineDetailItem({required this.id, required this.title, required this.amount, required this.issuedBy, required this.remark});
+
+  factory FineDetailItem.fromJson(Map<String, dynamic> json) {
+    return FineDetailItem(
+      id: json['id'] ?? 0,
+      title: json['fine_type'] ?? 'N/A',
+      amount: double.tryParse(json['amount'].toString()) ?? 0.0,
+      issuedBy: '${json['issued_by']?['name'] ?? 'N/A'} on ${DateFormat('dd/MM/yyyy').format(DateTime.tryParse(json['created_at'] ?? '') ?? DateTime.now())}',
+      remark: json['remarks'] ?? 'No remarks',
+    );
+  }
+}
+
+class PaymentHistoryItem {
+  final double amount;
+  final String date;
+  final String mode;
+  final String submittedBy;
+  final String remark;
+
+  PaymentHistoryItem({required this.amount, required this.date, required this.mode, required this.submittedBy, required this.remark});
+
+  factory PaymentHistoryItem.fromJson(Map<String, dynamic> json) {
+    return PaymentHistoryItem(
+      amount: double.tryParse(json['paid_amount'].toString()) ?? 0.0,
+      date: DateFormat('dd/MM/yyyy').format(DateTime.tryParse(json['payment_date'] ?? '') ?? DateTime.now()),
+      mode: json['payment_mode'] ?? 'N/A',
+      submittedBy: json['student']?['name'] ?? 'N/A', // Assuming student submits
+      remark: json['remarks'] ?? 'No remarks',
+    );
+  }
+}
+
+class StudentFeeDetails {
+  final StudentInfo studentInfo;
+  final FinancialSummary financialSummary;
+  final List<FeeDetailItem> feeDetails;
+  final List<FineDetailItem> fineDetails;
+  final List<PaymentHistoryItem> paymentHistory;
+
+  StudentFeeDetails({
+    required this.studentInfo,
+    required this.financialSummary,
+    required this.feeDetails,
+    required this.fineDetails,
+    required this.paymentHistory,
+  });
+
+  factory StudentFeeDetails.fromJson(Map<String, dynamic> json) {
+    return StudentFeeDetails(
+      studentInfo: StudentInfo.fromJson(json['student'] ?? {}),
+      financialSummary: FinancialSummary.fromJson(json['summary'] ?? {}),
+      feeDetails: (json['fees'] as List? ?? []).map((i) => FeeDetailItem.fromJson(i)).toList(),
+      fineDetails: (json['fines'] as List? ?? []).map((i) => FineDetailItem.fromJson(i)).toList(),
+      paymentHistory: (json['payments'] as List? ?? []).map((i) => PaymentHistoryItem.fromJson(i)).toList(),
+    );
+  }
+}
+
+// ───────────────────────────────────────────────────────────
+//                         PAGE WIDGET
+// ───────────────────────────────────────────────────────────
+
+class FeeDetailsPage extends StatefulWidget {
+  final int studentId;
+
+  const FeeDetailsPage({super.key, required this.studentId});
 
   @override
   State<StatefulWidget> createState() => _FeeDetailsPageState();
 }
 
 class _FeeDetailsPageState extends State<FeeDetailsPage> {
+  late Future<StudentFeeDetails> _feeDetailsFuture;
+
+  @override
+  void initState() {
+    super.initState();
+    _feeDetailsFuture = _fetchFeeDetails();
+  }
+
+  Future<StudentFeeDetails> _fetchFeeDetails() async {
+    final response = await ApiService.get('manager/fees/student/${widget.studentId}');
+    if (response.statusCode == 200) {
+      final data = jsonDecode(response.body);
+      return StudentFeeDetails.fromJson(data);
+    } else {
+      throw Exception('Failed to load fee details');
+    }
+  }
+
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    // Data is hardcoded as per the original file, but uses widget.studentName
-    final studentInfo = {
-      'name': widget.studentName,
-      'roll': 'S-1024',
-      'classes': '10-A',
-      'email': 'ananya.s@school.com',
-      'feeFrequency': 'Monthly',
-    };
-
-    final financialSummary = {
-      'totalFee': 15000.0,
-      'totalFine': 200.0,
-      'totalPayable': 15200.0,
-      'paid': 10000.0,
-      'due': 5200.0,
-    };
-
-    final feeDetails = {
-      'tuitionFee': 12000.0,
-      'tType': 'Institute-Wide',
-      'tDetails': 'Monthly tuition fee for academic session',
-      'labFee': 3000.0,
-      'lType': 'Class-Specific',
-      'lDetails': 'For science lab equipment and materials',
-    };
-
-    final fineDetails = {
-      'lateFeePayment': 200.0,
-      'issued': 'Mr.Sharma on 15/05/2024',
-      'remark': 'Fee paid after due date',
-    };
-
-    final paymentHistory = {
-      'paymentReceived': 10000.0,
-      'date': '20/05/2024',
-      'mode': 'UPI (Ref: 1234567890)',
-      'submittedBy': 'Ananya Sharma',
-      'remark': 'Partial fee payment',
-    };
 
     return Scaffold(
       backgroundColor: theme.scaffoldBackgroundColor,
@@ -66,72 +190,50 @@ class _FeeDetailsPageState extends State<FeeDetailsPage> {
         title: const Text("Student Fee Details"),
         centerTitle: true,
       ),
-      body: LayoutBuilder(builder: (context, constraints) {
-        return SingleChildScrollView(
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(16, 16, 16, 50),
-            child: constraints.maxWidth > 800
-                ? _buildWideLayout(
-                    studentInfo, financialSummary, feeDetails, fineDetails, paymentHistory)
-                : _buildNarrowLayout(
-                    studentInfo, financialSummary, feeDetails, fineDetails, paymentHistory),
-          ),
-        );
-      }),
+      body: FutureBuilder<StudentFeeDetails>(
+        future: _feeDetailsFuture,
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return const Center(child: CircularProgressIndicator());
+          } else if (snapshot.hasError) {
+            return Center(child: Text("Error: ${snapshot.error}"));
+          } else if (snapshot.hasData) {
+            final data = snapshot.data!;
+            return LayoutBuilder(builder: (context, constraints) {
+              return SingleChildScrollView(
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 16, 16, 50),
+                  child: constraints.maxWidth > 800
+                      ? _buildWideLayout(data)
+                      : _buildNarrowLayout(data),
+                ),
+              );
+            });
+          } else {
+            return const Center(child: Text("No fee details available."));
+          }
+        },
+      ),
     );
   }
 
-  Widget _buildNarrowLayout(Map studentInfo, Map financialSummary, Map feeDetails, Map fineDetails, Map paymentHistory) {
+  Widget _buildNarrowLayout(StudentFeeDetails data) {
     return Column(
       children: [
-        CustomStudentInfoFeeDetailContainerBox(
-          heading: "Student Info",
-          name: studentInfo['name'],
-          roll: studentInfo['roll'],
-          classes: studentInfo['classes'],
-          email: studentInfo['email'],
-          feeFrequency: studentInfo['feeFrequency'],
-        ),
+        CustomStudentInfoFeeDetailContainerBox(studentInfo: data.studentInfo),
         const SizedBox(height: 16),
-        CustomFinancialSummaryFeeDetailContainerBox(
-          heading: "Financial Summary",
-          totalFee: financialSummary['totalFee'],
-          totalFine: financialSummary['totalFine'],
-          totalPayable: financialSummary['totalPayable'],
-          paid: financialSummary['paid'],
-          due: financialSummary['due'],
-        ),
+        CustomFinancialSummaryFeeDetailContainerBox(summary: data.financialSummary),
         const SizedBox(height: 16),
-        CustomFeeDetailsContainerBox(
-          heading: "Fee Details",
-          tuitionFee: feeDetails['tuitionFee'],
-          tType: feeDetails['tType'],
-          tDetails: feeDetails['tDetails'],
-          labFee: feeDetails['labFee'],
-          lType: feeDetails['lType'],
-          lDetails: feeDetails['lDetails'],
-        ),
+        CustomFeeDetailsContainerBox(feeDetails: data.feeDetails),
         const SizedBox(height: 16),
-        CustomFineDetailsContainerBox(
-          heading: "Fine Details",
-          lateFeePayment: fineDetails['lateFeePayment'],
-          issued: fineDetails['issued'],
-          remark: fineDetails['remark'],
-        ),
+        CustomFineDetailsContainerBox(studentId: widget.studentId, fineDetails: data.fineDetails),
         const SizedBox(height: 16),
-        CustomPaymentHistoryContainerBox(
-          heading: "Payment History",
-          paymentReceived: paymentHistory['paymentReceived'],
-          date: paymentHistory['date'],
-          mode: paymentHistory['mode'],
-          submittedBy: paymentHistory['submittedBy'],
-          remark: paymentHistory['remark'],
-        )
+        CustomPaymentHistoryContainerBox(paymentHistory: data.paymentHistory),
       ],
     );
   }
 
-  Widget _buildWideLayout(Map studentInfo, Map financialSummary, Map feeDetails, Map fineDetails, Map paymentHistory) {
+  Widget _buildWideLayout(StudentFeeDetails data) {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -139,24 +241,9 @@ class _FeeDetailsPageState extends State<FeeDetailsPage> {
           flex: 2,
           child: Column(
             children: [
-              CustomStudentInfoFeeDetailContainerBox(
-                heading: "Student Info",
-                name: studentInfo['name'],
-                roll: studentInfo['roll'],
-                classes: studentInfo['classes'],
-                email: studentInfo['email'],
-                feeFrequency: studentInfo['feeFrequency'],
-              ),
+              CustomStudentInfoFeeDetailContainerBox(studentInfo: data.studentInfo),
               const SizedBox(height: 16),
-              CustomFeeDetailsContainerBox(
-                heading: "Fee Details",
-                tuitionFee: feeDetails['tuitionFee'],
-                tType: feeDetails['tType'],
-                tDetails: feeDetails['tDetails'],
-                labFee: feeDetails['labFee'],
-                lType: feeDetails['lType'],
-                lDetails: feeDetails['lDetails'],
-              ),
+              CustomFeeDetailsContainerBox(feeDetails: data.feeDetails),
             ],
           ),
         ),
@@ -165,30 +252,11 @@ class _FeeDetailsPageState extends State<FeeDetailsPage> {
           flex: 1,
           child: Column(
             children: [
-              CustomFinancialSummaryFeeDetailContainerBox(
-                heading: "Financial Summary",
-                totalFee: financialSummary['totalFee'],
-                totalFine: financialSummary['totalFine'],
-                totalPayable: financialSummary['totalPayable'],
-                paid: financialSummary['paid'],
-                due: financialSummary['due'],
-              ),
+              CustomFinancialSummaryFeeDetailContainerBox(summary: data.financialSummary),
               const SizedBox(height: 16),
-              CustomFineDetailsContainerBox(
-                heading: "Fine Details",
-                lateFeePayment: fineDetails['lateFeePayment'],
-                issued: fineDetails['issued'],
-                remark: fineDetails['remark'],
-              ),
+              CustomFineDetailsContainerBox(studentId: widget.studentId, fineDetails: data.fineDetails),
               const SizedBox(height: 16),
-              CustomPaymentHistoryContainerBox(
-                heading: "Payment History",
-                paymentReceived: paymentHistory['paymentReceived'],
-                date: paymentHistory['date'],
-                mode: paymentHistory['mode'],
-                submittedBy: paymentHistory['submittedBy'],
-                remark: paymentHistory['remark'],
-              ),
+              CustomPaymentHistoryContainerBox(paymentHistory: data.paymentHistory),
             ],
           ),
         ),
@@ -197,23 +265,14 @@ class _FeeDetailsPageState extends State<FeeDetailsPage> {
   }
 }
 
-class CustomStudentInfoFeeDetailContainerBox extends StatelessWidget {
-  final String heading;
-  final String name;
-  final String roll;
-  final String classes;
-  final String email;
-  final String feeFrequency;
+// ───────────────────────────────────────────────────────────
+//                      REUSABLE WIDGETS
+// ───────────────────────────────────────────────────────────
 
-  const CustomStudentInfoFeeDetailContainerBox({
-    super.key,
-    required this.heading,
-    required this.name,
-    required this.roll,
-    required this.classes,
-    required this.email,
-    required this.feeFrequency,
-  });
+class CustomStudentInfoFeeDetailContainerBox extends StatelessWidget {
+  final StudentInfo studentInfo;
+
+  const CustomStudentInfoFeeDetailContainerBox({super.key, required this.studentInfo});
 
   @override
   Widget build(BuildContext context) {
@@ -228,15 +287,14 @@ class CustomStudentInfoFeeDetailContainerBox extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(heading, style: theme.textTheme.titleLarge?.copyWith(color: theme.colorScheme.onPrimary)),
+          Text("Student Info", style: theme.textTheme.titleLarge?.copyWith(color: theme.colorScheme.onPrimary)),
           const SizedBox(height: 8),
-          _buildInfoRow(theme, "Name", name, "Roll No.", roll),
+          _buildInfoRow(theme, "Name", studentInfo.name, "Roll No.", studentInfo.roll),
           const SizedBox(height: 8),
-          _buildInfoRow(theme, "Class", classes, "Email", email, isEmail: true),
+          _buildInfoRow(theme, "Class", studentInfo.classes, "Email", studentInfo.email, isEmail: true),
           const SizedBox(height: 8),
-          Text("Fee Frequency",
-              style: theme.textTheme.titleSmall?.copyWith(color: theme.colorScheme.onPrimary.withAlpha(150))),
-          Text(feeFrequency, style: theme.textTheme.bodyLarge?.copyWith(color: theme.colorScheme.onPrimary)),
+          Text("Fee Frequency", style: theme.textTheme.titleSmall?.copyWith(color: theme.colorScheme.onPrimary.withOpacity(0.6))),
+          Text(studentInfo.feeFrequency, style: theme.textTheme.bodyLarge?.copyWith(color: theme.colorScheme.onPrimary)),
         ],
       ),
     );
@@ -250,7 +308,7 @@ class CustomStudentInfoFeeDetailContainerBox extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(label1, style: theme.textTheme.titleSmall?.copyWith(color: theme.colorScheme.onPrimary.withAlpha(150))),
+              Text(label1, style: theme.textTheme.titleSmall?.copyWith(color: theme.colorScheme.onPrimary.withOpacity(0.6))),
               Text(value1, style: theme.textTheme.bodyLarge?.copyWith(color: theme.colorScheme.onPrimary)),
             ],
           ),
@@ -260,7 +318,7 @@ class CustomStudentInfoFeeDetailContainerBox extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(label2, style: theme.textTheme.titleSmall?.copyWith(color: theme.colorScheme.onPrimary.withAlpha(150))),
+              Text(label2, style: theme.textTheme.titleSmall?.copyWith(color: theme.colorScheme.onPrimary.withOpacity(0.6))),
               Text(value2, style: theme.textTheme.bodyLarge?.copyWith(color: theme.colorScheme.onPrimary), overflow: isEmail ? TextOverflow.ellipsis : null),
             ],
           ),
@@ -271,22 +329,9 @@ class CustomStudentInfoFeeDetailContainerBox extends StatelessWidget {
 }
 
 class CustomFinancialSummaryFeeDetailContainerBox extends StatelessWidget {
-  final String heading;
-  final double totalFee;
-  final double totalFine;
-  final double totalPayable;
-  final double paid;
-  final double due;
+  final FinancialSummary summary;
 
-  const CustomFinancialSummaryFeeDetailContainerBox({
-    super.key,
-    required this.heading,
-    required this.totalFee,
-    required this.totalFine,
-    required this.totalPayable,
-    required this.paid,
-    required this.due,
-  });
+  const CustomFinancialSummaryFeeDetailContainerBox({super.key, required this.summary});
 
   @override
   Widget build(BuildContext context) {
@@ -301,17 +346,17 @@ class CustomFinancialSummaryFeeDetailContainerBox extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(heading, style: theme.textTheme.titleLarge?.copyWith(color: theme.colorScheme.onPrimary)),
+          Text("Financial Summary", style: theme.textTheme.titleLarge?.copyWith(color: theme.colorScheme.onPrimary)),
           const SizedBox(height: 8),
-          _buildSummaryRow(theme, "Total Fee", totalFee),
+          _buildSummaryRow(theme, "Total Fee", summary.totalFee),
           const SizedBox(height: 4),
-          _buildSummaryRow(theme, "Total Fine", totalFine),
+          _buildSummaryRow(theme, "Total Fine", summary.totalFine),
           const Divider(),
-          _buildSummaryRow(theme, "Total Payable", totalPayable, isBold: true, color: theme.colorScheme.secondary),
+          _buildSummaryRow(theme, "Total Payable", summary.totalPayable, isBold: true, color: theme.colorScheme.secondary),
           const Divider(),
-          _buildSummaryRow(theme, "Paid", paid, color: Colors.green),
+          _buildSummaryRow(theme, "Paid", summary.paid, color: Colors.green),
           const SizedBox(height: 4),
-          _buildSummaryRow(theme, "Due", due, color: Colors.red),
+          _buildSummaryRow(theme, "Due", summary.due, color: Colors.red),
         ],
       ),
     );
@@ -322,31 +367,16 @@ class CustomFinancialSummaryFeeDetailContainerBox extends StatelessWidget {
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
         Text(label, style: theme.textTheme.bodyLarge?.copyWith(color: color ?? theme.colorScheme.onSurface, fontWeight: isBold ? FontWeight.bold : FontWeight.normal)),
-        Text("₹$amount", style: theme.textTheme.bodyLarge?.copyWith(color: color ?? theme.colorScheme.onSurface, fontWeight: isBold ? FontWeight.bold : FontWeight.normal)),
+        Text("₹${NumberFormat('#,##,##0.00').format(amount)}", style: theme.textTheme.bodyLarge?.copyWith(color: color ?? theme.colorScheme.onSurface, fontWeight: isBold ? FontWeight.bold : FontWeight.normal)),
       ],
     );
   }
 }
 
 class CustomFeeDetailsContainerBox extends StatelessWidget {
-  final String heading;
-  final double tuitionFee;
-  final String tType;
-  final String tDetails;
-  final double labFee;
-  final String lType;
-  final String lDetails;
+  final List<FeeDetailItem> feeDetails;
 
-  const CustomFeeDetailsContainerBox({
-    super.key,
-    required this.heading,
-    required this.tuitionFee,
-    required this.tType,
-    required this.tDetails,
-    required this.labFee,
-    required this.lType,
-    required this.lDetails,
-  });
+  const CustomFeeDetailsContainerBox({super.key, required this.feeDetails});
 
   @override
   Widget build(BuildContext context) {
@@ -361,11 +391,21 @@ class CustomFeeDetailsContainerBox extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(heading, style: theme.textTheme.titleLarge?.copyWith(color: theme.colorScheme.onPrimary)),
+          Text("Fee Details", style: theme.textTheme.titleLarge?.copyWith(color: theme.colorScheme.onPrimary)),
           const SizedBox(height: 16),
-          _buildFeeItem(theme, "1. Tuition Fee", tuitionFee, tType, tDetails, theme.colorScheme.secondary),
-          const Divider(height: 24),
-          _buildFeeItem(theme, "2. Lab Fee", labFee, lType, lDetails, Colors.orange),
+          if (feeDetails.isEmpty)
+            const Text("No fee details available.", style: TextStyle(color: Colors.white70))
+          else
+            ListView.separated(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              itemCount: feeDetails.length,
+              separatorBuilder: (context, index) => const Divider(height: 24),
+              itemBuilder: (context, index) {
+                final item = feeDetails[index];
+                return _buildFeeItem(theme, "${index + 1}. ${item.title}", item.amount, item.type, item.details, theme.colorScheme.secondary);
+              },
+            ),
         ],
       ),
     );
@@ -378,8 +418,8 @@ class CustomFeeDetailsContainerBox extends StatelessWidget {
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Text(title, style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w500)),
-            Text("₹$amount", style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
+            Flexible(child: Text(title, style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w500))),
+            Text("₹${NumberFormat('#,##,##0.00').format(amount)}", style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
           ],
         ),
         const SizedBox(height: 8),
@@ -389,7 +429,7 @@ class CustomFeeDetailsContainerBox extends StatelessWidget {
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
               decoration: BoxDecoration(
-                color: typeColor.withAlpha(35),
+                color: typeColor.withOpacity(0.1),
                 borderRadius: BorderRadius.circular(5),
               ),
               child: Text(type, style: theme.textTheme.bodySmall?.copyWith(color: typeColor, fontWeight: FontWeight.bold)),
@@ -404,18 +444,10 @@ class CustomFeeDetailsContainerBox extends StatelessWidget {
 }
 
 class CustomFineDetailsContainerBox extends StatelessWidget {
-  final String heading;
-  final double lateFeePayment;
-  final String issued;
-  final String remark;
+  final int studentId;
+  final List<FineDetailItem> fineDetails;
 
-  const CustomFineDetailsContainerBox({
-    super.key,
-    required this.heading,
-    required this.lateFeePayment,
-    required this.issued,
-    required this.remark,
-  });
+  const CustomFineDetailsContainerBox({super.key, required this.studentId, required this.fineDetails});
 
   @override
   Widget build(BuildContext context) {
@@ -433,10 +465,10 @@ class CustomFineDetailsContainerBox extends StatelessWidget {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(heading, style: theme.textTheme.titleLarge?.copyWith(color: theme.colorScheme.onPrimary)),
+              Text("Fine Details", style: theme.textTheme.titleLarge?.copyWith(color: theme.colorScheme.onPrimary)),
               ElevatedButton.icon(
                   onPressed: () {
-                    Navigator.push(context, MaterialPageRoute(builder: (context) => const AddNewFine()));
+                    Navigator.push(context, MaterialPageRoute(builder: (context) => AddNewFine(studentId: studentId)));
                   },
                   style: ElevatedButton.styleFrom(
                     backgroundColor: theme.colorScheme.secondary,
@@ -448,45 +480,59 @@ class CustomFineDetailsContainerBox extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 16),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text("1. Late Fee Payment", style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w500)),
-              Text("₹$lateFeePayment", style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
-            ],
-          ),
-          const SizedBox(height: 8),
-          Row(
-            children: [
-              Text("Issued by: ", style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w500)),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                decoration: BoxDecoration(
-                  color: theme.cardColor,
-                  borderRadius: BorderRadius.circular(5),
-                ),
-                child: Text(issued, style: theme.textTheme.bodySmall),
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          Text("Remark: $remark", style: theme.textTheme.bodyMedium?.copyWith(color: Colors.grey.shade500)),
-          const Divider(height: 24),
-          SizedBox(
-            width: double.infinity,
-            child: ElevatedButton.icon(
-              onPressed: () {
-                Navigator.push(context, MaterialPageRoute(builder: (context) => const EditFinePage()));
+          if (fineDetails.isEmpty)
+            const Text("No fine details available.", style: TextStyle(color: Colors.white70))
+          else
+            ListView.separated(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              itemCount: fineDetails.length,
+              separatorBuilder: (context, index) => const SizedBox(height: 24),
+              itemBuilder: (context, index) {
+                final item = fineDetails[index];
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                     Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Flexible(child: Text("${index + 1}. ${item.title}", style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w500))),
+                        Text("₹${NumberFormat('#,##,##0.00').format(item.amount)}", style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    Row(
+                      children: [
+                        Text("Issued by: ", style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w500)),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                          decoration: BoxDecoration(color: theme.cardColor, borderRadius: BorderRadius.circular(5)),
+                          child: Text(item.issuedBy, style: theme.textTheme.bodySmall),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    Text("Remark: ${item.remark}", style: theme.textTheme.bodyMedium?.copyWith(color: Colors.grey.shade500)),
+                    const Divider(height: 24),
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton.icon(
+                        onPressed: () {
+                           Navigator.push(context, MaterialPageRoute(builder: (context) => EditFinePage(fineId: item.id, reason: item.title, amount: item.amount.toString(), remarks: item.remark)));
+                        },
+                        icon: const Icon(Icons.edit, size: 16),
+                        label: const Text("Edit Fine"),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: theme.colorScheme.secondary.withOpacity(0.1),
+                          foregroundColor: theme.colorScheme.secondary,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                        ),
+                      ),
+                    ),
+                  ],
+                );
               },
-              icon: const Icon(Icons.edit, size: 16),
-              label: const Text("Edit Fine"),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: theme.colorScheme.secondary.withAlpha(35),
-                foregroundColor: theme.colorScheme.secondary,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-              ),
             ),
-          ),
         ],
       ),
     );
@@ -494,22 +540,9 @@ class CustomFineDetailsContainerBox extends StatelessWidget {
 }
 
 class CustomPaymentHistoryContainerBox extends StatelessWidget {
-  final String heading;
-  final double paymentReceived;
-  final String date;
-  final String mode;
-  final String submittedBy;
-  final String remark;
+  final List<PaymentHistoryItem> paymentHistory;
 
-  const CustomPaymentHistoryContainerBox({
-    super.key,
-    required this.heading,
-    required this.paymentReceived,
-    required this.date,
-    required this.mode,
-    required this.submittedBy,
-    required this.remark,
-  });
+  const CustomPaymentHistoryContainerBox({super.key, required this.paymentHistory});
 
   @override
   Widget build(BuildContext context) {
@@ -523,17 +556,34 @@ class CustomPaymentHistoryContainerBox extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(heading, style: theme.textTheme.titleLarge?.copyWith(color: theme.colorScheme.onPrimary)),
+          Text("Payment History", style: theme.textTheme.titleLarge?.copyWith(color: theme.colorScheme.onPrimary)),
           const SizedBox(height: 16),
-          _buildInfoRow(theme, "Payment Received", "₹$paymentReceived", valueColor: Colors.green),
-          const SizedBox(height: 8),
-          _buildInfoRow(theme, "Date", date),
-          const SizedBox(height: 8),
-          _buildInfoRow(theme, "Mode", mode),
-          const SizedBox(height: 8),
-          _buildInfoRow(theme, "Submitted by", submittedBy),
-          const SizedBox(height: 8),
-          _buildInfoRow(theme, "Remark", remark),
+           if (paymentHistory.isEmpty)
+            const Text("No payment history available.", style: TextStyle(color: Colors.white70))
+          else
+            ListView.separated(
+               shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              itemCount: paymentHistory.length,
+              separatorBuilder: (context, index) => const Divider(height: 24),
+              itemBuilder: (context, index) {
+                final item = paymentHistory[index];
+                 return Column(
+                   crossAxisAlignment: CrossAxisAlignment.start,
+                   children: [
+                    _buildInfoRow(theme, "Payment Received", "₹${NumberFormat('#,##,##0.00').format(item.amount)}", valueColor: Colors.green),
+                    const SizedBox(height: 8),
+                    _buildInfoRow(theme, "Date", item.date),
+                    const SizedBox(height: 8),
+                    _buildInfoRow(theme, "Mode", item.mode),
+                    const SizedBox(height: 8),
+                    _buildInfoRow(theme, "Submitted by", item.submittedBy),
+                    const SizedBox(height: 8),
+                    _buildInfoRow(theme, "Remark", item.remark),
+                   ],
+                 );
+              },
+            ),
         ],
       ),
     );
@@ -544,7 +594,7 @@ class CustomPaymentHistoryContainerBox extends StatelessWidget {
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(label, style: theme.textTheme.bodyLarge?.copyWith(color: theme.colorScheme.onPrimary.withAlpha(35))),
+        Text(label, style: theme.textTheme.bodyLarge?.copyWith(color: theme.colorScheme.onPrimary.withOpacity(0.6))),
         const SizedBox(width: 16),
         Expanded(
           child: Text(

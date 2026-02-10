@@ -1,4 +1,8 @@
+import 'dart:convert';
+
+import 'package:eduphin/services/api_service.dart';
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 
 // Data model for an assignment submission
 class AssignmentSubmission {
@@ -25,19 +29,18 @@ class AssignmentSubmission {
   });
 
   factory AssignmentSubmission.fromJson(Map<String, dynamic> json) {
-    final bool isGraded = json['graded'] as bool;
-    final String gradeValue = json['grade'] as String;
-    // The original logic to determine if a student failed.
-    final bool didFail = isGraded && gradeValue.startsWith('4');
+    final bool isGraded = json['marks_obtained'] != null;
+    final gradeValue = isGraded ? "${json['marks_obtained'] ?? 0} / ${json['assignment']?['total_marks'] ?? 100}" : 'Not Graded';
+    final didFail = isGraded && (json['marks_obtained'] ?? 0) < 40; // Example fail condition
 
     return AssignmentSubmission(
-      name: json['name'] as String,
-      fileName: json['fileName'] as String,
-      hasFile: json['hasFile'] as bool,
-      typedAnswer: json['typedAnswer'] as String,
-      submittedOn: json['submittedOn'] as String,
+      name: json['student']?['name'] ?? 'N/A',
+      fileName: json['file_path'] != null ? json['file_path'].split('/').last : 'No File',
+      hasFile: json['file_path'] != null,
+      typedAnswer: json['content'] ?? 'No typed answer provided.',
+      submittedOn: json['created_at'] != null ? DateFormat('dd MMM yyyy, hh:mm a').format(DateTime.parse(json['created_at'])) : 'N/A',
       grade: gradeValue,
-      remarks: json['remarks'] as String,
+      remarks: json['remarks'] ?? (isGraded ? '-' : 'Awaiting review.'),
       graded: isGraded,
       fail: didFail,
     );
@@ -45,9 +48,8 @@ class AssignmentSubmission {
 }
 
 class AssignmentSubmissionsScreen extends StatefulWidget {
-  // If you need to pass assignment details, add them here.
-  // For example: final String assignmentId;
-  const AssignmentSubmissionsScreen({super.key});
+  final int assignmentId;
+  const AssignmentSubmissionsScreen({super.key, required this.assignmentId});
 
   @override
   State<AssignmentSubmissionsScreen> createState() =>
@@ -58,6 +60,7 @@ class _AssignmentSubmissionsScreenState
     extends State<AssignmentSubmissionsScreen> {
   bool isLoading = true;
   List<AssignmentSubmission> submissions = [];
+  String assignmentTitle = '';
 
   @override
   void initState() {
@@ -65,53 +68,43 @@ class _AssignmentSubmissionsScreenState
     _fetchSubmissions();
   }
 
-  // TODO: Replace this with your actual API call.
   Future<void> _fetchSubmissions() async {
-    // Simulate network delay
-    await Future.delayed(const Duration(seconds: 1));
+    if (!mounted) return;
+    setState(() {
+      isLoading = true;
+    });
 
-    final dummyData = [
-      {
-        "name": "Rahul Sharma",
-        "fileName": "Uploaded PDF",
-        "hasFile": true,
-        "typedAnswer":
-        "The answer is provided in the attached document. Please refer to it for the detailed solution...",
-        "submittedOn": "18 Nov 2025, 10:30 AM",
-        "grade": "85 / 100",
-        "remarks": "Good effort. Some calculations need review.",
-        "graded": true
-      },
-      {
-        "name": "Priya Patel",
-        "fileName": "No File",
-        "hasFile": false,
-        "typedAnswer":
-        "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.",
-        "submittedOn": "19 Nov 2025, 09:15 PM",
-        "grade": "Not Graded",
-        "remarks": "Awaiting review.",
-        "graded": false
-      },
-      {
-        "name": "Anjali Verma",
-        "fileName": "Solution.pdf",
-        "hasFile": true,
-        "typedAnswer": "No typed answer provided.",
-        "submittedOn": "20 Nov 2025, 11:50 AM",
-        "grade": "45 / 100",
-        "remarks":
-        "Incomplete submission. Please follow the instructions carefully next time.",
-        "graded": true
-      },
-    ];
+    try {
+      final response = await ApiService.get('manager/study/assignment/${widget.assignmentId}/submissions');
+      if (response.statusCode == 200) {
+        final responseData = jsonDecode(response.body)['data'];
 
-    if (mounted) {
-      setState(() {
-        submissions =
-            dummyData.map((data) => AssignmentSubmission.fromJson(data)).toList();
-        isLoading = false;
-      });
+        final assignment = responseData['assignment'];
+        final submissionsData = responseData['submissions'] as List;
+
+        final fetchedSubmissions = submissionsData
+            .map((data) => AssignmentSubmission.fromJson(data))
+            .toList();
+
+        if (mounted) {
+          setState(() {
+            submissions = fetchedSubmissions;
+            assignmentTitle = assignment['title'] ?? 'Submissions';
+            isLoading = false;
+          });
+        }
+      } else {
+        throw Exception('Failed to load submissions');
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          isLoading = false;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error: $e')),
+        );
+      }
     }
   }
 
@@ -125,7 +118,7 @@ class _AssignmentSubmissionsScreenState
         elevation: 0,
         leading: BackButton(color: theme.colorScheme.onSurface),
         title: Text(
-          "Submissions for Assignment 1", // This can be dynamic too if passed to the widget
+          assignmentTitle,
           style: TextStyle(color: theme.colorScheme.onSurface),
         ),
       ),

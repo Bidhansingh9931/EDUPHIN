@@ -1,12 +1,24 @@
+import 'dart:convert';
+
+import 'package:eduphin/services/api_service.dart';
 import 'package:flutter/material.dart';
 
 import 'add_librarian.dart';
 
 class Librarian {
+  final int id;
   final String name;
   final String designation;
 
-  Librarian({required this.name, required this.designation});
+  Librarian({required this.id, required this.name, required this.designation});
+
+  factory Librarian.fromJson(Map<String, dynamic> json) {
+    return Librarian(
+      id: json['id'],
+      name: json['name'] ?? 'N/A',
+      designation: json['designation'] ?? 'Librarian',
+    );
+  }
 }
 
 class LibrarianListPage extends StatefulWidget {
@@ -17,6 +29,47 @@ class LibrarianListPage extends StatefulWidget {
 }
 
 class _LibrarianListPageState extends State<LibrarianListPage> {
+  List<Librarian> _librarians = [];
+  bool _isLoading = true;
+  String _error = '';
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchLibrarians();
+  }
+
+  Future<void> _fetchLibrarians() async {
+    setState(() {
+      _isLoading = true;
+      _error = '';
+    });
+
+    try {
+      final response = await ApiService.get('manager/users/6');
+
+      if (mounted) {
+        if (response.statusCode == 200) {
+          final data = jsonDecode(response.body);
+          final List<dynamic> usersData = data['data'] ?? data;
+          setState(() {
+            _librarians = usersData.map((json) => Librarian.fromJson(json)).toList();
+            _isLoading = false;
+          });
+        } else {
+          throw Exception('Failed to load librarians');
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _error = e.toString();
+          _isLoading = false;
+        });
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -28,13 +81,16 @@ class _LibrarianListPageState extends State<LibrarianListPage> {
           width: double.infinity,
           height: 50,
           child: FloatingActionButton(
-            onPressed: () {
-              Navigator.push(
+            onPressed: () async {
+              final result = await Navigator.push(
                 context,
                 MaterialPageRoute(
                   builder: (context) => const AddLibrarianPage(),
                 ),
               );
+              if (result == true && mounted) {
+                _fetchLibrarians();
+              }
             },
             child: Row(
               mainAxisAlignment: MainAxisAlignment.center,
@@ -46,8 +102,7 @@ class _LibrarianListPageState extends State<LibrarianListPage> {
                 const SizedBox(width: 8),
                 Text(
                   "Add Librarian",
-                  style: textTheme.titleMedium
-                      ?.copyWith(color: theme.colorScheme.onSurface),
+                  style: textTheme.titleMedium?.copyWith(color: theme.colorScheme.onSurface),
                 ),
               ],
             ),
@@ -61,8 +116,7 @@ class _LibrarianListPageState extends State<LibrarianListPage> {
           children: [
             Text(
               "Librarian List",
-              style: textTheme.titleLarge
-                  ?.copyWith(fontWeight: FontWeight.bold),
+              style: textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
             ),
             Icon(
               Icons.download,
@@ -71,72 +125,26 @@ class _LibrarianListPageState extends State<LibrarianListPage> {
           ],
         ),
       ),
-      body: LayoutBuilder(
-        builder: (context, constraints) {
-          return const Padding(
-            padding: EdgeInsets.only(bottom: 50.0, left: 16, right: 16, top: 16),
-            child: SingleChildScrollView(
-              child: Column(
-                children: [
-                  CustomLibrarianListBox(),
-                ],
-              ),
-            ),
-          );
-        },
+      body: Padding(
+        padding: const EdgeInsets.only(bottom: 50.0, left: 16, right: 16, top: 16),
+        child: _isLoading
+            ? const Center(child: CircularProgressIndicator())
+            : _error.isNotEmpty
+                ? Center(child: Text(_error))
+                : _librarians.isEmpty
+                    ? const Center(child: Text("No librarians found."))
+                    : RefreshIndicator(
+                        onRefresh: _fetchLibrarians,
+                        child: CustomLibrarianListBox(librarians: _librarians),
+                      ),
       ),
     );
   }
 }
 
-class CustomLibrarianListBox extends StatefulWidget {
-  const CustomLibrarianListBox({super.key});
-
-  @override
-  State<CustomLibrarianListBox> createState() => _CustomLibrarianListBoxState();
-}
-
-class _CustomLibrarianListBoxState extends State<CustomLibrarianListBox> {
-  String? _selectedLibrarian = "All Librarian";
-  final List<String> _librarianTypes = [
-    "All Librarian",
-    "Institute Librarian",
-    "Branch Librarian",
-    "Department Librarian",
-  ];
-
-  final List<Librarian> _librarians = [];
-  bool _isLoading = true;
-
-  @override
-  void initState() {
-    super.initState();
-    _fetchLibrarians();
-  }
-
-  Future<void> _fetchLibrarians() async {
-    // Simulate API call to fetch librarians.
-    // Replace this with your actual API call.
-    await Future.delayed(const Duration(seconds: 2));
-    final List<Librarian> newLibrarians = [
-      Librarian(name: "Rohan Mehra", designation: "Principal"),
-      Librarian(name: "Sunita Williams", designation: "Vice Principal"),
-      Librarian(name: "Anjali Sharma", designation: "Academic Head"),
-      Librarian(name: "Vikram Rathore", designation: "Admissions Officer"),
-      Librarian(name: "Priya Kapoor", designation: "HR Manager"),
-      Librarian(name: "Amit Dessai", designation: "Finance Manager"),
-      Librarian(name: "Sneha Verma", designation: "IT Head"),
-      Librarian(name: "Rajesh Kumar", designation: "Operations Manager"),
-      Librarian(name: "Deepa Singh", designation: "Librarian"),
-    ];
-
-    if (mounted) {
-      setState(() {
-        _librarians.addAll(newLibrarians);
-        _isLoading = false;
-      });
-    }
-  }
+class CustomLibrarianListBox extends StatelessWidget {
+  final List<Librarian> librarians;
+  const CustomLibrarianListBox({super.key, required this.librarians});
 
   @override
   Widget build(BuildContext context) {
@@ -153,84 +161,44 @@ class _CustomLibrarianListBoxState extends State<CustomLibrarianListBox> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12),
-            decoration: BoxDecoration(
-              color: theme.colorScheme.onPrimary.withAlpha(25),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: DropdownButton<String>(
-              value: _selectedLibrarian,
-              underline: const SizedBox(),
-              isExpanded: true,
-              icon: Icon(Icons.arrow_drop_down, color: theme.colorScheme.onPrimary),
-              onChanged: (String? newValue) {
-                setState(() {
-                  _selectedLibrarian = newValue;
-                });
-              },
-              items: _librarianTypes.map<DropdownMenuItem<String>>((String value) {
-                return DropdownMenuItem<String>(
-                  value: value,
-                  child: Wrap(
-                    crossAxisAlignment: WrapCrossAlignment.center,
-                    children: [
-                      Icon(Icons.person_outline, color: theme.colorScheme.onPrimary),
-                      const SizedBox(width: 8),
-                      Text(
-                        value,
-                        style: textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onPrimary),
-                      ),
-                    ],
-                  ),
-                );
-              }).toList(),
-            ),
-          ),
-          const SizedBox(height: 16),
-          _isLoading
-              ? const Center(child: CircularProgressIndicator())
-              : LayoutBuilder(
-                  builder: (context, constraints) {
-                    return ListView.separated(
-                      shrinkWrap: true,
-                      physics: const NeverScrollableScrollPhysics(),
-                      itemCount: _librarians.length,
-                      separatorBuilder: (context, index) => const SizedBox(height: 16),
-                      itemBuilder: (context, index) {
-                        final librarian = _librarians[index];
-                        return Container(
-                          padding: const EdgeInsets.all(12),
-                          decoration: BoxDecoration(
-                            color: theme.colorScheme.onPrimary.withAlpha(25),
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: Row(
-                            children: [
-                              const SizedBox(width: 16),
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      librarian.name,
-                                      style: textTheme.titleMedium?.copyWith(color: theme.colorScheme.onPrimary),
-                                    ),
-                                    const SizedBox(height: 4),
-                                    Text(
-                                      librarian.designation,
-                                      style: textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onPrimary.withAlpha(180)),
-                                    )
-                                  ],
-                                ),
-                              )
-                            ],
-                          ),
-                        );
-                      },
-                    );
-                  },
+          ListView.separated(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            itemCount: librarians.length,
+            separatorBuilder: (context, index) => const SizedBox(height: 16),
+            itemBuilder: (context, index) {
+              final librarian = librarians[index];
+              return Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: theme.colorScheme.onPrimary.withAlpha(25),
+                  borderRadius: BorderRadius.circular(12),
                 ),
+                child: Row(
+                  children: [
+                    const CircleAvatar(child: Icon(Icons.person)),
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            librarian.name,
+                            style: textTheme.titleMedium?.copyWith(color: theme.colorScheme.onPrimary),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            librarian.designation,
+                            style: textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onPrimary.withAlpha(180)),
+                          )
+                        ],
+                      ),
+                    )
+                  ],
+                ),
+              );
+            },
+          ),
         ],
       ),
     );

@@ -1,7 +1,12 @@
+import 'dart:async';
+import 'dart:convert';
+
+import 'package:eduphin/services/api_service.dart';
 import 'package:flutter/material.dart';
 
 class AddNewRemarksPage extends StatefulWidget {
-  const AddNewRemarksPage({super.key});
+  final int studentId;
+  const AddNewRemarksPage({super.key, required this.studentId});
 
   @override
   State<AddNewRemarksPage> createState() => _AddNewRemarksPageState();
@@ -25,26 +30,56 @@ class _AddNewRemarksPageState extends State<AddNewRemarksPage> {
       _isLoading = true;
     });
 
-    // Simulate API call
-    await Future.delayed(const Duration(seconds: 2));
+    try {
+      final remarkData = {
+        'student_id': widget.studentId,
+        'remarks_type': _selectedRemarkType,
+        'remarks': _descriptionController.text,
+        'from_date': _fromDateController.text,
+        'to_date': _toDateController.text,
+      };
 
-    final remarkData = {
-      'type': _selectedRemarkType,
-      'description': _descriptionController.text,
-      'from_date': _fromDateController.text,
-      'to_date': _toDateController.text,
-    };
+      final response = await ApiService.post('manager/students/remarks', remarkData);
 
-    print('Adding remark: $remarkData');
-
-    if (mounted) {
-      setState(() {
-        _isLoading = false;
-      });
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Remark added successfully!')),
-      );
-      Navigator.of(context).pop();
+      if (mounted) {
+        final responseData = jsonDecode(response.body);
+        if (response.statusCode == 201 && responseData['status'] == true) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(responseData['message'] ?? 'Remark added successfully!'),
+              backgroundColor: Colors.green,
+            ),
+          );
+          Navigator.of(context).pop(true);
+        } else {
+          throw Exception(responseData['message'] ?? 'Failed to add remark');
+        }
+      }
+    } on TimeoutException {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('The connection timed out. Please try again.'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } on Exception catch (e) {
+      if (mounted) {
+        final message = e.toString().replaceFirst('Exception: ', '');
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(message),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
     }
   }
 
@@ -254,8 +289,8 @@ class _AddNewRemarksPageState extends State<AddNewRemarksPage> {
     );
     if (picked != null) {
       setState(() {
-        // Format date to DD-MM-YYYY
-        controller.text = "${picked.day.toString().padLeft(2, '0')}-${picked.month.toString().padLeft(2, '0')}-${picked.year}";
+        // Format date to YYYY-MM-DD for the API
+        controller.text = "${picked.year}-${picked.month.toString().padLeft(2, '0')}-${picked.day.toString().padLeft(2, '0')}";
       });
     }
   }

@@ -1,7 +1,11 @@
+import 'dart:convert';
+
+import 'package:eduphin/services/api_service.dart';
 import 'package:flutter/material.dart';
 
 class AddNewFine extends StatefulWidget {
-  const AddNewFine({super.key});
+  final int studentId;
+  const AddNewFine({super.key, required this.studentId});
 
   @override
   State<StatefulWidget> createState() => _AddNewFineState();
@@ -12,6 +16,7 @@ class _AddNewFineState extends State<AddNewFine> {
   late final TextEditingController _reasonController;
   late final TextEditingController _amountController;
   late final TextEditingController _remarksController;
+  bool _isSaving = false;
 
   @override
   void initState() {
@@ -29,14 +34,50 @@ class _AddNewFineState extends State<AddNewFine> {
     super.dispose();
   }
 
-  void _saveFine() {
-    if (_formKey.currentState!.validate()) {
-      final result = {
-        'reason': _reasonController.text,
+  Future<void> _saveFine() async {
+    if (!_formKey.currentState!.validate()) {
+      return;
+    }
+
+    setState(() => _isSaving = true);
+
+    try {
+      final body = {
+        'student_id': widget.studentId.toString(),
+        'fine_type': _reasonController.text,
         'amount': _amountController.text,
         'remarks': _remarksController.text,
       };
-      Navigator.pop(context, result);
+
+      final response = await ApiService.post('manager/fees/fine', body);
+
+      if (!mounted) return;
+
+      final responseData = jsonDecode(response.body);
+
+      if (response.statusCode == 200 && responseData['status'] == true) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(responseData['message'] ?? 'Fine added successfully!'), backgroundColor: Colors.green),
+        );
+        Navigator.pop(context, true); // Return true to indicate success
+      } else {
+        String errorMessage = responseData['message'] ?? 'An unknown error occurred.';
+        if (responseData.containsKey('errors')) {
+          final errors = responseData['errors'] as Map<String, dynamic>;
+          errorMessage = errors.values.first[0];
+        }
+        throw Exception(errorMessage);
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(e.toString().replaceFirst("Exception: ", "")), backgroundColor: Colors.red),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isSaving = false);
+      }
     }
   }
 
@@ -70,7 +111,7 @@ class _AddNewFineState extends State<AddNewFine> {
             const SizedBox(width: 16),
             Expanded(
               child: ElevatedButton(
-                onPressed: _saveFine,
+                onPressed: _isSaving ? null : _saveFine,
                 style: ElevatedButton.styleFrom(
                   backgroundColor: theme.colorScheme.primary,
                   foregroundColor: theme.colorScheme.onPrimary,
@@ -79,7 +120,9 @@ class _AddNewFineState extends State<AddNewFine> {
                     borderRadius: BorderRadius.circular(12),
                   ),
                 ),
-                child: Text("Save", style: theme.textTheme.labelLarge?.copyWith(color: theme.colorScheme.onPrimary)),
+                child: _isSaving
+                    ? const SizedBox(height: 24, width: 24, child: CircularProgressIndicator(strokeWidth: 3, valueColor: AlwaysStoppedAnimation(Colors.white)))
+                    : Text("Save", style: theme.textTheme.labelLarge?.copyWith(color: theme.colorScheme.onPrimary)),
               ),
             ),
           ],

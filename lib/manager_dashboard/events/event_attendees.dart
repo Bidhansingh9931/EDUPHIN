@@ -1,4 +1,7 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
+import 'package:eduphin/services/api_service.dart';
 
 class Attendee {
   final String name;
@@ -12,10 +15,23 @@ class Attendee {
     required this.status,
     required this.attendance,
   });
+
+  factory Attendee.fromJson(Map<String, dynamic> participant, Map<String, dynamic>? user) {
+    final status = participant['status'] as String? ?? 'pending';
+    final isAttended = status == 'confirmed';
+
+    return Attendee(
+      name: user?['name'] as String? ?? 'N/A',
+      email: user?['email'] as String? ?? 'N/A',
+      status: status,
+      attendance: isAttended ? 'Attended' : 'Not Attended',
+    );
+  }
 }
 
 class EventAttendees extends StatefulWidget {
-  const EventAttendees({super.key});
+  final int eventId;
+  const EventAttendees({super.key, required this.eventId});
 
   @override
   State<StatefulWidget> createState() => _EventAttendeesState();
@@ -26,6 +42,8 @@ class _EventAttendeesState extends State<EventAttendees> {
   List<Attendee> _allAttendees = [];
   List<Attendee> _filteredAttendees = [];
   bool _isLoading = true;
+  String _eventName = "";
+  String _errorMessage = "";
   final TextEditingController _searchController = TextEditingController();
 
   @override
@@ -35,7 +53,7 @@ class _EventAttendeesState extends State<EventAttendees> {
     _searchController.addListener(_filterAttendees);
   }
 
-    @override
+  @override
   void dispose() {
     _searchController.dispose();
     super.dispose();
@@ -43,25 +61,58 @@ class _EventAttendeesState extends State<EventAttendees> {
 
 
   Future<void> _fetchAttendees() async {
-    // Simulate API call to fetch attendees.
-    // Replace this with your actual API call.
-    await Future.delayed(const Duration(seconds: 2));
-    final List<Attendee> attendees = [
-      Attendee(name: "Aarav Sharma", email: "aarav.sharma@school.com", status: "Student", attendance: "Attended"),
-      Attendee(name: "Diya Patel", email: "diya.patel@school.com", status: "Student", attendance: "Not Attended"),
-      Attendee(name: "Rohan Kumar", email: "rohan.kumar@school.com", status: "Student", attendance: "Attended"),
-      Attendee(name: "Ms.Anjali Mehta", email: "anjali.mehta@school.com", status: "Teacher", attendance: "Attended"),
-      Attendee(name: "Arjun Gupta", email: "arjun.gupta@school.com", status: "Student", attendance: "Not Attended"),
-      Attendee(name: "Mr.Vikram Rathore", email: "vikram.rathore@school.com", status: "Staff", attendance: "Not Attended"),
-      Attendee(name: "Vivaan Reddy", email: "vivaan.reddy@school.com", status: "Student", attendance: "Attended"),
-    ];
+    if (!mounted) return;
+    setState(() {
+      _isLoading = true;
+      _errorMessage = "";
+    });
 
-    if (mounted) {
-      setState(() {
-        _allAttendees = attendees;
-        _filteredAttendees = attendees;
-        _isLoading = false;
-      });
+    try {
+      final response = await ApiService.get('manager/events/${widget.eventId}/participants');
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        final event = data['event'] as Map<String, dynamic>?;
+        final participants = data['participants'] as List<dynamic>?;
+        final users = data['users'] as List<dynamic>?;
+
+        if (event == null || participants == null || users == null) {
+          throw Exception('Invalid API response format');
+        }
+
+        final userMap = {for (var user in users) user['id']: user};
+
+        final attendees = participants.map((p) {
+          try {
+            final user = userMap[p['user_id']];
+            return Attendee.fromJson(p, user);
+          } catch (e) {
+            debugPrint('Error parsing attendee: $e');
+            return null;
+          }
+        }).where((a) => a != null).cast<Attendee>().toList();
+
+        if (mounted) {
+          setState(() {
+            _eventName = event['title'] as String? ?? 'Event Attendees';
+            _allAttendees = attendees;
+            _filteredAttendees = attendees;
+            _isLoading = false;
+          });
+        }
+      } else {
+        throw Exception('Failed to load attendees. Status: ${response.statusCode}');
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+          _errorMessage = e.toString().replaceFirst("Exception: ", "");
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(_errorMessage)),
+        );
+      }
     }
   }
 
@@ -107,7 +158,7 @@ class _EventAttendeesState extends State<EventAttendees> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text("Annual Sports Day", style: theme.textTheme.headlineSmall),
+            Text(_eventName, style: theme.textTheme.headlineSmall),
             const SizedBox(height: 8),
             SearchBar(
               controller: _searchController,
@@ -142,10 +193,12 @@ class _EventAttendeesState extends State<EventAttendees> {
                     );
                   }).toList(),
                   onChanged: (String? newValue) {
-                    setState(() {
-                      _selectedFilter = newValue!;
-                      _filterAttendees();
-                    });
+                    if (newValue != null) {
+                      setState(() {
+                        _selectedFilter = newValue;
+                        _filterAttendees();
+                      });
+                    }
                   },
                 ),
               ],
@@ -157,15 +210,19 @@ class _EventAttendeesState extends State<EventAttendees> {
             Expanded(
               child: _isLoading
                   ? const Center(child: CircularProgressIndicator())
-                  : LayoutBuilder(
-                      builder: (context, constraints) {
-                        if (constraints.maxWidth < 600) {
-                          return _buildAttendeeList();
-                        } else {
-                          return _buildAttendeeGrid();
-                        }
-                      },
-                    ),
+                  : _errorMessage.isNotEmpty 
+                    ? Center(child: Text(_errorMessage, style: TextStyle(color: theme.colorScheme.error)))
+                    : _filteredAttendees.isEmpty 
+                        ? const Center(child: Text("No attendees found."))
+                        : LayoutBuilder(
+                            builder: (context, constraints) {
+                              if (constraints.maxWidth < 600) {
+                                return _buildAttendeeList();
+                              } else {
+                                return _buildAttendeeGrid();
+                              }
+                            },
+                          ),
             ),
           ],
         ),
@@ -187,10 +244,10 @@ class _EventAttendeesState extends State<EventAttendees> {
   Widget _buildAttendeeGrid() {
     return GridView.builder(
       gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
-        maxCrossAxisExtent: 400, // Each item will have a maximum width of 400
+        maxCrossAxisExtent: 400,
         mainAxisSpacing: 16,
         crossAxisSpacing: 16,
-        childAspectRatio: 3, // Adjust aspect ratio for better layout
+        childAspectRatio: 3,
       ),
       itemCount: _filteredAttendees.length,
       itemBuilder: (context, index) {

@@ -202,7 +202,7 @@ class _ModeratorProfilePageState extends State<ModeratorProfilePage> {
         title: Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Text("Moderator Profile",
+            Text("Profile",
                 style: TextStyle(
                     color: Colors.white, fontSize: responsiveFontSize(20))),
             const Icon(Icons.download, color: Colors.white),

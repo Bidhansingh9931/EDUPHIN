@@ -1,4 +1,9 @@
+import 'dart:async';
+import 'dart:convert';
+
+import 'package:eduphin/services/api_service.dart';
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 
 // --- Data Models ---
 class StudentDetails {
@@ -11,6 +16,21 @@ class StudentDetails {
     required this.rollNo,
     required this.className,
   });
+
+  factory StudentDetails.fromJson(Map<String, dynamic> json) {
+    // Safely combine first and last names
+    final firstName = json['first_name'] ?? '';
+    final lastName = json['last_name'] ?? '';
+    final fullName = '$firstName $lastName'.trim();
+
+    return StudentDetails(
+      name: fullName.isEmpty ? 'N/A' : fullName,
+      // Check for different possible roll number keys and handle null
+      rollNo: json['student_roll_no']?.toString() ?? json['roll_no']?.toString() ?? 'N/A',
+      // Safely access nested class name
+      className: json['class']?['name'] ?? 'N/A',
+    );
+  }
 }
 
 class AttendanceRecord {
@@ -29,7 +49,8 @@ class AttendanceRecord {
 
 // --- Page Widget ---
 class ViewAttendancePage extends StatefulWidget {
-  const ViewAttendancePage({super.key});
+  final int studentId;
+  const ViewAttendancePage({super.key, required this.studentId});
 
   @override
   State<StatefulWidget> createState() => ViewAttendancePageState();
@@ -39,6 +60,7 @@ class ViewAttendancePageState extends State<ViewAttendancePage> {
   bool _isLoading = true;
   StudentDetails? _studentDetails;
   final List<AttendanceRecord> _attendanceRecords = [];
+  String _error = '';
 
   @override
   void initState() {
@@ -47,32 +69,88 @@ class ViewAttendancePageState extends State<ViewAttendancePage> {
   }
 
   Future<void> _fetchAttendanceData() async {
-    // Simulate API call to fetch data.
-    // Replace this with your actual API call.
-    await Future.delayed(const Duration(seconds: 2));
+    if (!mounted) return;
+    setState(() {
+      _isLoading = true;
+      _error = '';
+    });
 
-    final student = StudentDetails(
-      name: "Aarav Sharma",
-      rollNo: "1",
-      className: "10th - A",
-    );
+    try {
+      final response = await ApiService.get('manager/attendance/student/${widget.studentId}');
+      if (!mounted) return;
 
-    final records = [
-      AttendanceRecord(date: "25 Jul 2025", day: "Thursday", attendedClasses: 7, totalClasses: 8),
-      AttendanceRecord(date: "24 Jul 2025", day: "Wednesday", attendedClasses: 8, totalClasses: 8),
-      AttendanceRecord(date: "23 Jul 2025", day: "Tuesday", attendedClasses: 4, totalClasses: 8),
-      AttendanceRecord(date: "22 Jul 2025", day: "Monday", attendedClasses: 8, totalClasses: 8),
-      AttendanceRecord(date: "21 Jul 2025", day: "Saturday", attendedClasses: 4, totalClasses: 4),
-      AttendanceRecord(date: "19 Jul 2025", day: "Friday", attendedClasses: 6, totalClasses: 8),
-      AttendanceRecord(date: "18 Jul 2025", day: "Thursday", attendedClasses: 8, totalClasses: 8),
-    ];
+      if (response.statusCode == 200) {
+        final responseData = jsonDecode(response.body);
 
-    if (mounted) {
-      setState(() {
-        _studentDetails = student;
-        _attendanceRecords.addAll(records);
-        _isLoading = false;
-      });
+        if (responseData['success'] == true && responseData['data'] != null) {
+          final data = responseData['data'];
+
+          final student = StudentDetails.fromJson(data['student']);
+          
+          final rawAttendanceList = (data['student_attendance'] as List);
+
+          // Group attendance records by date
+          final Map<String, List<dynamic>> groupedByDate = {};
+          for (var record in rawAttendanceList) {
+            final date = record['date'];
+            if (date != null) {
+              groupedByDate.putIfAbsent(date, () => []).add(record);
+            }
+          }
+
+          // Process grouped data into AttendanceRecord objects
+          final processedRecords = groupedByDate.entries.map((entry) {
+            final date = entry.key;
+            final recordsForDay = entry.value;
+
+            final attended = recordsForDay.where((r) => r['status'] == 'present').length;
+            final total = recordsForDay.length;
+
+            final dayOfWeek = DateFormat('EEEE').format(DateTime.parse(date));
+
+            return AttendanceRecord(
+              date: DateFormat('d MMM, yyyy').format(DateTime.parse(date)),
+              day: dayOfWeek,
+              attendedClasses: attended,
+              totalClasses: total,
+            );
+          }).toList();
+          
+          // Sort records by date (most recent first)
+          processedRecords.sort((a, b) => DateFormat('d MMM, yyyy').parse(b.date).compareTo(DateFormat('d MMM, yyyy').parse(a.date)));
+
+          if (mounted) {
+            setState(() {
+              _studentDetails = student;
+              _attendanceRecords.clear();
+              _attendanceRecords.addAll(processedRecords);
+            });
+          }
+        } else {
+          final errorMessage = responseData['message'] ?? 'API did not return successful data.';
+          throw Exception(errorMessage);
+        }
+      } else {
+        throw Exception('Failed to load attendance data. Status Code: ${response.statusCode}');
+      }
+    } on TimeoutException {
+      if (mounted) {
+        setState(() {
+          _error = "The connection timed out. Please try again.";
+        });
+      }
+    } on Exception catch (e) {
+      if (mounted) {
+        setState(() {
+          _error = e.toString().replaceFirst('Exception: ', '');
+        });
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
     }
   }
 
@@ -81,55 +159,85 @@ class ViewAttendancePageState extends State<ViewAttendancePage> {
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
-        title: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            const Text("Attendance Details"),
-            IconButton(onPressed: () {}, icon: const Icon(Icons.more_vert_sharp)),
-          ],
-        ),
+        title: const Text("Attendance Details"),
+        centerTitle: true,
+        actions: [
+          IconButton(onPressed: _fetchAttendanceData, icon: const Icon(Icons.refresh)),
+        ],
       ),
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : Padding(
-              padding: const EdgeInsets.fromLTRB(16, 16, 16, 50),
-              child: Column(
-                children: [
-                  if (_studentDetails != null)
-                    StudentInfoCard(details: _studentDetails!),
-                  const SizedBox(height: 16),
-                  Expanded(
-                    child: LayoutBuilder(builder: (context, constraints) {
-                      if (constraints.maxWidth > 600) {
-                        return GridView.builder(
-                          itemCount: _attendanceRecords.length,
-                          gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
-                            maxCrossAxisExtent: 400,
-                            mainAxisSpacing: 10,
-                            crossAxisSpacing: 10,
-                            childAspectRatio: 3,
-                          ),
-                          itemBuilder: (context, index) {
-                            return AttendanceRecordCard(
-                                record: _attendanceRecords[index]);
-                          },
-                        );
-                      } else {
-                        return ListView.separated(
-                          itemCount: _attendanceRecords.length,
-                          separatorBuilder: (context, index) =>
-                              const SizedBox(height: 10),
-                          itemBuilder: (context, index) {
-                            return AttendanceRecordCard(
-                                record: _attendanceRecords[index]);
-                          },
-                        );
-                      }
-                    }),
-                  ),
-                ],
+      body: _buildBody(),
+    );
+  }
+
+  Widget _buildBody() {
+    if (_isLoading) {
+      return const Center(child: CircularProgressIndicator());
+    }
+    if (_error.isNotEmpty) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(16.0),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Text(
+                _error,
+                textAlign: TextAlign.center,
+                style: const TextStyle(color: Colors.red),
               ),
-            ),
+              const SizedBox(height: 16),
+              ElevatedButton(
+                onPressed: _fetchAttendanceData,
+                child: const Text("Retry"),
+              )
+            ],
+          ),
+        ),
+      );
+    }
+    if (_studentDetails == null) {
+      return const Center(child: Text("No student details found."));
+    }
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 50),
+      child: Column(
+        children: [
+          StudentInfoCard(details: _studentDetails!),
+          const SizedBox(height: 16),
+          Expanded(
+            child: _attendanceRecords.isEmpty
+                ? const Center(child: Text("No attendance records found."))
+                : LayoutBuilder(builder: (context, constraints) {
+                    if (constraints.maxWidth > 600) {
+                      return GridView.builder(
+                        itemCount: _attendanceRecords.length,
+                        gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
+                          maxCrossAxisExtent: 400,
+                          mainAxisSpacing: 10,
+                          crossAxisSpacing: 10,
+                          childAspectRatio: 3,
+                        ),
+                        itemBuilder: (context, index) {
+                          return AttendanceRecordCard(
+                              record: _attendanceRecords[index]);
+                        },
+                      );
+                    } else {
+                      return ListView.separated(
+                        itemCount: _attendanceRecords.length,
+                        separatorBuilder: (context, index) =>
+                            const SizedBox(height: 10),
+                        itemBuilder: (context, index) {
+                          return AttendanceRecordCard(
+                              record: _attendanceRecords[index]);
+                        },
+                      );
+                    }
+                  }),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -163,11 +271,11 @@ class StudentInfoCard extends StatelessWidget {
           const SizedBox(height: 5),
           Text("Roll No : ${details.rollNo}",
               style: theme.textTheme.bodyLarge
-                  ?.copyWith(color: theme.colorScheme.onSurface.withAlpha(35))),
+                  ?.copyWith(color: theme.colorScheme.onSurface.withAlpha(150))),
           const SizedBox(height: 5),
           Text("Class : ${details.className}",
               style: theme.textTheme.bodyLarge
-                  ?.copyWith(color: theme.colorScheme.onSurface.withAlpha(35))),
+                  ?.copyWith(color: theme.colorScheme.onSurface.withAlpha(150))),
         ],
       ),
     );
@@ -253,6 +361,7 @@ class AttendanceRecordCard extends StatelessWidget {
                 const SizedBox(width: 16),
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.end,
+                  mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     Text(
                       "${record.attendedClasses}/${record.totalClasses}",

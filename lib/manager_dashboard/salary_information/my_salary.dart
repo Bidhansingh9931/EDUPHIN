@@ -1,4 +1,8 @@
+import 'dart:convert';
+import 'package:http/http.dart' as http;
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
+import 'package:eduphin/services/api_service.dart';
 
 // --- DATA MODELS ---
 
@@ -9,25 +13,58 @@ class SalaryDetails {
   final String employerBranch;
   final String zone;
 
-  SalaryDetails({
+  const SalaryDetails({
     required this.bankAccount,
     required this.ifsc,
     required this.bankName,
     required this.employerBranch,
     required this.zone,
   });
+
+  factory SalaryDetails.fromJson(Map<String, dynamic> json) {
+    return SalaryDetails(
+      bankAccount: json['bank_account_number'] ?? '',
+      ifsc: json['ifsc_code'] ?? '',
+      bankName: json['bank_name'] ?? '',
+      employerBranch: json['branch'] ?? '',
+      zone: json['zone'] ?? '',
+    );
+  }
 }
 
 class PastSalaryRecord {
   final String monthYear;
   final String amount;
   final String paidOn;
+  final int id;
 
-  PastSalaryRecord({
+  const PastSalaryRecord({
     required this.monthYear,
     required this.amount,
     required this.paidOn,
+    required this.id,
   });
+
+  factory PastSalaryRecord.fromJson(Map<String, dynamic> json) {
+    final numberFormat = NumberFormat.currency(locale: 'en_IN', symbol: '');
+    final double netSalary = double.tryParse(json['net_salary']?.toString() ?? '0.0') ?? 0.0;
+    
+    String formattedDate = 'N/A';
+    if(json['created_at'] != null) {
+      try {
+        formattedDate = 'paid on ${DateFormat('d MMM yyyy').format(DateTime.parse(json['created_at']))}';
+      } catch (e) {
+        // Do nothing if date parsing fails
+      }
+    }
+
+    return PastSalaryRecord(
+      id: json['id'] ?? 0,
+      monthYear: '${json['month'] ?? ''} ${json['year'] ?? ''}',
+      amount: numberFormat.format(netSalary),
+      paidOn: formattedDate,
+    );
+  }
 }
 
 // --- MAIN WIDGET ---
@@ -42,8 +79,8 @@ class MySalaryPage extends StatefulWidget {
 class _MySalaryPageState extends State<MySalaryPage> {
   bool _isLoading = true;
   bool _isSaving = false;
-  SalaryDetails? _salaryDetails;
   final List<PastSalaryRecord> _pastRecords = [];
+  Map<String, dynamic>? _accountDetails;
 
   // Text editing controllers for the form fields
   final _bankAccountController = TextEditingController();
@@ -69,58 +106,119 @@ class _MySalaryPageState extends State<MySalaryPage> {
   }
 
   Future<void> _fetchSalaryData() async {
-    await Future.delayed(const Duration(seconds: 1)); // Simulate API call
+    if (!mounted) return;
+    setState(() => _isLoading = true);
 
-    final details = SalaryDetails(
-      bankAccount: "111122223333",
-      ifsc: "UN11100010",
-      bankName: "Unity Bank",
-      employerBranch: "Unity Branch - Sector 2",
-      zone: "Sector 2",
-    );
+    try {
+      final token = await ApiService.getToken();
+      if (token == null) throw Exception('Token not found');
 
-    final records = [
-      PastSalaryRecord(monthYear: "May 2024", amount: "75,000", paidOn: "paid on 31 May 2024"),
-      PastSalaryRecord(monthYear: "April 2024", amount: "75,000", paidOn: "paid on 30 April 2024"),
-      PastSalaryRecord(monthYear: "March 2024", amount: "75,000", paidOn: "paid on 31 Mar 2024"),
-    ];
+      final response = await http.get(
+        Uri.parse('${ApiService.baseUrl}/api/manager/my-salary'),
+        headers: {
+          'Authorization': 'Bearer $token',
+          'Accept': 'application/json',
+        },
+      );
 
-    if (mounted) {
-      setState(() {
-        _salaryDetails = details;
-        _pastRecords.addAll(records);
+      if (!mounted) return;
 
-        _bankAccountController.text = details.bankAccount;
-        _ifscController.text = details.ifsc;
-        _bankNameController.text = details.bankName;
-        _employerBranchController.text = details.employerBranch;
-        _zoneController.text = details.zone;
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        
+        _accountDetails = data['account'] as Map<String, dynamic>?;
+        if (_accountDetails == null) {
+          throw Exception("Could not retrieve account details.");
+        }
 
-        _isLoading = false;
-      });
+        final details = SalaryDetails.fromJson(_accountDetails!);
+        final records = (data['salaries'] as List)
+            .map((record) => PastSalaryRecord.fromJson(record))
+            .toList();
+
+        setState(() {
+          _pastRecords.clear();
+          _pastRecords.addAll(records);
+
+          _bankAccountController.text = details.bankAccount;
+          _ifscController.text = details.ifsc;
+          _bankNameController.text = details.bankName;
+          _employerBranchController.text = details.employerBranch;
+          _zoneController.text = details.zone;
+
+          _isLoading = false;
+        });
+      } else {
+        throw Exception('Failed to load salary data: ${response.statusCode}');
+      }
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _isLoading = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error: ${e.toString()}')),
+      );
     }
   }
 
   Future<void> _saveSalaryData() async {
-    setState(() => _isSaving = true);
-    await Future.delayed(const Duration(seconds: 2)); // Simulate API call
-
-    final updatedDetails = SalaryDetails(
-      bankAccount: _bankAccountController.text,
-      ifsc: _ifscController.text,
-      bankName: _bankNameController.text,
-      employerBranch: _employerBranchController.text,
-      zone: _zoneController.text,
-    );
-
-    print('Saving data for account: ${updatedDetails.bankAccount}');
-
     if (!mounted) return;
+    setState(() => _isSaving = true);
 
-    setState(() => _isSaving = false);
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Banking details updated successfully!')),
-    );
+    try {
+      final token = await ApiService.getToken();
+      if (token == null) throw Exception('Token not found');
+
+      if (_accountDetails == null) {
+        throw Exception('Cannot save, user details not loaded.');
+      }
+      
+      final Map<String, dynamic> updatedDetails = Map.from(_accountDetails!);
+      updatedDetails['bank_account_number'] = _bankAccountController.text;
+      updatedDetails['ifsc_code'] = _ifscController.text;
+      updatedDetails['bank_name'] = _bankNameController.text;
+      updatedDetails['branch'] = _employerBranchController.text;
+      updatedDetails['zone'] = _zoneController.text;
+
+      // Remove fields that are not being updated to avoid validation errors.
+      updatedDetails.remove('photo');
+      updatedDetails.remove('resume');
+      
+      final response = await http.post(
+        Uri.parse('${ApiService.baseUrl}/api/manager/profile/update'),
+        headers: {
+          'Authorization': 'Bearer $token',
+          'Accept': 'application/json',
+          'Content-Type': 'application/json',
+        },
+        body: jsonEncode(updatedDetails),
+      );
+      
+      if (!mounted) return;
+      
+      if (response.statusCode == 200) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Banking details updated successfully!'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      } else {
+        final responseData = jsonDecode(response.body);
+        throw Exception(responseData['message'] ?? 'Failed to save details');
+      }
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error: ${e.toString()}'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _isSaving = false);
+      }
+    }
   }
 
   @override
@@ -136,7 +234,6 @@ class _MySalaryPageState extends State<MySalaryPage> {
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
           : LayoutBuilder(builder: (context, constraints) {
-              // Use a different layout for wider screens
               if (constraints.maxWidth > 800) {
                 return _buildWideLayout();
               } else {
@@ -165,13 +262,12 @@ class _MySalaryPageState extends State<MySalaryPage> {
 
   Widget _buildNarrowLayout() {
     return SingleChildScrollView(
-      padding: const EdgeInsets.fromLTRB(16, 16, 16, 50),
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 80),
       child: Column(
         children: [
           _buildBankingInfoSection(),
           const SizedBox(height: 16),
           _buildPastSalariesSection(),
-          const SizedBox(height: 80), // Padding for FAB
         ],
       ),
     );
@@ -179,7 +275,7 @@ class _MySalaryPageState extends State<MySalaryPage> {
 
   Widget _buildWideLayout() {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 16, 16, 50),
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 80),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -219,15 +315,18 @@ class _MySalaryPageState extends State<MySalaryPage> {
       title: "Past Salary Record",
       icon: Icons.history,
       children: [
-        ListView.separated(
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          itemCount: _pastRecords.length,
-          separatorBuilder: (context, index) => const SizedBox(height: 16),
-          itemBuilder: (context, index) {
-            return _buildSalaryRecordCard(_pastRecords[index]);
-          },
-        )
+        if (_pastRecords.isEmpty)
+          const Center(child: Text("No records found."))
+        else
+          ListView.separated(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            itemCount: _pastRecords.length,
+            separatorBuilder: (context, index) => const SizedBox(height: 16),
+            itemBuilder: (context, index) {
+              return _buildSalaryRecordCard(_pastRecords[index]);
+            },
+          )
       ],
     );
   }
@@ -237,7 +336,7 @@ class _MySalaryPageState extends State<MySalaryPage> {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: theme.scaffoldBackgroundColor, // Use theme color
+        color: theme.scaffoldBackgroundColor,
         borderRadius: BorderRadius.circular(14),
       ),
       child: Column(
@@ -283,7 +382,7 @@ class SectionCard extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: theme.colorScheme.surface, // Use theme color
+        color: theme.colorScheme.surface,
         borderRadius: BorderRadius.circular(14),
       ),
       child: Column(

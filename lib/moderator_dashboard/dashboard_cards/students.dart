@@ -1,5 +1,8 @@
 import 'dart:async';
+import 'dart:convert';
+import 'package:eduphin/services/api_service.dart';
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
 
 // 1. Data Model for a Student
 class Student {
@@ -14,27 +17,51 @@ class Student {
     required this.grade,
     required this.section,
   });
+
+  factory Student.fromJson(Map<String, dynamic> json) {
+    return Student(
+      id: json['id']?.toString() ?? 'N/A',
+      name: json['name'] ?? 'No Name',
+      grade: json['grade'] ?? 'No Grade',
+      section: json['section'] ?? 'No Section',
+    );
+  }
 }
 
 // 2. Data Provider to fetch student data
 class StudentProvider {
-  Future<List<Student>> fetchStudents() async {
-    await Future.delayed(const Duration(seconds: 2));
-    return List.generate(
-      30, // Increased count for better grid view
-      (index) => Student(
-        id: 'ID-${index + 1}',
-        name: 'Student ${index + 1}',
-        grade: 'Grade 10',
-        section: 'Section A',
-      ),
+  Future<List<Student>> fetchStudents(String instituteId) async {
+    final token = await ApiService.getToken();
+    if (token == null) {
+      throw Exception('Authentication token not found.');
+    }
+
+    final response = await http.get(
+      Uri.parse('${ApiService.baseUrl}/moderator/institutes/$instituteId/students'),
+      headers: {
+        'Authorization': 'Bearer $token',
+        'Accept': 'application/json',
+      },
     );
+
+    if (response.statusCode == 200) {
+      final data = jsonDecode(response.body);
+      if (data['success'] == true && data['students'] != null) {
+        final List<dynamic> studentsJson = data['students'];
+        return studentsJson.map((json) => Student.fromJson(json)).toList();
+      } else {
+        throw Exception(data['message'] ?? 'Failed to load students.');
+      }
+    } else {
+      throw Exception('Failed to load students. Status Code: ${response.statusCode}');
+    }
   }
 }
 
 // 3. Updated StatefulWidget to be dynamic
 class StudentsPage extends StatefulWidget {
-  const StudentsPage({super.key});
+  final String instituteId;
+  const StudentsPage({super.key, required this.instituteId});
 
   @override
   State<StudentsPage> createState() => _StudentsPageState();
@@ -47,7 +74,7 @@ class _StudentsPageState extends State<StudentsPage> {
   @override
   void initState() {
     super.initState();
-    _studentsFuture = _provider.fetchStudents();
+    _studentsFuture = _provider.fetchStudents(widget.instituteId);
   }
 
   @override
@@ -84,7 +111,7 @@ class _StudentsPageState extends State<StudentsPage> {
             return Center(child: Text('Error: ${snapshot.error}', style: const TextStyle(color: Colors.white70)));
           }
           if (!snapshot.hasData || snapshot.data!.isEmpty) {
-            return const Center(child: Text('No students found.', style: const TextStyle(color: Colors.white70)));
+            return const Center(child: Text('No students found.', style: TextStyle(color: Colors.white70)));
           }
 
           final students = snapshot.data!;

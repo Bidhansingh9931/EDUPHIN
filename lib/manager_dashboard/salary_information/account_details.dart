@@ -1,4 +1,7 @@
+import 'dart:convert';
+import 'package:eduphin/services/api_service.dart';
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 
 // --- DATA MODELS ---
 
@@ -18,6 +21,17 @@ class AccountDetails {
     required this.zone,
     required this.currentSalary,
   });
+
+  factory AccountDetails.fromJson(Map<String, dynamic> json) {
+    return AccountDetails(
+      bankAccount: json['bank_account_number'] as String? ?? 'N/A',
+      ifsc: json['ifsc_code'] as String? ?? 'N/A',
+      bankName: json['bank_name'] as String? ?? 'N/A',
+      employerBranch: json['branch'] as String? ?? 'N/A',
+      zone: json['zone'] as String? ?? 'N/A',
+      currentSalary: (json['salary'] ?? '0').toString(),
+    );
+  }
 }
 
 class PastSalaryRecord {
@@ -30,12 +44,23 @@ class PastSalaryRecord {
     required this.amount,
     required this.paidOn,
   });
+
+  factory PastSalaryRecord.fromJson(Map<String, dynamic> json) {
+    return PastSalaryRecord(
+      monthYear: "${json['month'] ?? ''} ${json['year'] ?? ''}",
+      amount: (json['net_salary'] ?? '0').toString(),
+      paidOn: json['created_at'] != null
+          ? "paid on ${DateFormat('d MMM yyyy').format(DateTime.parse(json['created_at']))}"
+          : "N/A",
+    );
+  }
 }
 
 // --- MAIN WIDGET ---
 
 class AccountDetailsPage extends StatefulWidget {
-  const AccountDetailsPage({super.key});
+  final int employeeId;
+  const AccountDetailsPage({super.key, required this.employeeId});
 
   @override
   State<AccountDetailsPage> createState() => _AccountDetailsPageState();
@@ -44,8 +69,8 @@ class AccountDetailsPage extends StatefulWidget {
 class _AccountDetailsPageState extends State<AccountDetailsPage> {
   bool _isLoading = true;
   bool _isSaving = false;
-  AccountDetails? _accountDetails;
   final List<PastSalaryRecord> _pastRecords = [];
+  Map<String, dynamic>? _accountDetails; // Store the original account data
 
   // Text editing controllers for the form fields
   final _bankAccountController = TextEditingController();
@@ -73,69 +98,105 @@ class _AccountDetailsPageState extends State<AccountDetailsPage> {
   }
 
   Future<void> _fetchAccountDetails() async {
-    await Future.delayed(const Duration(seconds: 1)); // Simulate API call
+    if (!mounted) return;
+    setState(() => _isLoading = true);
 
-    final details = AccountDetails(
-        bankAccount: "111122223333",
-        ifsc: "UN11100010",
-        bankName: "Unity Bank",
-        employerBranch: "Unity Branch - Sector 2",
-        zone: "Sector 2",
-        currentSalary: "75,000");
+    try {
+      final response = await ApiService.get('manager/salary/account/${widget.employeeId}');
 
-    final records = [
-      PastSalaryRecord(
-          monthYear: "May 2024",
-          amount: "75,000",
-          paidOn: "paid on 31 May 2024"),
-      PastSalaryRecord(
-          monthYear: "April 2024",
-          amount: "75,000",
-          paidOn: "paid on 30 April 2024"),
-      PastSalaryRecord(
-          monthYear: "March 2024",
-          amount: "75,000",
-          paidOn: "paid on 31 Mar 2024"),
-    ];
+      if (!mounted) return;
 
-    if (mounted) {
-      setState(() {
-        _accountDetails = details;
-        _pastRecords.addAll(records);
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
 
-        _bankAccountController.text = details.bankAccount;
-        _ifscController.text = details.ifsc;
-        _bankNameController.text = details.bankName;
-        _employerBranchController.text = details.employerBranch;
-        _zoneController.text = details.zone;
-        _currentSalaryController.text = details.currentSalary;
+        // Store the raw account data
+        _accountDetails = data['account'] as Map<String, dynamic>?;
+        if (_accountDetails == null) {
+          throw Exception("Could not retrieve account details.");
+        }
 
-        _isLoading = false;
-      });
+        final details = AccountDetails.fromJson(_accountDetails!);
+        final records = (data['salaries'] as List)
+            .map((record) => PastSalaryRecord.fromJson(record))
+            .toList();
+
+        setState(() {
+          _pastRecords.clear();
+          _pastRecords.addAll(records);
+
+          _bankAccountController.text = details.bankAccount;
+          _ifscController.text = details.ifsc;
+          _bankNameController.text = details.bankName;
+          _employerBranchController.text = details.employerBranch;
+          _zoneController.text = details.zone;
+          _currentSalaryController.text = details.currentSalary;
+        });
+      } else {
+        throw Exception('Failed to load account details: ${response.statusCode}');
+      }
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error: ${e.toString()}')),
+      );
+    } finally {
+      if(mounted) {
+        setState(() => _isLoading = false);
+      }
     }
   }
 
   Future<void> _saveAccountDetails() async {
     setState(() => _isSaving = true);
-    await Future.delayed(const Duration(seconds: 2)); // Simulate API call
 
-    final updatedDetails = {
-      "bank_account": _bankAccountController.text,
-      "ifsc": _ifscController.text,
-      "bank_name": _bankNameController.text,
-      "employer_branch": _employerBranchController.text,
-      "zone": _zoneController.text,
-      "current_salary": _currentSalaryController.text,
-    };
+    try {
+       if (_accountDetails == null) {
+        throw Exception("Cannot save, original account details not loaded.");
+      }
 
-    print('Saving data: $updatedDetails');
+      // Create a mutable copy of the original data and update it
+      final Map<String, dynamic> body = Map.from(_accountDetails!);
+      body['bank_account_number'] = _bankAccountController.text;
+      body['ifsc_code'] = _ifscController.text;
+      body['bank_name'] = _bankNameController.text;
+      body['branch'] = _employerBranchController.text;
+      body['zone'] = _zoneController.text;
+      body['salary'] = _currentSalaryController.text;
 
-    if (!mounted) return;
+      final response = await ApiService.post('manager/users/${widget.employeeId}', body);
 
-    setState(() => _isSaving = false);
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Account details updated successfully!')),
-    );
+      if (!mounted) return;
+
+      if (response.statusCode == 200) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Account details updated successfully!'),
+            backgroundColor: Colors.green,
+          ),
+        );
+        await _fetchAccountDetails();
+      } else {
+        final responseBody = jsonDecode(response.body);
+        final message = responseBody['message'] ?? 'Failed to save account details';
+        throw Exception(message);
+      }
+    } catch (e) {
+      if (!mounted) return;
+      String errorMessage = e.toString().replaceFirst("Exception: ", "");
+      if (errorMessage.contains("1062") && errorMessage.contains("user_details_bank_account_number_unique")) {
+        errorMessage = "Error: This bank account number is already in use by another user.";
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(errorMessage),
+          backgroundColor: Colors.red,
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _isSaving = false);
+      }
+    }
   }
 
   @override
@@ -151,7 +212,6 @@ class _AccountDetailsPageState extends State<AccountDetailsPage> {
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
           : LayoutBuilder(builder: (context, constraints) {
-              // Use a different layout for wider screens
               if (constraints.maxWidth > 800) {
                 return _buildWideLayout();
               } else {
@@ -238,7 +298,7 @@ class _AccountDetailsPageState extends State<AccountDetailsPage> {
         CustomTextField(
             label: "Zone / Sector", controller: _zoneController, editable: true),
         CustomTextField(
-            label: "Current Salary(per month)",
+            label: "Current Salary (per month)",
             controller: _currentSalaryController,
             editable: true),
       ],
@@ -279,11 +339,8 @@ class _AccountDetailsPageState extends State<AccountDetailsPage> {
               Text(record.monthYear, style: theme.textTheme.titleMedium),
               Row(
                 children: [
-                  Icon(Icons.currency_rupee,
-                      size: 20, color: Colors.green.shade400),
-                  Text(record.amount,
-                      style: theme.textTheme.titleMedium
-                          ?.copyWith(color: Colors.green.shade400)),
+                  Icon(Icons.currency_rupee, size: 20, color: Colors.green.shade400),
+                  Text(record.amount, style: theme.textTheme.titleMedium?.copyWith(color: Colors.green.shade400)),
                 ],
               )
             ],
@@ -292,12 +349,8 @@ class _AccountDetailsPageState extends State<AccountDetailsPage> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(record.paidOn,
-                  style: theme.textTheme.bodySmall
-                      ?.copyWith(color: theme.hintColor)),
-              Text("View Details",
-                  style: theme.textTheme.bodySmall
-                      ?.copyWith(color: theme.colorScheme.secondary)),
+              Text(record.paidOn, style: theme.textTheme.bodySmall?.copyWith(color: theme.hintColor)),
+              Text("View Details", style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.secondary)),
             ],
           ),
         ],
@@ -387,9 +440,6 @@ class CustomTextField extends StatelessWidget {
                 borderRadius: BorderRadius.circular(10),
                 borderSide: BorderSide.none,
               ),
-              prefixIcon: icon != null ? Icon(icon, color: theme.hintColor) : null,
-              contentPadding:
-                  const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
             ),
           ),
         ],

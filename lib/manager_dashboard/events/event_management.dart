@@ -1,20 +1,44 @@
+import 'dart:convert';
+import 'package:eduphin/services/api_service.dart';
+import 'package:intl/intl.dart';
 import 'package:eduphin/manager_dashboard/events/event_attendees.dart';
 import 'package:flutter/material.dart';
 
 import 'generate_new_event.dart';
 
 class Event {
+  final int id;
+  final String title;
+  final DateTime eventDate;
   final String day;
   final String month;
-  final String title;
   final String fullDate;
 
   Event({
-    required this.day,
-    required this.month,
+    required this.id,
     required this.title,
-    required this.fullDate,
-  });
+    required this.eventDate,
+  })  : day = DateFormat('dd').format(eventDate),
+        month = DateFormat('MMM').format(eventDate),
+        fullDate = DateFormat('EEEE, MMMM d').format(eventDate);
+
+  factory Event.fromJson(Map<String, dynamic> json) {
+    // Validate and handle potential null or invalid data
+    if (json['id'] == null || json['event_date'] == null) {
+      throw const FormatException("Invalid event data: 'id' or 'event_date' is missing.");
+    }
+
+    try {
+      return Event(
+        id: json['id'],
+        title: json['title'] ?? 'No Title',
+        eventDate: DateTime.parse(json['event_date']),
+      );
+    } catch (e) {
+      // Handle parsing errors gracefully
+      throw FormatException("Error parsing event data: ${e.toString()}");
+    }
+  }
 }
 
 class EventManagementPage extends StatefulWidget {
@@ -25,13 +49,16 @@ class EventManagementPage extends StatefulWidget {
 }
 
 class _EventManagementPageState extends State<EventManagementPage> {
-  String selectedValue = 'Status';
-  String selectedValue1 = 'Type';
-  String selectedValue2 = 'Audience';
+  String _selectedStatus = 'Status';
+  String _selectedType = 'Type';
+  String _selectedAudience = 'Audience';
 
-  final List<Event> _upcomingEvents = [];
-  final List<Event> _pastEvents = [];
+  List<String> _audienceOptions = ['Audience', 'All'];
+
+  List<Event> _upcomingEvents = [];
+  List<Event> _pastEvents = [];
   bool _isLoading = true;
+  String _errorMessage = '';
 
   @override
   void initState() {
@@ -40,24 +67,125 @@ class _EventManagementPageState extends State<EventManagementPage> {
   }
 
   Future<void> _fetchEvents() async {
-    // Simulate API call to fetch events.
-    // Replace this with your actual API call.
-    await Future.delayed(const Duration(seconds: 2));
-    final List<Event> upcoming = [
-      Event(day: "12", month: "Dec", title: "Annual Financial Literacy Working 2025", fullDate: "Friday, December 12"),
-      Event(day: "03", month: "Jan", title: "Campus Cultural Fest 2025", fullDate: "Saturday, January 3"),
-    ];
-    final List<Event> past = [
-      Event(day: "12", month: "Dec", title: "Annual Financial Literacy Working 2024", fullDate: "Thursday, December 12"),
-      Event(day: "03", month: "Jan", title: "Campus Cultural Fest 2024", fullDate: "Friday, January 3"),
-    ];
+    if (!mounted) return;
+    setState(() {
+      _isLoading = true;
+      _errorMessage = '';
+    });
 
-    if (mounted) {
-      setState(() {
-        _upcomingEvents.addAll(upcoming);
-        _pastEvents.addAll(past);
-        _isLoading = false;
-      });
+    try {
+      // Mapping UI values to API query params
+      String? statusParam;
+      if (_selectedStatus == 'Upcoming') {
+        statusParam = 'upcoming';
+      } else if (_selectedStatus == 'Past') {
+        statusParam = 'expired';
+      }
+
+      String? typeParam;
+      if (_selectedType == 'Paid') {
+        typeParam = 'paid';
+      } else if (_selectedType == 'Free') {
+        typeParam = 'free';
+      }
+
+      String? audienceParam;
+      if (_selectedAudience != 'Audience' && _selectedAudience != 'All') {
+        audienceParam = _selectedAudience.toLowerCase();
+      } else if (_selectedAudience == 'All') {
+        audienceParam = 'all';
+      }
+
+      final queryParams = {
+        if (statusParam != null) 'status': statusParam,
+        if (typeParam != null) 'type': typeParam,
+        if (audienceParam != null) 'audience': audienceParam,
+      };
+
+      final endpoint = Uri(path: 'manager/events', queryParameters: queryParams.isNotEmpty ? queryParams : null).toString();
+
+      final response = await ApiService.get(endpoint);
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+
+        // Safely access nested data
+        final List<dynamic>? eventData = data['events'];
+        final List<dynamic>? roleData = data['roles'];
+
+        if (eventData == null || roleData == null) {
+          throw Exception("Invalid data structure from API.");
+        }
+
+        final List<Event> allEvents = eventData
+            .map((json) {
+              try {
+                return Event.fromJson(json);
+              } catch (e) {
+                // Log the error and skip the invalid event
+                debugPrint("Error parsing event: ${e.toString()}");
+                return null;
+              }
+            })
+            .where((event) => event != null)
+            .cast<Event>()
+            .toList();
+
+        final List<Event> upcoming = [];
+        final List<Event> past = [];
+        final now = DateTime.now();
+
+        for (var event in allEvents) {
+          final eventDateOnly = DateTime(event.eventDate.year, event.eventDate.month, event.eventDate.day);
+          final nowDateOnly = DateTime(now.year, now.month, now.day);
+          if (eventDateOnly.isAfter(nowDateOnly) || eventDateOnly.isAtSameMomentAs(nowDateOnly)) {
+            upcoming.add(event);
+          } else {
+            past.add(event);
+          }
+        }
+
+        final List<String> roles = ['Audience', 'All'];
+        roles.addAll(roleData
+            .map((role) => role['name']?.toString())
+            .where((roleName) =>
+                roleName != null && roleName != 'Admin' && roleName != 'Super Admin')
+            .cast<String>()
+            .toList());
+
+        if (mounted) {
+          setState(() {
+            if (statusParam == 'upcoming') {
+              _upcomingEvents = allEvents;
+              _pastEvents.clear();
+            } else if (statusParam == 'expired') {
+              _pastEvents = allEvents;
+              _upcomingEvents.clear();
+            } else {
+              _upcomingEvents = upcoming;
+              _pastEvents = past;
+            }
+
+            _audienceOptions = roles.toSet().toList(); // Remove duplicates
+            if (!_audienceOptions.contains(_selectedAudience)) {
+              _selectedAudience = 'Audience';
+            }
+            _isLoading = false;
+          });
+        }
+      } else {
+        throw Exception('Failed to load events. Status code: ${response.statusCode}');
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+          _errorMessage = 'Error fetching events: ${e.toString().replaceFirst("Exception: ", "")}';
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(_errorMessage)),
+        );
+      }
     }
   }
 
@@ -72,8 +200,8 @@ class _EventManagementPageState extends State<EventManagementPage> {
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
           Text("Event Management",
-              style: theme.textTheme.titleLarge?.copyWith(color: theme.colorScheme.onSurface),
-              textAlign: TextAlign.center),
+              style: theme.textTheme.titleLarge
+                  ?.copyWith(color: theme.colorScheme.onSurface)),
           Icon(Icons.download, color: theme.colorScheme.onSurface),
         ],
       )),
@@ -89,7 +217,7 @@ class _EventManagementPageState extends State<EventManagementPage> {
                   Navigator.push(
                       context,
                       MaterialPageRoute(
-                          builder: (context) => const UpcomingEvents()));
+                          builder: (context) => const GenerateNewEvent()));
                 },
                 style: ElevatedButton.styleFrom(
                   backgroundColor: theme.colorScheme.surface,
@@ -97,9 +225,11 @@ class _EventManagementPageState extends State<EventManagementPage> {
                     borderRadius: BorderRadius.circular(12),
                   ),
                 ),
-                icon: Icon(Icons.add, size: 30, color: theme.colorScheme.onPrimary),
+                icon: Icon(Icons.add,
+                    size: 30, color: theme.colorScheme.onPrimary),
                 label: Text("Generate New Event",
-                    style: theme.textTheme.titleMedium?.copyWith(color: theme.colorScheme.onPrimary)),
+                    style: theme.textTheme.titleMedium
+                        ?.copyWith(color: theme.colorScheme.onPrimary)),
               ),
             ),
             const SizedBox(height: 16),
@@ -113,13 +243,19 @@ class _EventManagementPageState extends State<EventManagementPage> {
             Expanded(
               child: _isLoading
                   ? const Center(child: CircularProgressIndicator())
-                  : LayoutBuilder(builder: (context, constraints) {
-                      if (constraints.maxWidth > 600) {
-                        return _buildWideLayout(context);
-                      } else {
-                        return _buildNarrowLayout(context);
-                      }
-                    }),
+                  : _errorMessage.isNotEmpty
+                      ? Center(
+                          child: Text(_errorMessage,
+                              textAlign: TextAlign.center,
+                              style:
+                                  TextStyle(color: theme.colorScheme.error)))
+                      : LayoutBuilder(builder: (context, constraints) {
+                          if (constraints.maxWidth > 600) {
+                            return _buildWideLayout(context);
+                          } else {
+                            return _buildNarrowLayout(context);
+                          }
+                        }),
             ),
           ],
         ),
@@ -132,26 +268,34 @@ class _EventManagementPageState extends State<EventManagementPage> {
       spacing: 10.0,
       runSpacing: 10.0,
       children: [
-        _buildDropdown(theme, selectedValue, ['Status', 'Upcoming', 'Past'], (newValue) {
+        _buildDropdown(
+            theme, _selectedStatus, ['Status', 'Upcoming', 'Past'],
+            (newValue) {
           setState(() {
-            selectedValue = newValue!;
+            _selectedStatus = newValue!;
           });
+          _fetchEvents();
         }),
-        _buildDropdown(theme, selectedValue1, ['Type', 'Event', 'Meeting', 'Party'], (newValue) {
+        _buildDropdown(theme, _selectedType, ['Type', 'Paid', 'Free'],
+            (newValue) {
           setState(() {
-            selectedValue1 = newValue!;
+            _selectedType = newValue!;
           });
+          _fetchEvents();
         }),
-        _buildDropdown(theme, selectedValue2, ['Audience', 'Student', 'Teacher', 'Staff', 'Librarian', 'Counselor'], (newValue) {
+        _buildDropdown(theme, _selectedAudience, _audienceOptions,
+            (newValue) {
           setState(() {
-            selectedValue2 = newValue!;
+            _selectedAudience = newValue!;
           });
+          _fetchEvents();
         }),
       ],
     );
   }
 
-  Widget _buildDropdown(ThemeData theme, String value, List<String> items, ValueChanged<String?> onChanged) {
+  Widget _buildDropdown(ThemeData theme, String value, List<String> items,
+      ValueChanged<String?> onChanged) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10.0),
       decoration: BoxDecoration(
@@ -160,7 +304,7 @@ class _EventManagementPageState extends State<EventManagementPage> {
       ),
       child: DropdownButtonHideUnderline(
         child: DropdownButton<String>(
-          value: value,
+          value: items.contains(value) ? value : items.first,
           items: items.map((String value) {
             return DropdownMenuItem<String>(
               value: value,
@@ -180,9 +324,14 @@ class _EventManagementPageState extends State<EventManagementPage> {
     return SingleChildScrollView(
       child: Column(
         children: [
-          _buildEventSection(context, "Upcoming Events", _upcomingEvents),
-          const SizedBox(height: 16),
-          _buildEventSection(context, "Past Events", _pastEvents),
+          if (_upcomingEvents.isNotEmpty)
+            _buildEventSection(context, "Upcoming Events", _upcomingEvents),
+          if (_upcomingEvents.isNotEmpty && _pastEvents.isNotEmpty)
+            const SizedBox(height: 16),
+          if (_pastEvents.isNotEmpty)
+            _buildEventSection(context, "Past Events", _pastEvents),
+          if (_upcomingEvents.isEmpty && _pastEvents.isEmpty)
+            const Center(child: Text('No events found.'))
         ],
       ),
     );
@@ -194,13 +343,18 @@ class _EventManagementPageState extends State<EventManagementPage> {
       children: [
         Expanded(
           child: SingleChildScrollView(
-            child: _buildEventSection(context, "Upcoming Events", _upcomingEvents),
+            child: _upcomingEvents.isNotEmpty
+                ? _buildEventSection(
+                    context, "Upcoming Events", _upcomingEvents)
+                : const Center(child: Text("No upcoming events.")),
           ),
         ),
         const SizedBox(width: 16),
         Expanded(
           child: SingleChildScrollView(
-            child: _buildEventSection(context, "Past Events", _pastEvents),
+            child: _pastEvents.isNotEmpty
+                ? _buildEventSection(context, "Past Events", _pastEvents)
+                : const Center(child: Text("No past events.")),
           ),
         ),
       ],
@@ -210,91 +364,94 @@ class _EventManagementPageState extends State<EventManagementPage> {
   Widget _buildEventSection(
       BuildContext context, String title, List<Event> events) {
     final theme = Theme.of(context);
-    return InkWell(
-      onTap: () {
-        Navigator.push(context,
-            MaterialPageRoute(builder: (context) => const EventAttendees()));
-      },
-      child: Container(
-        padding: const EdgeInsets.all(16.0),
-        decoration: BoxDecoration(
-          color: theme.primaryColor,
-          borderRadius: BorderRadius.circular(12),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Icon(Icons.event, size: 30, color: theme.colorScheme.onPrimary),
-                const SizedBox(width: 8),
-                Text(title,
-                    style: theme.textTheme.titleLarge?.copyWith(color: theme.colorScheme.onPrimary)),
-              ],
-            ),
-            const SizedBox(height: 16),
-            ListView.separated(
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              itemCount: events.length,
-              separatorBuilder: (context, index) => const SizedBox(height: 16),
-              itemBuilder: (context, index) {
-                final event = events[index];
-                return _buildEventCard(context, event);
-              },
-            ),
-          ],
-        ),
+    return Container(
+      padding: const EdgeInsets.all(16.0),
+      decoration: BoxDecoration(
+        color: theme.primaryColor,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.event,
+                  size: 30, color: theme.colorScheme.onPrimary),
+              const SizedBox(width: 8),
+              Text(title,
+                  style: theme.textTheme.titleLarge
+                      ?.copyWith(color: theme.colorScheme.onPrimary)),
+            ],
+          ),
+          const SizedBox(height: 16),
+          ListView.separated(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            itemCount: events.length,
+            separatorBuilder: (context, index) => const SizedBox(height: 16),
+            itemBuilder: (context, index) {
+              final event = events[index];
+              return _buildEventCard(context, event);
+            },
+          ),
+        ],
       ),
     );
   }
 
   Widget _buildEventCard(BuildContext context, Event event) {
     final theme = Theme.of(context);
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: theme.colorScheme.onPrimary.withAlpha(25),
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Row(
-        children: [
-          Column(
-            children: [
-              Text(event.day,
-                  style: theme.textTheme.headlineSmall?.copyWith(color: theme.colorScheme.onPrimary)),
-              Text(event.month,
-                  style: theme.textTheme.titleMedium?.copyWith(
-                      color: theme.colorScheme.onPrimary.withAlpha(180))),
-            ],
-          ),
-          const SizedBox(width: 16),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+    return InkWell(
+      onTap: () {
+        Navigator.push(
+            context,
+            MaterialPageRoute(
+                builder: (context) => EventAttendees(eventId: event.id)));
+      },
+      child: Container(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: theme.colorScheme.onPrimary.withAlpha(25),
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Row(
+          children: [
+            Column(
               children: [
-                Text(
-                  event.title,
-                  style: theme.textTheme.titleMedium?.copyWith(color: theme.colorScheme.onPrimary),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  event.fullDate,
-                  style: theme.textTheme.bodyMedium?.copyWith(
-                      color: theme.colorScheme.onPrimary.withAlpha(180)),
-                )
+                Text(event.day,
+                    style: theme.textTheme.headlineSmall
+                        ?.copyWith(color: theme.colorScheme.onPrimary)),
+                Text(event.month,
+                    style: theme.textTheme.titleMedium?.copyWith(
+                        color: theme.colorScheme.onPrimary.withAlpha(180))),
               ],
             ),
-          ),
-          IconButton(
-            onPressed: () {},
-            icon: Icon(
+            const SizedBox(width: 16),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    event.title,
+                    style: theme.textTheme.titleMedium
+                        ?.copyWith(color: theme.colorScheme.onPrimary),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    event.fullDate,
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                        color: theme.colorScheme.onPrimary.withAlpha(180)),
+                  )
+                ],
+              ),
+            ),
+            Icon(
               Icons.arrow_forward_ios_outlined,
               size: 20,
               color: theme.colorScheme.onPrimary,
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

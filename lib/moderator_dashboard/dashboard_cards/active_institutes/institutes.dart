@@ -1,4 +1,7 @@
 import 'dart:async';
+import 'dart:convert';
+import 'package:eduphin/services/api_service.dart';
+import 'package:http/http.dart' as http;
 import 'package:eduphin/moderator_dashboard/dashboard_cards/active_institutes/add_institute.dart';
 import 'package:eduphin/moderator_dashboard/dashboard_cards/active_institutes/view_institute_page.dart';
 import 'package:flutter/material.dart';
@@ -7,34 +10,31 @@ import 'manage/manage_institute.dart';
 
 // 1. Data Provider to fetch institute data
 class InstituteProvider {
-  // In the future, you will replace this with your actual API call
   Future<List<Institute>> fetchInstitutes() async {
-    // Simulate a network delay to mimic an API call
-    await Future.delayed(const Duration(seconds: 2));
+    final token = await ApiService.getToken();
+    if (token == null) {
+      throw Exception('Authentication token not found. Please log in again.');
+    }
 
-    // This is where you would fetch your data from an API.
-    return [
-      Institute(
-          name: "Global Tech Academy",
-          code: "GTA2024",
-          chairman: "Dr. Evelyn Reed",
-          address: "123 Tech Park, Silicon Valley, CA 94043, USA",
-          email: "contact@gta.edu",
-          phone: "+1(555)123-4567",
-          website: "www.globaltechacademy.edu",
-          affiliation: "International Board of Education (IBE)",
-          pan: "PUWPS1245"),
-      Institute(
-          name: "St. Xavier's High School",
-          code: "SXHS01",
-          chairman: "Mr. John Doe",
-          address: "456 Edu Street, New Delhi, India",
-          email: "contact@sxhs.edu.in",
-          phone: "+91 11 2345 6789",
-          website: "www.sxhs.edu.in",
-          affiliation: "CBSE",
-          pan: "ABCDE1234F"),
-    ];
+    final response = await http.get(
+      Uri.parse('${ApiService.baseUrl}/moderator/institutes'),
+      headers: {
+        'Authorization': 'Bearer $token',
+        'Accept': 'application/json',
+      },
+    );
+
+    if (response.statusCode == 200) {
+      final responseBody = jsonDecode(response.body);
+      if (responseBody['success'] == true && responseBody['data'] != null) {
+        final List<dynamic> data = responseBody['data'];
+        return data.map((json) => Institute.fromJson(json)).toList();
+      } else {
+        throw Exception('Failed to parse institutes from API response.');
+      }
+    } else {
+      throw Exception('Failed to load institutes. Status code: ${response.statusCode}');
+    }
   }
 }
 
@@ -51,6 +51,7 @@ class _InstitutesPageState extends State<InstitutesPage> {
   List<Institute> _filteredInstitutes = [];
   final _searchController = TextEditingController();
   bool _isLoading = true;
+  String? _error;
 
   @override
   void initState() {
@@ -60,6 +61,10 @@ class _InstitutesPageState extends State<InstitutesPage> {
   }
 
   Future<void> _fetchData() async {
+    setState(() {
+      _isLoading = true;
+      _error = null;
+    });
     try {
       final data = await _provider.fetchInstitutes();
       if (mounted) {
@@ -73,9 +78,10 @@ class _InstitutesPageState extends State<InstitutesPage> {
       if (mounted) {
         setState(() {
           _isLoading = false;
+          _error = e.toString();
         });
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to load institutes: \$e')),
+          SnackBar(content: Text('Failed to load institutes: $e')),
         );
       }
     }
@@ -99,18 +105,15 @@ class _InstitutesPageState extends State<InstitutesPage> {
   }
 
   void _navigateAndAdd() async {
-    final newInstitute = await Navigator.push(
+    final result = await Navigator.push(
       context,
       MaterialPageRoute(
         builder: (_) => const AddNewInstitutePage(),
       ),
     );
 
-    if (newInstitute != null && newInstitute is Institute && mounted) {
-      setState(() {
-        _allInstitutes.add(newInstitute);
-        _filterInstitutes();
-      });
+    if (result == true && mounted) {
+      _fetchData();
     }
   }
 
@@ -182,8 +185,7 @@ class _InstitutesPageState extends State<InstitutesPage> {
                           ),
                         ],
                       ),
-                    ),
-                  ),
+                    ),                  ),
                   const SizedBox(width: 10),
                   GestureDetector(
                     onTap: _navigateAndAdd,
@@ -204,50 +206,62 @@ class _InstitutesPageState extends State<InstitutesPage> {
             Expanded(
               child: _isLoading
                   ? const Center(child: CircularProgressIndicator())
-                  : _filteredInstitutes.isEmpty
+                  : _error != null
                       ? Center(
-                          child: Text(
-                          "No institutes found.",
-                          style: TextStyle(
-                              color: Colors.white54,
-                              fontSize: responsiveFontSize(14)),
-                        ))
-                      : LayoutBuilder(builder: (context, constraints) {
-                          if (constraints.maxWidth > 600) {
-                            int crossAxisCount = constraints.maxWidth > 1200
-                                ? 4
-                                : (constraints.maxWidth > 900 ? 3 : 2);
-                            return GridView.builder(
-                              padding: EdgeInsets.all(screenWidth * 0.04),
-                              itemCount: _filteredInstitutes.length,
-                              gridDelegate:
-                                  SliverGridDelegateWithFixedCrossAxisCount(
-                                crossAxisCount: crossAxisCount,
-                                crossAxisSpacing: 16,
-                                mainAxisSpacing: 16,
-                                childAspectRatio: 2.2,
-                              ),
-                              itemBuilder: (context, index) {
-                                return InstituteCard(
-                                  _filteredInstitutes[index],
-                                  isGridView: true,
+                          child: Padding(
+                            padding: const EdgeInsets.all(16.0),
+                            child: Text(
+                              "Error: $_error",
+                              textAlign: TextAlign.center,
+                              style: TextStyle(
+                                  color: Colors.red.shade300,
+                                  fontSize: responsiveFontSize(14)),
+                            ),
+                          ),
+                        )
+                      : _filteredInstitutes.isEmpty
+                          ? Center(
+                              child: Text(
+                              "No institutes found.",
+                              style: TextStyle(
+                                  color: Colors.white54,
+                                  fontSize: responsiveFontSize(14)),
+                            ))
+                          : LayoutBuilder(builder: (context, constraints) {
+                              if (constraints.maxWidth > 600) {
+                                int crossAxisCount = constraints.maxWidth > 1200
+                                    ? 4
+                                    : (constraints.maxWidth > 900 ? 3 : 2);
+                                return GridView.builder(
+                                  padding: EdgeInsets.all(screenWidth * 0.04),
+                                  itemCount: _filteredInstitutes.length,
+                                  gridDelegate:
+                                      SliverGridDelegateWithFixedCrossAxisCount(
+                                    crossAxisCount: crossAxisCount,
+                                    crossAxisSpacing: 16,
+                                    mainAxisSpacing: 16,
+                                    childAspectRatio: 2.4,                                  ),
+                                  itemBuilder: (context, index) {
+                                    return InstituteCard(
+                                      _filteredInstitutes[index],
+                                      isGridView: true,
+                                    );
+                                  },
                                 );
-                              },
-                            );
-                          } else {
-                            return ListView.builder(
-                              padding: EdgeInsets.symmetric(
-                                  horizontal: screenWidth * 0.04),
-                              itemCount: _filteredInstitutes.length,
-                              itemBuilder: (context, index) {
-                                return InstituteCard(
-                                  _filteredInstitutes[index],
-                                  isGridView: false,
+                              } else {
+                                return ListView.builder(
+                                  padding: EdgeInsets.symmetric(
+                                      horizontal: screenWidth * 0.04),
+                                  itemCount: _filteredInstitutes.length,
+                                  itemBuilder: (context, index) {
+                                    return InstituteCard(
+                                      _filteredInstitutes[index],
+                                      isGridView: false,
+                                    );
+                                  },
                                 );
-                              },
-                            );
-                          }
-                        }),
+                              }
+                            }),
             ),
           ],
         ),
@@ -257,27 +271,65 @@ class _InstitutesPageState extends State<InstitutesPage> {
 }
 
 class Institute {
+  final int id;
   final String name;
   final String code;
-  final String chairman;
+  final String? logo;
+  final int establishedYear;
   final String address;
-  final String email;
-  final String phone;
-  final String website;
-  final String affiliation;
-  final String pan;
+  final String city;
+  final String state;
+  final String pincode;
+  final String contactEmail;
+  final String contactPhone;
+  final String chairmanName;
+  final String? website;
+  final String? affiliationDetails;
+  final String status;
 
   Institute({
+    required this.id,
     required this.name,
     required this.code,
-    required this.chairman,
+    this.logo,
+    required this.establishedYear,
     required this.address,
-    required this.email,
-    required this.phone,
-    required this.website,
-    required this.affiliation,
-    required this.pan,
+    required this.city,
+    required this.state,
+    required this.pincode,
+    required this.contactEmail,
+    required this.contactPhone,
+    required this.chairmanName,
+    this.website,
+    this.affiliationDetails,
+    required this.status,
   });
+
+  factory Institute.fromJson(Map<String, dynamic> json) {
+    int parseYear(dynamic year) {
+      if (year is int) return year;
+      if (year is String) return int.tryParse(year) ?? 0;
+      return 0;
+    }
+    
+    return Institute(
+      id: json['id'] ?? 0,
+      name: json['name'] ?? 'N/A',
+      code: json['code'] ?? 'N/A',
+      logo: json['logo'],
+      establishedYear: parseYear(json['established_year']),
+      address: json['address'] ?? 'N/A',
+      city: json['city'] ?? 'N/A',
+      state: json['state'] ?? 'N/A',
+      pincode: json['pincode'] ?? 'N/A',
+      contactEmail: json['contact_email'] ?? 'N/A',
+      contactPhone: json['contact_phone'] ?? 'N/A',
+      chairmanName: json['chairman_name'] ?? 'N/A',
+      website: json['website'],
+      affiliationDetails: json['affiliation_details'],
+      status: json['status'] ?? 'pending',
+    );
+  }
 }
 
 class InstituteCard extends StatelessWidget {
@@ -285,6 +337,19 @@ class InstituteCard extends StatelessWidget {
   final bool isGridView;
 
   const InstituteCard(this.data, {super.key, this.isGridView = false});
+  
+  Color _getStatusColor(String status) {
+    switch (status.toLowerCase()) {
+      case 'active':
+        return Colors.green.shade600;
+      case 'inactive':
+        return Colors.red.shade600;
+      case 'pending':
+        return Colors.orange.shade600;
+      default:
+        return Colors.grey.shade600;
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -305,9 +370,10 @@ class InstituteCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisAlignment:
-            isGridView ? MainAxisAlignment.center : MainAxisAlignment.start,
+            isGridView ? MainAxisAlignment.spaceBetween : MainAxisAlignment.start,
         children: [
           Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Container(
                 padding: const EdgeInsets.all(12),
@@ -330,11 +396,12 @@ class InstituteCard extends StatelessWidget {
                         fontSize: responsiveFontSize(16),
                         fontWeight: FontWeight.bold,
                       ),
+                      maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      "Code: \${data.code}",
+                      "Code: ${data.code}",
                       style: TextStyle(
                           color: Colors.white54,
                           fontSize: responsiveFontSize(13)),
@@ -344,7 +411,32 @@ class InstituteCard extends StatelessWidget {
               ),
             ],
           ),
-          SizedBox(height: isGridView ? 20 : 16),
+          SizedBox(height: isGridView ? 12 : 16),
+          Row(
+            children: [
+              Text(
+                "Status: ",
+                style: TextStyle(
+                    color: Colors.white70, fontSize: responsiveFontSize(13)),
+              ),
+              Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: _getStatusColor(data.status),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Text(
+                  data.status.toUpperCase(),
+                  style: TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                      fontSize: responsiveFontSize(11)),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
           Row(
             children: [
               Expanded(
@@ -356,7 +448,7 @@ class InstituteCard extends StatelessWidget {
                         context,
                         MaterialPageRoute(
                             builder: (_) =>
-                                ViewInstitutePage(instituteId: data.code)));
+                                ViewInstitutePage(instituteId: data.id.toString())));
                   },
                 ),
               ),
@@ -366,8 +458,15 @@ class InstituteCard extends StatelessWidget {
                   icon: Icons.settings_outlined,
                   label: "Manage",
                   onTap: () {
-                    Navigator.push(context,
-                        MaterialPageRoute(builder: (_) => ManageInstitute()));
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => ManageInstitute(
+                          instituteId: data.id.toString(),
+                          instituteName: data.name,
+                        ),
+                      ),
+                    );
                   },
                 ),
               ),

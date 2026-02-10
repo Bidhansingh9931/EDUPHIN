@@ -1,24 +1,46 @@
+import 'dart:convert';
+import 'package:eduphin/services/api_service.dart';
+import 'package:intl/intl.dart';
+
 import 'package:eduphin/manager_dashboard/examinations/create_new_exam.dart';
 import 'package:eduphin/manager_dashboard/examinations/edit_exam.dart';
 import 'package:eduphin/manager_dashboard/examinations/manage_schedule.dart';
 import 'package:flutter/material.dart';
 
+// Data model from API
 class Exam {
-  final String heading;
-  final String subHeading;
-  final String type;
+  final int id;
+  final String name;
+  final String? type;
   final String examCode;
-  final String isActive;
-  final String startEndDate;
+  final bool isActive;
+  final String? startDate;
+  final String? endDate;
+  final String? description;
 
   Exam({
-    required this.heading,
-    required this.subHeading,
-    required this.type,
+    required this.id,
+    required this.name,
+    this.type,
     required this.examCode,
     required this.isActive,
-    required this.startEndDate,
+    this.startDate,
+    this.endDate,
+    this.description,
   });
+
+  factory Exam.fromJson(Map<String, dynamic> json) {
+    return Exam(
+      id: json['id'],
+      name: json['name'] as String? ?? 'Unnamed Exam',
+      type: json['type'] as String?,
+      examCode: json['code'] as String? ?? 'N/A',
+      isActive: json['status'] == 'active',
+      startDate: json['start_date'] as String?,
+      endDate: json['end_date'] as String?,
+      description: json['description'] as String?,
+    );
+  }
 }
 
 class ExamInfoPage extends StatefulWidget {
@@ -29,32 +51,37 @@ class ExamInfoPage extends StatefulWidget {
 }
 
 class _ExamInfoPageState extends State<ExamInfoPage> {
-  final List<Exam> _exams = [
-    Exam(
-      heading: "#1",
-      subHeading: "Mid-Term Examination 2025",
-      type: "Objective",
-      examCode: "MTE-2025-01",
-      isActive: "Active",
-      startEndDate: "15 Dec 2025 - 22 Dec 2025",
-    ),
-    Exam(
-      heading: "#2",
-      subHeading: "Final Examination 2024",
-      type: "Written",
-      examCode: "FE-2024-02",
-      isActive: "Inactive",
-      startEndDate: "1 Jun 2025 - 10 Jun 2025",
-    ),
-    Exam(
-      heading: "#3",
-      subHeading: "Unit Test - 1 (Science)",
-      type: "Objective",
-      examCode: "UT1-SCI-2025",
-      isActive: "Active",
-      startEndDate: "20 Oct 2025 - 20 Oct 2025",
-    ),
-  ];
+  late Future<List<Exam>> _examsFuture;
+
+  @override
+  void initState() {
+    super.initState();
+    _examsFuture = _fetchExams();
+  }
+
+  Future<List<Exam>> _fetchExams() async {
+    try {
+      final response = await ApiService.get('manager/exams');
+      final body = json.decode(response.body);
+      if (body['status'] == true) {
+        final List<dynamic> examJson = body['data'];
+        return examJson.map((json) => Exam.fromJson(json)).toList();
+      } else {
+        throw Exception('Failed to load exams: ${body['message']}');
+      }
+    } catch (e) {
+      // Providing a more user-friendly error message
+      throw Exception('Could not fetch exams. Please check your network connection and try again.');
+    }
+  }
+
+  void _refreshExams() {
+    if (mounted) {
+      setState(() {
+        _examsFuture = _fetchExams();
+      });
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -66,11 +93,14 @@ class _ExamInfoPageState extends State<ExamInfoPage> {
           height: 50,
           width: double.infinity,
           child: FloatingActionButton.extended(
-            onPressed: () {
-              Navigator.push(
+            onPressed: () async {
+              final result = await Navigator.push(
                   context,
                   MaterialPageRoute(
                       builder: (context) => const CreateExamScreen()));
+              if (result == true) {
+                _refreshExams();
+              }
             },
             backgroundColor: Colors.blue.shade900,
             label: Text(
@@ -92,12 +122,27 @@ class _ExamInfoPageState extends State<ExamInfoPage> {
       ),
       body: Padding(
         padding: const EdgeInsets.fromLTRB(16, 16, 16, 50),
-        child: LayoutBuilder(
-          builder: (context, constraints) {
-            if (constraints.maxWidth < 600) {
-              return _buildListView();
+        child: FutureBuilder<List<Exam>>(
+          future: _examsFuture,
+          builder: (context, snapshot) {
+            if (snapshot.connectionState == ConnectionState.waiting) {
+              return const Center(child: CircularProgressIndicator());
+            } else if (snapshot.hasError) {
+              // Display the error message from the exception
+              return Center(child: Text('Error: ${snapshot.error.toString().replaceFirst("Exception: ", "")}'));
+            } else if (!snapshot.hasData || snapshot.data!.isEmpty) {
+              return const Center(child: Text('No exams found.'));
             } else {
-              return _buildGridView();
+              final exams = snapshot.data!;
+              return LayoutBuilder(
+                builder: (context, constraints) {
+                  if (constraints.maxWidth < 600) {
+                    return _buildListView(exams);
+                  } else {
+                    return _buildGridView(exams);
+                  }
+                },
+              );
             }
           },
         ),
@@ -105,27 +150,20 @@ class _ExamInfoPageState extends State<ExamInfoPage> {
     );
   }
 
-  Widget _buildListView() {
+  Widget _buildListView(List<Exam> exams) {
     return ListView.separated(
-      itemCount: _exams.length,
+      itemCount: exams.length,
       separatorBuilder: (context, index) => const SizedBox(height: 16),
       itemBuilder: (context, index) {
-        final exam = _exams[index];
-        return CustomExamListContainerBox(
-          heading: exam.heading,
-          subHeading: exam.subHeading,
-          type: exam.type,
-          examCode: exam.examCode,
-          isActive: exam.isActive,
-          startEndDate: exam.startEndDate,
-        );
+        final exam = exams[index];
+        return _buildExamCard(exam);
       },
     );
   }
 
-  Widget _buildGridView() {
+  Widget _buildGridView(List<Exam> exams) {
     return GridView.builder(
-      itemCount: _exams.length,
+      itemCount: exams.length,
       gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
         maxCrossAxisExtent: 500,
         mainAxisSpacing: 16,
@@ -133,15 +171,74 @@ class _ExamInfoPageState extends State<ExamInfoPage> {
         childAspectRatio: 1.8, // Adjust this for best fit
       ),
       itemBuilder: (context, index) {
-        final exam = _exams[index];
-        return CustomExamListContainerBox(
-          heading: exam.heading,
-          subHeading: exam.subHeading,
-          type: exam.type,
-          examCode: exam.examCode,
-          isActive: exam.isActive,
-          startEndDate: exam.startEndDate,
-        );
+        final exam = exams[index];
+        return _buildExamCard(exam);
+      },
+    );
+  }
+
+  Widget _buildExamCard(Exam exam) {
+    String formattedStartDate = 'N/A';
+    if (exam.startDate != null && exam.startDate!.isNotEmpty) {
+      try {
+        formattedStartDate = DateFormat('dd MMM yyyy').format(DateTime.parse(exam.startDate!));
+      } catch (e) {
+        formattedStartDate = 'Invalid Date';
+      }
+    }
+
+    String formattedEndDate = 'N/A';
+    if (exam.endDate != null && exam.endDate!.isNotEmpty) {
+      try {
+        formattedEndDate = DateFormat('dd MMM yyyy').format(DateTime.parse(exam.endDate!));
+      } catch (e) {
+        formattedEndDate = 'Invalid Date';
+      }
+    }
+
+    final startEndDate = '$formattedStartDate - $formattedEndDate';
+
+    return CustomExamListContainerBox(
+      heading: '#${exam.id}',
+      subHeading: exam.name,
+      type: exam.type ?? 'N/A',
+      examCode: exam.examCode,
+      isActive: exam.isActive ? 'Active' : 'Inactive',
+      startEndDate: startEndDate,
+      onEdit: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => EditExamPage(
+              examId: exam.id,
+              examName: exam.name,
+              examType: exam.type ?? 'N/A',
+              examCode: exam.examCode,
+              isActive: exam.isActive,
+              startEndDate: startEndDate,
+              description: exam.description,
+            ),
+          ),
+        ).then((result) {
+          if (result == true) {
+            _refreshExams();
+          }
+        });
+      },
+      onManageSchedule: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => ManageSchedulePage(
+              examId: exam.id,
+              examName: exam.name,
+            ),
+          ),
+        ).then((result) {
+          if (result == true) {
+            _refreshExams();
+          }
+        });
       },
     );
   }
@@ -154,6 +251,8 @@ class CustomExamListContainerBox extends StatelessWidget {
   final String examCode;
   final String isActive;
   final String startEndDate;
+  final VoidCallback onEdit;
+  final VoidCallback onManageSchedule;
 
   const CustomExamListContainerBox({
     super.key,
@@ -163,6 +262,8 @@ class CustomExamListContainerBox extends StatelessWidget {
     required this.examCode,
     required this.isActive,
     required this.startEndDate,
+    required this.onEdit,
+    required this.onManageSchedule,
   });
 
   @override
@@ -277,18 +378,7 @@ class CustomExamListContainerBox extends StatelessWidget {
                   children: [
                     Expanded(
                       child: ElevatedButton.icon(
-                        onPressed: () {
-                          Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                  builder: (context) => EditExamPage(
-                                        examName: subHeading,
-                                        examType: type,
-                                        examCode: examCode,
-                                        isActive: isActive == "Active",
-                                        startEndDate: startEndDate,
-                                      )));
-                        },
+                        onPressed: onEdit,
                         style: ElevatedButton.styleFrom(
                           backgroundColor: Colors.grey.withAlpha(55),
                           shape: RoundedRectangleBorder(
@@ -311,9 +401,7 @@ class CustomExamListContainerBox extends StatelessWidget {
                     ),
                     Expanded(
                       child: ElevatedButton(
-                        onPressed: () {
-                          Navigator.push(context, MaterialPageRoute(builder: (context)=>ManageSchedulePage()));
-                        },
+                        onPressed: onManageSchedule,
                         style: ElevatedButton.styleFrom(
                           backgroundColor: Colors.blue.withAlpha(55),
                           shape: RoundedRectangleBorder(

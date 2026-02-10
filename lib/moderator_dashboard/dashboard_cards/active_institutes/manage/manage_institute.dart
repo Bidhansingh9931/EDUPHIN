@@ -1,7 +1,11 @@
+import 'dart:convert';
+
 import 'package:eduphin/moderator_dashboard/moderator_dashboard.dart';
 import 'package:eduphin/moderator_dashboard/dashboard_cards/active_institutes/manage/add_employee.dart';
+import 'package:eduphin/services/api_service.dart';
 import 'package:flutter/material.dart';
 import 'dart:async';
+import 'package:http/http.dart' as http;
 
 import 'employ_details.dart';
 
@@ -12,26 +16,54 @@ class Employee {
   final String id;
   final String name;
   final String role;
-  // final String avatarUrl; // Can be added later for network images
 
   Employee({required this.id, required this.name, required this.role});
+
+  factory Employee.fromJson(Map<String, dynamic> json) {
+    String roleName = 'Unassigned';
+    if (json['roles'] != null && (json['roles'] as List).isNotEmpty) {
+      roleName = json['roles'][0]['name'] ?? 'Unassigned';
+    }
+
+    return Employee(
+      id: json['id'].toString(),
+      name: json['name'] ?? 'N/A',
+      role: roleName,
+    );
+  }
 }
 
-// 2. Data Provider to fetch employee data
+// 2. Data Provider to fetch employee data from the live API
 class EmployeeProvider {
   Future<List<Employee>> fetchEmployees(String instituteId) async {
-    await Future.delayed(const Duration(seconds: 2));
-    return [
-      Employee(id: 'emp1', name: 'Dr. Evelyn Reed', role: 'Principal'),
-      Employee(id: 'emp2', name: 'Marcus Chen', role: 'Head of Mathematics'),
-      Employee(id: 'emp3', name: 'Sophia Rodriguez', role: 'Science Teacher'),
-      Employee(id: 'emp4', name: 'David Kim', role: 'Librarian'),
-      Employee(id: 'emp5', name: 'Linda Williams', role: 'Administrator'),
-      Employee(id: 'emp6', name: 'James Brown', role: 'IT Support'),
-      Employee(id: 'emp7', name: 'Anita Singh', role: 'Art Teacher'),
-      Employee(id: 'emp8', name: 'Robert Johnson', role: 'Physical Education'),
-      Employee(id: 'emp9', name: 'Laura Martinez', role: 'Counselors'),
-    ];
+    final token = await ApiService.getToken();
+    if (token == null) {
+      throw Exception('Authentication token not found.');
+    }
+
+    // CORRECTED: Using the URL structure from the accounts.dart file you provided.
+    final uri = Uri.parse('${ApiService.baseUrl}/moderator/institutes/$instituteId/accounts');
+
+    final response = await http.get(
+      uri,
+      headers: {
+        'Authorization': 'Bearer $token',
+        'Accept': 'application/json',
+      },
+    );
+
+    if (response.statusCode == 200) {
+      final data = jsonDecode(response.body);
+      // CORRECTED: Parsing the JSON based on the structure from accounts.dart { "success": true, "accounts": [...] }
+      if (data['success'] == true && data['accounts'] != null) {
+        final List<dynamic> accountsJson = data['accounts'];
+        return accountsJson.map((json) => Employee.fromJson(json)).toList();
+      } else {
+        throw Exception(data['message'] ?? 'Failed to load accounts.');
+      }
+    } else {
+      throw Exception('Failed to load employees. Status Code: ${response.statusCode}');
+    }
   }
 }
 
@@ -57,7 +89,7 @@ class ManageInstitute extends StatefulWidget {
   const ManageInstitute({
     super.key,
     this.instituteName = "Global Tech Academy",
-    this.instituteId = "default_id",
+    required this.instituteId, // Made required to ensure it's passed
   });
 
   @override
@@ -69,6 +101,7 @@ class _ManageInstitutePageState extends State<ManageInstitute> {
   final _searchController = TextEditingController();
 
   bool _isLoading = true;
+  String? _error;
   List<Employee> _allEmployees = [];
   List<Employee> _filteredEmployees = [];
   String _selectedRole = 'All';
@@ -87,6 +120,10 @@ class _ManageInstitutePageState extends State<ManageInstitute> {
   }
 
   Future<void> _fetchEmployees() async {
+    setState(() {
+      _isLoading = true;
+      _error = null;
+    });
     try {
       final employees = await _provider.fetchEmployees(widget.instituteId);
       if (mounted) {
@@ -100,6 +137,7 @@ class _ManageInstitutePageState extends State<ManageInstitute> {
       if (mounted) {
         setState(() {
           _isLoading = false;
+          _error = e.toString();
         });
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Failed to load employees: $e')),
@@ -126,13 +164,26 @@ class _ManageInstitutePageState extends State<ManageInstitute> {
     _applyFilters();
   }
 
+  void _navigateAndRefresh() async {
+    final result = await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => AddEmployeePage(instituteId: widget.instituteId),
+      ),
+    );
+
+    if (result == true && mounted) {
+      _fetchEmployees();
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final screenWidth = MediaQuery.of(context).size.width;
     double responsiveFontSize(double baseSize) {
-        if (screenWidth > 1200) return baseSize * 1.2;
-        if (screenWidth > 600) return baseSize * 1.1;
-        return baseSize;
+      if (screenWidth > 1200) return baseSize * 1.2;
+      if (screenWidth > 600) return baseSize * 1.1;
+      return baseSize;
     }
 
     return Scaffold(
@@ -143,77 +194,61 @@ class _ManageInstitutePageState extends State<ManageInstitute> {
         title: Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Text(
-              widget.instituteName,
-              style: TextStyle(color: Colors.white, fontSize: responsiveFontSize(18)),
-              overflow: TextOverflow.ellipsis,
+            Expanded(
+              child: Text(
+                widget.instituteName,
+                style: TextStyle(color: Colors.white, fontSize: responsiveFontSize(18)),
+                overflow: TextOverflow.ellipsis,
+              ),
             ),
             InkWell(
-                onTap: () => Navigator.pushReplacement(
-                    context,
-                    MaterialPageRoute(
-                        builder: (context) => const ModeratorDashboardPage())),
-                child: const Icon(
-                  Icons.home_sharp,
-                  size: 30,
-                  color: Colors.white,
-                )),
+              onTap: () => Navigator.pushReplacement(
+                context,
+                MaterialPageRoute(builder: (context) => const ModeratorDashboardPage()),
+              ),
+              child: const Icon(Icons.home_sharp, size: 30, color: Colors.white),
+            ),
           ],
         ),
       ),
       body: Padding(
-        padding: EdgeInsets.fromLTRB(screenWidth * 0.04, 12, screenWidth * 0.04, 80),
+        padding: EdgeInsets.fromLTRB(screenWidth * 0.04, 12, screenWidth * 0.04, 0),
         child: Column(
           children: [
             Row(
               children: [
                 Expanded(
-                  child: Container(
-                    height: 50,
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF1B263B),
-                      borderRadius: BorderRadius.circular(30),
-                    ),
-                    child: Row(
-                      children: [
-                        const Icon(Icons.search, color: Colors.white54),
-                        const SizedBox(width: 10),
-                        Expanded(
-                          child: TextField(
-                            controller: _searchController,
-                            style: TextStyle(color: Colors.white, fontSize: responsiveFontSize(14)),
-                            decoration: InputDecoration(
-                              border: InputBorder.none,
-                              hintText: "Search employees...",
-                              hintStyle: TextStyle(color: Colors.white54, fontSize: responsiveFontSize(14)),
-                            ),
-                          ),
-                        ),
-                      ],
+                  child: TextField(
+                    controller: _searchController,
+                    style: TextStyle(color: Colors.white, fontSize: responsiveFontSize(14)),
+                    decoration: InputDecoration(
+                      hintText: "Search employees...",
+                      hintStyle: TextStyle(color: Colors.white54, fontSize: responsiveFontSize(14)),
+                      prefixIcon: const Icon(Icons.search, color: Colors.white54),
+                      filled: true,
+                      fillColor: const Color(0xFF1B263B),
+                      contentPadding: const EdgeInsets.symmetric(vertical: 0, horizontal: 20),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(30),
+                        borderSide: BorderSide.none,
+                      ),
                     ),
                   ),
                 ),
                 const SizedBox(width: 10),
                 GestureDetector(
-                  onTap: () {
-                    Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                            builder: (context) => const AddEmployeePage()));
-                  },
+                  onTap: _navigateAndRefresh,
                   child: Container(
                     width: 50,
                     height: 50,
                     decoration: const BoxDecoration(
-                      color: const Color(0xFF1B263B),
+                      color: Color(0xFF1B263B),
                       shape: BoxShape.circle,
                     ),
                     child: const Icon(Icons.person_add_alt_1_outlined, color: Colors.white, size: 24),
                   ),
                 ),
-              ],
-            ),
+              ],),
             const SizedBox(height: 15),
             SizedBox(
               height: 40,
@@ -237,34 +272,36 @@ class _ManageInstitutePageState extends State<ManageInstitute> {
             Expanded(
               child: _isLoading
                   ? const Center(child: CircularProgressIndicator())
-                  : _filteredEmployees.isEmpty
-                      ? Center(child: Text("No employees found.", style: TextStyle(color: Colors.white54, fontSize: responsiveFontSize(14))))
-                      : LayoutBuilder(builder: (context, constraints) {
-                          if (constraints.maxWidth > 600) {
-                            int crossAxisCount = constraints.maxWidth > 1200 ? 4 : (constraints.maxWidth > 900 ? 3 : 2);
-                            return GridView.builder(
-                              padding: const EdgeInsets.only(bottom: 16),
-                              itemCount: _filteredEmployees.length,
-                              gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                                crossAxisCount: crossAxisCount,
-                                crossAxisSpacing: 16,
-                                mainAxisSpacing: 16,
-                                childAspectRatio: 3,
-                              ),
-                              itemBuilder: (context, index) {
-                                return EmployeeCard(_filteredEmployees[index]);
-                              },
-                            );
-                          } else {
-                            return ListView.builder(
-                              padding: const EdgeInsets.only(bottom: 50),
-                              itemCount: _filteredEmployees.length,
-                              itemBuilder: (context, index) {
-                                return EmployeeCard(_filteredEmployees[index]);
-                              },
-                            );
-                          }
-                        }),
+                  : _error != null
+                      ? Center(child: Text("Error: $_error", style: TextStyle(color: Colors.red.shade300, fontSize: responsiveFontSize(14))))
+                      : _filteredEmployees.isEmpty
+                          ? Center(child: Text("No employees found.", style: TextStyle(color: Colors.white54, fontSize: responsiveFontSize(14))))
+                          : LayoutBuilder(builder: (context, constraints) {
+                              if (constraints.maxWidth > 600) {
+                                int crossAxisCount = constraints.maxWidth > 1200 ? 4 : (constraints.maxWidth > 900 ? 3 : 2);
+                                return GridView.builder(
+                                  padding: const EdgeInsets.only(bottom: 16),
+                                  itemCount: _filteredEmployees.length,
+                                  gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                                    crossAxisCount: crossAxisCount,
+                                    crossAxisSpacing: 16,
+                                    mainAxisSpacing: 16,
+                                    childAspectRatio: 3,
+                                  ),
+                                  itemBuilder: (context, index) {
+                                    return EmployeeCard(_filteredEmployees[index]);
+                                  },
+                                );
+                              } else {
+                                return ListView.builder(
+                                  padding: const EdgeInsets.only(bottom: 50),
+                                  itemCount: _filteredEmployees.length,
+                                  itemBuilder: (context, index) {
+                                    return EmployeeCard(_filteredEmployees[index]);
+                                  },
+                                );
+                              }
+                            }),
             ),
           ],
         ),
@@ -272,7 +309,6 @@ class _ManageInstitutePageState extends State<ManageInstitute> {
     );
   }
 }
-
 
 class EmployeeCard extends StatelessWidget {
   final Employee employee;
@@ -283,21 +319,21 @@ class EmployeeCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final screenWidth = MediaQuery.of(context).size.width;
     double responsiveFontSize(double baseSize) {
-        if (screenWidth > 1200) return baseSize * 1.2;
-        if (screenWidth > 600) return baseSize * 1.1;
-        return baseSize;
+      if (screenWidth > 1200) return baseSize * 1.2;
+      if (screenWidth > 600) return baseSize * 1.1;
+      return baseSize;
     }
 
     return InkWell(
       onTap: () {
         Navigator.push(
-            context,
-            MaterialPageRoute(
-                builder: (context) => EmployeeDetailsPage(employeeId: employee.id)));
+          context,
+          MaterialPageRoute(builder: (context) => EmployeeDetailsPage(employeeId: employee.id)),
+        );
       },
       borderRadius: BorderRadius.circular(16),
       child: Container(
-        margin: const EdgeInsets.only(bottom: 12), // Only applied in ListView
+        margin: const EdgeInsets.only(bottom: 12),
         padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(16),
@@ -360,21 +396,15 @@ class RoleChip extends StatelessWidget {
       onTap: onTap,
       borderRadius: BorderRadius.circular(20),
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
         decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(20),
           color: isSelected ? const Color(0xFF0E86D4) : const Color(0xFF1B263B),
-          border: Border.all(color: Colors.white24, width: 0.5),
+          borderRadius: BorderRadius.circular(20),
         ),
-        child: Center(
-            child: Text(
+        child: Text(
           label,
-          style: const TextStyle(
-            fontWeight: FontWeight.bold,
-            color: Colors.white,
-            fontSize: 13,
-          ),
-        )),
+          style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+        ),
       ),
     );
   }

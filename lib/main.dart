@@ -8,13 +8,6 @@ void main() {
 class MyApp extends StatelessWidget {
   const MyApp({super.key});
 
-  // Simulate app initialization
-  Future<void> _initializeApp() async {
-    // In a real app, you would initialize services, load settings, etc.
-    // Here, we just simulate a delay.
-    await Future.delayed(const Duration(seconds: 2));
-  }
-
   @override
   Widget build(BuildContext context) {
     const primaryColor = Color(0xFF2E6CFF);
@@ -96,20 +89,7 @@ class MyApp extends StatelessWidget {
         ),
         textTheme: buildTextTheme(darkScheme),
       ),
-      home: FutureBuilder(
-        future: _initializeApp(),
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.done) {
-            return const SplashScreen();
-          }
-          // While initializing, show a simple loading screen.
-          return const Scaffold(
-            body: Center(
-              child: CircularProgressIndicator(),
-            ),
-          );
-        },
-      ),
+      home: const SplashScreen(),
     );
   }
 }

@@ -1,5 +1,8 @@
+import 'dart:convert';
+
 import 'package:eduphin/login_logout/ui_helper.dart';
 import 'package:eduphin/login_logout/verify.dart';
+import 'package:eduphin/services/api_service.dart';
 import 'package:flutter/material.dart';
 
 class ForgotPasswordPage extends StatefulWidget {
@@ -31,18 +34,43 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
       _isLoading = true;
     });
 
-    // Simulate a network request
-    await Future.delayed(const Duration(seconds: 2));
-
-    if (mounted) {
-      setState(() {
-        _isLoading = false;
+    try {
+      final response = await ApiService.post('forgot-password', {
+        'email': emailController.text,
       });
 
-      Navigator.push(
-        context,
-        MaterialPageRoute(builder: (context) => const VerifyPasswordPage()),
-      );
+      if (mounted) {
+        final responseData = jsonDecode(response.body);
+        if (response.statusCode == 200 && responseData['status'] == true) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+                content: Text(responseData['message'] ?? 'Password reset link sent!'),
+                backgroundColor: Colors.green),
+          );
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+                builder: (context) =>
+                    VerifyPasswordPage(email: emailController.text)),
+          );
+        } else {
+          throw Exception(responseData['message'] ?? 'Failed to send reset link.');
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+              content: Text(e.toString().replaceFirst('Exception: ', '')),
+              backgroundColor: Colors.red),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
     }
   }
 

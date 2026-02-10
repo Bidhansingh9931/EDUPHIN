@@ -57,7 +57,7 @@ class _ModeratorDashboardPageState extends State<ModeratorDashboardPage> {
         elevation: 0,
         automaticallyImplyLeading: false,
         title: Text(
-          "Moderator Dashboard Overview",
+          "Dashboard Overview",
           style: TextStyle(
               color: Colors.white, fontSize: responsiveFontSize(18)),
         ),

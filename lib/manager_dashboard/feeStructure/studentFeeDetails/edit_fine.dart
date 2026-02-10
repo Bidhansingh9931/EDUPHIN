@@ -1,12 +1,17 @@
+import 'dart:convert';
+
+import 'package:eduphin/services/api_service.dart';
 import 'package:flutter/material.dart';
 
 class EditFinePage extends StatefulWidget {
+  final int fineId;
   final String? reason;
   final String? amount;
   final String? remarks;
 
   const EditFinePage({
     super.key,
+    required this.fineId,
     this.reason,
     this.amount,
     this.remarks,
@@ -21,14 +26,15 @@ class _EditFinePageState extends State<EditFinePage> {
   late TextEditingController _amountController;
   late TextEditingController _remarksController;
   final _formKey = GlobalKey<FormState>();
+  bool _isSaving = false;
 
   @override
   void initState() {
     super.initState();
-    _reasonController = TextEditingController(text: widget.reason ?? "Late Fee Payment");
-    _amountController = TextEditingController(text: widget.amount ?? "200");
+    _reasonController = TextEditingController(text: widget.reason ?? "");
+    _amountController = TextEditingController(text: widget.amount ?? "");
     _remarksController =
-        TextEditingController(text: widget.remarks ?? "Add any additional remarks");
+        TextEditingController(text: widget.remarks ?? "");
   }
 
   @override
@@ -39,16 +45,48 @@ class _EditFinePageState extends State<EditFinePage> {
     super.dispose();
   }
 
-  void _updateFine() {
-    if (_formKey.currentState!.validate()) {
-      final result = {
-        'reason': _reasonController.text,
+  Future<void> _updateFine() async {
+    if (!_formKey.currentState!.validate()) {
+      return;
+    }
+
+    setState(() => _isSaving = true);
+
+    try {
+      final body = {
+        'fine_id': widget.fineId.toString(),
+        'fine_type': _reasonController.text,
         'amount': _amountController.text,
         'remarks': _remarksController.text,
       };
-      Navigator.pop(context, result);
+
+      final response = await ApiService.post('manager/fees/fine', body);
+
+      if (!mounted) return;
+
+      final responseData = jsonDecode(response.body);
+
+      if (response.statusCode == 200 && responseData['status'] == true) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(responseData['message'] ?? 'Fine updated successfully!'), backgroundColor: Colors.green),
+        );
+        Navigator.pop(context, true); // Return true to indicate success and trigger a refresh
+      } else {
+        throw Exception(responseData['message'] ?? 'Failed to update fine');
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(e.toString().replaceFirst("Exception: ", "")), backgroundColor: Colors.red),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isSaving = false);
+      }
     }
   }
+
 
   @override
   Widget build(BuildContext context) {
@@ -80,7 +118,7 @@ class _EditFinePageState extends State<EditFinePage> {
             const SizedBox(width: 16),
             Expanded(
               child: ElevatedButton(
-                onPressed: _updateFine,
+                onPressed: _isSaving ? null : _updateFine,
                 style: ElevatedButton.styleFrom(
                   backgroundColor: theme.colorScheme.primary,
                   foregroundColor: theme.colorScheme.onPrimary,
@@ -89,7 +127,9 @@ class _EditFinePageState extends State<EditFinePage> {
                     borderRadius: BorderRadius.circular(12),
                   ),
                 ),
-                child: Text("Update Fine", style: theme.textTheme.labelLarge?.copyWith(color: theme.colorScheme.onPrimary)),
+                child: _isSaving
+                    ? const SizedBox(height: 24, width: 24, child: CircularProgressIndicator(strokeWidth: 3, valueColor: AlwaysStoppedAnimation(Colors.white)))
+                    : Text("Update Fine", style: theme.textTheme.labelLarge?.copyWith(color: theme.colorScheme.onPrimary)),
               ),
             ),
           ],

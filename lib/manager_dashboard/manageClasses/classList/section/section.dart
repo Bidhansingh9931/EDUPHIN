@@ -1,21 +1,24 @@
+import 'dart:async';
+import 'dart:convert';
 import 'dart:ui';
 
 import 'package:eduphin/manager_dashboard/manageClasses/classList/section/create_new_section.dart';
 import 'package:eduphin/manager_dashboard/manageClasses/classList/section/edit_section.dart';
 import 'package:eduphin/manager_dashboard/manageClasses/classList/section/studentList/student_list.dart';
+import 'package:eduphin/services/api_service.dart';
 import 'package:flutter/material.dart';
 
-// Data model for a Section
-class Section {
-  final String name;
-  final String mentor;
-  final int limit;
-
-  Section({required this.name, required this.mentor, required this.limit});
-}
+import 'section_model.dart';
 
 class SectionsPage extends StatefulWidget {
-  const SectionsPage({super.key});
+  final int classId;
+  final String className;
+
+  const SectionsPage({
+    super.key,
+    required this.classId,
+    required this.className,
+  });
 
   @override
   State<SectionsPage> createState() => _SectionsPageState();
@@ -23,7 +26,8 @@ class SectionsPage extends StatefulWidget {
 
 class _SectionsPageState extends State<SectionsPage> {
   bool _isLoading = true;
-  final List<Section> _sections = [];
+  List<Section> _sections = [];
+  String _error = '';
 
   @override
   void initState() {
@@ -32,21 +36,55 @@ class _SectionsPageState extends State<SectionsPage> {
   }
 
   Future<void> _fetchSections() async {
-    // Simulate API call to fetch sections.
-    await Future.delayed(const Duration(seconds: 2));
+    if (!mounted) return;
+    setState(() {
+      _isLoading = true;
+      _error = '';
+    });
 
-    final List<Section> fetchedSections = [
-      Section(name: "Section A", mentor: "Mrs. Anjali Sharma", limit: 40),
-      Section(name: "Section B", mentor: "Mr. Vikram Singh", limit: 42),
-      Section(name: "Section C", mentor: "Ms. Priya Kumari", limit: 38),
-      Section(name: "Section D", mentor: "Mr. Rajeev Mehta", limit: 41),
-    ];
+    try {
+      final response = await ApiService.get('manager/classes');
+      if (!mounted) return;
 
-    if (mounted) {
-      setState(() {
-        _sections.addAll(fetchedSections);
-        _isLoading = false;
-      });
+      final responseData = jsonDecode(response.body);
+
+      if (response.statusCode == 200 && responseData['status'] == true) {
+        final allClasses = responseData['data']['classes'] as List? ?? [];
+        final currentClass = allClasses.firstWhere(
+          (classData) => classData['id'] == widget.classId,
+          orElse: () => null,
+        );
+
+        if (currentClass != null) {
+          final sectionsData = currentClass['sections'] as List? ?? [];
+          final fetchedSections = sectionsData
+              .map((sectionJson) => Section.fromJson(sectionJson))
+              .toList();
+
+          if (mounted) {
+            setState(() {
+              _sections = fetchedSections;
+            });
+          }
+        } else {
+          throw Exception("Class with ID ${widget.classId} not found.");
+        }
+      } else {
+        throw Exception(
+            responseData['message'] ?? "Failed to fetch sections for class.");
+      }
+    } on Exception catch (e) {
+      if (mounted) {
+        setState(() {
+          _error = e.toString().replaceFirst('Exception: ', '');
+        });
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
     }
   }
 
@@ -56,9 +94,17 @@ class _SectionsPageState extends State<SectionsPage> {
     return Scaffold(
       backgroundColor: theme.scaffoldBackgroundColor,
       floatingActionButton: FloatingActionButton.extended(
-        onPressed: () {
-          Navigator.push(context,
-              MaterialPageRoute(builder: (context) => const CreateNewSectionPage()));
+        onPressed: () async {
+          final result = await Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) =>
+                  CreateNewSectionPage(classId: widget.classId),
+            ),
+          );
+          if (result == true) {
+            _fetchSections(); // Refresh data if a new section was created
+          }
         },
         label: const Text("Create New Section"),
         icon: const Icon(Icons.add),
@@ -67,54 +113,70 @@ class _SectionsPageState extends State<SectionsPage> {
       appBar: AppBar(
         title: Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: const [
-            Text("Sections for Class VIII"),
-            Icon(Icons.menu),
+          children: [
+            Expanded(
+              child: Text(
+                "Sections for ${widget.className}",
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+            const Icon(Icons.menu),
           ],
         ),
-        centerTitle: true,
       ),
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : LayoutBuilder(
-              builder: (context, constraints) {
-                if (constraints.maxWidth > 600) {
-                  return GridView.builder(
-                    padding: const EdgeInsets.fromLTRB(16, 16, 16, 80),
-                    itemCount: _sections.length,
-                    gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
-                      maxCrossAxisExtent: 400,
-                      mainAxisSpacing: 16,
-                      crossAxisSpacing: 16,
-                      childAspectRatio: 1.5, // Adjust for content
-                    ),
-                    itemBuilder: (context, index) {
-                      final section = _sections[index];
-                      return SectionCard(section: section);
-                    },
-                  );
-                } else {
-                  return ListView.separated(
-                    padding: const EdgeInsets.fromLTRB(16, 16, 16, 80), 
-                    itemCount: _sections.length,
-                    separatorBuilder: (context, index) =>
-                        const SizedBox(height: 16),
-                    itemBuilder: (context, index) {
-                      final section = _sections[index];
-                      return SectionCard(section: section);
-                    },
-                  );
-                }
-              },
+      body: _buildBody(),
+    );
+  }
+
+  Widget _buildBody() {
+    if (_isLoading) {
+      return const Center(child: CircularProgressIndicator());
+    }
+    if (_error.isNotEmpty) {
+      return Center(child: Text(_error, style: const TextStyle(color: Colors.red)));
+    }
+    if (_sections.isEmpty) {
+      return const Center(child: Text("No sections found for this class."));
+    }
+
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        if (constraints.maxWidth > 600) {
+          return GridView.builder(
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 80),
+            itemCount: _sections.length,
+            gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
+              maxCrossAxisExtent: 400,
+              mainAxisSpacing: 16,
+              crossAxisSpacing: 16,
+              childAspectRatio: 1.5, // Adjust for content
             ),
+            itemBuilder: (context, index) {
+              final section = _sections[index];
+              return SectionCard(section: section, onUpdate: _fetchSections);
+            },
+          );
+        } else {
+          return ListView.separated(
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 80),
+            itemCount: _sections.length,
+            separatorBuilder: (context, index) => const SizedBox(height: 16),
+            itemBuilder: (context, index) {
+              final section = _sections[index];
+              return SectionCard(section: section, onUpdate: _fetchSections);
+            },
+          );
+        }
+      },
     );
   }
 }
 
 class SectionCard extends StatelessWidget {
   final Section section;
+  final VoidCallback onUpdate;
 
-  const SectionCard({super.key, required this.section});
+  const SectionCard({super.key, required this.section, required this.onUpdate});
 
   @override
   Widget build(BuildContext context) {
@@ -148,8 +210,8 @@ class SectionCard extends StatelessWidget {
             ],
           ),
           Text("Mentor: ${section.mentor}",
-              style: theme.textTheme.bodyLarge
-                  ?.copyWith(color: theme.colorScheme.onPrimary.withAlpha(180))),
+              style: theme.textTheme.bodyLarge?.copyWith(
+                  color: theme.colorScheme.onPrimary.withAlpha(180))),
           const SizedBox(height: 12),
           Divider(
             color: theme.colorScheme.onPrimary.withAlpha(180),
@@ -160,11 +222,15 @@ class SectionCard extends StatelessWidget {
             children: [
               Expanded(
                 child: ElevatedButton.icon(
-                  onPressed: () {
-                    Navigator.push(
+                  onPressed: () async {
+                    final result = await Navigator.push(
                         context,
                         MaterialPageRoute(
-                            builder: (context) => const EditSectionPage()));
+                            builder: (context) =>
+                                EditSectionPage(section: section)));
+                    if (result == true) {
+                      onUpdate();
+                    }
                   },
                   style: ElevatedButton.styleFrom(
                       backgroundColor: theme.colorScheme.primaryContainer,
@@ -180,7 +246,9 @@ class SectionCard extends StatelessWidget {
                     Navigator.push(
                         context,
                         MaterialPageRoute(
-                            builder: (context) => const StudentListPage()));
+                            builder: (context) => StudentListPage(
+                                sectionId: section.id,
+                                sectionName: section.name)));
                   },
                   style: ElevatedButton.styleFrom(
                       backgroundColor: theme.colorScheme.secondaryContainer,
@@ -192,7 +260,7 @@ class SectionCard extends StatelessWidget {
               const SizedBox(width: 8),
               Expanded(
                 child: ElevatedButton.icon(
-                  onPressed: () => showDeleteDialog(context, section.name),
+                  onPressed: () => showDeleteDialog(context, section, onUpdate),
                   style: ElevatedButton.styleFrom(
                       backgroundColor: theme.colorScheme.errorContainer,
                       foregroundColor: theme.colorScheme.onErrorContainer),
@@ -208,7 +276,8 @@ class SectionCard extends StatelessWidget {
   }
 }
 
-void showDeleteDialog(BuildContext context, String sectionName) {
+void showDeleteDialog(
+    BuildContext context, Section section, VoidCallback onUpdate) {
   showGeneralDialog(
     context: context,
     barrierDismissible: true,
@@ -217,19 +286,57 @@ void showDeleteDialog(BuildContext context, String sectionName) {
     transitionDuration: const Duration(milliseconds: 200),
     pageBuilder: (_, __, ___) {
       return DeleteSectionDialog(
-        sectionName: sectionName,
+        section: section,
+        onUpdate: onUpdate,
       );
     },
   );
 }
 
-class DeleteSectionDialog extends StatelessWidget {
-  final String sectionName;
+class DeleteSectionDialog extends StatefulWidget {
+  final Section section;
+  final VoidCallback onUpdate;
 
   const DeleteSectionDialog({
     super.key,
-    required this.sectionName,
+    required this.section,
+    required this.onUpdate,
   });
+
+  @override
+  State<DeleteSectionDialog> createState() => _DeleteSectionDialogState();
+}
+
+class _DeleteSectionDialogState extends State<DeleteSectionDialog> {
+  bool _isDeleting = false;
+
+  Future<void> _deleteSection() async {
+    setState(() => _isDeleting = true);
+    try {
+      await ApiService.delete('manager/sections/${widget.section.id}');
+      if (mounted) {
+        Navigator.pop(context);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Section deleted successfully'),
+            backgroundColor: Colors.green,
+          ),
+        );
+        widget.onUpdate();
+      }
+    } catch (e) {
+      if (mounted) {
+        Navigator.pop(context);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error: $e')),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isDeleting = false);
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -257,10 +364,10 @@ class DeleteSectionDialog extends StatelessWidget {
                 ),
                 const SizedBox(height: 12),
                 Text(
-                  "Are you sure you want to delete this section: $sectionName? This action cannot be undone.",
+                  "Are you sure you want to delete this section: ${widget.section.name}? This action cannot be undone.",
                   textAlign: TextAlign.center,
                   style: theme.textTheme.bodyMedium?.copyWith(
-                    color: theme.colorScheme.onSurface.withAlpha(35),
+                    color: theme.colorScheme.onSurface.withAlpha(220),
                   ),
                 ),
                 const SizedBox(height: 24),
@@ -275,11 +382,17 @@ class DeleteSectionDialog extends StatelessWidget {
                         borderRadius: BorderRadius.circular(12),
                       ),
                     ),
-                    onPressed: () {
-                      // Implement delete logic here
-                      Navigator.pop(context);
-                    },
-                    child: const Text("Yes, Delete"),
+                    onPressed: _isDeleting ? null : _deleteSection,
+                    child: _isDeleting
+                        ? const SizedBox(
+                            height: 24,
+                            width: 24,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 3,
+                              valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                            ),
+                          )
+                        : const Text("Yes, Delete"),
                   ),
                 ),
                 const SizedBox(height: 12),
@@ -288,7 +401,7 @@ class DeleteSectionDialog extends StatelessWidget {
                   child: OutlinedButton(
                     style: OutlinedButton.styleFrom(
                       padding: const EdgeInsets.symmetric(vertical: 14),
-                       side: BorderSide(color: theme.dividerColor),
+                      side: BorderSide(color: theme.dividerColor),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(12),
                       ),

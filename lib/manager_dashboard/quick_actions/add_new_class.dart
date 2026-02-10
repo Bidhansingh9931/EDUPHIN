@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:eduphin/services/api_service.dart';
 import 'package:flutter/material.dart';
 
 // ───────────────────────────────────────────────────────────
@@ -13,12 +14,11 @@ class NewClass {
 }
 
 // ───────────────────────────────────────────────────────────
-//                         MOCK API SERVICE
+//                         API SERVICE
 // ───────────────────────────────────────────────────────────
 
-class MockClassApiService {
+class ClassApiService {
   Future<List<String>> fetchClassLevels() async {
-    // Simulate fetching data for dropdowns from an API
     await Future.delayed(const Duration(milliseconds: 500));
     return [
       'Primary',
@@ -29,14 +29,15 @@ class MockClassApiService {
     ];
   }
 
-  Future<bool> addClass(NewClass newClass) async {
-    // Simulate sending data to an API
-    await Future.delayed(const Duration(seconds: 1));
-    debugPrint("Submitting to API:");
-    debugPrint(
-        'ClassName: ${newClass.className}, ClassCode: ${newClass.classCode}, Level: ${newClass.level}, Description: ${newClass.description}');
-    // Simulate a successful API call
-    return true;
+  // Updated to return response data and throw specific errors for better UI feedback
+  Future<Map<String, dynamic>> addClass(NewClass newClass) async {
+    final classData = {
+      'name': newClass.className,
+      'code': newClass.classCode,
+      'description': newClass.description,
+      'level': newClass.level,
+    };
+    return ApiService.addClass(classData);
   }
 }
 
@@ -49,10 +50,9 @@ class AddNewClassPage extends StatefulWidget {
 
 class _AddNewClassPageState extends State<AddNewClassPage> {
   final _formKey = GlobalKey<FormState>();
-  final _apiService = MockClassApiService();
+  final _apiService = ClassApiService();
   late Future<List<String>> _levelsFuture;
 
-  // Model to hold all form data
   final _newClass = NewClass();
   bool _isSubmitting = false;
 
@@ -62,8 +62,8 @@ class _AddNewClassPageState extends State<AddNewClassPage> {
     _levelsFuture = _apiService.fetchClassLevels();
   }
 
+  // Updated to handle exceptions from the API service gracefully
   Future<void> _submitForm() async {
-    // Use form validation before submitting
     if (!_formKey.currentState!.validate()) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -78,21 +78,31 @@ class _AddNewClassPageState extends State<AddNewClassPage> {
       _isSubmitting = true;
     });
 
-    final success = await _apiService.addClass(_newClass);
+    try {
+      final responseData = await _apiService.addClass(_newClass);
 
-    if (mounted) {
-      setState(() {
-        _isSubmitting = false;
-      });
+      if (!mounted) return;
 
+      final message = responseData['message'] ?? 'Class added successfully!';
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(message), backgroundColor: Colors.green),
+      );
+      Navigator.of(context).pop(true); // Pop with success
+
+    } catch (e) {
+      if (!mounted) return;
+      // Display specific error message from the exception
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(success ? 'Class added successfully!' : 'Failed to add class.'),
-          backgroundColor: success ? Colors.green : Colors.red,
+          content: Text(e.toString().replaceFirst("Exception: ", "")),
+          backgroundColor: Colors.red,
         ),
       );
-      if (success) {
-        Navigator.of(context).pop();
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isSubmitting = false;
+        });
       }
     }
   }
@@ -106,12 +116,10 @@ class _AddNewClassPageState extends State<AddNewClassPage> {
         title: const Text("Add New Class"),
         centerTitle: true,
       ),
-      // Using a responsive FAB for actions
       floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
       floatingActionButton: FutureBuilder<List<String>>(
         future: _levelsFuture,
         builder: (context, snapshot) {
-          // Only show button if data has loaded to prevent premature submission
           if (snapshot.hasData) {
             return _buildActionButtons(theme);
           } else {
@@ -137,14 +145,12 @@ class _AddNewClassPageState extends State<AddNewClassPage> {
     );
   }
 
-  // Builds the main form content
   Widget _buildForm(ThemeData theme, List<String> levels) {
     return SingleChildScrollView(
-      // Added responsive padding, including 50 at the bottom
       padding: const EdgeInsets.fromLTRB(16, 16, 16, 120),
       child: Center(
         child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 600), // Limit width on large screens
+          constraints: const BoxConstraints(maxWidth: 600),
           child: Form(
             key: _formKey,
             child: Container(
@@ -184,7 +190,7 @@ class _AddNewClassPageState extends State<AddNewClassPage> {
                   ),
                   const SizedBox(height: 16),
                   _buildDropdown(theme, levels),
-                  const SizedBox(height: 80), // Padding for the FAB
+                  const SizedBox(height: 80),
                 ],
               ),
             ),
@@ -194,7 +200,6 @@ class _AddNewClassPageState extends State<AddNewClassPage> {
     );
   }
 
-  // Refactored TextField for reusability and consistency
   Widget _buildTextField({
     required ThemeData theme,
     required String label,
@@ -231,7 +236,6 @@ class _AddNewClassPageState extends State<AddNewClassPage> {
     );
   }
 
-  // Refactored Dropdown for reusability and consistency
   Widget _buildDropdown(ThemeData theme, List<String> levels) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -243,7 +247,7 @@ class _AddNewClassPageState extends State<AddNewClassPage> {
         ),
         const SizedBox(height: 8),
         DropdownButtonFormField<String>(
-          initialValue: _newClass.level,
+          value: _newClass.level,
           hint: Text("Select Level", style: TextStyle(color: theme.hintColor)),
           decoration: InputDecoration(
             filled: true,
@@ -267,7 +271,6 @@ class _AddNewClassPageState extends State<AddNewClassPage> {
     );
   }
 
-  // Responsive action buttons, now in the FAB
   Widget _buildActionButtons(ThemeData theme) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16.0),

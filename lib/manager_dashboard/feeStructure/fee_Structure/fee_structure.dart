@@ -1,24 +1,43 @@
+import 'dart:convert';
 import 'dart:ui';
 import 'package:eduphin/manager_dashboard/feeStructure/fee_Structure/create_new_fee.dart';
+import 'package:eduphin/services/api_service.dart';
 import 'package:flutter/material.dart';
 
 import 'edit_fee.dart';
 
+// ───────────────────────────────────────────────────────────
+//                          DATA MODELS (ROBUST)
+// ───────────────────────────────────────────────────────────
+
 class InstituteFee {
+  final int id;
   final String title;
   final String mandatoryOrOptional;
   final String detail;
   final int amount;
 
   InstituteFee({
+    required this.id,
     required this.title,
     required this.mandatoryOrOptional,
     required this.detail,
     required this.amount,
   });
+
+  factory InstituteFee.fromJson(Map<String, dynamic> json) {
+    return InstituteFee(
+      id: json['id'] ?? 0,
+      title: json['fee_name']?.toString() ?? 'N/A',
+      mandatoryOrOptional: (json['is_optional'] == true || json['is_optional'] == 1) ? "Optional" : "Mandatory",
+      detail: json['description']?.toString() ?? '',
+      amount: int.tryParse(json['amount']?.toString() ?? '0') ?? 0,
+    );
+  }
 }
 
 class ClassFee {
+  final int id;
   final String heading;
   final String subHeading;
   final String isOptional;
@@ -26,13 +45,30 @@ class ClassFee {
   final int fee;
 
   ClassFee({
+    required this.id,
     required this.heading,
     required this.subHeading,
     required this.isOptional,
     required this.details,
     required this.fee,
   });
+
+  factory ClassFee.fromJson(Map<String, dynamic> json) {
+    final className = (json['class'] is Map<String, dynamic>) ? json['class']['name']?.toString() : 'N/A';
+    return ClassFee(
+      id: json['id'] ?? 0,
+      heading: "Class: ${className ?? 'N/A'}",
+      subHeading: json['fee_name']?.toString() ?? 'N/A',
+      isOptional: (json['is_optional'] == true || json['is_optional'] == 1) ? "Optional" : "Mandatory",
+      details: json['description']?.toString() ?? '',
+      fee: int.tryParse(json['amount']?.toString() ?? '0') ?? 0,
+    );
+  }
 }
+
+// ───────────────────────────────────────────────────────────
+//                         PAGE WIDGET
+// ───────────────────────────────────────────────────────────
 
 class FeeStructurePage extends StatefulWidget {
   const FeeStructurePage({super.key});
@@ -53,49 +89,69 @@ class _FeeStructurePageState extends State<FeeStructurePage> {
   }
 
   Future<void> _fetchData() async {
-    // Simulate API call
-    await Future.delayed(const Duration(seconds: 1));
+    if (!mounted) return;
+    setState(() {
+      _isLoading = true;
+    });
 
-    final instituteFeesData = [
-      InstituteFee(
-        title: "Annual Tuition Fee",
-        mandatoryOrOptional: "Mandatory",
-        detail: "Standard annual fee for all academic programs",
-        amount: 75000,
-      ),
-      InstituteFee(
-          title: "Sports Facility Fee",
-          mandatoryOrOptional: "Optional",
-          detail: "Standard annual fee for all academic programs",
-          amount: 3000),
-    ];
+    try {
+      final response = await ApiService.get('manager/fees');
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        
+        // Fix: Safely handle null lists from the API
+        final List<dynamic> instituteFeesData = data['institute_fees'] as List? ?? [];
+        final List<dynamic> classFeesData = data['class_fees'] as List? ?? [];
 
-    final classFeesData = [
-      ClassFee(
-          heading: "Class: 10th Grade",
-          subHeading: "Lab Fee",
-          isOptional: "Mandatory",
-          details: "Mandatory for all science stream students in 10th grade.",
-          fee: 4000),
-      ClassFee(
-          heading: "Class: 5th Grade",
-          subHeading: "Art Supplies Fee",
-          isOptional: "Optional",
-          details:
-              "Provides all necessary art supplies for the year long art class.",
-          fee: 4000),
-    ];
+        final instituteFees = instituteFeesData.whereType<Map<String, dynamic>>().map((fee) => InstituteFee.fromJson(fee)).toList();
+        final classFees = classFeesData.whereType<Map<String, dynamic>>().map((fee) => ClassFee.fromJson(fee)).toList();
 
-    if (mounted) {
-      setState(() {
-        _instituteFees = instituteFeesData;
-        _classFees = classFeesData;
-        _isLoading = false;
-      });
+        if (mounted) {
+          setState(() {
+            _instituteFees = instituteFees;
+            _classFees = classFees;
+          });
+        }
+      } else {
+        throw Exception('Failed to load fees: ${response.body}');
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(e.toString())),
+        );
+      }
+    } finally {
+      if(mounted) {
+        setState(() => _isLoading = false);
+      }
     }
   }
 
- @override
+  Future<void> _deleteFee(int feeId) async {
+     try {
+      final response = await ApiService.delete('manager/fees/$feeId');
+      if (response.statusCode == 200 || response.statusCode == 204) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Fee deleted successfully'), backgroundColor: Colors.green),
+          );
+          _fetchData(); // Refresh the data
+        }
+      } else {
+         final error = jsonDecode(response.body)['message'] ?? 'Failed to delete fee';
+        throw Exception(error);
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(e.toString()), backgroundColor: Colors.red),
+        );
+      }
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     return Scaffold(
@@ -103,9 +159,14 @@ class _FeeStructurePageState extends State<FeeStructurePage> {
       floatingActionButton: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 16.0),
         child: FloatingActionButton.extended(
-          onPressed: () {
-            Navigator.push(context,
-                MaterialPageRoute(builder: (context) => const CreateNewFeePage()));
+          onPressed: () async {
+            final result = await Navigator.push(
+                context,
+                MaterialPageRoute(
+                    builder: (context) => const CreateNewFeePage()));
+            if (result == true) {
+              _fetchData();
+            }
           },
           backgroundColor: Colors.blue.shade900,
           icon: const Icon(Icons.add, color: Colors.white),
@@ -122,15 +183,18 @@ class _FeeStructurePageState extends State<FeeStructurePage> {
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
-          : Padding(
-              padding: const EdgeInsets.fromLTRB(16, 16, 16, 120),
-              child: LayoutBuilder(builder: (context, constraints) {
-                if (constraints.maxWidth > 800) {
-                  return _buildWideLayout();
-                } else {
-                  return _buildNarrowLayout();
-                }
-              }),
+          : RefreshIndicator(
+              onRefresh: _fetchData,
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(16, 16, 16, 120),
+                child: LayoutBuilder(builder: (context, constraints) {
+                  if (constraints.maxWidth > 800) {
+                    return _buildWideLayout();
+                  } else {
+                    return _buildNarrowLayout();
+                  }
+                }),
+              ),
             ),
     );
   }
@@ -196,6 +260,7 @@ class _FeeStructurePageState extends State<FeeStructurePage> {
                     context,
                     MaterialPageRoute(
                       builder: (context) => EditFeePage(
+                        feeId: fee.id,
                         feeName: fee.title,
                         amount: fee.amount.toString(),
                         description: fee.detail,
@@ -204,27 +269,15 @@ class _FeeStructurePageState extends State<FeeStructurePage> {
                       ),
                     ),
                   );
-                  if (result != null && mounted) {
-                    setState(() {
-                      _instituteFees[index] = InstituteFee(
-                        title: result['feeName'],
-                        mandatoryOrOptional:
-                            result['isOptional'] ? "Optional" : "Mandatory",
-                        detail: result['description'],
-                        amount: int.parse(result['amount']),
-                      );
-                    });
+                  if (result == true) {
+                    _fetchData();
                   }
                 },
                 onDelete: () {
                   showDeleteFeeDialog(
                     context,
                     feeName: fee.title,
-                    onConfirm: () {
-                      setState(() {
-                        _instituteFees.removeAt(index);
-                      });
-                    },
+                    onConfirm: () => _deleteFee(fee.id),
                   );
                 },
               ),
@@ -265,6 +318,7 @@ class _FeeStructurePageState extends State<FeeStructurePage> {
                       context,
                       MaterialPageRoute(
                         builder: (context) => EditFeePage(
+                          feeId: fee.id,
                           feeName: fee.subHeading,
                           amount: fee.fee.toString(),
                           description: fee.details,
@@ -273,28 +327,15 @@ class _FeeStructurePageState extends State<FeeStructurePage> {
                         ),
                       ),
                     );
-                    if (result != null && mounted) {
-                      setState(() {
-                        _classFees[index] = ClassFee(
-                          heading: fee.heading,
-                          subHeading: result['feeName'],
-                          isOptional:
-                              result['isOptional'] ? "Optional" : "Mandatory",
-                          details: result['description'],
-                          fee: int.parse(result['amount']),
-                        );
-                      });
+                    if (result == true) {
+                      _fetchData();
                     }
                   },
                   onDelete: () {
                     showDeleteFeeDialog(
                       context,
                       feeName: fee.subHeading,
-                      onConfirm: () {
-                        setState(() {
-                          _classFees.removeAt(index);
-                        });
-                      },
+                      onConfirm: () => _deleteFee(fee.id),
                     );
                   }),
             );
@@ -307,9 +348,9 @@ class _FeeStructurePageState extends State<FeeStructurePage> {
 
 void showDeleteFeeDialog(
     BuildContext context, {
-    required String feeName,
-    required VoidCallback onConfirm,
-  }) {
+      required String feeName,
+      required VoidCallback onConfirm,
+    }) {
   showGeneralDialog(
     context: context,
     barrierDismissible: true,
@@ -359,10 +400,17 @@ class DeleteFeeDialog extends StatelessWidget {
                 children: [
                   Text("Delete Fee", style: theme.textTheme.titleLarge?.copyWith(color: Colors.white)),
                   const SizedBox(height: 12),
-                  Text(
-                    "Are you sure you want to delete \"$feeName\"? This action cannot be undone.",
+                   // Fix: Use RichText for better text handling and styling
+                  RichText(
                     textAlign: TextAlign.center,
-                    style: theme.textTheme.bodyMedium?.copyWith(color: Colors.grey.shade400),
+                    text: TextSpan(
+                      style: theme.textTheme.bodyMedium?.copyWith(color: Colors.grey.shade400),
+                      children: <TextSpan>[
+                        const TextSpan(text: 'Are you sure you want to delete '),
+                        TextSpan(text: '"$feeName"', style: const TextStyle(fontWeight: FontWeight.bold)),
+                        const TextSpan(text: '? This action cannot be undone.'),
+                      ],
+                    ),
                   ),
                   const SizedBox(height: 24),
                   SizedBox(
@@ -385,20 +433,11 @@ class DeleteFeeDialog extends StatelessWidget {
                   const SizedBox(height: 12),
                   SizedBox(
                     width: double.infinity,
-                    child: ElevatedButton(
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF374151),
-                        padding: const EdgeInsets.symmetric(vertical: 14),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                      ),
-                      onPressed: () {
-                        Navigator.pop(context);
-                      },
+                    child: TextButton(
+                      onPressed: () => Navigator.pop(context),
                       child: Text("Cancel", style: theme.textTheme.labelLarge?.copyWith(color: Colors.white)),
                     ),
-                  ),
+                  )
                 ],
               ),
             ),
@@ -409,11 +448,15 @@ class DeleteFeeDialog extends StatelessWidget {
   }
 }
 
+// ───────────────────────────────────────────────────────────
+//                         CUSTOM WIDGETS
+// ───────────────────────────────────────────────────────────
+
 class CustomInstituteContainerBox extends StatelessWidget {
   final String title;
   final String mandatoryOrOptional;
-  final int amount;
   final String detail;
+  final int amount;
   final VoidCallback onEdit;
   final VoidCallback onDelete;
 
@@ -430,79 +473,73 @@ class CustomInstituteContainerBox extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final isMandatory = mandatoryOrOptional == "Mandatory";
-
     return Container(
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(10),
         color: theme.primaryColor,
+        borderRadius: BorderRadius.circular(10),
       ),
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(16.0),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(title,
-                  style: theme.textTheme.titleLarge
-                      ?.copyWith(color: theme.colorScheme.onPrimary)),
-              Container(
-                decoration: BoxDecoration(
-                  color: isMandatory
-                      ? Colors.grey.withAlpha(25)
-                      : Colors.blue.withAlpha(100),
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              // Fix: Wrap title in Flexible to prevent overflow
+              Flexible(
                 child: Text(
-                  mandatoryOrOptional,
-                  style: theme.textTheme.labelSmall
-                      ?.copyWith(color: Colors.white, fontWeight: FontWeight.bold),
+                  title,
+                  style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w600, color: Colors.white),
                 ),
-              )
-            ],
-          ),
-           Row(
-            children: [
-              Icon(
-                Icons.currency_rupee,
-                size: 16,
-                color: Colors.blue,
               ),
-              Text(amount.toString(),
-                  style: theme.textTheme.bodyMedium?.copyWith(color: Colors.blue)),
+              const SizedBox(width: 8),
+              Text(
+                "₹$amount",
+                style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w600, color: Colors.white),
+              ),
             ],
           ),
           const SizedBox(height: 8),
-          Text(detail, style: theme.textTheme.bodyMedium?.copyWith(color: Colors.grey)),
-          const SizedBox(height: 8),
-          Divider(
-            color: theme.colorScheme.onPrimary.withAlpha(180),
-            thickness: 1,
+          Text(
+            mandatoryOrOptional,
+            style: theme.textTheme.bodyMedium?.copyWith(
+              color: mandatoryOrOptional == "Mandatory" ? Colors.redAccent : Colors.green,
+            ),
           ),
           const SizedBox(height: 8),
+          Text(
+            detail,
+            style: theme.textTheme.bodyMedium?.copyWith(color: Colors.grey.shade400),
+          ),
+          const SizedBox(height: 16),
           Row(
             children: [
               Expanded(
                 child: ElevatedButton.icon(
                   onPressed: onEdit,
+                  icon: const Icon(Icons.edit, size: 16, color: Colors.white),
+                  label: Text("Edit", style: theme.textTheme.labelLarge?.copyWith(color: Colors.white)),
                   style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.blue.withAlpha(45)),
-                  icon: const Icon(Icons.edit, color: Colors.blue, size: 16),
-                  label: Text("Edit",
-                      style: theme.textTheme.labelLarge?.copyWith(color: Colors.blue)),
+                    backgroundColor: Colors.blue.withAlpha(51),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                  ),
                 ),
               ),
               const SizedBox(width: 8),
               Expanded(
                 child: ElevatedButton.icon(
                   onPressed: onDelete,
+                  icon: const Icon(Icons.delete, size: 16, color: Colors.white),
+                  label: Text("Delete", style: theme.textTheme.labelLarge?.copyWith(color: Colors.white)),
                   style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.red.withAlpha(45)),
-                  icon: const Icon(Icons.delete, color: Colors.red, size: 16),
-                  label: Text("Delete",
-                      style: theme.textTheme.labelLarge?.copyWith(color: Colors.red)),
+                    backgroundColor: Colors.red.withAlpha(51),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                  ),
                 ),
               ),
             ],
@@ -536,83 +573,74 @@ class CustomSpecificContainerBox extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final isMandatory = isOptional == "Mandatory";
-
     return Container(
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(10),
         color: theme.primaryColor,
+        borderRadius: BorderRadius.circular(10),
       ),
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(16.0),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(heading,
-              style: theme.textTheme.titleSmall
-                  ?.copyWith(color: theme.colorScheme.onPrimary.withAlpha(180))),
+          Text(heading, style: theme.textTheme.bodyMedium?.copyWith(color: Colors.grey.shade400)),
           const SizedBox(height: 4),
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(subHeading,
-                  style: theme.textTheme.titleLarge
-                      ?.copyWith(color: theme.colorScheme.onPrimary)),
-              Container(
-                decoration: BoxDecoration(
-                  color: isMandatory
-                      ? Colors.grey.withAlpha(25)
-                      : Colors.blue.withAlpha(100),
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              // Fix: Wrap title in Flexible to prevent overflow
+              Flexible(
                 child: Text(
-                  isOptional,
-                  style: theme.textTheme.labelSmall
-                      ?.copyWith(color: Colors.white, fontWeight: FontWeight.bold),
+                  subHeading,
+                  style: theme.textTheme.titleLarge?.copyWith(color: Colors.white, fontWeight: FontWeight.w600),
                 ),
               ),
-            ],
-          ),
-          Row(
-            children: [
-              const Icon(
-                Icons.currency_rupee,
-                size: 16,
-                color: Colors.blue,
+              const SizedBox(width: 8),
+              Text(
+                "₹$fee",
+                style: theme.textTheme.titleLarge?.copyWith(color: Colors.white, fontWeight: FontWeight.w600),
               ),
-              Text(fee.toString(),
-                  style: theme.textTheme.bodyMedium?.copyWith(color: Colors.blue)),
             ],
           ),
           const SizedBox(height: 8),
-          Text(details, style: theme.textTheme.bodyMedium?.copyWith(color: Colors.grey)),
-          const SizedBox(height: 8),
-          Divider(
-            color: theme.colorScheme.onPrimary.withAlpha(180),
-            thickness: 1,
+          Text(
+            isOptional,
+            style: theme.textTheme.bodyMedium?.copyWith(
+              color: isOptional == "Mandatory" ? Colors.redAccent : Colors.green,
+            ),
           ),
-           const SizedBox(height: 8),
+          const SizedBox(height: 8),
+          Text(
+            details,
+            style: theme.textTheme.bodyMedium?.copyWith(color: Colors.grey.shade400),
+          ),
+          const SizedBox(height: 16),
           Row(
             children: [
               Expanded(
                 child: ElevatedButton.icon(
                   onPressed: onEdit,
+                  icon: const Icon(Icons.edit, size: 16, color: Colors.white),
+                  label: Text("Edit", style: theme.textTheme.labelLarge?.copyWith(color: Colors.white)),
                   style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.blue.withAlpha(45)),
-                  icon: const Icon(Icons.edit, color: Colors.blue, size: 16),
-                  label: Text("Edit",
-                      style: theme.textTheme.labelLarge?.copyWith(color: Colors.blue)),
+                    backgroundColor: Colors.blue.withAlpha(51),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                  ),
                 ),
               ),
               const SizedBox(width: 8),
               Expanded(
                 child: ElevatedButton.icon(
                   onPressed: onDelete,
+                  icon: const Icon(Icons.delete, size: 16, color: Colors.white),
+                  label: Text("Delete", style: theme.textTheme.labelLarge?.copyWith(color: Colors.white)),
                   style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.red.withAlpha(45)),
-                  icon: const Icon(Icons.delete, color: Colors.red, size: 16),
-                  label: Text("Delete",
-                      style: theme.textTheme.labelLarge?.copyWith(color: Colors.red)),
+                    backgroundColor: Colors.red.withAlpha(51),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                  ),
                 ),
               ),
             ],

@@ -1,25 +1,47 @@
+import 'dart:async';
+import 'dart:convert';
+import 'dart:ui';
+
 import 'package:flutter/material.dart';
 
+import 'package:eduphin/services/api_service.dart';
 import 'add_new_remarks.dart';
 
 // Data model for a Remark
 class Remark {
-  final String type; // "Positive" or "Negative"
+  final int id;
+  final String type;
   final String description;
   final String remarkDate;
   final String dateRange;
 
-  Remark({
+  const Remark({
+    required this.id,
     required this.type,
     required this.description,
     required this.remarkDate,
     required this.dateRange,
   });
+
+  factory Remark.fromJson(Map<String, dynamic> json) {
+    return Remark(
+      id: json['id'] ?? 0,
+      type: json['remarks_type'] ?? 'N/A',
+      description: json['remarks'] ?? 'No description',
+      remarkDate: json['remarks_date'] ?? 'N/A',
+      dateRange: "${json['from_date'] ?? 'N/A'} - ${json['to_date'] ?? 'N/A'}",
+    );
+  }
 }
 
 class RemarksPage extends StatefulWidget {
+  final int studentId;
   final String studentName;
-  const RemarksPage({super.key, this.studentName = "Aarav Sharma"});
+  const RemarksPage({
+    super.key,
+    required this.studentId,
+    this.studentName = "Student",
+  });
 
   @override
   State<StatefulWidget> createState() => _RemarksPageState();
@@ -28,6 +50,7 @@ class RemarksPage extends StatefulWidget {
 class _RemarksPageState extends State<RemarksPage> {
   bool _isLoading = true;
   final List<Remark> _remarks = [];
+  String _error = '';
 
   @override
   void initState() {
@@ -36,41 +59,54 @@ class _RemarksPageState extends State<RemarksPage> {
   }
 
   Future<void> _fetchRemarks() async {
-    // Simulate API call. Replace with your actual API fetching logic.
-    await Future.delayed(const Duration(seconds: 2));
+    if (!mounted) return;
+    setState(() {
+      _isLoading = true;
+      _error = '';
+    });
 
-    final List<Remark> fetchedRemarks = [
-      Remark(
-        type: "Positive",
-        description: "Excellent performance in the recent mathematics quiz. Showed great problem solving skills.",
-        remarkDate: "20 Oct 2023",
-        dateRange: "15 Oct 2023 - 20 Oct 2023",
-      ),
-      Remark(
-        type: "Negative",
-        description: "Frequently late to the first period class. Needs to improve punctuality.",
-        remarkDate: "18 Oct 2023",
-        dateRange: "10 Oct 2023 - 18 Oct 2023",
-      ),
-      Remark(
-        type: "Positive",
-        description: "Actively participates in class discussions and helps other students.",
-        remarkDate: "15 Oct 2023",
-        dateRange: "1 Oct 2023 - 15 Oct 2023",
-      ),
-      Remark(
-        type: "Negative",
-        description: "Incomplete homework assignment submitted for the science project.",
-        remarkDate: "12 Oct 2023",
-        dateRange: "10 Oct 2023 - 12 Oct 2023",
-      ),
-    ];
+    try {
+      final response =
+          await ApiService.get('manager/students/${widget.studentId}/remarks');
 
-    if (mounted) {
-      setState(() {
-        _remarks.addAll(fetchedRemarks);
-        _isLoading = false;
-      });
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        if (data['status'] == true && data['remarks'] is List) {
+          final fetchedRemarks = (data['remarks'] as List)
+              .map((remarkJson) => Remark.fromJson(remarkJson))
+              .toList();
+
+          if (mounted) {
+            setState(() {
+              _remarks.clear();
+              _remarks.addAll(fetchedRemarks);
+            });
+          }
+        } else {
+          throw Exception(
+              'API response format is incorrect or status is false.');
+        }
+      } else {
+        throw Exception('Failed to load remarks: ${response.statusCode}');
+      }
+    } on TimeoutException {
+      if (mounted) {
+        setState(() {
+          _error = "The connection timed out. Please try again.";
+        });
+      }
+    } on Exception catch (e) {
+      if (mounted) {
+        setState(() {
+          _error = e.toString().replaceFirst('Exception: ', '');
+        });
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
     }
   }
 
@@ -79,13 +115,18 @@ class _RemarksPageState extends State<RemarksPage> {
     final theme = Theme.of(context);
     return Scaffold(
       backgroundColor: theme.scaffoldBackgroundColor,
-      // Using a responsive FloatingActionButton
       floatingActionButton: FloatingActionButton.extended(
-        onPressed: () {
-          Navigator.push(
-              context,
-              MaterialPageRoute(
-                  builder: (context) => const AddNewRemarksPage()));
+        onPressed: () async {
+          final result = await Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) =>
+                  AddNewRemarksPage(studentId: widget.studentId),
+            ),
+          );
+          if (result == true) {
+            _fetchRemarks();
+          }
         },
         label: const Text("Add New Remark"),
         icon: const Icon(Icons.add),
@@ -95,7 +136,6 @@ class _RemarksPageState extends State<RemarksPage> {
         title: Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            // Using Flexible to prevent overflow on small screens
             Flexible(
               child: Text(
                 "Remarks for ${widget.studentName}",
@@ -103,59 +143,74 @@ class _RemarksPageState extends State<RemarksPage> {
               ),
             ),
             IconButton(
-                onPressed: () {},
-                icon: const Icon(Icons.more_vert_sharp)),
+              onPressed: () {},
+              icon: const Icon(Icons.more_vert_sharp),
+            ),
           ],
         ),
       ),
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
-          // Using LayoutBuilder for a responsive grid/list
-          : LayoutBuilder(
-              builder: (context, constraints) {
-                // Use GridView for wider screens
-                if (constraints.maxWidth > 600) {
-                  return GridView.builder(
-                    // Increased bottom padding for FAB
-                    padding: const EdgeInsets.fromLTRB(16, 16, 16, 80),
-                    itemCount: _remarks.length,
-                    gridDelegate:
-                        const SliverGridDelegateWithMaxCrossAxisExtent(
-                      maxCrossAxisExtent: 450, // Max width per item
-                      crossAxisSpacing: 16,
-                      mainAxisSpacing: 16,
-                      childAspectRatio: 1.8, // Adjust for content
-                    ),
-                    itemBuilder: (context, index) {
-                      final remark = _remarks[index];
-                      return RemarkCard(remark: remark);
-                    },
-                  );
-                } else {
-                  // Use ListView for narrower screens
-                  return ListView.separated(
-                    // Increased bottom padding for FAB
-                    padding: const EdgeInsets.fromLTRB(16, 16, 16, 120),
-                    itemCount: _remarks.length,
-                    separatorBuilder: (context, index) =>
-                        const SizedBox(height: 16),
-                    itemBuilder: (context, index) {
-                      final remark = _remarks[index];
-                      return RemarkCard(remark: remark);
-                    },
-                  );
-                }
-              },
+      body: _buildBody(),
+    );
+  }
+
+  Widget _buildBody() {
+    if (_isLoading) {
+      return const Center(child: CircularProgressIndicator());
+    }
+    if (_error.isNotEmpty) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(16.0),
+          child: Text(
+            _error,
+            textAlign: TextAlign.center,
+            style: const TextStyle(color: Colors.red),
+          ),
+        ),
+      );
+    }
+    if (_remarks.isEmpty) {
+      return const Center(child: Text("No remarks found for this student."));
+    }
+
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        if (constraints.maxWidth > 600) {
+          return GridView.builder(
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 80),
+            itemCount: _remarks.length,
+            gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
+              maxCrossAxisExtent: 450,
+              crossAxisSpacing: 16,
+              mainAxisSpacing: 16,
+              childAspectRatio: 1.8,
             ),
+            itemBuilder: (context, index) {
+              final remark = _remarks[index];
+              return RemarkCard(remark: remark, onUpdate: _fetchRemarks);
+            },
+          );
+        } else {
+          return ListView.separated(
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 120),
+            itemCount: _remarks.length,
+            separatorBuilder: (context, index) => const SizedBox(height: 16),
+            itemBuilder: (context, index) {
+              final remark = _remarks[index];
+              return RemarkCard(remark: remark, onUpdate: _fetchRemarks);
+            },
+          );
+        }
+      },
     );
   }
 }
 
-// Widget for displaying a single remark card
 class RemarkCard extends StatelessWidget {
   final Remark remark;
+  final VoidCallback onUpdate;
 
-  const RemarkCard({super.key, required this.remark});
+  const RemarkCard({super.key, required this.remark, required this.onUpdate});
 
   @override
   Widget build(BuildContext context) {
@@ -172,7 +227,7 @@ class RemarkCard extends StatelessWidget {
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisAlignment: MainAxisAlignment.spaceBetween, // For GridView
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -182,28 +237,26 @@ class RemarkCard extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Container(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 10, vertical: 5),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                     decoration: BoxDecoration(
                       color: typeColor.withAlpha(35),
                       borderRadius: BorderRadius.circular(20),
                     ),
                     child: Text(
                       remark.type,
-                      // Using theme for scalable font
-                      style: theme.textTheme.labelLarge
-                          ?.copyWith(color: typeColor, fontWeight: FontWeight.bold),
+                      style: theme.textTheme.labelLarge?.copyWith(
+                          color: typeColor, fontWeight: FontWeight.bold),
                     ),
                   ),
                   IconButton(
-                      onPressed: () {
-                        // TODO: Implement delete functionality
-                      },
-                      icon: Icon(Icons.delete, color: theme.colorScheme.error)),
+                    onPressed: () =>
+                        showDeleteRemarkDialog(context, remark, onUpdate),
+                    icon: Icon(Icons.delete, color: theme.colorScheme.error),
+                  ),
                 ],
               ),
               const SizedBox(height: 10),
-              // Using theme for scalable font
               Text(remark.description, style: theme.textTheme.bodyLarge),
             ],
           ),
@@ -215,7 +268,6 @@ class RemarkCard extends StatelessWidget {
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  // Using theme for scalable font
                   Text("Date of Remarks",
                       style: theme.textTheme.bodyMedium
                           ?.copyWith(color: theme.hintColor)),
@@ -226,7 +278,6 @@ class RemarkCard extends StatelessWidget {
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  // Using theme for scalable font
                   Text("From Date - To Date",
                       style: theme.textTheme.bodyMedium
                           ?.copyWith(color: theme.hintColor)),
@@ -237,6 +288,93 @@ class RemarkCard extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+void showDeleteRemarkDialog(
+    BuildContext context, Remark remark, VoidCallback onUpdate) {
+  showDialog(
+    context: context,
+    builder: (_) => BackdropFilter(
+      filter: ImageFilter.blur(sigmaX: 4, sigmaY: 4),
+      child: DeleteRemarkDialog(remark: remark, onUpdate: onUpdate),
+    ),
+  );
+}
+
+class DeleteRemarkDialog extends StatefulWidget {
+  final Remark remark;
+  final VoidCallback onUpdate;
+
+  const DeleteRemarkDialog(
+      {super.key, required this.remark, required this.onUpdate});
+
+  @override
+  State<DeleteRemarkDialog> createState() => _DeleteRemarkDialogState();
+}
+
+class _DeleteRemarkDialogState extends State<DeleteRemarkDialog> {
+  bool _isDeleting = false;
+
+  Future<void> _deleteRemark() async {
+    if (!mounted) return;
+    setState(() => _isDeleting = true);
+
+    try {
+      await ApiService.delete('manager/students/remarks/${widget.remark.id}');
+      if (mounted) {
+        Navigator.of(context).pop();
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Remark deleted successfully!'),
+            backgroundColor: Colors.green,
+          ),
+        );
+        widget.onUpdate();
+      }
+    } on Exception catch (e) {
+      if (mounted) {
+        Navigator.of(context).pop();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(e.toString().replaceFirst('Exception: ', '')),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isDeleting = false);
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return AlertDialog(
+      backgroundColor: theme.cardColor,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      title: const Text('Delete Remark'),
+      content: const Text('Are you sure you want to delete this remark? This action cannot be undone.'),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('Cancel'),
+        ),
+        ElevatedButton(
+          onPressed: _isDeleting ? null : _deleteRemark,
+          style: ElevatedButton.styleFrom(backgroundColor: theme.colorScheme.error),
+          child: _isDeleting
+              ? const SizedBox(
+                  width: 24,
+                  height: 24,
+                  child: CircularProgressIndicator(strokeWidth: 3, valueColor: AlwaysStoppedAnimation(Colors.white)),
+                )
+              : const Text('Delete'),
+        ),
+      ],
     );
   }
 }

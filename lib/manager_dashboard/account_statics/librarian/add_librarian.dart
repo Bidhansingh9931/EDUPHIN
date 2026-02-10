@@ -1,8 +1,10 @@
-import 'dart:ui';
-
+import 'dart:convert';
 import 'package:eduphin/manager_dashboard/manager_dashboard.dart';
 import 'package:eduphin/manager_dashboard/manager_profile.dart';
+import 'package:eduphin/services/api_service.dart';
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 
 class AddLibrarianPage extends StatefulWidget {
   const AddLibrarianPage({super.key});
@@ -13,112 +15,165 @@ class AddLibrarianPage extends StatefulWidget {
 
 class _AddLibrarianPageState extends State<AddLibrarianPage> {
   bool _isLoading = false;
-  final TextEditingController _fullNameController =
-      TextEditingController(text: "Rajveer K.Malhotra");
-  final TextEditingController _emailController =
-      TextEditingController(text: "raj@iias.com");
-  final TextEditingController _newPasswordController =
-      TextEditingController(text: "");
+  final TextEditingController _fullNameController = TextEditingController();
+  final TextEditingController _emailController = TextEditingController();
+  final TextEditingController _newPasswordController = TextEditingController();
   final TextEditingController _roleController =
       TextEditingController(text: "Librarian");
-  final TextEditingController _genderController =
-      TextEditingController(text: "Male");
-  final TextEditingController _dateOfBirthController =
-      TextEditingController(text: "01-07-2020");
-  final TextEditingController _relationshipStatusController =
-      TextEditingController(text: "Single");
-  final TextEditingController _phoneNumberController =
-      TextEditingController(text: "+91 1234567890");
+  String? _selectedGender;
+  final TextEditingController _dateOfBirthController = TextEditingController();
+  String? _selectedRelationshipStatus;
+  final TextEditingController _phoneNumberController = TextEditingController();
   final TextEditingController _alternateNumberController =
-      TextEditingController(text: "+91 0987654321");
-  final TextEditingController _addressController =
-      TextEditingController(text: "123, Tech Park Road");
-  final TextEditingController _cityController =
-      TextEditingController(text: "Bengaluru");
-  final TextEditingController _stateController =
-      TextEditingController(text: "Karnataka");
-  final TextEditingController _pinCodeController =
-      TextEditingController(text: "560001");
-  final TextEditingController _positionController =
-      TextEditingController(text: "Senior Librarian");
-  final TextEditingController _employmentTypeController =
-      TextEditingController(text: "Full-Time");
-  final TextEditingController _joiningDateController =
-      TextEditingController(text: "01-07-2020");
-  final TextEditingController _experienceController =
-      TextEditingController(text: "5");
-  final TextEditingController _statusController =
-      TextEditingController(text: "Active");
-  final TextEditingController _referenceController =
-      TextEditingController(text: "N/A");
+      TextEditingController();
+  final TextEditingController _addressController = TextEditingController();
+  final TextEditingController _cityController = TextEditingController();
+  final TextEditingController _stateController = TextEditingController();
+  final TextEditingController _pinCodeController = TextEditingController();
+  final TextEditingController _positionController = TextEditingController();
+  String? _selectedEmploymentType;
+  final TextEditingController _joiningDateController = TextEditingController();
+  final TextEditingController _experienceController = TextEditingController();
+  String? _selectedStatus;
+  final TextEditingController _referenceController = TextEditingController();
   final TextEditingController _qualificationController =
-      TextEditingController(text: "M.Lib.Sc.");
+      TextEditingController();
   final TextEditingController _matriculationMarksController =
-      TextEditingController(text: "92%");
+      TextEditingController();
   final TextEditingController _intermediateMarksController =
-      TextEditingController(text: "88%");
+      TextEditingController();
   final TextEditingController _bankAccountNumberController =
-      TextEditingController(text: "123456789012");
-  final TextEditingController _ifscCodeController =
-      TextEditingController(text: "BANK0001234");
-  final TextEditingController _bankNameController =
-      TextEditingController(text: "Example Bank");
-  final TextEditingController _branchController =
-      TextEditingController(text: "Tech Park Branch");
+      TextEditingController();
+  final TextEditingController _ifscCodeController = TextEditingController();
+  final TextEditingController _bankNameController = TextEditingController();
+  final TextEditingController _branchController = TextEditingController();
   final TextEditingController _emergencyContactNameController =
-      TextEditingController(text: "John Doe");
+      TextEditingController();
   final TextEditingController _emergencyContactNumberController =
-      TextEditingController(text: "+91 0987654321");
+      TextEditingController();
+  final TextEditingController _aadhaarController = TextEditingController();
+
+  PlatformFile? _matriculationMarksheet;
+  PlatformFile? _intermediateMarksheet;
+  PlatformFile? _resume;
+
+  Future<void> _pickFile(Function(PlatformFile) onFilePicked) async {
+    try {
+      FilePickerResult? result = await FilePicker.platform.pickFiles();
+      if (result != null) {
+        setState(() {
+          onFilePicked(result.files.single);
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error picking file: $e')),
+        );
+      }
+    }
+  }
+
+  Future<void> _selectDate(BuildContext context) async {
+    final DateTime? picked = await showDatePicker(
+      context: context,
+      initialDate: DateTime.now(),
+      firstDate: DateTime(1900),
+      lastDate: DateTime.now(),
+    );
+    if (picked != null) {
+      setState(() {
+        _dateOfBirthController.text = DateFormat('yyyy-MM-dd').format(picked);
+      });
+    }
+  }
+
+  Future<void> _selectJoiningDate(BuildContext context) async {
+    final DateTime? picked = await showDatePicker(
+      context: context,
+      initialDate: DateTime.now(),
+      firstDate: DateTime(2000),
+      lastDate: DateTime.now().add(const Duration(days: 365)),
+    );
+    if (picked != null) {
+      setState(() {
+        _joiningDateController.text = DateFormat('yyyy-MM-dd').format(picked);
+      });
+    }
+  }
 
   void _addLibrarian() async {
     setState(() {
       _isLoading = true;
     });
 
-    // Simulate API call to add librarian data.
-    // Replace this with your actual API call.
-    await Future.delayed(const Duration(seconds: 2));
+    try {
+      final body = {
+        'name': _fullNameController.text,
+        'email': _emailController.text,
+        'password': _newPasswordController.text,
+        'role_id': '6', // Assuming 6 is for Librarian
+        'institute_id': '1', // This should be dynamic based on the logged-in user
+        'gender': _selectedGender ?? '',
+        'dob': _dateOfBirthController.text,
+        'marital_status': _selectedRelationshipStatus ?? '',
+        'phone': _phoneNumberController.text,
+        'alternate_phone': _alternateNumberController.text,
+        'address': _addressController.text,
+        'city': _cityController.text,
+        'state': _stateController.text,
+        'pincode': _pinCodeController.text,
+        'position': _positionController.text,
+        'employment_type': _selectedEmploymentType ?? '',
+        'joining_date': _joiningDateController.text,
+        'experience': _experienceController.text,
+        'status': _selectedStatus ?? '',
+        'reference': _referenceController.text,
+        'qualification': _qualificationController.text,
+        'matric_marks': _matriculationMarksController.text,
+        'inter_marks': _intermediateMarksController.text,
+        'account_no': _bankAccountNumberController.text,
+        'ifsc_code': _ifscCodeController.text,
+        'bank_name': _bankNameController.text,
+        'branch_name': _branchController.text,
+        'emergency_contact_name': _emergencyContactNameController.text,
+        'emergency_contact_phone': _emergencyContactNumberController.text,
+        'aadhaar_no': _aadhaarController.text,
+      };
 
-    final librarianData = {
-      'fullName': _fullNameController.text,
-      'email': _emailController.text,
-      'role': _roleController.text,
-      'gender': _genderController.text,
-      'dateOfBirth': _dateOfBirthController.text,
-      'relationshipStatus': _relationshipStatusController.text,
-      'phoneNumber': _phoneNumberController.text,
-      'alternateNumber': _alternateNumberController.text,
-      'address': _addressController.text,
-      'city': _cityController.text,
-      'state': _stateController.text,
-      'pinCode': _pinCodeController.text,
-      'position': _positionController.text,
-      'employmentType': _employmentTypeController.text,
-      'joiningDate': _joiningDateController.text,
-      'experience': _experienceController.text,
-      'status': _statusController.text,
-      'reference': _referenceController.text,
-      'qualification': _qualificationController.text,
-      'matriculationMarks': _matriculationMarksController.text,
-      'intermediateMarks': _intermediateMarksController.text,
-      'bankAccountNumber': _bankAccountNumberController.text,
-      'ifscCode': _ifscCodeController.text,
-      'bankName': _bankNameController.text,
-      'branch': _branchController.text,
-      'emergencyContactName': _emergencyContactNameController.text,
-      'emergencyContactNumber': _emergencyContactNumberController.text,
-    };
+      // To handle file uploads, you need to send a multipart request.
+      // Your ApiService.post method sends JSON and cannot include files.
+      // You'll need to update your ApiService to build and send a multipart request.
 
-    print('Adding librarian with data: $librarianData');
+      final response = await ApiService.post('manager/users', body);
 
-    setState(() {
-      _isLoading = false;
-    });
+      if (!mounted) return;
 
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Librarian added successfully!')),
-      );
+      final responseData = jsonDecode(response.body);
+
+      if (response.statusCode == 201 && responseData['status'] == true) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+              content: Text(
+                  responseData['message'] ?? 'Librarian added successfully!')),
+        );
+        Navigator.pop(context, true); // Pop with success
+      } else {
+        throw Exception(
+            responseData['message'] ?? 'Failed to add librarian.');
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(e.toString().replaceFirst('Exception: ', ''))),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
     }
   }
 
@@ -216,7 +271,8 @@ class _AddLibrarianPageState extends State<AddLibrarianPage> {
               children: [
                 const CustomProfileBox(),
                 const SizedBox(height: 20),
-                _buildEditableInfoTile(context, "Full Name", _fullNameController),
+                _buildEditableInfoTile(
+                    context, "Full Name", _fullNameController),
                 _buildEditableInfoTile(context, "Email", _emailController),
                 _buildEditableInfoTile(
                     context, "New Password", _newPasswordController),
@@ -231,12 +287,40 @@ class _AddLibrarianPageState extends State<AddLibrarianPage> {
                       isWide,
                       "Personal Details",
                       [
-                        _buildEditableInfoTile(context, "Role", _roleController),
-                        _buildEditableInfoTile(context, "Gender", _genderController),
+                        _buildEditableInfoTile(context, "Role", _roleController,
+                            readOnly: true),
+                        _buildDropdownInfoTile(
+                          context,
+                          "Gender",
+                          _selectedGender,
+                          ['Male', 'Female', 'Other'],
+                          (newValue) {
+                            setState(() {
+                              _selectedGender = newValue;
+                            });
+                          },
+                        ),
                         _buildEditableInfoTile(
-                            context, "Date of Birth", _dateOfBirthController),
-                        _buildEditableInfoTile(context, "Relationship Status",
-                            _relationshipStatusController),
+                          context,
+                          "Date of Birth",
+                          _dateOfBirthController,
+                          readOnly: true,
+                          onTap: () => _selectDate(context),
+                          suffixIcon: const Icon(Icons.calendar_today),
+                        ),
+                        _buildDropdownInfoTile(
+                          context,
+                          "Relationship Status",
+                          _selectedRelationshipStatus,
+                          ['Single', 'Married', 'Divorced', 'Widowed'],
+                          (newValue) {
+                            setState(() {
+                              _selectedRelationshipStatus = newValue;
+                            });
+                          },
+                        ),
+                        _buildEditableInfoTile(
+                            context, "Aadhaar Number", _aadhaarController),
                       ],
                     ),
                     _buildSection(
@@ -257,8 +341,10 @@ class _AddLibrarianPageState extends State<AddLibrarianPage> {
                       [
                         _buildEditableInfoTile(
                             context, "Address", _addressController),
-                        _buildEditableInfoTile(context, "City", _cityController),
-                        _buildEditableInfoTile(context, "State", _stateController),
+                        _buildEditableInfoTile(
+                            context, "City", _cityController),
+                        _buildEditableInfoTile(
+                            context, "State", _stateController),
                         _buildEditableInfoTile(
                             context, "Pin code", _pinCodeController),
                       ],
@@ -270,14 +356,38 @@ class _AddLibrarianPageState extends State<AddLibrarianPage> {
                       [
                         _buildEditableInfoTile(
                             context, "Position", _positionController),
-                        _buildEditableInfoTile(context, "Employment Type",
-                            _employmentTypeController),
+                        _buildDropdownInfoTile(
+                          context,
+                          "Employment Type",
+                          _selectedEmploymentType,
+                          ['Full-time', 'Part-time', 'Contract'],
+                          (newValue) {
+                            setState(() {
+                              _selectedEmploymentType = newValue;
+                            });
+                          },
+                        ),
                         _buildEditableInfoTile(
-                            context, "Joining Date", _joiningDateController),
-                        _buildEditableInfoTile(
-                            context, "Experience (Years)", _experienceController),
-                        _buildEditableInfoTile(
-                            context, "Status", _statusController),
+                          context,
+                          "Joining Date",
+                          _joiningDateController,
+                          readOnly: true,
+                          onTap: () => _selectJoiningDate(context),
+                          suffixIcon: const Icon(Icons.calendar_today),
+                        ),
+                        _buildEditableInfoTile(context, "Experience (Years)",
+                            _experienceController),
+                        _buildDropdownInfoTile(
+                          context,
+                          "Status",
+                          _selectedStatus,
+                          ['Active', 'Inactive', 'On Leave'],
+                          (newValue) {
+                            setState(() {
+                              _selectedStatus = newValue;
+                            });
+                          },
+                        ),
                         _buildEditableInfoTile(
                             context, "Reference", _referenceController),
                       ],
@@ -289,25 +399,30 @@ class _AddLibrarianPageState extends State<AddLibrarianPage> {
                       [
                         _buildEditableInfoTile(
                             context, "Qualification", _qualificationController),
+                        _buildEditableInfoTile(
+                            context,
+                            "Matriculation Marks (%)",
+                            _matriculationMarksController),
                         _buildEditableInfoTile(context,
-                            "Matriculation Marks (%)", _matriculationMarksController),
-                        _buildEditableInfoTile(
-                            context,
-                            "Intermediate Marks (%)",
-                            _intermediateMarksController),
-                        _buildEditableInfoTile(
-                            context,
-                            "Matriculation Marksheet",
-                            TextEditingController(text: "View Document"),
-                            readOnly: true),
-                        _buildEditableInfoTile(
-                            context,
-                            "Intermediate Marksheet",
-                            TextEditingController(text: "View Document"),
-                            readOnly: true),
-                        _buildEditableInfoTile(context, "Resume",
-                            TextEditingController(text: "View Document"),
-                            readOnly: true),
+                            "Intermediate Marks (%)", _intermediateMarksController),
+                        _buildFilePickerTile(
+                          context,
+                          "Matriculation Marksheet",
+                          _matriculationMarksheet,
+                          () => _pickFile((file) => _matriculationMarksheet = file),
+                        ),
+                        _buildFilePickerTile(
+                          context,
+                          "Intermediate Marksheet",
+                          _intermediateMarksheet,
+                          () => _pickFile((file) => _intermediateMarksheet = file),
+                        ),
+                        _buildFilePickerTile(
+                          context,
+                          "Resume",
+                          _resume,
+                          () => _pickFile((file) => _resume = file),
+                        ),
                       ],
                     ),
                     _buildSection(
@@ -346,6 +461,97 @@ class _AddLibrarianPageState extends State<AddLibrarianPage> {
     );
   }
 
+  Widget _buildDropdownInfoTile(
+    BuildContext context,
+    String title,
+    String? value,
+    List<String> items,
+    Function(String?) onChanged,
+  ) {
+    final theme = Theme.of(context);
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8.0),
+      child: DropdownButtonFormField<String>(
+        initialValue: value,
+        items: items.map((String item) {
+          return DropdownMenuItem<String>(
+            value: item,
+            child: Text(item),
+          );
+        }).toList(),
+        onChanged: onChanged,
+        decoration: InputDecoration(
+          labelText: title,
+          labelStyle:
+              theme.textTheme.bodyMedium?.copyWith(color: theme.hintColor),
+          filled: true,
+          fillColor: theme.cardColor,
+          contentPadding:
+              const EdgeInsets.symmetric(vertical: 16.0, horizontal: 12.0),
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(8),
+            borderSide: BorderSide(color: theme.dividerColor, width: 1.0),
+          ),
+          enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(8),
+            borderSide: BorderSide(color: theme.dividerColor, width: 1.0),
+          ),
+          focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(8),
+            borderSide: BorderSide(color: theme.primaryColor, width: 1.5),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildFilePickerTile(
+      BuildContext context, String title, PlatformFile? file, VoidCallback onTap) {
+    final theme = Theme.of(context);
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8.0),
+      child: InkWell(
+        onTap: onTap,
+        child: InputDecorator(
+          decoration: InputDecoration(
+            labelText: title,
+            labelStyle:
+                theme.textTheme.bodyMedium?.copyWith(color: theme.hintColor),
+            filled: true,
+            fillColor: theme.cardColor,
+            contentPadding:
+                const EdgeInsets.symmetric(vertical: 16.0, horizontal: 12.0),
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+              borderSide: BorderSide(color: theme.dividerColor, width: 1.0),
+            ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+              borderSide: BorderSide(color: theme.dividerColor, width: 1.0),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+              borderSide: BorderSide(color: theme.primaryColor, width: 1.5),
+            ),
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Expanded(
+                child: Text(
+                  file?.name ?? 'Select Document',
+                  style: theme.textTheme.bodyLarge,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+              const Icon(Icons.attach_file),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget _buildSection(
       BuildContext context, bool isWide, String title, List<Widget> children) {
     final theme = Theme.of(context);
@@ -359,7 +565,8 @@ class _AddLibrarianPageState extends State<AddLibrarianPage> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(title,
-              style: textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold)),
+              style:
+                  textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold)),
           const SizedBox(height: 12),
           ...children,
         ],
@@ -368,16 +575,20 @@ class _AddLibrarianPageState extends State<AddLibrarianPage> {
   }
 
   Widget _buildEditableInfoTile(
-      BuildContext context, String title, TextEditingController controller,
-      {bool readOnly = false}) {
+    BuildContext context,
+    String title,
+    TextEditingController controller,
+      {bool readOnly = false, VoidCallback? onTap, Widget? suffixIcon}) {
     final theme = Theme.of(context);
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 8.0),
       child: TextField(
         controller: controller,
         readOnly: readOnly,
+        onTap: onTap,
         style: theme.textTheme.bodyLarge,
         decoration: InputDecoration(
+          suffixIcon: suffixIcon,
           labelText: title,
           labelStyle:
               theme.textTheme.bodyMedium?.copyWith(color: theme.hintColor),
@@ -425,7 +636,8 @@ class CustomProfileBox extends StatelessWidget {
           children: [
             Row(
               children: [
-                Icon(Icons.person, color: theme.colorScheme.onPrimary, size: 30),
+                Icon(Icons.person,
+                    color: theme.colorScheme.onPrimary, size: 30),
                 const SizedBox(width: 8),
                 Text("Profile Overview",
                     style: textTheme.titleLarge?.copyWith(
@@ -439,41 +651,14 @@ class CustomProfileBox extends StatelessWidget {
               backgroundImage: AssetImage("assets/images/random_boy.jpg"),
             ),
             const SizedBox(height: 8),
-            Text("Rajeev K.Malhotra",
-                style: textTheme.titleLarge?.copyWith(
-                    color: theme.colorScheme.onPrimary,
-                    fontWeight: FontWeight.bold)),
+            Text(
+              "Rajeev K.Malhotra",
+              style: textTheme.titleLarge
+                  ?.copyWith(color: theme.colorScheme.onPrimary),
+            ),
             Text("Librarian",
                 style: textTheme.titleMedium
-                    ?.copyWith(color: theme.colorScheme.onPrimary.withAlpha(180))),
-            const SizedBox(height: 16),
-            Container(
-              height: 50,
-              width: double.infinity,
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(10),
-                color: const Color(0xFF2A3F5F),
-              ),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.center,
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  const Padding(
-                    padding: EdgeInsets.only(right: 10),
-                    child: Icon(
-                      Icons.camera_alt_outlined,
-                      size: 30,
-                      color: Color(0xFF9FB4CC),
-                    ),
-                  ),
-                  Text(
-                    "Update Profile Image",
-                    style: textTheme.titleMedium?.copyWith(
-                        color: const Color(0xFF9FB4CC), fontWeight: FontWeight.bold),
-                  ),
-                ],
-              ),
-            )
+                    ?.copyWith(color: theme.colorScheme.onPrimary)),
           ],
         ),
       ),
@@ -481,93 +666,30 @@ class CustomProfileBox extends StatelessWidget {
   }
 }
 
+// Dummy function to avoid error, you should have your own implementation
 void showDeleteDialog(BuildContext context) {
-  showGeneralDialog(
+  showDialog(
     context: context,
-    barrierDismissible: true,
-    barrierLabel: "Delete",
-    barrierColor: const Color.fromRGBO(0, 0, 0, 0.6),
-    transitionDuration: const Duration(milliseconds: 200),
-    pageBuilder: (_, __, ___) {
-      return const DeleteLibrarianDialog(
-        librarianName: "Rajeev K.Malhotra",
+    builder: (BuildContext context) {
+      return AlertDialog(
+        title: const Text('Delete'),
+        content: const Text('Are you sure you want to delete?'),
+        actions: <Widget>[
+          TextButton(
+            child: const Text('Cancel'),
+            onPressed: () {
+              Navigator.of(context).pop();
+            },
+          ),
+          TextButton(
+            child: const Text('Delete'),
+            onPressed: () {
+              // Perform the delete action here
+              Navigator.of(context).pop();
+            },
+          ),
+        ],
       );
     },
   );
-}
-
-class DeleteLibrarianDialog extends StatelessWidget {
-  final String librarianName;
-
-  const DeleteLibrarianDialog({
-    super.key,
-    required this.librarianName,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final textTheme = Theme.of(context).textTheme;
-    return Scaffold(
-      backgroundColor: Colors.transparent,
-      body: Stack(
-        children: [
-          BackdropFilter(
-            filter: ImageFilter.blur(sigmaX: 6, sigmaY: 6),
-            child: Container(color: Colors.transparent),
-          ),
-          Center(
-            child: Container(
-              margin: const EdgeInsets.symmetric(horizontal: 24),
-              padding: const EdgeInsets.all(20),
-              decoration: BoxDecoration(
-                color: const Color(0xFF1F2937),
-                borderRadius: BorderRadius.circular(20),
-              ),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    "Delete Librarian",
-                    style: textTheme.titleLarge?.copyWith(
-                      fontWeight: FontWeight.bold,
-                      color: Colors.white,
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  Text(
-                    "Are you sure you want to delete this Librarian "
-                    "'$librarianName'? This action cannot be undone.",
-                    textAlign: TextAlign.center,
-                    style: textTheme.bodyMedium
-                        ?.copyWith(color: Colors.grey.shade400),
-                  ),
-                  const SizedBox(height: 24),
-                  SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton(
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFFC5392A),
-                        padding: const EdgeInsets.symmetric(vertical: 14),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                      ),
-                      onPressed: () {
-                        Navigator.pop(context);
-                      },
-                      child: Text(
-                        "Yes, Delete",
-                        style: textTheme.titleMedium
-                            ?.copyWith(color: Colors.white),
-                      ),
-                    ),
-                  )
-                ],
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
 }

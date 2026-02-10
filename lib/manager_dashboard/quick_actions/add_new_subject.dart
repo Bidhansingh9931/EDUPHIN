@@ -1,4 +1,6 @@
 import 'dart:async';
+import 'dart:convert';
+import 'package:eduphin/services/api_service.dart';
 import 'package:flutter/material.dart';
 
 // ───────────────────────────────────────────────────────────
@@ -22,26 +24,46 @@ class SubjectFormData {
 }
 
 // ───────────────────────────────────────────────────────────
-//                         MOCK API SERVICE
+//                         API SERVICE
 // ───────────────────────────────────────────────────────────
 
-class MockSubjectApiService {
+class SubjectApiService {
   Future<SubjectFormData> fetchSubjectFormData() async {
-    // Simulate fetching data for dropdowns from an API
-    await Future.delayed(const Duration(milliseconds: 500));
+    // The API doesn't provide an endpoint for this, so we use static data
+    // that matches the API's validation rules.
+    await Future.delayed(const Duration(milliseconds: 100)); // Simulate a tiny delay
     return SubjectFormData(
-      types: ['Theory', 'Practical', 'Project'],
+      types: ['Theory', 'Practical', 'Applied'], // Changed 'Project' to 'Applied'
       statuses: ['Active', 'Inactive'],
     );
   }
 
-  Future<bool> addSubject(NewSubject subject) async {
-    // Simulate sending data to an API
-    await Future.delayed(const Duration(seconds: 1));
-    debugPrint(
-        'Submitting to API: Name: ${subject.subjectName}, Code: ${subject.subjectCode}, Credit: ${subject.credit}, Type: ${subject.type}, Status: ${subject.status}');
-    // Simulate a successful API call
-    return true;
+  Future<Map<String, dynamic>> addSubject(NewSubject subject) async {
+    final body = {
+      'subject_name': subject.subjectName,
+      'code': subject.subjectCode,
+      'description': subject.description,
+      'credit': subject.credit,
+      'type': subject.type,
+      'status': subject.status?.toLowerCase(), // API expects lowercase
+    };
+
+    final response = await ApiService.post('manager/subjects', body);
+    final responseData = jsonDecode(response.body);
+
+    if (response.statusCode >= 200 && response.statusCode < 300) {
+      if (responseData['status'] == true) {
+        return responseData;
+      } else {
+        throw Exception(responseData['message'] ?? 'Failed to add subject.');
+      }
+    } else {
+      if (responseData.containsKey('errors')) {
+        final errors = responseData['errors'] as Map<String, dynamic>;
+        throw Exception(errors.values.first[0]); // Throw first validation error
+      }
+      throw Exception(responseData['message'] ?? 'An error occurred.');
+    }
   }
 }
 
@@ -58,7 +80,7 @@ class AddNewSubjectPage extends StatefulWidget {
 
 class _AddNewSubjectPageState extends State<AddNewSubjectPage> {
   final _formKey = GlobalKey<FormState>();
-  final _apiService = MockSubjectApiService();
+  final _apiService = SubjectApiService();
   late Future<SubjectFormData> _formDataFuture;
 
   final _newSubject = NewSubject();
@@ -71,7 +93,6 @@ class _AddNewSubjectPageState extends State<AddNewSubjectPage> {
   }
 
   Future<void> _submitForm() async {
-    // Use form validation before submitting
     if (!_formKey.currentState!.validate()) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -85,22 +106,32 @@ class _AddNewSubjectPageState extends State<AddNewSubjectPage> {
       _isSubmitting = true;
     });
 
-    final success = await _apiService.addSubject(_newSubject);
+    try {
+      final responseData = await _apiService.addSubject(_newSubject);
 
-    if (mounted) {
-      setState(() {
-        _isSubmitting = false;
-      });
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-              success ? 'Subject added successfully!' : 'Failed to add subject.'),
-          backgroundColor: success ? Colors.green : Colors.red,
-        ),
-      );
-      if (success) {
-        Navigator.of(context).pop();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(responseData['message'] ?? 'Subject added successfully!'),
+            backgroundColor: Colors.green,
+          ),
+        );
+        Navigator.of(context).pop(true); // Pop with success
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(e.toString().replaceFirst('Exception: ', '')),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isSubmitting = false;
+        });
       }
     }
   }
@@ -150,7 +181,6 @@ class _AddNewSubjectPageState extends State<AddNewSubjectPage> {
 
   Widget _buildForm(ThemeData theme, SubjectFormData formData, bool isWide) {
     return SingleChildScrollView(
-      // Add responsive padding, including 50 at the bottom
       padding: const EdgeInsets.fromLTRB(16, 16, 16, 120),
       child: Center(
         child: ConstrainedBox(

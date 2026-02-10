@@ -1,10 +1,13 @@
+import 'dart:convert';
 import 'dart:ui';
 import 'package:eduphin/manager_dashboard/manageClasses/subjectList/create_new_subject.dart';
 import 'package:eduphin/manager_dashboard/manageClasses/subjectList/edit_suject.dart';
+import 'package:eduphin/services/api_service.dart';
 import 'package:flutter/material.dart';
 
 // Data model for a Subject
 class Subject {
+  final int id;
   final String name;
   final String description;
   final bool isActive;
@@ -13,6 +16,7 @@ class Subject {
   final String type;
 
   Subject({
+    required this.id,
     required this.name,
     required this.description,
     required this.isActive,
@@ -20,6 +24,18 @@ class Subject {
     required this.credit,
     required this.type,
   });
+
+  factory Subject.fromJson(Map<String, dynamic> json) {
+    return Subject(
+      id: json['id'] as int? ?? 0,
+      name: json['name'] as String? ?? 'No Name',
+      description: json['description'] as String? ?? '',
+      isActive: json['status'] == 'active',
+      code: json['code'] as String? ?? 'N/A',
+      credit: (json['credit'] ?? '0').toString(),
+      type: json['type'] as String? ?? 'N/A',
+    );
+  }
 }
 
 class SubjectListPage extends StatefulWidget {
@@ -31,7 +47,7 @@ class SubjectListPage extends StatefulWidget {
 
 class _SubjectListPageState extends State<SubjectListPage> {
   bool _isLoading = true;
-  final List<Subject> _subjects = [];
+  List<Subject> _subjects = [];
 
   @override
   void initState() {
@@ -40,34 +56,59 @@ class _SubjectListPageState extends State<SubjectListPage> {
   }
 
   Future<void> _fetchSubjects() async {
-    // Simulate API call to fetch subjects.
-    // Replace this with your actual API call.
-    await Future.delayed(const Duration(seconds: 2));
+    if (!mounted) return;
+    setState(() {
+      _isLoading = true;
+    });
 
-    final List<Subject> fetchedSubjects = [
-      Subject(
-        name: "Financial Accounting Basics",
-        description: "An introductory course covering the fundamentals of financial accounting principles and practices.",
-        isActive: true,
-        code: "FAB-101",
-        credit: "4",
-        type: "Theory",
-      ),
-      Subject(
-        name: "Advanced Corporate Finance",
-        description: "In-depth study of financial theories and their application to corporate financial policy and strategy.",
-        isActive: false,
-        code: "ACF-310",
-        credit: "4",
-        type: "Theory",
-      ),
-    ];
+    try {
+      final response = await ApiService.get('manager/subjects');
+      if (mounted) {
+        if (response.statusCode == 200) {
+          final data = jsonDecode(response.body);
+          final subjectsData = (data['data'] as List)
+              .map((subjectJson) => Subject.fromJson(subjectJson))
+              .toList();
+          setState(() {
+            _subjects = subjectsData;
+            _isLoading = false;
+          });
+        } else {
+          throw Exception('Failed to load subjects');
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(e.toString())),
+        );
+      }
+    }
+  }
 
-    if (mounted) {
-      setState(() {
-        _subjects.addAll(fetchedSubjects);
-        _isLoading = false;
-      });
+  Future<void> _deleteSubject(int subjectId) async {
+    try {
+      final response = await ApiService.delete('manager/subjects/$subjectId');
+      if (mounted) {
+        if (response.statusCode == 200 || response.statusCode == 204) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Subject deleted successfully')),
+          );
+          _fetchSubjects(); // Refresh the list
+        } else {
+          final responseData = jsonDecode(response.body);
+          throw Exception(responseData['message'] ?? 'Failed to delete subject');
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(e.toString())),
+        );
+      }
     }
   }
 
@@ -77,9 +118,14 @@ class _SubjectListPageState extends State<SubjectListPage> {
     return Scaffold(
       backgroundColor: theme.scaffoldBackgroundColor,
       floatingActionButton: FloatingActionButton.extended(
-        onPressed: () {
-          Navigator.push(
-              context, MaterialPageRoute(builder: (context) => const CreateNewSubjectPage()));
+        onPressed: () async {
+          final result = await Navigator.push(
+            context,
+            MaterialPageRoute(builder: (context) => const CreateNewSubjectPage()),
+          );
+          if (result == true) {
+            _fetchSubjects();
+          }
         },
         label: const Text("Create New Subject"),
         icon: const Icon(Icons.add),
@@ -91,11 +137,14 @@ class _SubjectListPageState extends State<SubjectListPage> {
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
-          : LayoutBuilder(
-              builder: (context, constraints) {
-                final bool isWide = constraints.maxWidth > 600;
-                return isWide ? _buildGridView() : _buildListView();
-              },
+          : RefreshIndicator(
+              onRefresh: _fetchSubjects,
+              child: LayoutBuilder(
+                builder: (context, constraints) {
+                  final bool isWide = constraints.maxWidth > 600;
+                  return isWide ? _buildGridView() : _buildListView();
+                },
+              ),
             ),
     );
   }
@@ -107,7 +156,7 @@ class _SubjectListPageState extends State<SubjectListPage> {
       separatorBuilder: (context, index) => const SizedBox(height: 16),
       itemBuilder: (context, index) {
         final subject = _subjects[index];
-        return SubjectCard(subject: subject);
+        return SubjectCard(subject: subject, onDelete: () => _deleteSubject(subject.id), onEdit: () => _navigateToEdit(subject));
       },
     );
   }
@@ -124,17 +173,31 @@ class _SubjectListPageState extends State<SubjectListPage> {
       ),
       itemBuilder: (context, index) {
         final subject = _subjects[index];
-        return SubjectCard(subject: subject);
+        return SubjectCard(subject: subject, onDelete: () => _deleteSubject(subject.id), onEdit: () => _navigateToEdit(subject));
       },
     );
+  }
+  
+  void _navigateToEdit(Subject subject) async {
+      final result = await Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => UpdateSubjectPage(subject: subject),
+        ),
+      );
+      if (result == true) {
+        _fetchSubjects();
+      }
   }
 }
 
 // Widget for displaying a single subject card
 class SubjectCard extends StatelessWidget {
   final Subject subject;
+  final VoidCallback onDelete;
+  final VoidCallback onEdit;
 
-  const SubjectCard({super.key, required this.subject});
+  const SubjectCard({super.key, required this.subject, required this.onDelete, required this.onEdit});
 
   @override
   Widget build(BuildContext context) {
@@ -164,7 +227,7 @@ class SubjectCard extends StatelessWidget {
                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                 decoration: BoxDecoration(
                   borderRadius: BorderRadius.circular(8),
-                  color: statusColor.withOpacity(0.1),
+                  color: statusColor.withAlpha(26),
                 ),
                 child: Text(statusText,
                     style: theme.textTheme.labelMedium?.copyWith(color: statusColor, fontWeight: FontWeight.bold)),
@@ -189,13 +252,7 @@ class SubjectCard extends StatelessWidget {
             children: [
               Expanded(
                 child: ElevatedButton.icon(
-                  onPressed: () {
-                    Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          // Passing data to the edit page
-                            builder: (context) => UpdateSubjectPage(subject: subject)));
-                  },
+                  onPressed: onEdit,
                   style: ElevatedButton.styleFrom(
                     backgroundColor: theme.colorScheme.primaryContainer,
                     foregroundColor: theme.colorScheme.onPrimaryContainer,
@@ -207,7 +264,7 @@ class SubjectCard extends StatelessWidget {
               const SizedBox(width: 16),
               Expanded(
                 child: ElevatedButton.icon(
-                  onPressed: () => showDeleteDialog(context, subject.name),
+                  onPressed: () => showDeleteDialog(context, subject.name, onDelete),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: theme.colorScheme.errorContainer,
                     foregroundColor: theme.colorScheme.onErrorContainer,
@@ -235,7 +292,7 @@ class SubjectCard extends StatelessWidget {
   }
 }
 
-void showDeleteDialog(BuildContext context, String subjectName) {
+void showDeleteDialog(BuildContext context, String subjectName, VoidCallback onConfirm) {
   showGeneralDialog(
     context: context,
     barrierDismissible: true,
@@ -245,6 +302,7 @@ void showDeleteDialog(BuildContext context, String subjectName) {
     pageBuilder: (_, __, ___) {
       return DeleteSubjectDialog(
         subjectName: subjectName,
+        onConfirm: onConfirm,
       );
     },
   );
@@ -252,10 +310,12 @@ void showDeleteDialog(BuildContext context, String subjectName) {
 
 class DeleteSubjectDialog extends StatelessWidget {
   final String subjectName;
+  final VoidCallback onConfirm;
 
   const DeleteSubjectDialog({
     super.key,
     required this.subjectName,
+    required this.onConfirm,
   });
 
   @override
@@ -296,8 +356,8 @@ class DeleteSubjectDialog extends StatelessWidget {
                       ),
                     ),
                     onPressed: () {
-                      // Implement delete logic here
                       Navigator.pop(context);
+                      onConfirm();
                     },
                     child: const Text("Yes, Delete"),
                   ),

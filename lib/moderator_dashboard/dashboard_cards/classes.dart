@@ -1,5 +1,8 @@
 import 'dart:async';
+import 'dart:convert';
+import 'package:eduphin/services/api_service.dart';
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
 
 // 1. Data Model for a Class
 class ClassInfo {
@@ -10,25 +13,49 @@ class ClassInfo {
     required this.name,
     required this.section,
   });
+
+  factory ClassInfo.fromJson(Map<String, dynamic> json) {
+    return ClassInfo(
+      name: json['name'] ?? 'No Name',
+      section: json['section'] ?? 'No Section',
+    );
+  }
 }
 
 // 2. Data Provider to fetch class data
 class ClassProvider {
-  Future<List<ClassInfo>> fetchClasses() async {
-    await Future.delayed(const Duration(seconds: 2));
-    return List.generate(
-      10, 
-      (index) => ClassInfo(
-        name: 'Class ${index + 1}',
-        section: 'Section A',
-      ),
+  Future<List<ClassInfo>> fetchClasses(String instituteId) async {
+    final token = await ApiService.getToken();
+    if (token == null) {
+      throw Exception('Authentication token not found.');
+    }
+
+    final response = await http.get(
+      Uri.parse('${ApiService.baseUrl}/moderator/institutes/$instituteId/classes'),
+      headers: {
+        'Authorization': 'Bearer $token',
+        'Accept': 'application/json',
+      },
     );
+
+    if (response.statusCode == 200) {
+      final data = jsonDecode(response.body);
+      if (data['success'] == true && data['classes'] != null) {
+        final List<dynamic> classesJson = data['classes'];
+        return classesJson.map((json) => ClassInfo.fromJson(json)).toList();
+      } else {
+        throw Exception(data['message'] ?? 'Failed to load classes.');
+      }
+    } else {
+      throw Exception('Failed to load classes. Status Code: ${response.statusCode}');
+    }
   }
 }
 
 // 3. Updated StatefulWidget
 class ClassesPage extends StatefulWidget {
-  const ClassesPage({super.key});
+  final String instituteId;
+  const ClassesPage({super.key, required this.instituteId});
 
   @override
   State<ClassesPage> createState() => _ClassesPageState();
@@ -41,7 +68,7 @@ class _ClassesPageState extends State<ClassesPage> {
   @override
   void initState() {
     super.initState();
-    _classesFuture = _provider.fetchClasses();
+    _classesFuture = _provider.fetchClasses(widget.instituteId);
   }
 
   @override

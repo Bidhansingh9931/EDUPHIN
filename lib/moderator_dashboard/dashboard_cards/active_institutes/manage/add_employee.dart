@@ -1,80 +1,13 @@
-import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_datetime_picker_plus/flutter_datetime_picker_plus.dart' as picker;
 import 'package:intl/intl.dart';
-import '../../../moderator_dashboard.dart';
 
-// 1. Data Model for the new employee
-class NewEmployee {
-  final String fullName;
-  final String email;
-  final String? role;
-  final String gender;
-  final DateTime? dateOfBirth;
-  final String? relationshipStatus;
-  final String phoneNumber;
-  final String? alternateNumber;
-  final String address;
-  final String city;
-  final String state;
-  final String pinCode;
-  final String position;
-  final String? employmentType;
-  final DateTime? joiningDate;
-  final String experience;
-  final String status;
-  final String? reference;
-  final String qualification;
-  final String matriculationMarks;
-  final String intermediateMarks;
-  final String bankAccountNumber;
-  final String ifscCode;
-  final String bankName;
-  final String branch;
-  final String emergencyContactName;
-  final String emergencyContactNumber;
-
-  NewEmployee({
-    required this.fullName,
-    required this.email,
-    this.role,
-    required this.gender,
-    this.dateOfBirth,
-    this.relationshipStatus,
-    required this.phoneNumber,
-    this.alternateNumber,
-    required this.address,
-    required this.city,
-    required this.state,
-    required this.pinCode,
-    required this.position,
-    this.employmentType,
-    this.joiningDate,
-    required this.experience,
-    required this.status,
-    this.reference,
-    required this.qualification,
-    required this.matriculationMarks,
-    required this.intermediateMarks,
-    required this.bankAccountNumber,
-    required this.ifscCode,
-    required this.bankName,
-    required this.branch,
-    required this.emergencyContactName,
-    required this.emergencyContactNumber,
-  });
-}
-
-// 2. Provider class to handle data submission
-class AddEmployeeProvider {
-  Future<void> addEmployee(NewEmployee employee) async {
-    debugPrint('Submitting new employee: ${employee.fullName}');
-    await Future.delayed(const Duration(seconds: 2));
-  }
-}
+import 'new_employee_model.dart';
+import 'add_employee_provider.dart';
 
 class AddEmployeePage extends StatefulWidget {
-  const AddEmployeePage({super.key});
+  final String instituteId;
+  const AddEmployeePage({Key? key, required this.instituteId}) : super(key: key);
 
   @override
   State<AddEmployeePage> createState() => _AddEmployeePageState();
@@ -84,15 +17,7 @@ class _AddEmployeePageState extends State<AddEmployeePage> {
   final AddEmployeeProvider _provider = AddEmployeeProvider();
   bool _isLoading = false;
 
-  // State variables
-  String selectedGender = "Male";
-  String? selectedRole;
-  String? selectedEmploymentType;
-  String? selectedRelationshipStatus;
-  DateTime? selectedBirthDate;
-  DateTime? selectedJoiningDate;
-
-  // Controllers
+  // Controllers for text fields
   final fullNameController = TextEditingController();
   final emailController = TextEditingController();
   final phoneController = TextEditingController();
@@ -114,6 +39,14 @@ class _AddEmployeePageState extends State<AddEmployeePage> {
   final branchController = TextEditingController();
   final emergencyContactNameController = TextEditingController();
   final emergencyContactNumberController = TextEditingController();
+
+  // Dropdown and Date values
+  String? selectedRole;
+  String? selectedGender;
+  DateTime? selectedBirthDate;
+  String? selectedRelationshipStatus;
+  String? selectedEmploymentType;
+  DateTime? selectedJoiningDate;
 
   @override
   void dispose() {
@@ -157,6 +90,7 @@ class _AddEmployeePageState extends State<AddEmployeePage> {
     });
 
     final newEmployee = NewEmployee(
+      instituteId: widget.instituteId,
       fullName: fullNameController.text,
       email: emailController.text,
       role: selectedRole,
@@ -195,7 +129,7 @@ class _AddEmployeePageState extends State<AddEmployeePage> {
             backgroundColor: Colors.green,
           ),
         );
-        Navigator.of(context).pop();
+        Navigator.of(context).pop(true); // Return true on success
       }
     } catch (e) {
       if (mounted) {
@@ -229,23 +163,9 @@ class _AddEmployeePageState extends State<AddEmployeePage> {
       appBar: AppBar(
         backgroundColor: const Color(0xFF0D1B2A),
         iconTheme: const IconThemeData(color: Colors.white),
-        title: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Text(
-              'Add Employee',
-              style: TextStyle(color: Colors.white, fontSize: responsiveFontSize(18)),
-            ),
-            InkWell(
-              onTap: () => Navigator.pushReplacement(
-                  context, MaterialPageRoute(builder: (context) => const ModeratorDashboardPage())),
-              child: const Icon(
-                Icons.home_sharp,
-                size: 30,
-                color: Colors.white,
-              ),
-            ),
-          ],
+        title: Text(
+          'Add Employee',
+          style: TextStyle(color: Colors.white, fontSize: responsiveFontSize(18)),
         ),
       ),
       body: SingleChildScrollView(
@@ -278,10 +198,10 @@ class _AddEmployeePageState extends State<AddEmployeePage> {
               context: context,
               title: "Address Details",
               children: [
-                 _buildTextField(context: context, controller: addressController, label: "Address", icon: Icons.location_on_outlined),
-                 _buildTextField(context: context, controller: cityController, label: "City", icon: Icons.location_city),
-                 _buildTextField(context: context, controller: stateController, label: "State", icon: Icons.location_history),
-                 _buildTextField(context: context, controller: pinController, label: "Pin code", icon: Icons.pin, isNumeric: true),
+                _buildTextField(context: context, controller: addressController, label: "Address", icon: Icons.location_on_outlined),
+                _buildTextField(context: context, controller: cityController, label: "City", icon: Icons.location_city),
+                _buildTextField(context: context, controller: stateController, label: "State", icon: Icons.location_history),
+                _buildTextField(context: context, controller: pinController, label: "Pin code", icon: Icons.pin, isNumeric: true),
               ],
             ),
             _buildSection(
@@ -293,7 +213,7 @@ class _AddEmployeePageState extends State<AddEmployeePage> {
                 _buildDatePickerField(context: context, hint: 'Select joining date', title: "Joining Date", currentValue: selectedJoiningDate, onConfirm: (date) => setState(() => selectedJoiningDate = date)),
                 _buildTextField(context: context, controller: experienceController, label: "Experience (Years)", icon: Icons.work_history_outlined, isNumeric: true),
                 _buildTextField(context: context, controller: statusController, label: "Status", icon: Icons.check_circle_outline),
-                 _buildTextField(context: context, controller: referenceController, label: "Reference", icon: Icons.group_outlined),
+                _buildTextField(context: context, controller: referenceController, label: "Reference", icon: Icons.group_outlined),
               ],
             ),
             _buildSection(
@@ -331,7 +251,7 @@ class _AddEmployeePageState extends State<AddEmployeePage> {
                 onPressed: _isLoading ? null : _submitEmployeeData,
                 style: ElevatedButton.styleFrom(
                   backgroundColor: const Color(0xFF0E86D4),
-                  disabledBackgroundColor: const Color(0xFF0E86D4).withOpacity(0.5),
+                  disabledBackgroundColor: const Color(0xFF0E86D4).withAlpha(30),
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
                 ),
                 child: _isLoading
@@ -510,7 +430,7 @@ class _AddEmployeePageState extends State<AddEmployeePage> {
                 const Icon(Icons.calendar_month_outlined, color: Colors.white54),
                 const SizedBox(width: 12),
                 Text(
-                  currentValue != null ? DateFormat('yyyy-MM-dd').format(currentValue!) : hint,
+                  currentValue != null ? DateFormat('yyyy-MM-dd').format(currentValue) : hint,
                   style: TextStyle(color: currentValue != null ? Colors.white : Colors.white54, fontSize: responsiveFontSize(14)),
                 ),
               ],

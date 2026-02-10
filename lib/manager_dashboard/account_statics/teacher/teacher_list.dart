@@ -1,13 +1,39 @@
+import 'dart:convert';
+
+import 'package:eduphin/manager_dashboard/account_statics/teacher/add_teacher.dart';
+import 'package:eduphin/services/api_service.dart';
 import 'package:flutter/material.dart';
 
-import 'add_teacher.dart';
+// ───────────────────────────────────────────────────────────
+//                          DATA MODELS
+// ───────────────────────────────────────────────────────────
+
+class Role {
+  final int id;
+  final String name;
+
+  Role({required this.id, required this.name});
+}
 
 class Teacher {
+  final int id;
   final String name;
   final String designation;
 
-  Teacher({required this.name, required this.designation});
+  Teacher({required this.id, required this.name, required this.designation});
+
+  factory Teacher.fromJson(Map<String, dynamic> json) {
+    return Teacher(
+      id: json['id'] ?? 0,
+      name: json['name'] ?? 'N/A',
+      designation: json['designation'] ?? 'Teacher', // API doesn't provide a specific designation
+    );
+  }
 }
+
+// ───────────────────────────────────────────────────────────
+//                       TEACHER LIST PAGE
+// ───────────────────────────────────────────────────────────
 
 class TeacherListPage extends StatefulWidget {
   const TeacherListPage({super.key});
@@ -17,6 +43,88 @@ class TeacherListPage extends StatefulWidget {
 }
 
 class _TeacherListPageState extends State<TeacherListPage> {
+  bool _isLoading = true;
+  int? _selectedRoleId;
+  List<Role> _roles = [];
+  List<Teacher> _teachers = [];
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchInitialData();
+  }
+
+  Future<void> _fetchInitialData() async {
+    if (!mounted) return;
+    setState(() {
+      _isLoading = true;
+    });
+
+    try {
+      final response = await ApiService.get('manager/salary/accounts');
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        final List<dynamic> rolesData = data['roles'];
+        
+        final List<Role> allRoles = rolesData
+            .map((role) => Role(id: role['role_id'], name: role['name']))
+            .toList();
+
+        // Filter for roles that are considered 'teachers'
+        final teacherRoles = allRoles.where((role) => 
+          role.name.toLowerCase().contains('teacher')
+        ).toList();
+
+        if (teacherRoles.isNotEmpty) {
+          if (mounted) {
+            setState(() {
+              _roles = teacherRoles;
+              _selectedRoleId = teacherRoles.first.id;
+            });
+            await _fetchTeachersForRole(_selectedRoleId!); // Fetch teachers for the default role
+          }
+        } else {
+          setState(() => _isLoading = false); // No teacher roles found
+        }
+      } else {
+        throw Exception('Failed to load roles');
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString())));
+        setState(() => _isLoading = false);
+      }
+    }
+  }
+
+  Future<void> _fetchTeachersForRole(int roleId) async {
+    if (!mounted) return;
+    setState(() {
+      _isLoading = true;
+    });
+
+    try {
+      final response = await ApiService.get('manager/users/$roleId');
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        final List<dynamic> teachersData = data['data'];
+        if(mounted){
+          setState(() {
+            _teachers = teachersData.map((json) => Teacher.fromJson(json)).toList();
+            _isLoading = false;
+          });
+        }
+      } else {
+        throw Exception('Failed to load teachers for the selected role');
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString())));
+        setState(() => _isLoading = false);
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -28,8 +136,11 @@ class _TeacherListPageState extends State<TeacherListPage> {
               height: 50,
               child: FloatingActionButton.extended(
                 heroTag: 'addTeacherBtn',
-                onPressed: (){
-                  Navigator.push(context, MaterialPageRoute(builder: (context)=>const AddTeacherPage()));
+                onPressed: () async {
+                  final result = await Navigator.push(context, MaterialPageRoute(builder: (context)=>const AddTeacherPage()));
+                  if (result == true && mounted) {
+                    _fetchTeachersForRole(_selectedRoleId!); // Refresh list on return
+                  }
                 },
                 label: Text(
                   "Add Teacher",
@@ -53,72 +164,53 @@ class _TeacherListPageState extends State<TeacherListPage> {
                     color: theme.colorScheme.onSurface,
                     fontWeight: FontWeight.bold),
               ),
-              Icon(
+              const Icon(
                 Icons.download,
-                color: theme.colorScheme.onSurface,
               ),
             ],
           ),
         ),
-        body: const Padding(
-          padding: EdgeInsets.fromLTRB(16, 16, 16, 50),
-          child: SingleChildScrollView(
-            child: Column(children: [
-              CustomTeacherListBox(),
-            ]),
+        body: SingleChildScrollView(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 50),
+            child: CustomTeacherListBox(
+              isLoading: _isLoading,
+              teachers: _teachers,
+              roles: _roles,
+              selectedRoleId: _selectedRoleId,
+              onRoleChanged: (int? newRoleId) {
+                if (newRoleId != null) {
+                  setState(() {
+                    _selectedRoleId = newRoleId;
+                  });
+                  _fetchTeachersForRole(newRoleId);
+                }
+              },
+            ),
           ),
         ));
   }
 }
 
-class CustomTeacherListBox extends StatefulWidget {
-  const CustomTeacherListBox({super.key});
+// ───────────────────────────────────────────────────────────
+//                      TEACHER LIST BOX
+// ───────────────────────────────────────────────────────────
 
-  @override
-  State<CustomTeacherListBox> createState() => _CustomTeacherListBoxState();
-}
+class CustomTeacherListBox extends StatelessWidget {
+  final bool isLoading;
+  final List<Teacher> teachers;
+  final List<Role> roles;
+  final int? selectedRoleId;
+  final ValueChanged<int?> onRoleChanged;
 
-class _CustomTeacherListBoxState extends State<CustomTeacherListBox> {
-  String? _selectedTeacher = "All Teacher";
-  final List<String> _teacherTypes = [
-    "All Teacher",
-    "Teacher Manager",
-    "Teacher Manager new",
-  ];
-
-  List<Teacher> _teachers = [];
-  bool _isLoading = true;
-
-  @override
-  void initState() {
-    super.initState();
-    _fetchTeachers();
-  }
-
-  // TODO: Implement API call to fetch teachers
-  Future<void> _fetchTeachers() async {
-    // For now, using hardcoded data.
-    // Replace this with your API call.
-    await Future.delayed(const Duration(seconds: 2));
-    final List<Teacher> newTeachers = [
-      Teacher(name: "Rohan Mehra", designation: "Principal"),
-      Teacher(name: "Sunita Williams", designation: "Vice Principal"),
-      Teacher(name: "Anjali Sharma", designation: "Academic Head"),
-      Teacher(name: "Vikram Rathore", designation: "Admissions Officer"),
-      Teacher(name: "Priya Kapoor", designation: "HR Manager"),
-      Teacher(name: "Amit Dessai", designation: "Finance Manager"),
-      Teacher(name: "Sneha Verma", designation: "IT Head"),
-      Teacher(name: "Rajesh Kumar", designation: "Operations Manager"),
-      Teacher(name: "Deepa Singh", designation: "Librarian"),
-    ];
-
-    if (mounted) {
-      setState(() {
-        _teachers.addAll(newTeachers);
-        _isLoading = false;
-      });
-    }
-  }
+  const CustomTeacherListBox({
+    super.key,
+    required this.isLoading,
+    required this.teachers,
+    required this.roles,
+    required this.selectedRoleId,
+    required this.onRoleChanged,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -139,28 +231,22 @@ class _CustomTeacherListBoxState extends State<CustomTeacherListBox> {
               color: theme.colorScheme.onPrimary.withAlpha(25),
               borderRadius: BorderRadius.circular(12),
             ),
-            child: DropdownButton<String>(
-              value: _selectedTeacher,
+            child: DropdownButton<int>(
+              value: selectedRoleId,
               underline: const SizedBox(),
               isExpanded: true,
               icon: Icon(Icons.arrow_drop_down, color: theme.colorScheme.onPrimary),
-              onChanged: (String? newValue) {
-                setState(() {
-                  _selectedTeacher = newValue;
-                });
-              },
-              items: _teacherTypes.map<DropdownMenuItem<String>>((String value) {
-                return DropdownMenuItem<String>(
-                  value: value,
+              onChanged: onRoleChanged,
+              items: roles.map<DropdownMenuItem<int>>((Role role) {
+                return DropdownMenuItem<int>(
+                  value: role.id,
                   child: Row(
                     children: [
-                      Icon(Icons.menu_open_sharp, color: theme.colorScheme.onPrimary), // Prefix icon
+                      const Icon(Icons.person_outline), // Prefix icon
                       const SizedBox(width: 8),
                       Text(
-                        value,
-                        style: theme.textTheme.titleMedium?.copyWith(
-                          color: theme.colorScheme.onPrimary,
-                        ),
+                        role.name,
+                        style: theme.textTheme.bodyLarge,
                       ),
                     ],
                   ),
@@ -169,54 +255,51 @@ class _CustomTeacherListBoxState extends State<CustomTeacherListBox> {
             ),
           ),
           const SizedBox(height: 16),
-          _isLoading
+          isLoading
               ? const Center(child: CircularProgressIndicator())
               : LayoutBuilder(
-            builder: (context, constraints) {
-              if (constraints.maxWidth < 600) {
-                return _buildTeacherList(theme);
-              } else {
-                return _buildTeacherGrid(theme);
-              }
-            },
-          ),
+                  builder: (context, constraints) {
+                    if (teachers.isEmpty) {
+                      return const Center(child: Text("No teachers found for this role.", style: TextStyle(color: Colors.white),));
+                    }
+
+                    final isLargeScreen = constraints.maxWidth > 600;
+                    if (isLargeScreen) {
+                      return GridView.builder(
+                        shrinkWrap: true,
+                        physics: const NeverScrollableScrollPhysics(),
+                        itemCount: teachers.length,
+                        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                          crossAxisCount: 2,
+                          crossAxisSpacing: 16,
+                          mainAxisSpacing: 16,
+                          childAspectRatio: 3.5,
+                        ),
+                        itemBuilder: (context, index) {
+                          return _buildTeacherTile(context, teachers[index]);
+                        },
+                      );
+                    } else {
+                      return ListView.separated(
+                        shrinkWrap: true,
+                        physics: const NeverScrollableScrollPhysics(),
+                        itemCount: teachers.length,
+                        separatorBuilder: (context, index) => const SizedBox(height: 16),
+                        itemBuilder: (context, index) {
+                          return _buildTeacherTile(context, teachers[index]);
+                        },
+                      );
+                    }
+                  },
+                ),
         ],
       ),
     );
   }
 
-  Widget _buildTeacherList(ThemeData theme) {
-    return ListView.separated(
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      itemCount: _teachers.length,
-      separatorBuilder: (context, index) => const SizedBox(height: 16),
-      itemBuilder: (context, index) {
-        final teacher = _teachers[index];
-        return _buildTeacherTile(teacher, theme);
-      },
-    );
-  }
-
-  Widget _buildTeacherGrid(ThemeData theme) {
-    return GridView.builder(
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      itemCount: _teachers.length,
-      gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
-        maxCrossAxisExtent: 400,
-        mainAxisSpacing: 16,
-        crossAxisSpacing: 16,
-        childAspectRatio: 4, // Adjust aspect ratio as needed
-      ),
-      itemBuilder: (context, index) {
-        final teacher = _teachers[index];
-        return _buildTeacherTile(teacher, theme);
-      },
-    );
-  }
-
-  Widget _buildTeacherTile(Teacher teacher, ThemeData theme) {
+  Widget _buildTeacherTile(BuildContext context, Teacher teacher) {
+    final theme = Theme.of(context);
+    final textTheme = theme.textTheme;
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
@@ -225,6 +308,10 @@ class _CustomTeacherListBoxState extends State<CustomTeacherListBox> {
       ),
       child: Row(
         children: [
+           CircleAvatar(
+            backgroundColor: theme.colorScheme.primaryContainer,
+            child: Icon(Icons.person, color: theme.colorScheme.onPrimaryContainer),
+          ),
           const SizedBox(width: 16),
           Expanded(
             child: Column(
@@ -233,7 +320,7 @@ class _CustomTeacherListBoxState extends State<CustomTeacherListBox> {
               children: [
                 Text(
                   teacher.name,
-                  style: theme.textTheme.titleMedium?.copyWith(
+                  style: textTheme.titleMedium?.copyWith(
                     color: theme.colorScheme.onPrimary,
                     fontWeight: FontWeight.bold,
                   ),
@@ -241,8 +328,8 @@ class _CustomTeacherListBoxState extends State<CustomTeacherListBox> {
                 const SizedBox(height: 4),
                 Text(
                   teacher.designation,
-                  style: theme.textTheme.bodyMedium?.copyWith(
-                    color: theme.colorScheme.onPrimary.withAlpha(200),
+                  style: textTheme.bodyMedium?.copyWith(
+                    color: theme.colorScheme.onPrimary.withAlpha(180),
                   ),
                 )
               ],

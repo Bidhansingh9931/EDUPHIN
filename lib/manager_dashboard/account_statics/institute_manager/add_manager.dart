@@ -1,45 +1,44 @@
-import 'dart:async';
-import 'dart:ui';
+import 'dart:convert';
+import 'package:eduphin/services/api_service.dart';
 import 'package:flutter/material.dart';
-
-import '../../manager_profile.dart';
 
 // ───────────────────────────────────────────────────────────
 //                          DATA MODELS
 // ───────────────────────────────────────────────────────────
 
 class Manager {
-  String fullName = 'Rajeev K.Malhotra';
-  String email = 'rajeev.malhotra@example.com';
+  String fullName = '';
+  String email = '';
   String newPassword = '';
   String role = 'General Manager';
-  String? gender = 'Male';
-  String dateOfBirth = '1985-05-20';
-  String? relationshipStatus = 'Married';
-  String phoneNumber = '+91 98765 43210';
+  String? gender;
+  String dateOfBirth = '';
+  String? relationshipStatus;
+  String phoneNumber = '';
   String alternateNumber = '';
-  String address = '123, ABC Lane, XYZ Colony';
-  String city = 'New Delhi';
-  String state = 'Delhi';
-  String pinCode = '110001';
-  String position = 'General Manager';
-  String? employmentType = 'Full-time';
-  String joiningDate = '2010-08-15';
-  String experience = '14'; // in years
-  String? status = 'Active';
-  String reference = 'N/A';
-  String qualification = 'MBA in Hospital Management';
-  String matriculationMarks = '85';
-  String intermediateMarks = '82';
+  String address = '';
+  String city = '';
+  String state = '';
+  String pinCode = '';
+  String position = '';
+  String? employmentType;
+  String joiningDate = '';
+  String experience = ''; // in years
+  String? status;
+  String reference = '';
+  String qualification = '';
+  String matriculationMarks = '';
+  String intermediateMarks = '';
   String? matriculationMarksheet;
   String? intermediateMarksheet;
   String? resume;
-  String bankAccountNumber = '123456789012';
-  String ifscCode = 'ABCD0001234';
-  String bankName = 'Global Bank';
-  String branch = 'Central Delhi';
-  String emergencyContactName = 'Sunita Malhotra';
-  String emergencyContactNumber = '+91 98765 43211';
+  String bankAccountNumber = '';
+  String ifscCode = '';
+  String bankName = '';
+  String branch = '';
+  String emergencyContactName = '';
+  String emergencyContactNumber = '';
+  String aadharNumber = ''; // Added for API
 }
 
 class ManagerFormData {
@@ -59,28 +58,53 @@ class ManagerFormData {
 }
 
 // ───────────────────────────────────────────────────────────
-//                         MOCK API SERVICE
+//                         API SERVICE
 // ───────────────────────────────────────────────────────────
 
-class MockManagerApiService {
+class ManagerApiService {
   Future<ManagerFormData> fetchManagerData() async {
     await Future.delayed(const Duration(milliseconds: 300));
     return ManagerFormData(
-      manager: Manager(), // Pre-populated data
+      manager: Manager(), // Clean manager object
       genders: ['Male', 'Female', 'Other'],
       relationshipStatuses: ['Single', 'Married', 'Divorced', 'Widowed'],
-      employmentTypes: ['Full-time', 'Part-time', 'Contract'],
-      statuses: ['Active', 'On-leave', 'Terminated'],
+      employmentTypes: ['full-time', 'part-time', 'internship', 'contract-based', 'other'],
+      statuses: ['live', 'expired'],
     );
   }
 
   Future<bool> saveManager(Manager manager) async {
-    await Future.delayed(const Duration(seconds: 1));
-    // In a real app, you'd send this data to your backend
-    print('Saving manager data for: ${manager.fullName}');
-    return true; // Simulate success
+    final body = {
+      'name': manager.fullName,
+      'email': manager.email,
+      'password': manager.newPassword,
+      'role_id': '4', // Assuming '4' is for Manager
+      'institute_id': '1', // This should be dynamically set
+      'employment_type': manager.employmentType,
+      'gender': manager.gender,
+      'date_of_birth': manager.dateOfBirth,
+      'aadhar_number': manager.aadharNumber,
+      'address': manager.address,
+      'city': manager.city,
+      'state': manager.state,
+      'pincode': manager.pinCode,
+      'phone': manager.phoneNumber,
+      'alternate_phone': manager.alternateNumber,
+      'bank_account_number': manager.bankAccountNumber,
+      'status': manager.status,
+    };
+
+    final response = await ApiService.post('manager/users', body);
+    final responseData = jsonDecode(response.body);
+
+    if (response.statusCode >= 200 && response.statusCode < 300) {
+      return responseData['status'] == true;
+    } else {
+      throw Exception(responseData['message'] ?? 'Failed to save manager.');
+    }
   }
 }
+
 
 // ───────────────────────────────────────────────────────────
 //                       ADD MANAGER PAGE
@@ -94,7 +118,7 @@ class AddManagerPage extends StatefulWidget {
 }
 
 class _AddManagerPageState extends State<AddManagerPage> {
-  final _apiService = MockManagerApiService();
+  final _apiService = ManagerApiService();
   late Future<ManagerFormData> _formDataFuture;
   late Manager _manager;
   bool _isSubmitting = false;
@@ -110,21 +134,34 @@ class _AddManagerPageState extends State<AddManagerPage> {
       _isSubmitting = true;
     });
 
-    final success = await _apiService.saveManager(_manager);
+    try {
+      final success = await _apiService.saveManager(_manager);
 
-    setState(() {
-      _isSubmitting = false;
-    });
-
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(success ? 'Manager saved successfully!' : 'Failed to save manager.'),
-          backgroundColor: success ? Colors.green : Colors.red,
-        ),
-      );
-      if (success) {
-        Navigator.of(context).pop();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(success ? 'Manager saved successfully!' : 'Failed to save manager.'),
+            backgroundColor: success ? Colors.green : Colors.red,
+          ),
+        );
+        if (success) {
+          Navigator.of(context).pop();
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(e.toString()),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isSubmitting = false;
+        });
       }
     }
   }
@@ -137,10 +174,6 @@ class _AddManagerPageState extends State<AddManagerPage> {
       appBar: AppBar(
         title: const Text("Add New Manager"),
         actions: [
-          IconButton(
-            icon: const Icon(Icons.delete_outline),
-            onPressed: () => showDeleteDialog(context),
-          ),
           Padding(
             padding: const EdgeInsets.only(right: 8.0),
             child: ElevatedButton(
@@ -181,7 +214,7 @@ class _AddManagerPageState extends State<AddManagerPage> {
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                CustomProfileBox(manager: _manager),
+                                const _AddManagerProfileBox(),
                                 const SizedBox(height: 20),
                                 _buildEditableInfoTile(context, "Full Name", _manager.fullName, (val) => _manager.fullName = val),
                                 _buildEditableInfoTile(context, "Email", _manager.email, (val) => _manager.email = val),
@@ -226,7 +259,7 @@ class _AddManagerPageState extends State<AddManagerPage> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          CustomProfileBox(manager: _manager),
+                          const _AddManagerProfileBox(),
                           const SizedBox(height: 20),
                           _buildEditableInfoTile(context, "Full Name", _manager.fullName, (val) => _manager.fullName = val),
                           _buildEditableInfoTile(context, "Email", _manager.email, (val) => _manager.email = val),
@@ -398,6 +431,7 @@ class _AddManagerPageState extends State<AddManagerPage> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         _buildSectionTitle(context, "Personal Details"),
+        _buildEditableInfoTile(context, "Aadhaar Number", manager.aadharNumber, (val) => manager.aadharNumber = val),
         _buildEditableInfoTile(context, "Role", manager.role, (val) => manager.role = val),
         _buildDropdownInfoTile(context, "Gender", manager.gender, formData.genders, (val) => setState(() => manager.gender = val)),
         _buildDatePickerTile(context, "Date of Birth", manager.dateOfBirth, (val) => setState(() => manager.dateOfBirth = val)),
@@ -425,7 +459,7 @@ class _AddManagerPageState extends State<AddManagerPage> {
         _buildEditableInfoTile(context, "Address", manager.address, (val) => manager.address = val),
         _buildEditableInfoTile(context, "City", manager.city, (val) => manager.city = val),
         _buildEditableInfoTile(context, "State", manager.state, (val) => manager.state = val),
-        _buildEditableInfoTile(context, "Pin code", manager.pinCode, (val) => manager.pinCode = val),
+        _buildEditableInfoTile(context, "Pin Code", manager.pinCode, (val) => manager.pinCode = val),
       ],
     );
   }
@@ -438,7 +472,7 @@ class _AddManagerPageState extends State<AddManagerPage> {
         _buildEditableInfoTile(context, "Position", manager.position, (val) => manager.position = val),
         _buildDropdownInfoTile(context, "Employment Type", manager.employmentType, formData.employmentTypes, (val) => setState(() => manager.employmentType = val)),
         _buildDatePickerTile(context, "Joining Date", manager.joiningDate, (val) => setState(() => manager.joiningDate = val)),
-        _buildEditableInfoTile(context, "Experience (Years)", manager.experience, (val) => manager.experience = val),
+        _buildEditableInfoTile(context, "Experience (in years)", manager.experience, (val) => manager.experience = val),
         _buildDropdownInfoTile(context, "Status", manager.status, formData.statuses, (val) => setState(() => manager.status = val)),
         _buildEditableInfoTile(context, "Reference", manager.reference, (val) => manager.reference = val),
       ],
@@ -453,9 +487,9 @@ class _AddManagerPageState extends State<AddManagerPage> {
         _buildEditableInfoTile(context, "Qualification", manager.qualification, (val) => manager.qualification = val),
         _buildEditableInfoTile(context, "Matriculation Marks (%)", manager.matriculationMarks, (val) => manager.matriculationMarks = val),
         _buildEditableInfoTile(context, "Intermediate Marks (%)", manager.intermediateMarks, (val) => manager.intermediateMarks = val),
-        _buildDocumentPickerTile(context, "Matriculation Marksheet", manager.matriculationMarksheet, () => setState(() => manager.matriculationMarksheet = 'matric_marksheet.pdf')),
-        _buildDocumentPickerTile(context, "Intermediate Marksheet", manager.intermediateMarksheet, () => setState(() => manager.intermediateMarksheet = 'inter_marksheet.pdf')),
-        _buildDocumentPickerTile(context, "Resume", manager.resume, () => setState(() => manager.resume = 'resume_${manager.fullName.replaceAll(' ', '_')}.pdf')),
+        _buildDocumentPickerTile(context, "Matriculation Marksheet", manager.matriculationMarksheet, () {}),
+        _buildDocumentPickerTile(context, "Intermediate Marksheet", manager.intermediateMarksheet, () {}),
+        _buildDocumentPickerTile(context, "Resume", manager.resume, () {}),
       ],
     );
   }
@@ -485,150 +519,41 @@ class _AddManagerPageState extends State<AddManagerPage> {
   }
 }
 
-class CustomProfileBox extends StatelessWidget {
-  final Manager manager;
-  const CustomProfileBox({super.key, required this.manager});
+class _AddManagerProfileBox extends StatelessWidget {
+  const _AddManagerProfileBox();
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final isWide = MediaQuery.of(context).size.width > 600;
-
-    return InkWell(
-      onTap: () => Navigator.push(context, MaterialPageRoute(builder: (context) => const ManagerProfilePage())),
-      child: Container(
-        width: double.infinity,
-        padding: const EdgeInsets.all(16.0),
-        decoration: BoxDecoration(
-          color: theme.primaryColor,
-          borderRadius: BorderRadius.circular(12),
-        ),
-        child: Column(
-          children: [
-            Row(
-              children: [
-                Icon(Icons.person, color: theme.colorScheme.onPrimary, size: isWide ? 32 : 28),
-                const SizedBox(width: 8),
-                Text("Profile Overview", style: TextStyle(fontWeight: FontWeight.bold, fontSize: isWide ? 22 : 20, color: theme.colorScheme.onPrimary))
-              ],
-            ),
-            const SizedBox(height: 16),
-            const CircleAvatar(
-              radius: 40,
-              backgroundImage: AssetImage("assets/images/random_boy.jpg"),
-            ),
-            const SizedBox(height: 8),
-            Text(manager.fullName, style: TextStyle(fontWeight: FontWeight.bold, fontSize: isWide ? 22 : 20, color: theme.colorScheme.onPrimary)),
-            Text(manager.role, style: TextStyle(fontSize: isWide ? 18 : 16, color: theme.colorScheme.onPrimary.withAlpha(180))),
-            const SizedBox(height: 16),
-            Container(
-              height: 50,
-              width: double.infinity,
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(10),
-                color: const Color(0xFF2A3F5F),
-              ),
-              child: const Row(
-                crossAxisAlignment: CrossAxisAlignment.center,
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Padding(
-                    padding: EdgeInsets.only(right: 10),
-                    child: Icon(Icons.camera_alt_outlined, size: 30, color: Color(0xFF9FB4CC)),
-                  ),
-                  Text("Update Profile Image", style: TextStyle(color: Color(0xFF9FB4CC), fontSize: 16, fontWeight: FontWeight.bold)),
-                ],
-              ),
-            )
-          ],
-        ),
+    final textTheme = theme.textTheme;
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16.0),
+      decoration: BoxDecoration(
+        color: theme.primaryColor,
+        borderRadius: BorderRadius.circular(12),
       ),
-    );
-  }
-}
-
-void showDeleteDialog(BuildContext context) {
-  showGeneralDialog(
-    context: context,
-    barrierDismissible: true,
-    barrierLabel: "Delete",
-    barrierColor: const Color.fromRGBO(0, 0, 0, 0.6),
-    transitionDuration: const Duration(milliseconds: 200),
-    pageBuilder: (_, __, ___) {
-      return const DeleteManagerDialog(
-        managerName: "Rajeev K.Malhotra",
-      );
-    },
-  );
-}
-
-class DeleteManagerDialog extends StatelessWidget {
-  final String managerName;
-
-  const DeleteManagerDialog({
-    super.key,
-    required this.managerName,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.transparent,
-      body: Stack(
+      child: Column(
         children: [
-          BackdropFilter(
-            filter: ImageFilter.blur(sigmaX: 6, sigmaY: 6),
-            child: Container(color: Colors.transparent),
+          Row(
+            children: [
+              Icon(Icons.person_add, color: theme.colorScheme.onPrimary, size: 30),
+              const SizedBox(width: 8),
+              Text("New Manager Profile",
+                  style: textTheme.titleLarge?.copyWith(
+                      color: theme.colorScheme.onPrimary,
+                      fontWeight: FontWeight.bold))
+            ],
           ),
-          Center(
-            child: Container(
-              margin: const EdgeInsets.symmetric(horizontal: 24),
-              padding: const EdgeInsets.all(20),
-              decoration: BoxDecoration(
-                color: const Color(0xFF1F2937),
-                borderRadius: BorderRadius.circular(20),
-              ),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const Text(
-                    "Delete Manager",
-                    style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.white),
-                  ),
-                  const SizedBox(height: 12),
-                  Text(
-                    "Are you sure you want to delete this manager, $managerName? This action cannot be undone.",
-                    textAlign: TextAlign.center,
-                    style: TextStyle(color: Colors.grey.shade400, fontSize: 14),
-                  ),
-                  const SizedBox(height: 24),
-                  SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton(
-                      onPressed: () {
-                        Navigator.of(context).pop(); // Close dialog
-                        // Add actual delete logic here
-                      },
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.red.shade800,
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                        padding: const EdgeInsets.symmetric(vertical: 16),
-                      ),
-                      child: const Text("Delete", style: TextStyle(fontSize: 16, color: Colors.white)),
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  SizedBox(
-                    width: double.infinity,
-                    child: TextButton(
-                      onPressed: () => Navigator.of(context).pop(),
-                      child: Text("Cancel", style: TextStyle(color: Colors.grey.shade400)),
-                    ),
-                  ),
-                ],
-              ),
-            ),
+          const SizedBox(height: 16),
+          const CircleAvatar(
+            radius: 40,
+            child: Icon(Icons.add_a_photo, size: 40),
           ),
+          const SizedBox(height: 8),
+          Text("Add Profile Photo",
+              style: textTheme.titleMedium
+                  ?.copyWith(color: theme.colorScheme.onPrimary, fontWeight: FontWeight.bold)),
         ],
       ),
     );

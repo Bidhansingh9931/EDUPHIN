@@ -1,10 +1,17 @@
+import 'dart:convert';
+import 'package:eduphin/manager_dashboard/studyMaterial/add_assignment.dart';
+import 'package:eduphin/manager_dashboard/studyMaterial/edit_assignment.dart';
+import 'package:eduphin/services/api_service.dart';
+import 'package:intl/intl.dart';
 import 'package:eduphin/manager_dashboard/studyMaterial/submission_assignment.dart';
 import 'package:flutter/material.dart';
 
 // --- Data Models ---
 
 class Assignment {
+  final int id;
   final String title;
+  final String description;
   final String subject;
   final String className;
   final String section;
@@ -13,7 +20,9 @@ class Assignment {
   final String dueDate;
 
   Assignment({
+    required this.id,
     required this.title,
+    required this.description,
     required this.subject,
     required this.className,
     required this.section,
@@ -22,19 +31,40 @@ class Assignment {
     required this.dueDate,
   });
 
-  factory Assignment.fromJson(Map<String, dynamic> json) {
+  factory Assignment.fromJson(Map<String, dynamic> json, Map<int, String> classMap, Map<int, String> sectionMap, Map<int, String> subjectMap, Map<int, String> teacherMap) {
     return Assignment(
-      title: json['title'] as String,
-      subject: json['subject'] as String,
-      className: json['className'] as String,
-      section: json['section'] as String,
-      uploadedBy: json['uploadedBy'] as String,
-      uploadedDate: json['uploadedDate'] as String,
-      dueDate: json['dueDate'] as String,
+      id: json['id'] as int? ?? 0,
+      title: json['title'] as String? ?? 'No Title',
+      description: json['description'] as String? ?? '',
+      subject: subjectMap[json['subject_id']] ?? 'N/A',
+      className: classMap[json['class_id']] ?? 'N/A',
+      section: sectionMap[json['section_id']] ?? 'N/A',
+      uploadedBy: teacherMap[json['teacher_id']] ?? 'N/A',
+      uploadedDate: json['created_at'] != null ? DateFormat('dd MMM yyyy').format(DateTime.parse(json['created_at'])) : 'N/A',
+      dueDate: json['due_date'] != null ? DateFormat('dd MMM yyyy').format(DateTime.parse(json['due_date'])) : 'N/A',
     );
   }
 }
 
+class ApiClass {
+  final int id;
+  final String name;
+  ApiClass({required this.id, required this.name});
+
+  factory ApiClass.fromJson(Map<String, dynamic> json) {
+    return ApiClass(id: json['id'], name: json['name']);
+  }
+}
+
+class ApiSection {
+  final int id;
+  final String name;
+  ApiSection({required this.id, required this.name});
+
+  factory ApiSection.fromJson(Map<String, dynamic> json) {
+    return ApiSection(id: json['id'], name: json['section_name']);
+  }
+}
 
 class AssignmentsPage extends StatefulWidget {
   const AssignmentsPage({super.key});
@@ -48,8 +78,8 @@ class _AssignmentsPageState extends State<AssignmentsPage> {
   String? selectedSection;
 
   bool isLoading = true;
-  List<String> classes = [];
-  List<String> sections = [];
+  List<ApiClass> classes = [];
+  List<ApiSection> sections = [];
   List<Assignment> allAssignments = [];
   Map<String, List<Assignment>> filteredAssignments = {};
 
@@ -59,82 +89,62 @@ class _AssignmentsPageState extends State<AssignmentsPage> {
     _fetchData();
   }
 
-  // TODO: Replace this with your actual API call in the future
   Future<void> _fetchData() async {
-    // Simulate network delay
-    await Future.delayed(const Duration(seconds: 1));
+    if (!mounted) return;
+    setState(() {
+      isLoading = true;
+    });
 
-    final List<String> fetchedClasses = [
-      "Class 6", "Class 7", "Class 8", "Class 9", "Class 10", "Class 11", "Class 12"
-    ];
-    final List<String> fetchedSections = ["Section A", "Section B", "Section C"];
-    final List<Map<String, dynamic>> fetchedAssignmentsData = [
-      {
-        "title": "Algebraic Equations",
-        "subject": "Mathematics",
-        "className": "Class 10",
-        "section": "Section A",
-        "uploadedBy": "Mr. Sharma",
-        "uploadedDate": "12 Nov 2025",
-        "dueDate": "20 Nov 2025"
-      },
-      {
-        "title": "Polynomials",
-        "subject": "Mathematics",
-        "className": "Class 10",
-        "section": "Section A",
-        "uploadedBy": "Mr. Sharma",
-        "uploadedDate": "12 Nov 2025",
-        "dueDate": "22 Nov 2025"
-      },
-      {
-        "title": "Light - Reflection and Refraction",
-        "subject": "Science",
-        "className": "Class 10",
-        "section": "Section A",
-        "uploadedBy": "Mrs. Gupta",
-        "uploadedDate": "10 Nov 2025",
-        "dueDate": "18 Nov 2025"
-      },
-      {
-        "title": "Federalism",
-        "subject": "Social Studies",
-        "className": "Class 10",
-        "section": "Section B",
-        "uploadedBy": "Ms. Singh",
-        "uploadedDate": "05 Nov 2025",
-        "dueDate": "15 Nov 2025"
-      },
-      {
-        "title": "Sectors of the Indian Economy",
-        "subject": "Social Studies",
-        "className": "Class 10",
-        "section": "Section B",
-        "uploadedBy": "Ms. Singh",
-        "uploadedDate": "05 Nov 2025",
-        "dueDate": "17 Nov 2025"
-      },
-      {
-        "title": "Number Systems",
-        "subject": "Mathematics",
-        "className": "Class 9",
-        "section": "Section A",
-        "uploadedBy": "Mr. Sharma",
-        "uploadedDate": "01 Nov 2025",
-        "dueDate": "10 Nov 2025"
+    try {
+      final response = await ApiService.get('manager/study/assignments');
+      if (response.statusCode == 200) {
+        final responseData = jsonDecode(response.body)['data'];
+
+        final List<ApiClass> fetchedClasses = (responseData['classes'] as List)
+            .map((data) => ApiClass.fromJson(data))
+            .toList();
+        final List<ApiSection> fetchedSections = (responseData['sections'] as List)
+            .map((data) => ApiSection.fromJson(data))
+            .toList();
+
+        final classMap = {for (var e in fetchedClasses) e.id: e.name};
+        final sectionMap = {for (var e in fetchedSections) e.id: e.name};
+
+        final schedules = responseData['schedules'] as List;
+        final Map<int, String> subjectMap = {for (var s in schedules) s['subject_id']: s['subject']?['name'] ?? 'N/A'};
+        final Map<int, String> teacherMap = {for (var s in schedules) s['teacher_id']: s['teacher']?['name'] ?? 'N/A'};
+
+        final List<Assignment> fetchedAssignments = (responseData['assignments'] as List)
+            .map((data) => Assignment.fromJson(data, classMap, sectionMap, subjectMap, teacherMap))
+            .toList();
+
+        if (mounted) {
+          setState(() {
+            classes = fetchedClasses;
+            sections = fetchedSections;
+            allAssignments = fetchedAssignments;
+            if (classes.isNotEmpty) {
+               selectedClass = classes.first.name;
+            }
+            if (sections.isNotEmpty) {
+              selectedSection = sections.first.name;
+            }
+            _filterAssignments();
+            isLoading = false;
+          });
+        }
+      } else {
+        throw Exception('Failed to load data');
       }
-    ];
-
-    if (mounted) {
-      setState(() {
-        classes = fetchedClasses;
-        sections = fetchedSections;
-        allAssignments = fetchedAssignmentsData.map((data) => Assignment.fromJson(data)).toList();
-        selectedClass = "Class 10";
-        selectedSection = "Section A";
-        _filterAssignments();
-        isLoading = false;
-      });
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          isLoading = false;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error fetching data: $e')),
+        );
+      }
     }
   }
 
@@ -158,6 +168,39 @@ class _AssignmentsPageState extends State<AssignmentsPage> {
     });
   }
 
+  Future<void> _deleteAssignment(int assignmentId) async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Delete Assignment'),
+        content: const Text('Are you sure you want to delete this assignment?'),
+        actions: [
+          TextButton(onPressed: () => Navigator.of(context).pop(false), child: const Text('Cancel')),
+          TextButton(onPressed: () => Navigator.of(context).pop(true), child: const Text('Delete')),
+        ],
+      ),
+    );
+
+    if (confirm == true) {
+      try {
+        final response = await ApiService.delete('manager/study/assignments/$assignmentId');
+        if (response.statusCode == 200) {
+           if(mounted){
+            ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Assignment deleted successfully'), backgroundColor: Colors.green));
+            _fetchData(); // Refresh list
+          }
+        } else {
+          throw Exception('Failed to delete assignment');
+        }
+      } catch (e) {
+        if(mounted){
+           ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString())));
+        }
+      }
+    }
+  }
+
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -169,27 +212,37 @@ class _AssignmentsPageState extends State<AssignmentsPage> {
         leading: BackButton(color: theme.colorScheme.onSurface),
         title: Text("Assignments", style: TextStyle(color: theme.colorScheme.onSurface)),
       ),
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: () async {
+          final result = await Navigator.push(context, MaterialPageRoute(builder: (context) => const AddAssignmentPage()));
+          if (result == true) {
+            _fetchData(); // Refresh list
+          }
+        },
+        label: const Text('Create New'),
+        icon: const Icon(Icons.add),
+      ),
       body: isLoading
           ? const Center(child: CircularProgressIndicator())
           : Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16.0),
-            child: Column(
-              children: [
-                 _buildFilterSection(theme),
-                 const SizedBox(height: 16),
-                 Expanded(
-                   child: filteredAssignments.isNotEmpty 
-                    ? _buildAssignmentsList()
-                    : const Center(
-                       child: Text("No assignments found for the selected filters."),
-                    ),
-                 )
-              ],
+              padding: const EdgeInsets.symmetric(horizontal: 16.0),
+              child: Column(
+                children: [
+                  _buildFilterSection(theme),
+                  const SizedBox(height: 16),
+                  Expanded(
+                    child: filteredAssignments.isNotEmpty
+                        ? _buildAssignmentsList()
+                        : const Center(
+                            child: Text("No assignments found for the selected filters."),
+                          ),
+                  )
+                ],
+              ),
             ),
-          ),
     );
   }
-  
+
   Widget _buildFilterSection(ThemeData theme) {
     return Container(
       padding: const EdgeInsets.all(16),
@@ -200,7 +253,7 @@ class _AssignmentsPageState extends State<AssignmentsPage> {
       child: Row(
         children: [
           Expanded(
-            child: _buildDropdown(theme, "Select Class *", selectedClass, classes, (v) {
+            child: _buildDropdown(theme, "Select Class *", selectedClass, classes.map((c) => c.name).toList(), (v) {
               if (v != null) {
                 setState(() => selectedClass = v);
                 _filterAssignments();
@@ -209,7 +262,7 @@ class _AssignmentsPageState extends State<AssignmentsPage> {
           ),
           const SizedBox(width: 16),
           Expanded(
-            child: _buildDropdown(theme, "Select Section *", selectedSection, sections, (v) {
+            child: _buildDropdown(theme, "Select Section *", selectedSection, sections.map((s) => s.name).toList(), (v) {
               if (v != null) {
                 setState(() => selectedSection = v);
                 _filterAssignments();
@@ -220,15 +273,20 @@ class _AssignmentsPageState extends State<AssignmentsPage> {
       ),
     );
   }
-  
+
   Widget _buildDropdown(ThemeData theme, String label, String? value, List<String> items, ValueChanged<String?> onChanged) {
+    final uniqueItems = items.toSet().toList();
+    final isValueValid = value == null || uniqueItems.contains(value);
+    final String? dropdownValue = isValueValid ? value : null;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(label, style: theme.textTheme.labelMedium?.copyWith(color: theme.colorScheme.onSurface.withAlpha(35))),
+        Text(label, style: theme.textTheme.labelMedium?.copyWith(color: theme.colorScheme.onSurface.withAlpha(153))),
         const SizedBox(height: 6),
         DropdownButtonFormField<String>(
-          initialValue: value,
+          isExpanded: true, // Fix: Allow dropdown to expand and truncate text
+          value: dropdownValue,
           dropdownColor: theme.cardColor,
           style: theme.textTheme.bodyLarge,
           decoration: InputDecoration(
@@ -240,7 +298,7 @@ class _AssignmentsPageState extends State<AssignmentsPage> {
             ),
             contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
           ),
-          items: items.map((e) => DropdownMenuItem(value: e, child: Text(e))).toList(),
+          items: uniqueItems.map((e) => DropdownMenuItem(value: e, child: Text(e, overflow: TextOverflow.ellipsis))).toList(),
           onChanged: onChanged,
         ),
       ],
@@ -250,7 +308,7 @@ class _AssignmentsPageState extends State<AssignmentsPage> {
   Widget _buildAssignmentsList() {
     final subjects = filteredAssignments.keys.toList();
     return ListView.builder(
-      padding: const EdgeInsets.only(bottom: 50),
+      padding: const EdgeInsets.only(bottom: 80), // Adjusted for FAB
       itemCount: subjects.length,
       itemBuilder: (context, index) {
         final subject = subjects[index];
@@ -262,10 +320,18 @@ class _AssignmentsPageState extends State<AssignmentsPage> {
               padding: const EdgeInsets.only(top: 16, bottom: 10),
               child: Text(
                 subject, // Subject Name
-                style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700),
+                style: Theme.of(context)
+                    .textTheme
+                    .titleLarge
+                    ?.copyWith(fontWeight: FontWeight.w700),
               ),
             ),
-            ...assignments.map((a) => _AssignmentCard(assignment: a)),
+            ...assignments.map((a) => _AssignmentCard(assignment: a, onDelete: () => _deleteAssignment(a.id), onEdit: () async {
+                 final result = await Navigator.push(context, MaterialPageRoute(builder: (context) => EditAssignmentPage(assignment: a)));
+                 if(result == true) {
+                    _fetchData();
+                 }
+            })),
           ],
         );
       },
@@ -273,11 +339,12 @@ class _AssignmentsPageState extends State<AssignmentsPage> {
   }
 }
 
-
 class _AssignmentCard extends StatelessWidget {
   final Assignment assignment;
+  final VoidCallback onEdit;
+  final VoidCallback onDelete;
 
-  const _AssignmentCard({required this.assignment});
+  const _AssignmentCard({required this.assignment, required this.onEdit, required this.onDelete});
 
   @override
   Widget build(BuildContext context) {
@@ -292,22 +359,38 @@ class _AssignmentCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            assignment.title,
-            style: theme.textTheme.titleMedium?.copyWith(
-              color: theme.colorScheme.secondary,
-              fontWeight: FontWeight.w700,
-            ),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Flexible(
+                child: Text(
+                  assignment.title,
+                  style: theme.textTheme.titleMedium?.copyWith(
+                  color: theme.colorScheme.secondary,
+                  fontWeight: FontWeight.w700,
+                ),
+                ),
+              ),
+               Row(
+                children: [
+                  IconButton(icon: Icon(Icons.edit, size: 20, color: theme.colorScheme.onSurface.withAlpha(153)), onPressed: onEdit, constraints: const BoxConstraints()),
+                  IconButton(icon: Icon(Icons.delete, size: 20, color: theme.colorScheme.error), onPressed: onDelete, constraints: const BoxConstraints()),
+                ],
+              ),
+            ],
           ),
           const SizedBox(height: 10),
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Expanded(
-                child: _buildInfoColumn(theme, "Uploaded by", assignment.uploadedBy),
+                child: _buildInfoColumn(
+                    theme, "Uploaded by", assignment.uploadedBy),
               ),
               Expanded(
-                child: _buildInfoColumn(theme, "Uploaded Date", assignment.uploadedDate),
+                child: _buildInfoColumn(
+                    theme, "Uploaded Date", assignment.uploadedDate),
               ),
             ],
           ),
@@ -317,7 +400,11 @@ class _AssignmentCard extends StatelessWidget {
             width: double.infinity,
             child: ElevatedButton(
               onPressed: () {
-                Navigator.push(context, MaterialPageRoute(builder: (context) => const AssignmentSubmissionsScreen()));
+                Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                        builder: (context) =>
+                            AssignmentSubmissionsScreen(assignmentId: assignment.id)));
               },
               style: ElevatedButton.styleFrom(
                 backgroundColor: theme.colorScheme.primary,

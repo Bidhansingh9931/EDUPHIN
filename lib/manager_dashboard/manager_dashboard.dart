@@ -1,24 +1,16 @@
-import 'package:eduphin/manager_dashboard/account_statics/accountant/accountant_list.dart';
-import 'package:eduphin/manager_dashboard/account_statics/institute_manager/manager_list.dart';
-import 'package:eduphin/manager_dashboard/events/event_management.dart';
-import 'package:eduphin/manager_dashboard/manageClasses/schedule/class_schedule_search.dart';
-import 'package:eduphin/manager_dashboard/manageClasses/subjectList/subject_list.dart';
-import 'package:eduphin/manager_dashboard/manageClasses/timeTable/time_table.dart';
-import 'package:eduphin/manager_dashboard/quick_actions/add_new_class.dart';
-import 'package:eduphin/manager_dashboard/quick_actions/add_new_schedule.dart';
-import 'package:eduphin/manager_dashboard/quick_actions/add_new_student.dart';
-import 'package:eduphin/manager_dashboard/quick_actions/add_new_subject.dart';
-import 'package:eduphin/manager_dashboard/recentSupportTickets/ticket_info.dart';
-import 'package:eduphin/manager_dashboard/salary_information/employees_salary.dart';
-import 'package:eduphin/manager_dashboard/salary_information/my_salary.dart';
-import 'package:eduphin/manager_dashboard/studyMaterial/assignments.dart';
-import 'package:eduphin/manager_dashboard/studyMaterial/notes.dart';
-import 'package:flutter/material.dart';
+import 'dart:convert';
 
+import 'package:eduphin/services/api_service.dart';
+import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
+
+import 'account_statics/accountant/accountant_list.dart';
 import 'account_statics/counselor/counselor_list.dart';
+import 'account_statics/institute_manager/manager_list.dart';
 import 'account_statics/librarian/librarian_list.dart';
 import 'account_statics/staff/staff_list.dart';
 import 'account_statics/teacher/teacher_list.dart';
+import 'events/event_management.dart';
 import 'examinations/exam_info.dart';
 import 'examinations/exam_result.dart';
 import 'feeStructure/fee_Structure/fee_structure.dart';
@@ -26,9 +18,25 @@ import 'feeStructure/studentFeeDetails/student_fee_details.dart';
 import 'library/available_books.dart';
 import 'library/lending_books.dart';
 import 'manageClasses/classList/class_list.dart';
+import 'manageClasses/schedule/class_schedule_search.dart';
+import 'manageClasses/subjectList/subject_list.dart';
+import 'manageClasses/timeTable/time_table.dart';
 import 'manager_profile.dart';
+import 'quick_actions/add_new_class.dart';
+import 'quick_actions/add_new_schedule.dart';
+import 'quick_actions/add_new_student.dart';
+import 'quick_actions/add_new_subject.dart';
+import 'recentSupportTickets/ticket_info.dart';
+import 'salary_information/employees_salary.dart';
+import 'salary_information/my_salary.dart';
+import 'studyMaterial/assignments.dart';
+import 'studyMaterial/notes.dart';
 
-// Data Models
+// ───────────────────────────────────────────────────────────
+//                          DATA MODELS
+// ───────────────────────────────────────────────────────────
+
+// --- Dynamic Models ---
 class Profile {
   final String name;
   final String role;
@@ -36,25 +44,75 @@ class Profile {
   final String phone;
   final String imageUrl;
 
-  Profile({
+  const Profile({
     required this.name,
     required this.role,
     required this.email,
     required this.phone,
     required this.imageUrl,
   });
+
+  factory Profile.fromJson(Map<String, dynamic> json) {
+    String rawImageUrl = json['photo'] ?? '';
+    return Profile(
+      name: json['name'] ?? 'N/A',
+      role: json['role']?['name'] ?? 'Manager', // Role might not be in profile data
+      email: json['email'] ?? 'N/A',
+      phone: json['phone'] ?? 'N/A',
+      imageUrl: rawImageUrl.isNotEmpty ? '${ApiService.baseImageUrl}/storage/$rawImageUrl' : '',
+    );
+  }
 }
 
+class RoleSummary {
+  final String name;
+  final int count;
+
+  RoleSummary({required this.name, required this.count});
+
+  factory RoleSummary.fromJson(Map<String, dynamic> json) {
+    return RoleSummary(
+      name: json['name'] ?? 'Unknown Role',
+      count: json['user_details_count'] ?? 0,
+    );
+  }
+}
+
+class UpcomingEvent {
+  final String title;
+  final DateTime eventDate;
+  final VoidCallback onTap;
+  final String date;
+  final String day;
+  final String fullDate;
+
+  UpcomingEvent({
+    required this.title,
+    required this.eventDate,
+    required this.onTap,
+  })  : date = DateFormat('d').format(eventDate),
+        day = DateFormat('MMM').format(eventDate),
+        fullDate = DateFormat('EEEE, MMMM d').format(eventDate);
+
+  factory UpcomingEvent.fromJson(Map<String, dynamic> json, BuildContext context) {
+    return UpcomingEvent(
+      title: json['title'] ?? 'Untitled Event',
+      eventDate: DateTime.tryParse(json['start_date'] ?? '') ?? DateTime.now(),
+      onTap: () {
+        if (context.mounted) {
+          Navigator.push(context, MaterialPageRoute(builder: (context) => const EventManagementPage()));
+        }
+      },
+    );
+  }
+}
+
+// --- Static Navigation Models ---
 class QuickAction {
   final String label;
   final IconData icon;
   final VoidCallback onTap;
-
-  QuickAction({
-    required this.label,
-    required this.icon,
-    required this.onTap,
-  });
+  const QuickAction({required this.label, required this.icon, required this.onTap});
 }
 
 class AccountStatistic {
@@ -62,106 +120,49 @@ class AccountStatistic {
   final String value;
   final IconData icon;
   final VoidCallback onTap;
-
-  AccountStatistic({
-    required this.label,
-    required this.value,
-    required this.icon,
-    required this.onTap,
-  });
-}
-
-class UpcomingEvent {
-  final String title;
-  final String date;
-  final String day;
-  final VoidCallback onTap;
-
-  UpcomingEvent({
-    required this.title,
-    required this.date,
-    required this.day,
-    required this.onTap,
-  });
+  const AccountStatistic({required this.label, required this.value, required this.icon, required this.onTap});
 }
 
 class SalaryInformation {
   final String title;
   final VoidCallback onTap;
-
-  SalaryInformation({
-    required this.title,
-    required this.onTap,
-  });
+  const SalaryInformation({required this.title, required this.onTap});
 }
 
 class ManageClass {
   final String title;
   final VoidCallback onTap;
-
-  ManageClass({
-    required this.title,
-    required this.onTap,
-  });
+  const ManageClass({required this.title, required this.onTap});
 }
 
 class FeeStructure {
   final String title;
   final VoidCallback onTap;
-
-  FeeStructure({
-    required this.title,
-    required this.onTap,
-  });
+  const FeeStructure({required this.title, required this.onTap});
 }
 
 class Examination {
   final String title;
   final VoidCallback onTap;
-
-  Examination({
-    required this.title,
-    required this.onTap,
-  });
+  const Examination({required this.title, required this.onTap});
 }
 
 class Library {
   final String title;
   final VoidCallback onTap;
-
-  Library({
-    required this.title,
-    required this.onTap,
-  });
+  const Library({required this.title, required this.onTap});
 }
 
 class StudyMaterial {
   final String title;
   final VoidCallback onTap;
-
-  StudyMaterial({
-    required this.title,
-    required this.onTap,
-  });
+  const StudyMaterial({required this.title, required this.onTap});
 }
 
 class RecentSupportTicket {
   final String title;
   final VoidCallback onTap;
-
-  RecentSupportTicket({
-    required this.title,
-    required this.onTap,
-  });
-}
-class Transport {
-  final String title;
-  final VoidCallback onTap;
-
-  Transport({
-    required this.title,
-    required this.onTap,
-  });
+  const RecentSupportTicket({required this.title, required this.onTap});
 }
 
 class DashboardData {
@@ -175,7 +176,6 @@ class DashboardData {
   final List<Examination> examinations;
   final List<Library> library;
   final List<StudyMaterial> studyMaterial;
-  final List<Transport> transport;
   final List<RecentSupportTicket> recentSupportTickets;
 
   DashboardData({
@@ -189,80 +189,120 @@ class DashboardData {
     required this.examinations,
     required this.library,
     required this.studyMaterial,
-    required this.transport,
     required this.recentSupportTickets,
   });
-}
 
-// Mock API Service
-class MockDashboardApiService {
-  Future<DashboardData> fetchDashboardData(BuildContext context) async {
-    // Simulate network delay
-    await Future.delayed(const Duration(seconds: 2));
+  factory DashboardData.fromJson(Map<String, dynamic> json, BuildContext context) {
+    // Helper to map role names from the API to the right icon and navigation page
+    AccountStatistic mapRoleToStatistic(RoleSummary role) {
+      final Map<String, dynamic> roleMap = {
+        'Manager': {'icon': Icons.person_outline_sharp, 'page': const ManagerListPage()},
+        'Counselor': {'icon': Icons.support_agent_sharp, 'page': const CounselorListPage()},
+        'Teacher': {'icon': Icons.school_outlined, 'page': const TeacherListPage()},
+        'Librarian': {'icon': Icons.local_library, 'page': const LibrarianListPage()},
+        'Accountant': {'icon': Icons.account_balance, 'page': const AccountantListPage()},
+        'Staff': {'icon': Icons.work, 'page': const StaffListPage()},
+      };
+
+      final roleConfig = roleMap[role.name] ?? {'icon': Icons.person, 'page': null};
+
+      return AccountStatistic(
+        label: role.name,
+        value: role.count.toString(),
+        icon: roleConfig['icon'],
+        onTap: () {
+          if (context.mounted && roleConfig['page'] != null) {
+            Navigator.push(context, MaterialPageRoute(builder: (context) => roleConfig['page']));
+          }
+        },
+      );
+    }
+
+    final profileData = json['profile'] != null ? Profile.fromJson(json['profile']) : const Profile(name: 'N/A', role: 'N/A', email: 'N/A', phone: 'N/A', imageUrl: '');
+    final rolesData = (json['roles_summary'] as List? ?? []).map((i) => RoleSummary.fromJson(i)).toList();
+    final eventsData = (json['events'] as List? ?? []).map((i) => UpcomingEvent.fromJson(i, context)).toList();
+
+    void navigate(Widget page) {
+      if (context.mounted) {
+        Navigator.push(context, MaterialPageRoute(builder: (context) => page));
+      }
+    }
 
     return DashboardData(
-      profile: Profile(
-        name: "Rajeev K.Malhotra",
-        role: "General Manager",
-        email: "raj@iias",
-        phone: "9812345678",
-        imageUrl: "assets/images/random_boy.jpg",
-      ),
+      profile: profileData,
+      accountStatistics: rolesData.map(mapRoleToStatistic).toList(),
+      upcomingEvents: eventsData,
       quickActions: [
-        QuickAction(label: "Students", icon: Icons.person_outline_sharp, onTap: () => Navigator.push(context, MaterialPageRoute(builder: (context) => AddNewStudentPage()))),
-        QuickAction(label: "Add New Class", icon: Icons.book_outlined, onTap: () => Navigator.push(context, MaterialPageRoute(builder: (context) => AddNewClassPage()))),
-        QuickAction(label: "Add New Subject", icon: Icons.book_rounded, onTap: () => Navigator.push(context, MaterialPageRoute(builder: (context) => AddNewSubjectPage()))),
-        QuickAction(label: "Add Class Schedule", icon: Icons.calendar_month, onTap: () => Navigator.push(context, MaterialPageRoute(builder: (context) => AddNewSchedulePage()))),
-      ],
-      accountStatistics: [
-        AccountStatistic(label: "Institute Manager", value: "1", icon: Icons.person_outline_sharp, onTap: () => Navigator.push(context, MaterialPageRoute(builder: (context) => ManagerListPage()))),
-        AccountStatistic(label: "Counselors", value: "2", icon: Icons.support_agent_sharp, onTap: () => Navigator.push(context, MaterialPageRoute(builder: (context) => CounselorListPage()))),
-        AccountStatistic(label: "Teacher", value: "2", icon: Icons.school_outlined, onTap: () => Navigator.push(context, MaterialPageRoute(builder: (context) => TeacherListPage()))),
-        AccountStatistic(label: "Librarian", value: "2", icon: Icons.local_library, onTap: () => Navigator.push(context, MaterialPageRoute(builder: (context) => LibrarianListPage()))),
-        AccountStatistic(label: "Accountants", value: "2", icon: Icons.account_balance, onTap: () => Navigator.push(context, MaterialPageRoute(builder: (context) => AccountantListPage()))),
-        AccountStatistic(label: "Staff", value: "2", icon: Icons.work, onTap: () => Navigator.push(context, MaterialPageRoute(builder: (context) => StaffListPage()))),
-      ],
-      upcomingEvents: [
-        UpcomingEvent(title: "Annual Financial Literacy Working 2025", date: "12", day: "Dec", onTap: () => Navigator.push(context, MaterialPageRoute(builder: (context) => EventManagementPage()))),
-        UpcomingEvent(title: "Campus Cultural Fest 2025", date: "03", day: "Jan", onTap: () => Navigator.push(context, MaterialPageRoute(builder: (context) => EventManagementPage()))),
+        QuickAction(label: "Students", icon: Icons.person_outline_sharp, onTap: () => navigate(const AddNewStudentPage())),
+        QuickAction(label: "Add New Class", icon: Icons.book_outlined, onTap: () => navigate(const AddNewClassPage())),
+        QuickAction(label: "Add New Subject", icon: Icons.book_rounded, onTap: () => navigate(const AddNewSubjectPage())),
+        QuickAction(label: "Add Class Schedule", icon: Icons.calendar_month, onTap: () => navigate(const AddNewSchedulePage())),
       ],
       salaryInformation: [
-        SalaryInformation(title: "My Salary", onTap: () => Navigator.push(context, MaterialPageRoute(builder: (context) => MySalaryPage()))),
-        SalaryInformation(title: "Employees Salary", onTap: () => Navigator.push(context, MaterialPageRoute(builder: (context) => EmployeesSalaryPage()))),
+        SalaryInformation(title: "My Salary", onTap: () => navigate(const MySalaryPage())),
+        SalaryInformation(title: "Employees Salary", onTap: () => navigate(const EmployeesSalaryPage())),
       ],
       manageClasses: [
-        ManageClass(title: "Class List", onTap: () => Navigator.push(context, MaterialPageRoute(builder: (context) => ClassListPage()))),
-        ManageClass(title: "Subject List", onTap: () => Navigator.push(context, MaterialPageRoute(builder: (context) => SubjectListPage()))),
-        ManageClass(title: "Time Table", onTap: () => Navigator.push(context, MaterialPageRoute(builder: (context) => TimeTableClassesPage()))),
-        ManageClass(title: "Schedule", onTap: () => Navigator.push(context, MaterialPageRoute(builder: (context) => ClassScheduleSearchPage()))),
+        ManageClass(title: "Class List", onTap: () => navigate(const ClassListPage())),
+        ManageClass(title: "Subject List", onTap: () => navigate(const SubjectListPage())),
+        ManageClass(title: "Time Table", onTap: () => navigate(const TimeTableClassesPage())),
+        ManageClass(title: "Schedule", onTap: () => navigate(const ClassScheduleSearchPage())),
       ],
       feeStructure: [
-        FeeStructure(title: "Fee Structure", onTap: () => Navigator.push(context, MaterialPageRoute(builder: (context) => FeeStructurePage()))),
-        FeeStructure(title: "Student Fee Details", onTap: () => Navigator.push(context, MaterialPageRoute(builder: (context) => StudentFeeDetailsPage()))),
+        FeeStructure(title: "Fee Structure", onTap: () => navigate(const FeeStructurePage())),
+        FeeStructure(title: "Student Fee Details", onTap: () => navigate(const StudentFeeDetailsPage())),
       ],
       examinations: [
-        Examination(title: "Exam Info", onTap: () => Navigator.push(context, MaterialPageRoute(builder: (context) => ExamInfoPage()))),
-        Examination(title: "Exam Result", onTap: () => Navigator.push(context, MaterialPageRoute(builder: (context) => ExamResultPage()))),
+        Examination(title: "Exam Info", onTap: () => navigate(const ExamInfoPage())),
+        Examination(title: "Exam Result", onTap: () => navigate(const ExamResultPage())),
       ],
       library: [
-        Library(title: "Available Books", onTap: () => Navigator.push(context, MaterialPageRoute(builder: (context) => AvailableBooksScreen()))),
-        Library(title: "Lending Books", onTap: () => Navigator.push(context, MaterialPageRoute(builder: (context) => LendingBooksScreen()))),
+        Library(title: "Available Books", onTap: () => navigate(const AvailableBooksScreen())),
+        Library(title: "Lending Books", onTap: () => navigate(const LendingBooksScreen())),
       ],
       studyMaterial: [
-        StudyMaterial(title: "Notes", onTap: () => Navigator.push(context, MaterialPageRoute(builder: (context) => NotesPage()))),
-        StudyMaterial(title: "Assignments", onTap: () => Navigator.push(context, MaterialPageRoute(builder: (context) => AssignmentsPage()))),
-      ],
-      transport: [
-        Transport(title: "Vehicle Tracking", onTap: () {}),
-        Transport(title: "Vehicle Details", onTap: () {}),
+        StudyMaterial(title: "Notes", onTap: () => navigate(const NotesPage())),
+        StudyMaterial(title: "Assignments", onTap: () => navigate(const AssignmentsPage())),
       ],
       recentSupportTickets: [
-        RecentSupportTicket(title: "Ticket Info", onTap: () => Navigator.push(context, MaterialPageRoute(builder: (context) => TicketInfoPage()))),
+        RecentSupportTicket(title: "Ticket Info", onTap: () => navigate(const TicketInfoPage())),
         RecentSupportTicket(title: "Assigned Ticket", onTap: () {}),
       ],
     );
   }
 }
+
+
+// ───────────────────────────────────────────────────────────
+//                         API SERVICE
+// ───────────────────────────────────────────────────────────
+
+class DashboardApiService {
+  Future<DashboardData> fetchDashboardData(BuildContext context) async {
+    try {
+      final response = await ApiService.get('manager/dashboard');
+
+      if (response.statusCode == 200) {
+        final responseBody = jsonDecode(response.body);
+        if (responseBody['success'] == true) {
+          // It's safer to check for `mounted` before using context across async gaps.
+          if (context.mounted) {
+            return DashboardData.fromJson(responseBody['data'], context);
+          }
+        }
+      }
+      // Throw an exception if we reach here, indicating a problem.
+      throw Exception('Failed to load dashboard data.');
+    } catch (e) {
+      // Rethrow to be caught by FutureBuilder
+      throw Exception('An error occurred: ${e.toString()}');
+    }
+  }
+}
+
+// ───────────────────────────────────────────────────────────
+//                      DASHBOARD WIDGET
+// ───────────────────────────────────────────────────────────
 
 class ManagerDashboardPage extends StatefulWidget {
   const ManagerDashboardPage({super.key});
@@ -273,11 +313,12 @@ class ManagerDashboardPage extends StatefulWidget {
 
 class _ManagerDashboardPageState extends State<ManagerDashboardPage> {
   late Future<DashboardData> _dashboardDataFuture;
-  final MockDashboardApiService _apiService = MockDashboardApiService();
+  final DashboardApiService _apiService = DashboardApiService();
 
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
+    // The context is safe to use here, so we pass it along.
     _dashboardDataFuture = _apiService.fetchDashboardData(context);
   }
 
@@ -295,7 +336,7 @@ class _ManagerDashboardPageState extends State<ManagerDashboardPage> {
             CircleAvatar(
                 backgroundColor: theme.primaryColor,
                 child: Image.asset('assets/images/eduphin_logo_bg.png', height: 40, width: 40)),
-            Icon(Icons.notifications, color: theme.colorScheme.onSurface),
+            const Icon(Icons.notifications),
           ],
         ),
       ),
@@ -305,7 +346,7 @@ class _ManagerDashboardPageState extends State<ManagerDashboardPage> {
           if (snapshot.connectionState == ConnectionState.waiting) {
             return const Center(child: CircularProgressIndicator());
           } else if (snapshot.hasError) {
-            return Center(child: Text("Error: ${snapshot.error}"));
+            return Center(child: Text("Error: ${snapshot.error.toString().replaceFirst('Exception: ', '')}"));
           } else if (snapshot.hasData) {
             final data = snapshot.data!;
             return SingleChildScrollView(
@@ -321,12 +362,9 @@ class _ManagerDashboardPageState extends State<ManagerDashboardPage> {
                         )),
                     const SizedBox(height: 10),
                     SearchBar(
-                      leading:
-                      Icon(Icons.search, color: theme.colorScheme.onSurface),
+                      leading: Icon(Icons.search, color: theme.colorScheme.onSurface),
                       hintText: "Search for students, teachers...",
-                      hintStyle: WidgetStateProperty.all(TextStyle(
-                        color: theme.hintColor,
-                      )),
+                      hintStyle: WidgetStateProperty.all(TextStyle(color: theme.hintColor)),
                       elevation: const WidgetStatePropertyAll(2),
                       backgroundColor: WidgetStatePropertyAll(theme.cardColor),
                       shape: WidgetStatePropertyAll(
@@ -356,8 +394,6 @@ class _ManagerDashboardPageState extends State<ManagerDashboardPage> {
                     CustomLibraryBox(library: data.library),
                     const SizedBox(height: 20),
                     CustomStudyMaterialBox(studyMaterial: data.studyMaterial),
-                    // const SizedBox(height: 20),
-                    // CustomTransportBox(transport: data.transport),
                     const SizedBox(height: 20),
                     CustomRecentSupportTicketsBox(tickets: data.recentSupportTickets),
                   ],
@@ -373,6 +409,10 @@ class _ManagerDashboardPageState extends State<ManagerDashboardPage> {
   }
 }
 
+// ───────────────────────────────────────────────────────────
+//                      CUSTOM WIDGETS
+// ───────────────────────────────────────────────────────────
+
 class CustomProfileBox extends StatelessWidget {
   final Profile profile;
   const CustomProfileBox({super.key, required this.profile});
@@ -381,8 +421,9 @@ class CustomProfileBox extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final textTheme = theme.textTheme;
+
     return InkWell(
-      onTap: () => Navigator.push(context, MaterialPageRoute(builder: (context)=>ManagerProfilePage())),
+      onTap: () => Navigator.push(context, MaterialPageRoute(builder: (context) => const ManagerProfilePage())),
       child: Container(
         width: double.infinity,
         padding: const EdgeInsets.all(16.0),
@@ -396,59 +437,74 @@ class CustomProfileBox extends StatelessWidget {
               children: [
                 Icon(Icons.person, color: theme.colorScheme.onPrimary, size: 30),
                 const SizedBox(width: 8),
-                Text("Profile Overview",
-                    style: textTheme.titleLarge?.copyWith(
-                        fontWeight: FontWeight.bold,
-                        color: theme.colorScheme.onPrimary))
+                Text("Profile Overview", style: textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold, color: theme.colorScheme.onPrimary))
               ],
             ),
             const SizedBox(height: 16),
             CircleAvatar(
               radius: 40,
-              backgroundImage: AssetImage(profile.imageUrl),
+              backgroundColor: theme.colorScheme.onPrimary.withAlpha(26), // 10% opacity
+              child: profile.imageUrl.isNotEmpty
+                  ? ClipOval(
+                      child: Image.network(
+                        profile.imageUrl,
+                        width: 80,
+                        height: 80,
+                        fit: BoxFit.cover,
+                        loadingBuilder: (context, child, loadingProgress) {
+                          if (loadingProgress == null) return child;
+                          return Center(
+                            child: CircularProgressIndicator(
+                              value: loadingProgress.expectedTotalBytes != null
+                                  ? loadingProgress.cumulativeBytesLoaded / (loadingProgress.expectedTotalBytes ?? 1)
+                                  : null,
+                              strokeWidth: 2,
+                              valueColor: AlwaysStoppedAnimation<Color>(theme.colorScheme.onPrimary),
+                            ),
+                          );
+                        },
+                        errorBuilder: (context, error, stackTrace) {
+                          return Icon(
+                            Icons.person,
+                            size: 40,
+                            color: theme.colorScheme.onPrimary,
+                          );
+                        },
+                      ),
+                    )
+                  : Icon(
+                      Icons.person,
+                      size: 40,
+                      color: theme.colorScheme.onPrimary,
+                    ),
             ),
             const SizedBox(height: 8),
-            Text(profile.name,
-                style: textTheme.titleLarge?.copyWith(
-                    fontWeight: FontWeight.bold,
-                    color: theme.colorScheme.onPrimary)),
-            Text(profile.role, style: textTheme.titleMedium?.copyWith(color: theme.colorScheme.onPrimary.withAlpha(180))),
+            Text(profile.name, style: textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold, color: theme.colorScheme.onPrimary)),
+            Text(profile.role, style: textTheme.titleMedium?.copyWith(color: theme.colorScheme.onPrimary.withAlpha(179))), // 70% opacity
             const SizedBox(height: 16),
             Wrap(
               spacing: 16,
               runSpacing: 16,
               alignment: WrapAlignment.spaceAround,
               children: [
-                Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(Icons.email, color: theme.colorScheme.onPrimary),
-                    const SizedBox(width: 8),
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(profile.email, style: textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onPrimary)),
-                        Text("Email", style: textTheme.bodySmall?.copyWith(color: theme.colorScheme.onPrimary.withAlpha(180))),
-                      ],
-                    ),
-                  ],
-                ),
-                Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(Icons.phone, color: theme.colorScheme.onPrimary),
-                    const SizedBox(width: 8),
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(profile.phone, style: textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onPrimary)),
-                        Text("Phone", style: textTheme.bodySmall?.copyWith(color: theme.colorScheme.onPrimary.withAlpha(180))),
-                      ],
-                    ),
-                  ],
-                ),
+                Row(mainAxisSize: MainAxisSize.min, children: [
+                  Icon(Icons.email, color: theme.colorScheme.onPrimary),
+                  const SizedBox(width: 8),
+                  Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    Text(profile.email, style: textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onPrimary)),
+                    Text("Email", style: textTheme.bodySmall?.copyWith(color: theme.colorScheme.onPrimary.withAlpha(179))), // 70% opacity
+                  ])
+                ]),
+                Row(mainAxisSize: MainAxisSize.min, children: [
+                  Icon(Icons.phone, color: theme.colorScheme.onPrimary),
+                  const SizedBox(width: 8),
+                  Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    Text(profile.phone, style: textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onPrimary)),
+                    Text("Phone", style: textTheme.bodySmall?.copyWith(color: theme.colorScheme.onPrimary.withAlpha(179))), // 70% opacity
+                  ])
+                ]),
               ],
-            )
+            ),
           ],
         ),
       ),
@@ -460,75 +516,34 @@ class CustomQuickActionBox extends StatelessWidget {
   final List<QuickAction> actions;
   const CustomQuickActionBox({super.key, required this.actions});
 
-  Widget _buildActionItem(BuildContext context, IconData icon, String label) {
-    final theme = Theme.of(context);
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 12),
-      decoration: BoxDecoration(
-        color: theme.colorScheme.onPrimary.withAlpha(25),
-        borderRadius: BorderRadius.circular(20),
-      ),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(icon, size: 20, color: theme.colorScheme.onPrimary),
-          const SizedBox(height: 8),
-          Text(label, style: Theme.of(context).textTheme.bodySmall?.copyWith(color: theme.colorScheme.onPrimary), textAlign: TextAlign.center),
-        ],
-      ),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     return Container(
-      width: double.infinity,
+      decoration: BoxDecoration(color: theme.cardColor, borderRadius: BorderRadius.circular(12)),
       padding: const EdgeInsets.all(16.0),
-      decoration: BoxDecoration(
-        color: theme.primaryColor,
-        borderRadius: BorderRadius.circular(12),
-      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            children: [
-              Icon(Icons.local_attraction_outlined,
-                  color: theme.colorScheme.onPrimary, size: 30),
-              const SizedBox(width: 8),
-              Text(
-                "Quick Actions",
-                style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                    fontWeight: FontWeight.bold,
-                    color: theme.colorScheme.onPrimary),
-              )
-            ],
-          ),
+          Text("Quick Actions", style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold)),
           const SizedBox(height: 16),
-          LayoutBuilder(
-            builder: (context, constraints) {
-              final crossAxisCount = constraints.maxWidth > 600 ? 4 : 2;
-              return GridView.builder(
-                shrinkWrap: true,
-                physics: const NeverScrollableScrollPhysics(),
-                itemCount: actions.length,
-                gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                  crossAxisCount: crossAxisCount,
-                  crossAxisSpacing: 12,
-                  mainAxisSpacing: 12,
-                  childAspectRatio: 2.0,
+          GridView.builder(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            itemCount: actions.length,
+            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: 2, childAspectRatio: 2.5, crossAxisSpacing: 12, mainAxisSpacing: 12),
+            itemBuilder: (context, index) {
+              final action = actions[index];
+              return InkWell(
+                onTap: action.onTap,
+                child: Container(
+                  decoration: BoxDecoration(color: theme.scaffoldBackgroundColor, borderRadius: BorderRadius.circular(10)),
+                  padding: const EdgeInsets.all(8),
+                  child: Row(children: [Icon(action.icon, color: theme.primaryColor), const SizedBox(width: 8), Flexible(child: Text(action.label, style: theme.textTheme.labelLarge, overflow: TextOverflow.ellipsis))]),
                 ),
-                itemBuilder: (context, index) {
-                  final action = actions[index];
-                  return InkWell(
-                    onTap: action.onTap,
-                    child: _buildActionItem(context, action.icon, action.label),
-                  );
-                },
               );
             },
-          )
+          ),
         ],
       ),
     );
@@ -539,80 +554,38 @@ class CustomAccountStaticsBox extends StatelessWidget {
   final List<AccountStatistic> statistics;
   const CustomAccountStaticsBox({super.key, required this.statistics});
 
-  Widget _buildStatisticItem(
-      BuildContext context, IconData icon, String value, String label) {
-    final theme = Theme.of(context);
-    final textTheme = theme.textTheme;
-    return Container(
-      padding: const EdgeInsets.all(8),
-      decoration: BoxDecoration(
-        color: theme.colorScheme.onPrimary.withAlpha(25),
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Column(
-        children: [
-          Icon(icon, size: 30, color: theme.colorScheme.onPrimary),
-          const SizedBox(height: 4),
-          Text(value, style: textTheme.titleLarge?.copyWith(color: theme.colorScheme.onPrimary)),
-          const SizedBox(height: 4),
-          Text(
-            label,
-            style: textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onPrimary.withAlpha(180)),
-            textAlign: TextAlign.center,
-            softWrap: true,
-          ),
-        ],
-      ),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(16.0),
-      decoration: BoxDecoration(
-        color: theme.primaryColor,
-        borderRadius: BorderRadius.circular(12),
-      ),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(color: theme.primaryColor, borderRadius: BorderRadius.circular(12)),
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            children: [
-              Icon(Icons.person_outline_sharp, color: theme.colorScheme.onPrimary),
-              const SizedBox(
-                width: 10,
-              ),
-              Text(
-                "Account Statics",
-                style: Theme.of(context).textTheme.titleLarge?.copyWith(color: theme.colorScheme.onPrimary),
-              ),
-            ],
+          Text("Account Statics", style: theme.textTheme.titleLarge?.copyWith(color: theme.colorScheme.onPrimary, fontWeight: FontWeight.bold)),
+          const SizedBox(height: 16),
+          GridView.builder(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            itemCount: statistics.length,
+            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: 3, crossAxisSpacing: 10, mainAxisSpacing: 10, childAspectRatio: 1),
+            itemBuilder: (context, index) {
+              final stat = statistics[index];
+              return InkWell(
+                onTap: stat.onTap,
+                child: Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(color: theme.scaffoldBackgroundColor, borderRadius: BorderRadius.circular(10)),
+                  child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+                    Row(mainAxisAlignment: MainAxisAlignment.center, children: [Icon(stat.icon, color: theme.primaryColor, size: 20), const SizedBox(width: 4), Text(stat.value, style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold, color: theme.primaryColor))]),
+                    const SizedBox(height: 4),
+                    Text(stat.label, style: theme.textTheme.labelMedium, textAlign: TextAlign.center, overflow: TextOverflow.ellipsis, maxLines: 2),
+                  ]),
+                ),
+              );
+            },
           ),
-          const SizedBox(height: 8),
-          LayoutBuilder(builder: (context, constraints) {
-            final crossAxisCount = constraints.maxWidth > 600 ? 3 : 2;
-            return GridView.builder(
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              itemCount: statistics.length,
-              gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                crossAxisCount: crossAxisCount,
-                crossAxisSpacing: 12,
-                mainAxisSpacing: 12,
-                childAspectRatio: 1.5,
-              ),
-              itemBuilder: (context, index) {
-                final statistic = statistics[index];
-                return InkWell(
-                  onTap: statistic.onTap,
-                  child: _buildStatisticItem(
-                      context, statistic.icon, statistic.value, statistic.label),
-                );
-              },
-            );
-          }),
         ],
       ),
     );
@@ -626,75 +599,40 @@ class CustomUpcomingEventsBox extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final textTheme = theme.textTheme;
-    return InkWell(
-      onTap: ()=>Navigator.push(context, MaterialPageRoute(builder: (context)=>EventManagementPage())),
-      child: Container(
-        width: double.infinity,
-        padding: const EdgeInsets.all(16.0),
-        decoration: BoxDecoration(
-          color: theme.primaryColor,
-          borderRadius: BorderRadius.circular(12),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Icon(Icons.event, size: 30, color: theme.colorScheme.onPrimary),
-                const SizedBox(width: 8),
-                Text("Upcoming Events",
-                    style: textTheme.titleLarge?.copyWith(color: theme.colorScheme.onPrimary)),
-              ],
-            ),
-            const SizedBox(height: 16),
-            ListView.separated(
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              itemCount: events.length,
-              separatorBuilder: (context, index) => const SizedBox(height: 16),
-              itemBuilder: (context, index) {
-                final event = events[index];
-                return Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: theme.colorScheme.onPrimary.withAlpha(25),
-                    borderRadius: BorderRadius.circular(12),
+    return Container(
+      padding: const EdgeInsets.all(16.0),
+      decoration: BoxDecoration(color: theme.cardColor, borderRadius: BorderRadius.circular(12)),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text("Upcoming Events", style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold)),
+          const SizedBox(height: 16),
+          ListView.separated(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            itemCount: events.length,
+            separatorBuilder: (context, index) => const Divider(height: 24),
+            itemBuilder: (context, index) {
+              final event = events[index];
+              return InkWell(
+                onTap: event.onTap,
+                child: Row(children: [
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(color: theme.primaryColor.withAlpha(26), borderRadius: BorderRadius.circular(10)), // 10% opacity
+                    child: Column(children: [Text(event.date, style: theme.textTheme.titleLarge?.copyWith(color: theme.primaryColor, fontWeight: FontWeight.bold)), Text(event.day, style: theme.textTheme.labelLarge?.copyWith(color: theme.primaryColor))]),
                   ),
-                  child: Row(
-                    children: [
-                      Column(
-                        children: [
-                          Text(event.date,
-                              style: textTheme.titleLarge?.copyWith(color: theme.colorScheme.onPrimary)),
-                          Text(event.day,
-                              style: textTheme.titleMedium?.copyWith(color: theme.colorScheme.onPrimary.withAlpha(180))),
-                        ],
-                      ),
-                      const SizedBox(width: 16),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              event.title,
-                              style: textTheme.titleMedium?.copyWith(color: theme.colorScheme.onPrimary),
-                            ),
-                            const SizedBox(height: 4),
-                            Text(
-                              "Friday, December 12", // This should be dynamic
-                              style: textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onPrimary.withAlpha(180)),
-                            )
-                          ],
-                        ),
-                      )
-                    ],
-                  ),
-                );
-              },
-            ),
-          ],
-        ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    Text(event.title, style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold), maxLines: 2, overflow: TextOverflow.ellipsis),
+                    Text(event.fullDate, style: theme.textTheme.bodyMedium?.copyWith(color: theme.hintColor)),
+                  ]))
+                ]),
+              );
+            },
+          ),
+        ],
       ),
     );
   }
@@ -707,51 +645,27 @@ class CustomSalaryInformationBox extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final textTheme = theme.textTheme;
     return Container(
-      width: double.infinity,
       padding: const EdgeInsets.all(16.0),
-      decoration: BoxDecoration(
-        color: theme.primaryColor,
-        borderRadius: BorderRadius.circular(12),
-      ),
+      decoration: BoxDecoration(color: theme.cardColor, borderRadius: BorderRadius.circular(12)),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            children: [
-              Icon(Icons.money, size: 30, color: theme.colorScheme.onPrimary),
-              const SizedBox(width: 8),
-              Text("Salary Information",
-                  style: textTheme.titleLarge?.copyWith(color: theme.colorScheme.onPrimary)),
-            ],
-          ),
-          const SizedBox(
-            height: 16,
-          ),
+          Text("Salary Information", style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold)),
+          const SizedBox(height: 16),
           ListView.separated(
             shrinkWrap: true,
             physics: const NeverScrollableScrollPhysics(),
             itemCount: salaryInfo.length,
-            separatorBuilder: (context, index) => const SizedBox(height: 16),
+            separatorBuilder: (context, index) => const SizedBox(height: 12),
             itemBuilder: (context, index) {
-              final item = salaryInfo[index];
-              return Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: theme.colorScheme.onPrimary.withAlpha(25),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: InkWell(
-                  onTap: item.onTap,
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(item.title,
-                          style: textTheme.titleMedium?.copyWith(color: theme.colorScheme.onPrimary)),
-                      Icon(Icons.arrow_forward_ios_sharp,size: 20,color: theme.colorScheme.onPrimary,),
-                    ],
-                  ),
+              final info = salaryInfo[index];
+              return InkWell(
+                onTap: info.onTap,
+                child: Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(color: theme.scaffoldBackgroundColor, borderRadius: BorderRadius.circular(10)),
+                  child: Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [Text(info.title, style: theme.textTheme.titleMedium), const Icon(Icons.arrow_forward_ios, size: 16)]),
                 ),
               );
             },
@@ -766,55 +680,30 @@ class CustomManageClassesSectionBox extends StatelessWidget {
   final List<ManageClass> manageClasses;
   const CustomManageClassesSectionBox({super.key, required this.manageClasses});
 
-
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final textTheme = theme.textTheme;
     return Container(
-      width: double.infinity,
       padding: const EdgeInsets.all(16.0),
-      decoration: BoxDecoration(
-        color: theme.primaryColor,
-        borderRadius: BorderRadius.circular(12),
-      ),
+      decoration: BoxDecoration(color: theme.cardColor, borderRadius: BorderRadius.circular(12)),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            children: [
-              Icon(Icons.home_work_outlined, size: 30, color: theme.colorScheme.onPrimary),
-              const SizedBox(width: 8),
-              Text("Manage Classes",
-                  style: textTheme.titleLarge?.copyWith(color: theme.colorScheme.onPrimary)),
-            ],
-          ),
-          const SizedBox(
-            height: 16,
-          ),
-          ListView.separated(
+          Text("Manage Classes", style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold)),
+          const SizedBox(height: 16),
+          GridView.builder(
             shrinkWrap: true,
             physics: const NeverScrollableScrollPhysics(),
             itemCount: manageClasses.length,
-            separatorBuilder: (context, index) => const SizedBox(height: 16),
+            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: 2, childAspectRatio: 2.5, crossAxisSpacing: 12, mainAxisSpacing: 12),
             itemBuilder: (context, index) {
               final item = manageClasses[index];
-              return Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: theme.colorScheme.onPrimary.withAlpha(25),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: InkWell(
-                  onTap: item.onTap,
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(item.title,
-                          style: textTheme.titleMedium?.copyWith(color: theme.colorScheme.onPrimary)),
-                      Icon(Icons.arrow_forward_ios_sharp,size: 20,color: theme.colorScheme.onPrimary,),
-                    ],
-                  ),
+              return InkWell(
+                onTap: item.onTap,
+                child: Container(
+                  decoration: BoxDecoration(color: theme.scaffoldBackgroundColor, borderRadius: BorderRadius.circular(10)),
+                  padding: const EdgeInsets.all(8),
+                  child: Row(children: [const Icon(Icons.class_, color: Colors.blue), const SizedBox(width: 8), Flexible(child: Text(item.title, style: theme.textTheme.labelLarge, overflow: TextOverflow.ellipsis))]),
                 ),
               );
             },
@@ -832,51 +721,27 @@ class CustomFeeStructureBox extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final textTheme = theme.textTheme;
     return Container(
-      width: double.infinity,
       padding: const EdgeInsets.all(16.0),
-      decoration: BoxDecoration(
-        color: theme.primaryColor,
-        borderRadius: BorderRadius.circular(12),
-      ),
+      decoration: BoxDecoration(color: theme.cardColor, borderRadius: BorderRadius.circular(12)),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            children: [
-              Icon(Icons.receipt_long_sharp, size: 30, color: theme.colorScheme.onPrimary),
-              const SizedBox(width: 8),
-              Text("Fee Structure",
-                  style: textTheme.titleLarge?.copyWith(color: theme.colorScheme.onPrimary)),
-            ],
-          ),
-          const SizedBox(
-            height: 16,
-          ),
+          Text("Fee Structure", style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold)),
+          const SizedBox(height: 16),
           ListView.separated(
             shrinkWrap: true,
             physics: const NeverScrollableScrollPhysics(),
             itemCount: feeStructure.length,
-            separatorBuilder: (context, index) => const SizedBox(height: 16),
+            separatorBuilder: (context, index) => const SizedBox(height: 12),
             itemBuilder: (context, index) {
               final item = feeStructure[index];
-              return Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: theme.colorScheme.onPrimary.withAlpha(25),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: InkWell(
-                  onTap: item.onTap,
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(item.title,
-                          style: textTheme.titleMedium?.copyWith(color: theme.colorScheme.onPrimary)),
-                      Icon(Icons.arrow_forward_ios_sharp,size: 20,color: theme.colorScheme.onPrimary,),
-                    ],
-                  ),
+              return InkWell(
+                onTap: item.onTap,
+                child: Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(color: theme.scaffoldBackgroundColor, borderRadius: BorderRadius.circular(10)),
+                  child: Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [Text(item.title, style: theme.textTheme.titleMedium), const Icon(Icons.arrow_forward_ios, size: 16)]),
                 ),
               );
             },
@@ -894,51 +759,27 @@ class CustomExaminationsBox extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final textTheme = theme.textTheme;
     return Container(
-      width: double.infinity,
       padding: const EdgeInsets.all(16.0),
-      decoration: BoxDecoration(
-        color: theme.primaryColor,
-        borderRadius: BorderRadius.circular(12),
-      ),
+      decoration: BoxDecoration(color: theme.cardColor, borderRadius: BorderRadius.circular(12)),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            children: [
-              Icon(Icons.app_registration, size: 30, color: theme.colorScheme.onPrimary),
-              const SizedBox(width: 8),
-              Text("Examinations",
-                  style: textTheme.titleLarge?.copyWith(color: theme.colorScheme.onPrimary)),
-            ],
-          ),
-          const SizedBox(
-            height: 16,
-          ),
+          Text("Examinations", style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold)),
+          const SizedBox(height: 16),
           ListView.separated(
             shrinkWrap: true,
             physics: const NeverScrollableScrollPhysics(),
             itemCount: examinations.length,
-            separatorBuilder: (context, index) => const SizedBox(height: 16),
+            separatorBuilder: (context, index) => const SizedBox(height: 12),
             itemBuilder: (context, index) {
               final item = examinations[index];
-              return Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: theme.colorScheme.onPrimary.withAlpha(25),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: InkWell(
-                  onTap: item.onTap,
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(item.title,
-                          style: textTheme.titleMedium?.copyWith(color: theme.colorScheme.onPrimary)),
-                      Icon(Icons.arrow_forward_ios_sharp,size: 20,color: theme.colorScheme.onPrimary,),
-                    ],
-                  ),
+              return InkWell(
+                onTap: item.onTap,
+                child: Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(color: theme.scaffoldBackgroundColor, borderRadius: BorderRadius.circular(10)),
+                  child: Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [Text(item.title, style: theme.textTheme.titleMedium), const Icon(Icons.arrow_forward_ios, size: 16)]),
                 ),
               );
             },
@@ -956,51 +797,27 @@ class CustomLibraryBox extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final textTheme = theme.textTheme;
     return Container(
-      width: double.infinity,
       padding: const EdgeInsets.all(16.0),
-      decoration: BoxDecoration(
-        color: theme.primaryColor,
-        borderRadius: BorderRadius.circular(12),
-      ),
+      decoration: BoxDecoration(color: theme.cardColor, borderRadius: BorderRadius.circular(12)),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            children: [
-              Icon(Icons.local_library, size: 30, color: theme.colorScheme.onPrimary),
-              const SizedBox(width: 8),
-              Text("Library",
-                  style: textTheme.titleLarge?.copyWith(color: theme.colorScheme.onPrimary)),
-            ],
-          ),
-          const SizedBox(
-            height: 16,
-          ),
+          Text("Library", style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold)),
+          const SizedBox(height: 16),
           ListView.separated(
             shrinkWrap: true,
             physics: const NeverScrollableScrollPhysics(),
             itemCount: library.length,
-            separatorBuilder: (context, index) => const SizedBox(height: 16),
+            separatorBuilder: (context, index) => const SizedBox(height: 12),
             itemBuilder: (context, index) {
               final item = library[index];
-              return Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: theme.colorScheme.onPrimary.withAlpha(25),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: InkWell(
-                  onTap: item.onTap,
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(item.title,
-                          style: textTheme.titleMedium?.copyWith(color: theme.colorScheme.onPrimary)),
-                      Icon(Icons.arrow_forward_ios_sharp,size: 20,color: theme.colorScheme.onPrimary,),
-                    ],
-                  ),
+              return InkWell(
+                onTap: item.onTap,
+                child: Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(color: theme.scaffoldBackgroundColor, borderRadius: BorderRadius.circular(10)),
+                  child: Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [Text(item.title, style: theme.textTheme.titleMedium), const Icon(Icons.arrow_forward_ios, size: 16)]),
                 ),
               );
             },
@@ -1018,51 +835,27 @@ class CustomStudyMaterialBox extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final textTheme = theme.textTheme;
     return Container(
-      width: double.infinity,
       padding: const EdgeInsets.all(16.0),
-      decoration: BoxDecoration(
-        color: theme.primaryColor,
-        borderRadius: BorderRadius.circular(12),
-      ),
+      decoration: BoxDecoration(color: theme.cardColor, borderRadius: BorderRadius.circular(12)),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            children: [
-              Icon(Icons.menu_book_sharp, size: 30, color: theme.colorScheme.onPrimary),
-              const SizedBox(width: 8),
-              Text("Study Material",
-                  style: textTheme.titleLarge?.copyWith(color: theme.colorScheme.onPrimary)),
-            ],
-          ),
-          const SizedBox(
-            height: 16,
-          ),
+          Text("Study Material", style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold)),
+          const SizedBox(height: 16),
           ListView.separated(
             shrinkWrap: true,
             physics: const NeverScrollableScrollPhysics(),
             itemCount: studyMaterial.length,
-            separatorBuilder: (context, index) => const SizedBox(height: 16),
+            separatorBuilder: (context, index) => const SizedBox(height: 12),
             itemBuilder: (context, index) {
               final item = studyMaterial[index];
-              return Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: theme.colorScheme.onPrimary.withAlpha(25),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: InkWell(
-                  onTap: item.onTap,
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(item.title,
-                          style: textTheme.titleMedium?.copyWith(color: theme.colorScheme.onPrimary)),
-                      Icon(Icons.arrow_forward_ios_sharp,size: 20,color: theme.colorScheme.onPrimary,),
-                    ],
-                  ),
+              return InkWell(
+                onTap: item.onTap,
+                child: Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(color: theme.scaffoldBackgroundColor, borderRadius: BorderRadius.circular(10)),
+                  child: Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [Text(item.title, style: theme.textTheme.titleMedium), const Icon(Icons.arrow_forward_ios, size: 16)]),
                 ),
               );
             },
@@ -1073,56 +866,6 @@ class CustomStudyMaterialBox extends StatelessWidget {
   }
 }
 
-// class CustomTransportBox extends StatelessWidget {
-//   final List<Transport> transport;
-//   const CustomTransportBox({super.key, required this.transport});
-//
-//   @override
-//   Widget build(BuildContext context) {
-//     final theme = Theme.of(context);
-//     return Container(
-//       width: double.infinity,
-//       padding: const EdgeInsets.all(16.0),
-//       decoration: BoxDecoration(
-//         color: theme.primaryColor,
-//         borderRadius: BorderRadius.circular(12),
-//       ),
-//       child: Column(
-//         crossAxisAlignment: CrossAxisAlignment.start,
-//         children: [
-//           Row(
-//             children: [
-//               Icon(Icons.directions_bus, size: 30, color: theme.colorScheme.onPrimary),
-//               const SizedBox(width: 8),
-//               Text("Transport",
-//                   style: TextStyle(fontSize: 20, color: theme.colorScheme.onPrimary)),
-//             ],
-//           ),
-//           const SizedBox(
-//             height: 16,
-//           ),
-//           ListView.separated(
-//             shrinkWrap: true,
-//             physics: const NeverScrollableScrollPhysics(),
-//             itemCount: transport.length,
-//             separatorBuilder: (context, index) => const SizedBox(height: 16),
-//             itemBuilder: (context, index) {
-//               final item = transport[index];
-//               return Container(
-//                 padding: const EdgeInsets.all(12),
-//                 decoration: BoxDecoration(
-//                   color: theme.colorScheme.onPrimary.withAlpha(25),
-//                   borderRadius: BorderRadius.circular(12),
-//                 ),
-//                 child: InkWell(
-//                   onTap: item.onTap,
-//                   child: Row(
-//                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
-//                     children: [
-//                       Text(item.title,
-//                           style: TextStyle(fontSize: 20, color: theme.colorScheme.onPrimary)),
-//                       Icon(Icons.arrow_forward_ios_sharp,size: 20,color: theme.colorScheme.onPrimary,),
-
 class CustomRecentSupportTicketsBox extends StatelessWidget {
   final List<RecentSupportTicket> tickets;
   const CustomRecentSupportTicketsBox({super.key, required this.tickets});
@@ -1130,51 +873,27 @@ class CustomRecentSupportTicketsBox extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final textTheme = theme.textTheme;
     return Container(
-      width: double.infinity,
       padding: const EdgeInsets.all(16.0),
-      decoration: BoxDecoration(
-        color: theme.primaryColor,
-        borderRadius: BorderRadius.circular(12),
-      ),
+      decoration: BoxDecoration(color: theme.cardColor, borderRadius: BorderRadius.circular(12)),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            children: [
-              Icon(Icons.support, size: 30, color: theme.colorScheme.onPrimary),
-              const SizedBox(width: 8),
-              Text("Recent Support Tickets",
-                  style: textTheme.titleLarge?.copyWith(color: theme.colorScheme.onPrimary)),
-            ],
-          ),
-          const SizedBox(
-            height: 16,
-          ),
+          Text("Recent Support Tickets", style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold)),
+          const SizedBox(height: 16),
           ListView.separated(
             shrinkWrap: true,
             physics: const NeverScrollableScrollPhysics(),
             itemCount: tickets.length,
-            separatorBuilder: (context, index) => const SizedBox(height: 16),
+            separatorBuilder: (context, index) => const SizedBox(height: 12),
             itemBuilder: (context, index) {
               final item = tickets[index];
-              return Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: theme.colorScheme.onPrimary.withAlpha(25),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: InkWell(
-                  onTap: item.onTap,
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(item.title,
-                          style: textTheme.titleMedium?.copyWith(color: theme.colorScheme.onPrimary)),
-                      Icon(Icons.arrow_forward_ios_sharp,size: 20,color: theme.colorScheme.onPrimary,),
-                    ],
-                  ),
+              return InkWell(
+                onTap: item.onTap,
+                child: Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(color: theme.scaffoldBackgroundColor, borderRadius: BorderRadius.circular(10)),
+                  child: Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [Text(item.title, style: theme.textTheme.titleMedium), const Icon(Icons.arrow_forward_ios, size: 16)]),
                 ),
               );
             },

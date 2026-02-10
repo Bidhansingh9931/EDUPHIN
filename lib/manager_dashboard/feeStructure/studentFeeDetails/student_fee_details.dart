@@ -1,23 +1,89 @@
+import 'dart:convert';
+
+import 'package:eduphin/services/api_service.dart';
 import 'package:flutter/material.dart';
 
 import 'fee_details.dart';
 
-// Data model for student fee details
+// ───────────────────────────────────────────────────────────
+//                          DATA MODELS
+// ───────────────────────────────────────────────────────────
+
+class ClassInfo {
+  final int id;
+  final String name;
+  final List<SectionInfo> sections;
+
+  ClassInfo({required this.id, required this.name, required this.sections});
+
+  factory ClassInfo.fromJson(Map<String, dynamic> json) {
+    final sectionsList = json['sections'] as List? ?? [];
+    final sections = sectionsList
+        .whereType<Map<String, dynamic>>()
+        .map((i) => SectionInfo.fromJson(i))
+        .toList();
+
+    return ClassInfo(
+      id: json['id'] ?? 0,
+      name: json['name']?.toString() ?? 'Unnamed Class',
+      sections: sections,
+    );
+  }
+}
+
+class SectionInfo {
+  final int id;
+  final String name;
+  SectionInfo({required this.id, required this.name});
+
+  factory SectionInfo.fromJson(Map<String, dynamic> json) {
+    return SectionInfo(
+      id: json['id'] ?? 0,
+      name: json['section_name']?.toString() ?? 'N/A',
+    );
+  }
+}
+
 class StudentFeeInfo {
+  final int id;
   final String name;
   final String regNo;
   final String className;
+  final String sectionName;
   final String status;
   final String imageUrl;
 
   StudentFeeInfo({
+    required this.id,
     required this.name,
     required this.regNo,
     required this.className,
+    required this.sectionName,
     required this.status,
     required this.imageUrl,
   });
+
+  factory StudentFeeInfo.fromJson(Map<String, dynamic> json) {
+    final studentData = json['student'] is Map<String, dynamic> ? json['student'] : {};
+    final classData = json['class'] is Map<String, dynamic> ? json['class'] : {};
+    final sectionData = json['section'] is Map<String, dynamic> ? json['section'] : {};
+
+    String rawImageUrl = studentData['profile_image']?.toString() ?? '';
+    return StudentFeeInfo(
+      id: json['student_id'] ?? 0,
+      name: studentData['name']?.toString() ?? 'N/A',
+      regNo: studentData['registration_no']?.toString() ?? 'N/A',
+      className: classData['name']?.toString() ?? 'N/A',
+      sectionName: sectionData['section_name']?.toString() ?? 'N/A',
+      status: studentData['status']?.toString() ?? 'Inactive',
+      imageUrl: rawImageUrl.isNotEmpty ? '${ApiService.baseImageUrl}/storage/$rawImageUrl' : 'assets/images/random_boy.jpg',
+    );
+  }
 }
+
+// ───────────────────────────────────────────────────────────
+//                         PAGE WIDGET
+// ───────────────────────────────────────────────────────────
 
 class StudentFeeDetailsPage extends StatefulWidget {
   const StudentFeeDetailsPage({super.key});
@@ -27,33 +93,95 @@ class StudentFeeDetailsPage extends StatefulWidget {
 }
 
 class _StudentFeeDetailsPageState extends State<StudentFeeDetailsPage> {
-  String _selectClass = "Class 1";
-  String _selectSection = "Section A";
+  bool _isLoading = true;
+  bool _isFetchingStudents = false;
 
-  // Dummy data - replace with API call
-  final List<StudentFeeInfo> _studentFeeDetails = [
-    StudentFeeInfo(
-      name: "Ananya Sharma",
-      regNo: "S-1024",
-      className: "10-A",
-      status: "Active",
-      imageUrl: "assets/images/random_boy.jpg",
-    ),
-    StudentFeeInfo(
-      name: "Rohan Verma",
-      regNo: "S-1025",
-      className: "10-A",
-      status: "Active",
-      imageUrl: "assets/images/random_boy.jpg",
-    ),
-    StudentFeeInfo(
-      name: "Priya Singh",
-      regNo: "S-1026",
-      className: "10-A",
-      status: "Inactive",
-      imageUrl: "assets/images/random_boy.jpg",
-    ),
-  ];
+  List<ClassInfo> _classList = [];
+  List<SectionInfo> _sectionList = [];
+  List<StudentFeeInfo> _studentFeeDetails = [];
+
+  int? _selectedClassId;
+  int? _selectedSectionId;
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchInitialData();
+  }
+
+  Future<void> _fetchInitialData() async {
+    try {
+      final response = await ApiService.get('manager/classes');
+      if (!mounted) return;
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        final List<dynamic> classData = data['data'] as List? ?? [];
+        final List<ClassInfo> fetchedClasses = classData
+            .whereType<Map<String, dynamic>>()
+            .map((json) => ClassInfo.fromJson(json))
+            .toList();
+
+        setState(() {
+          _classList = fetchedClasses;
+          if (_classList.isNotEmpty) {
+            _selectedClassId = _classList.first.id;
+            _sectionList = _classList.first.sections;
+            if (_sectionList.isNotEmpty) {
+              _selectedSectionId = _sectionList.first.id;
+            }
+          }
+        });
+        
+        if (_selectedClassId != null && _selectedSectionId != null) {
+          await _fetchStudents();
+        }
+
+      } else {
+        throw Exception('Failed to load class data');
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString())));
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
+    }
+  }
+
+  Future<void> _fetchStudents() async {
+    if (_selectedClassId == null || _selectedSectionId == null) return;
+
+    setState(() => _isFetchingStudents = true);
+
+    try {
+      final response = await ApiService.get('manager/fees/students?class_id=$_selectedClassId&section_id=$_selectedSectionId');
+      if (!mounted) return;
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        final List<dynamic> studentData = data['students'] as List? ?? [];
+        setState(() {
+          _studentFeeDetails = studentData
+              .whereType<Map<String, dynamic>>()
+              .map((json) => StudentFeeInfo.fromJson(json))
+              .toList();
+        });
+      } else {
+        throw Exception('Failed to load student data');
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString())));
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isFetchingStudents = false);
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -63,186 +191,141 @@ class _StudentFeeDetailsPageState extends State<StudentFeeDetailsPage> {
         title: const Text("Student Fee Details"),
         centerTitle: true,
       ),
-      body: Padding(
-        // Changed bottom padding to 50 as requested
-        padding: const EdgeInsets.fromLTRB(16, 16, 16, 50),
-        child: Column(
-          children: [
-            Row(
-              children: [
-                Expanded(
-                  child: Column(
+      body: _isLoading
+          ? const Center(child: CircularProgressIndicator())
+          : Padding(
+              padding: const EdgeInsets.fromLTRB(16, 16, 16, 50),
+              child: Column(
+                children: [
+                  Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
-                        "Class",
-                        // Using theme for scalable font
-                        style: theme.textTheme.titleMedium,
-                      ),
-                      const SizedBox(height: 8),
-                      DropDownBox(
-                        key: ValueKey(_selectClass),
-                        initialValue: _selectClass,
-                        items: const [
-                          "Class 1",
-                          "Class 2",
-                          "Class 3",
-                          "Class 4",
-                          "Class 5",
-                          "Class 6",
-                          "Class 7",
-                          "Class 8",
-                          "Class 9",
-                          "Class 10",
-                          "Class 11",
-                          "Class 12"
-                        ],
-                        onChanged: (value) {
-                          if (value != null) {
+                      Expanded(
+                        child: _buildDropdown(
+                          label: "Class",
+                          value: _selectedClassId,
+                          items: _classList.map((c) => DropdownMenuItem(value: c.id, child: Text(c.name))).toList(),
+                          onChanged: (value) {
+                            if (value == null || value == _selectedClassId) return;
                             setState(() {
-                              _selectClass = value;
+                              _selectedClassId = value;
+                              _sectionList = _classList.firstWhere((c) => c.id == value).sections;
+                              _selectedSectionId = _sectionList.isNotEmpty ? _sectionList.first.id : null;
                             });
-                          }
-                        },
-                        hintText: "--Select Subject",
+                            _fetchStudents();
+                          },
+                        ),
+                      ),
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: _buildDropdown(
+                          label: "Section",
+                          value: _selectedSectionId,
+                          items: _sectionList.map((s) => DropdownMenuItem(value: s.id, child: Text(s.name))).toList(),
+                          onChanged: (value) {
+                             if (value == null || value == _selectedSectionId) return;
+                            setState(() => _selectedSectionId = value);
+                            _fetchStudents();
+                          },
+                        ),
                       ),
                     ],
                   ),
-                ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        "Section",
-                        // Using theme for scalable font
-                        style: theme.textTheme.titleMedium,
-                      ),
-                      const SizedBox(height: 8),
-                      DropDownBox(
-                        key: ValueKey(_selectSection),
-                        initialValue: _selectSection,
-                        items: const [
-                          "Section A",
-                          "Section B",
-                          "Section C",
-                          "Section D",
-                          "Section E",
-                          "Section F"
-                        ],
-                        onChanged: (value) {
-                          if (value != null) {
-                            setState(() {
-                              _selectSection = value;
-                            });
-                          }
-                        },
-                        hintText: "--Select Section",
-                      ),
-                    ],
+                  const SizedBox(height: 16),
+                  Expanded(
+                    child: _isFetchingStudents
+                        ? const Center(child: CircularProgressIndicator())
+                        : _studentFeeDetails.isEmpty
+                            ? const Center(child: Text("No students found for this section."))
+                            : LayoutBuilder(
+                                builder: (context, constraints) {
+                                  if (constraints.maxWidth > 600) {
+                                    return GridView.builder(
+                                      gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
+                                        maxCrossAxisExtent: 500,
+                                        mainAxisSpacing: 16,
+                                        crossAxisSpacing: 16,
+                                        childAspectRatio: 2.5,
+                                      ),
+                                      itemCount: _studentFeeDetails.length,
+                                      itemBuilder: (context, index) {
+                                        final student = _studentFeeDetails[index];
+                                        return CustomStudentInfoFeeDetailContainerBox(
+                                          studentId: student.id,
+                                          heading: student.name,
+                                          subHeading: "Reg. No: ${student.regNo}, Class: ${student.className}-${student.sectionName}",
+                                          isActive: student.status,
+                                          imageUrl: student.imageUrl,
+                                        );
+                                      },
+                                    );
+                                  } else {
+                                    return ListView.builder(
+                                      itemCount: _studentFeeDetails.length,
+                                      itemBuilder: (context, index) {
+                                        final student = _studentFeeDetails[index];
+                                        return Padding(
+                                          padding: const EdgeInsets.only(bottom: 16.0),
+                                          child: CustomStudentInfoFeeDetailContainerBox(
+                                            studentId: student.id,
+                                            heading: student.name,
+                                            subHeading: "Reg. No: ${student.regNo}, Class: ${student.className}-${student.sectionName}",
+                                            isActive: student.status,
+                                            imageUrl: student.imageUrl,
+                                          ),
+                                        );
+                                      },
+                                    );
+                                  }
+                                },
+                              ),
                   ),
-                ),
-              ],
-            ),
-            const SizedBox(
-              height: 16,
-            ),
-            Expanded(
-              // Using LayoutBuilder for responsive list/grid
-              child: LayoutBuilder(
-                builder: (context, constraints) {
-                  if (constraints.maxWidth > 600) {
-                    // Use GridView for wider screens
-                    return GridView.builder(
-                      gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
-                          maxCrossAxisExtent: 500, // Max width for each item
-                          mainAxisSpacing: 16,
-                          crossAxisSpacing: 16,
-                          childAspectRatio: 2.5, // Adjust for content
-                      ),
-                      itemCount: _studentFeeDetails.length,
-                      itemBuilder: (context, index) {
-                        final student = _studentFeeDetails[index];
-                        return CustomStudentInfoFeeDetailContainerBox(
-                          heading: student.name,
-                          subHeading: "Reg. No: ${student.regNo}, Class: ${student.className}",
-                          isActive: student.status,
-                          imageUrl: student.imageUrl,
-                        );
-                      },
-                    );
-                  } else {
-                    // Use ListView for narrower screens
-                    return ListView.builder(
-                      itemCount: _studentFeeDetails.length,
-                      itemBuilder: (context, index) {
-                        final student = _studentFeeDetails[index];
-                        return Padding(
-                          padding: const EdgeInsets.only(bottom: 16.0),
-                          child: CustomStudentInfoFeeDetailContainerBox(
-                            heading: student.name,
-                            subHeading: "Reg. No: ${student.regNo}, Class: ${student.className}",
-                            isActive: student.status,
-                            imageUrl: student.imageUrl,
-                          ),
-                        );
-                      },
-                    );
-                  }
-                },
+                ],
               ),
             ),
-          ],
+    );
+  }
+
+  Widget _buildDropdown<T>({ 
+    required String label,
+    T? value,
+    required List<DropdownMenuItem<T>> items,
+    required ValueChanged<T?> onChanged,
+  }) {
+    final theme = Theme.of(context);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(label, style: theme.textTheme.titleMedium),
+        const SizedBox(height: 8),
+        DropdownButtonFormField<T>(
+          value: value,
+          isExpanded: true,
+          items: items,
+          onChanged: onChanged,
+          decoration: InputDecoration(
+            contentPadding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(10.0),
+              borderSide: BorderSide(color: theme.dividerColor),
+            ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(10.0),
+              borderSide: BorderSide(color: theme.dividerColor),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(10.0),
+              borderSide: BorderSide(color: theme.colorScheme.primary, width: 2),
+            ),
+          ),
         ),
-      ),
+      ],
     );
   }
 }
 
-class DropDownBox extends StatelessWidget {
-  final String initialValue;
-  final List<String> items;
-  final ValueChanged<String?> onChanged;
-  final String? hintText;
-
-  const DropDownBox({
-    super.key,
-    required this.initialValue,
-    required this.items,
-    required this.onChanged,
-    this.hintText,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return DropdownButtonFormField(
-        initialValue: initialValue,
-        isExpanded: true,
-        items:
-            items.map((e) => DropdownMenuItem(value: e, child: Text(e))).toList(),
-        onChanged: onChanged,
-        decoration: InputDecoration(
-          hintText: hintText,
-          contentPadding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
-          border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(10.0),
-            borderSide: BorderSide(color: theme.dividerColor),
-          ),
-           enabledBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(10.0),
-            borderSide: BorderSide(color: theme.dividerColor),
-          ),
-          focusedBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(10.0),
-            borderSide: BorderSide(color: theme.colorScheme.primary, width: 2),
-          ),
-        ));
-  }
-}
-
 class CustomStudentInfoFeeDetailContainerBox extends StatelessWidget {
+  final int studentId;
   final String heading;
   final String subHeading;
   final String isActive;
@@ -250,6 +333,7 @@ class CustomStudentInfoFeeDetailContainerBox extends StatelessWidget {
 
   const CustomStudentInfoFeeDetailContainerBox({
     super.key,
+    required this.studentId,
     required this.heading,
     required this.subHeading,
     required this.isActive,
@@ -259,7 +343,12 @@ class CustomStudentInfoFeeDetailContainerBox extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final isActiveStatus = isActive == "Active";
+    final isActiveStatus = isActive.toLowerCase() == "active" || isActive.toLowerCase() == "live";
+
+    ImageProvider<Object> backgroundImage = const AssetImage("assets/images/random_boy.jpg");
+    if (imageUrl.startsWith('http')) {
+      backgroundImage = NetworkImage(imageUrl);
+    }
 
     return Container(
       decoration: BoxDecoration(
@@ -269,71 +358,49 @@ class CustomStudentInfoFeeDetailContainerBox extends StatelessWidget {
       padding: const EdgeInsets.all(16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisAlignment: MainAxisAlignment.center, // Center content vertically
+        mainAxisAlignment: MainAxisAlignment.center,
         children: [
           Row(
             children: [
               ClipRRect(
                   borderRadius: BorderRadius.circular(40),
-                  child: Image(
-                    image: AssetImage(imageUrl),
-                    height: 50,
-                    width: 50,
-                    fit: BoxFit.cover,
-                  )),
-              const SizedBox(
-                width: 10,
-              ),
+                  child: Image(image: backgroundImage, height: 50, width: 50, fit: BoxFit.cover)),
+              const SizedBox(width: 10),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(heading,
-                        style: theme.textTheme.titleLarge?.copyWith(
-                            color: theme.colorScheme.onPrimary)),
-                    Text(subHeading,
-                        style: theme.textTheme.bodyMedium?.copyWith(
-                            color: theme.colorScheme.onPrimary.withAlpha(150))),
+                    Text(heading, style: theme.textTheme.titleLarge?.copyWith(color: theme.colorScheme.onPrimary)),
+                    Text(subHeading, style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onPrimary.withOpacity(0.6))),
                   ],
                 ),
               ),
               Container(
                   decoration: BoxDecoration(
-                    color: isActiveStatus
-                        ? Colors.green
-                        : Colors.red,
+                    color: isActiveStatus ? Colors.green : Colors.red,
                     borderRadius: BorderRadius.circular(10),
                   ),
                   child: Padding(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 8, vertical: 4),
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                     child: Text(
                       isActive,
-                      style:
-                          theme.textTheme.labelMedium?.copyWith(color: Colors.white, fontWeight: FontWeight.bold),
+                      style: theme.textTheme.labelMedium?.copyWith(color: Colors.white, fontWeight: FontWeight.bold),
                     ),
                   ))
             ],
           ),
-          const SizedBox(
-            height: 8,
-          ),
+          const SizedBox(height: 8),
           SizedBox(
             width: double.infinity,
-            // Removed fixed height to make button responsive
             child: ElevatedButton(
                 onPressed: () {
                   Navigator.push(
                     context,
                     MaterialPageRoute(
-                        builder: (context) => FeeDetailsPage(
-                          studentName: heading,
-                          studentDetails: subHeading
-                        ),
-                  ));
+                        builder: (context) => FeeDetailsPage(studentId: studentId)),
+                  );
                 },
                 style: ElevatedButton.styleFrom(
-                  // Using theme color for button
                   backgroundColor: theme.colorScheme.secondary,
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(30),
@@ -341,7 +408,6 @@ class CustomStudentInfoFeeDetailContainerBox extends StatelessWidget {
                 ),
                 child: Text(
                   "Fee Details",
-                  // Using theme for scalable font
                   style: theme.textTheme.labelLarge?.copyWith(color: theme.colorScheme.onSecondary),
                 )),
           ),

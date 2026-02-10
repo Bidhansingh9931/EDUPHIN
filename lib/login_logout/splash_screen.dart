@@ -1,8 +1,9 @@
 import 'dart:math';
+
 import 'package:eduphin/login_logout/login.dart';
-import 'package:eduphin/services/backend_change.dart';
+import 'package:eduphin/manager_dashboard/manager_dashboard.dart';
+import 'package:eduphin/services/api_service.dart';
 import 'package:flutter/material.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -74,16 +75,14 @@ class _SplashScreenState extends State<SplashScreen>
   }
 
   Future<void> _checkAuthStatusAndNavigate() async {
-    final prefs = await SharedPreferences.getInstance();
-    // Check for a login flag. Defaults to false if not found.
-    final bool isLoggedIn = prefs.getBool('isLoggedIn') ?? false;
+    final token = await ApiService.getToken();
 
     if (mounted) {
-      if (isLoggedIn) {
+      if (token != null) {
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(
-              builder: (context) => const BackendUIPage(screen: "moderator_dashboard")),
+              builder: (context) => const ManagerDashboardPage()),
         );
       } else {
         Navigator.pushReplacement(

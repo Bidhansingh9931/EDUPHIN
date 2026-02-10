@@ -1,8 +1,11 @@
+import 'dart:convert';
 import 'dart:ui';
 
-import 'package:eduphin/manager_dashboard/manager_dashboard.dart';
-import 'package:eduphin/manager_dashboard/manager_profile.dart';
+import 'package:eduphin/services/api_service.dart';
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
+
+import '../../manager_dashboard.dart';
 
 class AddTeacherPage extends StatefulWidget {
   const AddTeacherPage({super.key});
@@ -12,117 +15,137 @@ class AddTeacherPage extends StatefulWidget {
 }
 
 class _AddTeacherPageState extends State<AddTeacherPage> {
+  final _formKey = GlobalKey<FormState>();
   bool _isLoading = false;
-  final TextEditingController _fullNameController =
-      TextEditingController(text: "Rajveer K.Malhotra");
-  final TextEditingController _emailController =
-      TextEditingController(text: "raj@iias.com");
-  final TextEditingController _newPasswordController =
-      TextEditingController(text: "");
-  final TextEditingController _roleController =
-      TextEditingController(text: "Teacher");
-  final TextEditingController _genderController =
-      TextEditingController(text: "Male");
-  final TextEditingController _dateOfBirthController =
-      TextEditingController(text: "01-07-2020");
-  final TextEditingController _relationshipStatusController =
-      TextEditingController(text: "Single");
-  final TextEditingController _phoneNumberController =
-      TextEditingController(text: "+91 1234567890");
-  final TextEditingController _alternateNumberController =
-      TextEditingController(text: "+91 0987654321");
-  final TextEditingController _addressController =
-      TextEditingController(text: "123, Tech Park Road");
-  final TextEditingController _cityController =
-      TextEditingController(text: "Bengaluru");
-  final TextEditingController _stateController =
-      TextEditingController(text: "Karnataka");
-  final TextEditingController _pinCodeController =
-      TextEditingController(text: "560001");
-  final TextEditingController _positionController =
-      TextEditingController(text: "Senior Teacher");
-  final TextEditingController _employmentTypeController =
-      TextEditingController(text: "Full-Time");
-  final TextEditingController _joiningDateController =
-      TextEditingController(text: "01-07-2020");
-  final TextEditingController _experienceController =
-      TextEditingController(text: "5");
-  final TextEditingController _statusController =
-      TextEditingController(text: "Active");
-  final TextEditingController _referenceController =
-      TextEditingController(text: "N/A");
-  final TextEditingController _qualificationController =
-      TextEditingController(text: "M.Sc. Physics");
-  final TextEditingController _matriculationMarksController =
-      TextEditingController(text: "92%");
-  final TextEditingController _intermediateMarksController =
-      TextEditingController(text: "88%");
-  final TextEditingController _bankAccountNumberController =
-      TextEditingController(text: "123456789012");
-  final TextEditingController _ifscCodeController =
-      TextEditingController(text: "BANK0001234");
-  final TextEditingController _bankNameController =
-      TextEditingController(text: "Example Bank");
-  final TextEditingController _branchController =
-      TextEditingController(text: "Tech Park Branch");
-  final TextEditingController _emergencyContactNameController =
-      TextEditingController(text: "John Doe");
-  final TextEditingController _emergencyContactNumberController =
-      TextEditingController(text: "+91 0987654321");
+
+  // Controllers for text fields
+  final _fullNameController = TextEditingController();
+  final _emailController = TextEditingController();
+  final _newPasswordController = TextEditingController();
+  final _aadharController = TextEditingController();
+  final _phoneNumberController = TextEditingController();
+  final _alternateNumberController = TextEditingController();
+  final _addressController = TextEditingController();
+  final _cityController = TextEditingController();
+  final _stateController = TextEditingController();
+  final _pinCodeController = TextEditingController();
+  final _positionController = TextEditingController();
+  final _experienceController = TextEditingController();
+  final _referenceController = TextEditingController();
+  final _qualificationController = TextEditingController();
+  final _matriculationMarksController = TextEditingController();
+  final _intermediateMarksController = TextEditingController();
+  final _bankAccountNumberController = TextEditingController();
+  final _ifscCodeController = TextEditingController();
+  final _bankNameController = TextEditingController();
+  final _branchController = TextEditingController();
+  final _emergencyContactNameController = TextEditingController();
+  final _emergencyContactNumberController = TextEditingController();
+
+  // State for dropdowns and date pickers
+  String? _gender;
+  DateTime? _dateOfBirth;
+  String? _relationshipStatus;
+  String? _employmentType;
+  DateTime? _joiningDate;
+  String? _status;
+
+  @override
+  void dispose() {
+    // Dispose all controllers to free up resources
+    _fullNameController.dispose();
+    _emailController.dispose();
+    _newPasswordController.dispose();
+    _aadharController.dispose();
+    _phoneNumberController.dispose();
+    _alternateNumberController.dispose();
+    _addressController.dispose();
+    _cityController.dispose();
+    _stateController.dispose();
+    _pinCodeController.dispose();
+    _positionController.dispose();
+    _experienceController.dispose();
+    _referenceController.dispose();
+    _qualificationController.dispose();
+    _matriculationMarksController.dispose();
+    _intermediateMarksController.dispose();
+    _bankAccountNumberController.dispose();
+    _ifscCodeController.dispose();
+    _bankNameController.dispose();
+    _branchController.dispose();
+    _emergencyContactNameController.dispose();
+    _emergencyContactNumberController.dispose();
+    super.dispose();
+  }
 
   void _addTeacher() async {
+    if (!_formKey.currentState!.validate()) {
+      return;
+    }
+
     setState(() {
       _isLoading = true;
     });
 
-    // Simulate API call to add teacher data.
-    // Replace this with your actual API call.
-    await Future.delayed(const Duration(seconds: 2));
+    try {
+      final teacherData = {
+        'name': _fullNameController.text,
+        'email': _emailController.text,
+        'password': _newPasswordController.text,
+        'role_id': '5', // Teacher Role ID
+        'institute_id': '1', // This should be dynamic based on the logged-in user
+        'gender': _gender,
+        'date_of_birth': _dateOfBirth != null ? DateFormat('yyyy-MM-dd').format(_dateOfBirth!) : null,
+        'marital_status': _relationshipStatus,
+        'aadhar_number': _aadharController.text,
+        'phone': _phoneNumberController.text,
+        'alternate_phone': _alternateNumberController.text,
+        'address': _addressController.text,
+        'city': _cityController.text,
+        'state': _stateController.text,
+        'pincode': _pinCodeController.text,
+        'position': _positionController.text,
+        'employment_type': _employmentType,
+        'joining_date': _joiningDate != null ? DateFormat('yyyy-MM-dd').format(_joiningDate!) : null,
+        'experience': _experienceController.text,
+        'status': _status,
+        'reference': _referenceController.text,
+        'qualification': _qualificationController.text,
+        'matric_marks': _matriculationMarksController.text,
+        'inter_marks': _intermediateMarksController.text,
+        'bank_account_number': _bankAccountNumberController.text,
+        'ifsc_code': _ifscCodeController.text,
+        'bank_name': _bankNameController.text,
+        'branch': _branchController.text,
+        'emergency_contact_name': _emergencyContactNameController.text,
+        'emergency_contact_phone': _emergencyContactNumberController.text,
+      };
 
-    // Here you can collect data from controllers and send to your API
-    final teacherData = {
-      'fullName': _fullNameController.text,
-      'email': _emailController.text,
-      'role': _roleController.text,
-      'gender': _genderController.text,
-      'dateOfBirth': _dateOfBirthController.text,
-      'relationshipStatus': _relationshipStatusController.text,
-      'phoneNumber': _phoneNumberController.text,
-      'alternateNumber': _alternateNumberController.text,
-      'address': _addressController.text,
-      'city': _cityController.text,
-      'state': _stateController.text,
-      'pinCode': _pinCodeController.text,
-      'position': _positionController.text,
-      'employmentType': _employmentTypeController.text,
-      'joiningDate': _joiningDateController.text,
-      'experience': _experienceController.text,
-      'status': _statusController.text,
-      'reference': _referenceController.text,
-      'qualification': _qualificationController.text,
-      'matriculationMarks': _matriculationMarksController.text,
-      'intermediateMarks': _intermediateMarksController.text,
-      'bankAccountNumber': _bankAccountNumberController.text,
-      'ifscCode': _ifscCodeController.text,
-      'bankName': _bankNameController.text,
-      'branch': _branchController.text,
-      'emergencyContactName': _emergencyContactNameController.text,
-      'emergencyContactNumber': _emergencyContactNumberController.text,
-    };
+      final response = await ApiService.post('manager/users', teacherData);
 
-    // For demonstration, we'll just print the data.
-    print('Adding teacher with data: $teacherData');
+      if (!mounted) return;
+      final responseData = jsonDecode(response.body);
 
-    setState(() {
-      _isLoading = false;
-    });
-
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Teacher added successfully!')),
-      );
-      // You might want to navigate away or clear the controllers after success.
-      // Navigator.pop(context);
+      if (response.statusCode >= 200 && response.statusCode < 300 && responseData['status'] == true) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(responseData['message'] ?? 'Teacher added successfully!')),
+        );
+        Navigator.pop(context, true); // Return true to indicate success
+      } else {
+        throw Exception(responseData['message'] ?? 'Failed to add teacher');
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(e.toString().replaceFirst('Exception: ', '')), backgroundColor: Colors.red),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
     }
   }
 
@@ -130,52 +153,24 @@ class _AddTeacherPageState extends State<AddTeacherPage> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     return Scaffold(
+      floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
       floatingActionButton: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 16.0),
-        child: Row(
-          children: [
-            Expanded(
-              flex: 2,
-              child: FloatingActionButton.extended(
-                heroTag: 'addTeacherBtn',
-                onPressed: _isLoading ? null : _addTeacher,
-                label: _isLoading
-                    ? CircularProgressIndicator(
-                        valueColor: AlwaysStoppedAnimation<Color>(
-                            theme.colorScheme.onSurface),
-                      )
-                    : Text(
-                        "Add Teacher",
-                        style: theme.textTheme.labelLarge
-                            ?.copyWith(color: theme.colorScheme.onSurface),
-                      ),
-                icon: _isLoading
-                    ? null
-                    : Icon(
-                        Icons.add,
-                        color: theme.colorScheme.onSurface,
-                      ),
-              ),
-            ),
-            const SizedBox(width: 16),
-            Expanded(
-              flex: 1,
-              child: FloatingActionButton.extended(
-                heroTag: 'deleteBtn',
-                onPressed: () => showDeleteDialog(context),
-                backgroundColor: Colors.redAccent,
-                label: Text(
-                  "Delete",
-                  style: theme.textTheme.labelLarge
-                      ?.copyWith(color: theme.colorScheme.onSurface),
-                ),
-                icon: Icon(
-                  Icons.delete,
-                  color: theme.colorScheme.onSurface,
-                ),
-              ),
-            ),
-          ],
+        child: SizedBox(
+          width: double.infinity,
+          child: FloatingActionButton.extended(
+            heroTag: 'addTeacherBtn',
+            onPressed: _isLoading ? null : _addTeacher,
+            label: _isLoading
+                ? const CircularProgressIndicator(
+                    valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                  )
+                : Text(
+                    "Add Teacher",
+                    style: theme.textTheme.labelLarge?.copyWith(color: Colors.white),
+                  ),
+            icon: _isLoading ? null : const Icon(Icons.add, color: Colors.white),
+          ),
         ),
       ),
       backgroundColor: theme.scaffoldBackgroundColor,
@@ -197,16 +192,19 @@ class _AddTeacherPageState extends State<AddTeacherPage> {
         ),
         backgroundColor: theme.appBarTheme.backgroundColor,
       ),
-      body: Padding(
-        padding: const EdgeInsets.fromLTRB(16, 16, 16, 120),
-        child: LayoutBuilder(
-          builder: (context, constraints) {
-            if (constraints.maxWidth > 800) {
-              return _buildWideLayout();
-            } else {
-              return _buildNarrowLayout();
-            }
-          },
+      body: Form(
+        key: _formKey,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 16, 16, 120),
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              if (constraints.maxWidth > 800) {
+                return _buildWideLayout();
+              } else {
+                return _buildNarrowLayout();
+              }
+            },
+          ),
         ),
       ),
     );
@@ -220,10 +218,8 @@ class _AddTeacherPageState extends State<AddTeacherPage> {
           const CustomProfileBox(),
           const SizedBox(height: 20),
           _buildEditableInfoTile(context, "Full Name", _fullNameController),
-          _buildEditableInfoTile(context, "Email", _emailController),
-          _buildEditableInfoTile(
-              context, "New Password", _newPasswordController),
-          const Text("Leave blank to keep existing's password"),
+          _buildEditableInfoTile(context, "Email", _emailController, keyboardType: TextInputType.emailAddress),
+          _buildEditableInfoTile(context, "New Password", _newPasswordController, isPassword: true),
           const SizedBox(height: 20),
           _buildPersonalDetailsSection(context),
           const SizedBox(height: 20),
@@ -274,10 +270,8 @@ class _AddTeacherPageState extends State<AddTeacherPage> {
         const CustomProfileBox(),
         const SizedBox(height: 20),
         _buildEditableInfoTile(context, "Full Name", _fullNameController),
-        _buildEditableInfoTile(context, "Email", _emailController),
-        _buildEditableInfoTile(
-            context, "New Password", _newPasswordController),
-        const Text("Leave blank to keep existing's password"),
+        _buildEditableInfoTile(context, "Email", _emailController, keyboardType: TextInputType.emailAddress),
+        _buildEditableInfoTile(context, "New Password", _newPasswordController, isPassword: true),
         const SizedBox(height: 20),
         _buildPersonalDetailsSection(context),
         const SizedBox(height: 20),
@@ -303,26 +297,73 @@ class _AddTeacherPageState extends State<AddTeacherPage> {
     );
   }
 
-  Widget _buildEditableInfoTile(
-      BuildContext context, String title, TextEditingController controller,
-      {bool readOnly = false}) {
+  Widget _buildEditableInfoTile(BuildContext context, String title, TextEditingController controller, {bool isPassword = false, TextInputType keyboardType = TextInputType.text}) {
     final theme = Theme.of(context);
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 8.0),
-      child: TextField(
+      child: TextFormField(
         controller: controller,
-        readOnly: readOnly,
+        obscureText: isPassword,
+        keyboardType: keyboardType,
         style: theme.textTheme.bodyLarge,
-        decoration: InputDecoration(
-          labelText: title,
-          labelStyle:
-              theme.textTheme.bodyMedium?.copyWith(color: theme.hintColor),
+        decoration: _inputDecoration(theme, title),
+        validator: (value) {
+          if (value == null || value.isEmpty) {
+            return '$title cannot be empty';
+          }
+          return null;
+        },
+      ),
+    );
+  }
+  
+  Widget _buildDropdownField<T>(BuildContext context, String title, T? value, List<T> items, ValueChanged<T?> onChanged) {
+    final theme = Theme.of(context);
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8.0),
+      child: DropdownButtonFormField<T>(
+        value: value,
+        items: items.map((item) => DropdownMenuItem(value: item, child: Text(item.toString().split('.').last))).toList(),
+        onChanged: onChanged,
+        decoration: _inputDecoration(theme, title),
+        validator: (value) => value == null ? 'Please select a $title' : null,
+      ),
+    );
+  }
+
+  Widget _buildDatePickerField(BuildContext context, String title, DateTime? selectedDate, ValueChanged<DateTime?> onDateChanged) {
+    final theme = Theme.of(context);
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8.0),
+      child: TextFormField(
+        readOnly: true,
+        controller: TextEditingController(
+          text: selectedDate == null ? '' : DateFormat('yyyy-MM-dd').format(selectedDate),
+        ),
+        decoration: _inputDecoration(theme, title).copyWith(suffixIcon: const Icon(Icons.calendar_today)),
+        onTap: () async {
+          DateTime? picked = await showDatePicker(
+            context: context,
+            initialDate: selectedDate ?? DateTime.now(),
+            firstDate: DateTime(1950),
+            lastDate: DateTime.now(),
+          );
+          if (picked != null) {
+            onDateChanged(picked);
+          }
+        },
+        validator: (value) => value == null || value.isEmpty ? 'Please select a date' : null,
+      ),
+    );
+  }
+
+  InputDecoration _inputDecoration(ThemeData theme, String label) {
+     return InputDecoration(
+          labelText: label,
+          labelStyle: theme.textTheme.bodyMedium?.copyWith(color: theme.hintColor),
           filled: true,
-          fillColor: readOnly
-              ? theme.dividerColor.withAlpha(35)
-              : theme.cardColor,
-          contentPadding:
-              const EdgeInsets.symmetric(vertical: 16.0, horizontal: 12.0),
+          fillColor: theme.cardColor,
+          contentPadding: const EdgeInsets.symmetric(vertical: 16.0, horizontal: 12.0),
           border: OutlineInputBorder(
             borderRadius: BorderRadius.circular(8),
             borderSide: BorderSide(color: theme.dividerColor, width: 1.0),
@@ -335,124 +376,82 @@ class _AddTeacherPageState extends State<AddTeacherPage> {
             borderRadius: BorderRadius.circular(8),
             borderSide: BorderSide(color: theme.primaryColor, width: 1.5),
           ),
-        ),
-      ),
-    );
+        );
   }
 
+  // --- SECTION BUILDERS ---
+
   Widget _buildPersonalDetailsSection(BuildContext context) {
-    final theme = Theme.of(context);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text("Personal Details",
-            style:
-                theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold)),
-        const SizedBox(height: 12),
-        _buildEditableInfoTile(context, "Role", _roleController),
-        _buildEditableInfoTile(context, "Gender", _genderController),
-        _buildEditableInfoTile(context, "Date of Birth", _dateOfBirthController),
-        _buildEditableInfoTile(
-            context, "Relationship Status", _relationshipStatusController),
+        _buildSectionTitle(context, "Personal Details"),
+        // Role is fixed for this page
+        _buildEditableInfoTile(context, "Aadhaar Number", _aadharController),
+        _buildDropdownField(context, "Gender", _gender, ['Male', 'Female', 'Other'], (val) => setState(() => _gender = val)),
+        _buildDatePickerField(context, "Date of Birth", _dateOfBirth, (val) => setState(() => _dateOfBirth = val)),
+        _buildDropdownField(context, "Relationship Status", _relationshipStatus, ['Single', 'Married'], (val) => setState(() => _relationshipStatus = val)),
       ],
     );
   }
 
   Widget _buildContactDetailsSection(BuildContext context) {
-    final theme = Theme.of(context);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text("Contact Details",
-            style:
-                theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold)),
-        const SizedBox(height: 12),
-        _buildEditableInfoTile(
-            context, "Phone Number", _phoneNumberController),
-        _buildEditableInfoTile(
-            context, "Alternate Number", _alternateNumberController),
+        _buildSectionTitle(context, "Contact Details"),
+        _buildEditableInfoTile(context, "Phone Number", _phoneNumberController, keyboardType: TextInputType.phone),
+        _buildEditableInfoTile(context, "Alternate Number", _alternateNumberController, keyboardType: TextInputType.phone),
       ],
     );
   }
 
   Widget _buildAddressDetailsSection(BuildContext context) {
-    final theme = Theme.of(context);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text("Address Details",
-            style:
-                theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold)),
-        const SizedBox(height: 12),
+        _buildSectionTitle(context, "Address Details"),
         _buildEditableInfoTile(context, "Address", _addressController),
         _buildEditableInfoTile(context, "City", _cityController),
         _buildEditableInfoTile(context, "State", _stateController),
-        _buildEditableInfoTile(context, "Pin code", _pinCodeController),
+        _buildEditableInfoTile(context, "Pin code", _pinCodeController, keyboardType: TextInputType.number),
       ],
     );
   }
 
   Widget _buildProfessionalInformationSection(BuildContext context) {
-    final theme = Theme.of(context);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text("Professional Information",
-            style:
-                theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold)),
-        const SizedBox(height: 12),
+        _buildSectionTitle(context, "Professional Information"),
         _buildEditableInfoTile(context, "Position", _positionController),
-        _buildEditableInfoTile(
-            context, "Employment Type", _employmentTypeController),
-        _buildEditableInfoTile(
-            context, "Joining Date", _joiningDateController),
-        _buildEditableInfoTile(
-            context, "Experience (Years)", _experienceController),
-        _buildEditableInfoTile(context, "Status", _statusController),
+        _buildDropdownField(context, "Employment Type", _employmentType, ['full-time', 'part-time', 'internship', 'contract-based', 'other'], (val) => setState(() => _employmentType = val)),
+        _buildDatePickerField(context, "Joining Date", _joiningDate, (val) => setState(() => _joiningDate = val)),
+        _buildEditableInfoTile(context, "Experience (Years)", _experienceController, keyboardType: TextInputType.number),
+        _buildDropdownField(context, "Status", _status, ['live', 'expired'], (val) => setState(() => _status = val)),
         _buildEditableInfoTile(context, "Reference", _referenceController),
       ],
     );
   }
 
   Widget _buildEducationDetailsSection(BuildContext context) {
-    final theme = Theme.of(context);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text("Education & Documents",
-            style:
-                theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold)),
-        const SizedBox(height: 12),
-        _buildEditableInfoTile(
-            context, "Qualification", _qualificationController),
-        _buildEditableInfoTile(
-            context, "Matriculation Marks (%)", _matriculationMarksController),
-        _buildEditableInfoTile(
-            context, "Intermediate Marks (%)", _intermediateMarksController),
-        _buildEditableInfoTile(
-            context, "Matriculation Marksheet", TextEditingController(text: "View Document"),
-            readOnly: true),
-        _buildEditableInfoTile(
-            context, "Intermediate Marksheet", TextEditingController(text: "View Document"),
-            readOnly: true),
-        _buildEditableInfoTile(
-            context, "Resume", TextEditingController(text: "View Document"),
-            readOnly: true),
+        _buildSectionTitle(context, "Education & Documents"),
+        _buildEditableInfoTile(context, "Qualification", _qualificationController),
+        _buildEditableInfoTile(context, "Matriculation Marks (%)", _matriculationMarksController, keyboardType: TextInputType.number),
+        _buildEditableInfoTile(context, "Intermediate Marks (%)", _intermediateMarksController, keyboardType: TextInputType.number),
       ],
     );
   }
 
   Widget _buildBankingDetailsSection(BuildContext context) {
-    final theme = Theme.of(context);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text("Banking Details",
-            style:
-                theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold)),
-        const SizedBox(height: 12),
-        _buildEditableInfoTile(
-            context, "Bank Account Number", _bankAccountNumberController),
+        _buildSectionTitle(context, "Banking Details"),
+        _buildEditableInfoTile(context, "Bank Account Number", _bankAccountNumberController, keyboardType: TextInputType.number),
         _buildEditableInfoTile(context, "IFSC Code", _ifscCodeController),
         _buildEditableInfoTile(context, "Bank Name", _bankNameController),
         _buildEditableInfoTile(context, "Branch", _branchController),
@@ -461,19 +460,20 @@ class _AddTeacherPageState extends State<AddTeacherPage> {
   }
 
   Widget _buildEmergencyContactDetailsSection(BuildContext context) {
-    final theme = Theme.of(context);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text("Emergency Contact",
-            style:
-                theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold)),
-        const SizedBox(height: 12),
-        _buildEditableInfoTile(
-            context, "Contact Name", _emergencyContactNameController),
-        _buildEditableInfoTile(
-            context, "Contact Number", _emergencyContactNumberController),
+        _buildSectionTitle(context, "Emergency Contact"),
+        _buildEditableInfoTile(context, "Contact Name", _emergencyContactNameController),
+        _buildEditableInfoTile(context, "Contact Number", _emergencyContactNumberController, keyboardType: TextInputType.phone),
       ],
+    );
+  }
+
+  Widget _buildSectionTitle(BuildContext context, String title) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12, top: 12),
+      child: Text(title, style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold)),
     );
   }
 }
@@ -484,173 +484,79 @@ class CustomProfileBox extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    return InkWell(
-      onTap: () => Navigator.push(
-          context,
-          MaterialPageRoute(
-              builder: (context) => const ManagerProfilePage())),
-      child: Container(
-        width: double.infinity,
-        padding: const EdgeInsets.all(16.0),
-        decoration: BoxDecoration(
-          color: theme.primaryColor,
-          borderRadius: BorderRadius.circular(12),
-        ),
-        child: Column(
-          children: [
-            Row(
-              children: [
-                Icon(Icons.person,
-                    color: theme.colorScheme.onPrimary, size: 30),
-                const SizedBox(width: 8),
-                Text(
-                  "Profile Overview",
-                  style: theme.textTheme.titleLarge
-                      ?.copyWith(color: theme.colorScheme.onPrimary),
-                )
-              ],
-            ),
-            const SizedBox(height: 16),
-            const CircleAvatar(
-              radius: 40,
-              backgroundImage:
-                  AssetImage("assets/images/random_boy.jpg"),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              "Rajveer K.Malhotra",
-              style: theme.textTheme.titleLarge
-                  ?.copyWith(color: theme.colorScheme.onPrimary),
-            ),
-            Text("Senior Teacher",
-                style: theme.textTheme.bodyLarge?.copyWith(
-                    color: theme.colorScheme.onPrimary.withAlpha(180))),
-            const SizedBox(height: 16),
-            Container(
-              height: 50,
-              width: double.infinity,
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(10),
-                color: const Color(0xFF2A3F5F),
-              ),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.center,
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  const Padding(
-                    padding: EdgeInsets.only(right: 10),
-                    child: Icon(
-                      Icons.camera_alt_outlined,
-                      size: 30,
-                      color: Color(0xFF9FB4CC),
-                    ),
-                  ),
-                  Text(
-                    "Update Profile Image",
-                    style: theme.textTheme.labelLarge?.copyWith(
-                        color: const Color(0xFF9FB4CC),
-                        fontWeight: FontWeight.bold),
-                  ),
-                ],
-              ),
-            )
-          ],
-        ),
+    final textTheme = theme.textTheme;
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16.0),
+      decoration: BoxDecoration(
+        color: theme.primaryColor,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Column(
+        children: [
+          Row(
+            children: [
+              Icon(Icons.person_add_alt_1, color: theme.colorScheme.onPrimary, size: 30),
+              const SizedBox(width: 8),
+              Text("New Teacher Profile",
+                  style: textTheme.titleLarge?.copyWith(
+                      color: theme.colorScheme.onPrimary,
+                      fontWeight: FontWeight.bold))
+            ],
+          ),
+          const SizedBox(height: 16),
+          const CircleAvatar(
+            radius: 40,
+            child: Icon(Icons.person, size: 50),
+          ),
+          const SizedBox(height: 8),
+          Text("Profile Picture",
+              style: textTheme.titleMedium
+                  ?.copyWith(color: theme.colorScheme.onPrimary, fontWeight: FontWeight.bold)),
+        ],
       ),
     );
   }
 }
 
 void showDeleteDialog(BuildContext context) {
+  final theme = Theme.of(context);
+  final textTheme = theme.textTheme;
   showGeneralDialog(
     context: context,
     barrierDismissible: true,
     barrierLabel: "Delete",
-    barrierColor: const Color.fromRGBO(0, 0, 0, 0.6),
-    transitionDuration: const Duration(milliseconds: 200),
-    pageBuilder: (_, __, ___) {
-      return const DeleteTeacherDialog(
-        teacherName: "Rajeev K.Malhotra",
+    barrierColor: Colors.black.withOpacity(0.5),
+    transitionDuration: const Duration(milliseconds: 300),
+    pageBuilder: (context, anim1, anim2) {
+      return BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 5, sigmaY: 5),
+        child: AlertDialog(
+          backgroundColor: theme.scaffoldBackgroundColor,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          title: Center(
+            child: Text("Delete Teacher",
+                style: textTheme.titleLarge
+                    ?.copyWith(fontWeight: FontWeight.bold)),
+          ),
+          content: Text("Are you sure you want to delete this teacher?",
+              textAlign: TextAlign.center,
+              style: textTheme.bodyMedium?.copyWith(color: theme.hintColor)),
+          actions: [
+            Row(
+              children: [
+                Expanded(
+                  child: TextButton(onPressed: () {}, child: const Text("Delete"))),
+                Expanded(
+                    child: ElevatedButton(
+                  onPressed: () => Navigator.of(context).pop(),
+                  child: const Text("Cancel"),
+                ))
+              ],
+            )
+          ],
+        ),
       );
     },
   );
-}
-
-class DeleteTeacherDialog extends StatelessWidget {
-  final String teacherName;
-
-  const DeleteTeacherDialog({
-    super.key,
-    required this.teacherName,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return Scaffold(
-      backgroundColor: Colors.transparent,
-      body: Stack(
-        children: [
-          // 🔹 Blur Background
-          BackdropFilter(
-            filter: ImageFilter.blur(sigmaX: 6, sigmaY: 6),
-            child: Container(color: Colors.transparent),
-          ),
-
-          // 🔹 Center Card
-          Center(
-            child: Container(
-              margin: const EdgeInsets.symmetric(horizontal: 24),
-              padding: const EdgeInsets.all(20),
-              decoration: BoxDecoration(
-                color: const Color(0xFF1F2937),
-                borderRadius: BorderRadius.circular(20),
-              ),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    "Delete Teacher",
-                    style: theme.textTheme.titleLarge
-                        ?.copyWith(color: Colors.white),
-                  ),
-                  const SizedBox(height: 12),
-                  Text(
-                    "Are you sure you want to delete this Teacher: "
-                    "'$teacherName'? This action cannot be undone.",
-                    textAlign: TextAlign.center,
-                    style: theme.textTheme.bodyMedium
-                        ?.copyWith(color: Colors.grey.shade400),
-                  ),
-                  const SizedBox(height: 24),
-
-                  // 🔴 Delete Button
-                  SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton(
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFFC5392A),
-                        padding: const EdgeInsets.symmetric(vertical: 14),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                      ),
-                      onPressed: () {
-                        Navigator.pop(context);
-                        // 🔥 delete logic here
-                      },
-                      child: Text(
-                        "Yes, Delete",
-                        style: theme.textTheme.labelLarge,
-                      ),
-                    ),
-                  )
-                ],
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
 }

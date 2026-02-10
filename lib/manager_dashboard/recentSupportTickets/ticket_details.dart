@@ -1,6 +1,48 @@
-import 'package:flutter/material.dart';
+import 'dart:async';
+import 'dart:convert';
 
-// --- DATA MODELS ---
+import 'package:eduphin/services/api_service.dart';
+import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
+
+// --- ENUMS (Consistent with ticket_info.dart) ---
+
+enum TicketStatus {
+  open,
+  inProgress,
+  onHold,
+  resolved,
+  closed;
+
+  String get displayName => toBeginningOfSentenceCase(name.replaceAll('InProgress', 'In Progress'))!;
+}
+
+enum TicketPriority {
+  low,
+  medium,
+  high;
+
+  String get displayName => toBeginningOfSentenceCase(name)!;
+}
+
+extension on String {
+  TicketPriority toTicketPriority() {
+    return TicketPriority.values.firstWhere(
+      (e) => e.name.toLowerCase() == toLowerCase(),
+      orElse: () => TicketPriority.medium,
+    );
+  }
+
+  TicketStatus toTicketStatus() {
+    final formattedString = toLowerCase().replaceAll('-', '').replaceAll(' ', '');
+    return TicketStatus.values.firstWhere(
+      (e) => e.name.toLowerCase() == formattedString.toLowerCase(),
+      orElse: () => TicketStatus.open,
+    );
+  }
+}
+
+// --- DATA MODELS (Made Robust) ---
 
 class ChatMessage {
   final String text;
@@ -8,10 +50,10 @@ class ChatMessage {
 
   ChatMessage({required this.text, required this.isUser});
 
-  factory ChatMessage.fromJson(Map<String, dynamic> json) {
+  factory ChatMessage.fromJson(Map<String, dynamic> json, int currentUserId) {
     return ChatMessage(
-      text: json['text'] as String,
-      isUser: json['isUser'] as bool,
+      text: json['message']?.toString() ?? '', // Safe parsing
+      isUser: (json['user_id'] ?? -1) == currentUserId, // Safe comparison
     );
   }
 }
@@ -20,8 +62,8 @@ class TicketDetails {
   final String name;
   final String category;
   final String ticketId;
-  final String priority;
-  final String status;
+  final TicketPriority priority;
+  final TicketStatus status;
   final List<ChatMessage> messages;
 
   TicketDetails({
@@ -33,17 +75,24 @@ class TicketDetails {
     required this.messages,
   });
 
-  factory TicketDetails.fromJson(Map<String, dynamic> json) {
-    var messagesList = json['messages'] as List;
-    List<ChatMessage> messages =
-        messagesList.map((i) => ChatMessage.fromJson(i as Map<String, dynamic>)).toList();
+  factory TicketDetails.fromJson(Map<String, dynamic> json, int currentUserId) {
+    final ticketData = json['ticket'] is Map<String, dynamic> ? json['ticket'] : {};
+    final repliesData = json['replies'] as List? ?? [];
+
+    final messages = repliesData
+        .whereType<Map<String, dynamic>>()
+        .map((reply) => ChatMessage.fromJson(reply, currentUserId))
+        .toList();
+
+    final userData = ticketData['user'] is Map<String, dynamic> ? ticketData['user'] : {};
+    final categoryData = ticketData['category'] is Map<String, dynamic> ? ticketData['category'] : {};
 
     return TicketDetails(
-      name: json['name'] as String,
-      category: json['category'] as String,
-      ticketId: json['ticketId'] as String,
-      priority: json['priority'] as String,
-      status: json['status'] as String,
+      name: userData['name']?.toString() ?? 'Unknown User',
+      category: categoryData['name']?.toString() ?? 'Uncategorized',
+      ticketId: ticketData['serial']?.toString() ?? 'N/A',
+      priority: (ticketData['priority']?.toString() ?? 'medium').toTicketPriority(),
+      status: (ticketData['status']?.toString() ?? 'open').toTicketStatus(),
       messages: messages,
     );
   }
@@ -52,7 +101,8 @@ class TicketDetails {
 // --- MAIN WIDGET ---
 
 class TicketDetailsPage extends StatefulWidget {
-  const TicketDetailsPage({super.key});
+  final String ticketId;
+  const TicketDetailsPage({super.key, required this.ticketId});
 
   @override
   State<StatefulWidget> createState() => _TicketDetailsPageState();
@@ -63,8 +113,10 @@ class _TicketDetailsPageState extends State<TicketDetailsPage> {
   final ScrollController _scrollController = ScrollController();
 
   bool _isLoading = true;
+  String? _error;
   TicketDetails? _ticketDetails;
   final List<ChatMessage> _sessionMessages = [];
+  int? _currentUserId;
 
   @override
   void initState() {
@@ -73,56 +125,111 @@ class _TicketDetailsPageState extends State<TicketDetailsPage> {
   }
 
   Future<void> _fetchTicketDetails() async {
-    await Future.delayed(const Duration(seconds: 1));
+    if (!mounted) return;
+    setState(() {
+      _isLoading = true;
+      _error = null;
+    });
 
-    final dummyData = {
-      "name": "Ananya Sharma",
-      "category": "IT Support",
-      "ticketId": "#001245",
-      "priority": "High",
-      "status": "In Progress",
-      "messages": [
-        {"text": "Hello, I'm having trouble with the Wi-Fi in the library.", "isUser": true},
-        {
-          "text": "Hi Ananya, we are looking into the issue. Can you provide more details?",
-          "isUser": false
-        },
-      ]
-    };
+    try {
+      // Pre-flight check for a valid ticket ID
+      if (widget.ticketId == 'N/A' || widget.ticketId.isEmpty) {
+        throw Exception('Invalid Ticket ID provided.');
+      }
+      
+      final results = await Future.wait([
+        ApiService.get('manager/tickets/${widget.ticketId}/replies'),
+        ApiService.get('manager/profile'),
+      ]);
 
-    if (mounted) {
-      final details = TicketDetails.fromJson(dummyData);
+      if (!mounted) return;
+
+      final repliesResponse = results[0];
+      final profileResponse = results[1];
+
+      if (repliesResponse.statusCode != 200) {
+        throw Exception('Failed to load ticket details: ${repliesResponse.body}');
+      }
+      if (profileResponse.statusCode != 200) {
+        throw Exception('Failed to load user profile: ${profileResponse.body}');
+      }
+
+      final repliesData = jsonDecode(repliesResponse.body);
+      final profileData = jsonDecode(profileResponse.body);
+
+      final dynamic userIdDynamic = profileData['data']?['id'];
+      final currentUserId = int.tryParse(userIdDynamic.toString()) ?? 0;
+
+      if (currentUserId == 0) {
+        throw Exception('Could not determine the current user ID.');
+      }
+
+      final details = TicketDetails.fromJson(repliesData, currentUserId);
+
       setState(() {
+        _currentUserId = currentUserId;
         _ticketDetails = details;
+        _sessionMessages.clear();
         _sessionMessages.addAll(details.messages);
-        _isLoading = false;
       });
-      _scrollToBottom();
+
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _error = e.toString().replaceFirst('Exception: ', '');
+        });
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+        _scrollToBottom();
+      }
     }
   }
 
-  void _sendMessage() {
-    if (_controller.text.trim().isEmpty) return;
+  void _sendMessage() async {
+    if (_controller.text.trim().isEmpty || _isSavingMessage) return;
 
-    String userMessageText = _controller.text;
-    final userMessage = ChatMessage(text: userMessageText, isUser: true);
+    final userMessage = ChatMessage(text: _controller.text, isUser: true);
 
     setState(() {
+      _isSavingMessage = true;
       _sessionMessages.add(userMessage);
+      _controller.clear();
     });
-
-    _controller.clear();
     _scrollToBottom();
 
-    // Simulate bot reply
-    Future.delayed(const Duration(seconds: 1), () {
-      final botReply = ChatMessage(text: _getBotReply(userMessageText), isUser: false);
-      setState(() {
-        _sessionMessages.add(botReply);
+    try {
+      final response = await ApiService.post('manager/tickets/${widget.ticketId}/reply', {
+        'message': userMessage.text,
       });
-      _scrollToBottom();
-    });
+
+      if (!mounted) return;
+
+      if (response.statusCode != 201) {
+        throw Exception('Failed to send message.');
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _sessionMessages.remove(userMessage);
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(e.toString().replaceFirst('Exception: ', ''))),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isSavingMessage = false;
+        });
+      }
+    }
   }
+
+  bool _isSavingMessage = false;
 
   void _scrollToBottom() {
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -136,28 +243,6 @@ class _TicketDetailsPageState extends State<TicketDetailsPage> {
     });
   }
 
-  String _getBotReply(String message) {
-    message = message.toLowerCase();
-    if (message.contains("hello") || message.contains("hi")) {
-      return "Hi! How can I help you?";
-    } else if (message.contains("flutter")) {
-      return "Flutter is awesome for app development!";
-    } else if (message.contains("bye")) {
-      return "Goodbye! Have a great day 😊";
-    } else if (message.contains("how are you")) {
-      return "I'm fine, thank you!";
-    } else if (message.contains("what can you do") ||
-        message.contains("how can you help me")) {
-      return "I can help you by answering questions and providing support.";
-    } else if (message.contains("thank you")) {
-      return "I am here to help. If you have any more questions, feel free to ask!";
-    } else if (message.contains("your name")) {
-      return "I am a chatBot created by Bidhan Kumar Singh";
-    } else {
-      return "Sorry, I didn't understand that.";
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -167,36 +252,49 @@ class _TicketDetailsPageState extends State<TicketDetailsPage> {
         title: const Text("Ticket Details"),
         centerTitle: true,
       ),
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : _ticketDetails == null
-              ? const Center(child: Text("Failed to load ticket details."))
-              : Column(
-                  children: [
-                    Expanded(
-                      child: ListView.builder(
-                        controller: _scrollController,
-                        padding: const EdgeInsets.fromLTRB(16, 16, 16, 50),
-                        itemCount: _sessionMessages.length + 1, // +1 for the header card
-                        itemBuilder: (context, index) {
-                          if (index == 0) {
-                            // The first item is the details box
-                            return Padding(
-                              padding: const EdgeInsets.only(bottom: 16.0),
-                              child: CustomTicketDetailsBox(
-                                ticket: _ticketDetails!,
-                              ),
-                            );
-                          }
-                          // Subsequent items are chat messages
-                          final message = _sessionMessages[index - 1];
-                          return ChatBubble(message: message);
-                        },
-                      ),
-                    ),
-                    _buildInputArea(theme),
-                  ],
-                ),
+      body: _buildBody(theme),
+    );
+  }
+
+  Widget _buildBody(ThemeData theme) {
+    if (_isLoading) {
+      return const Center(child: CircularProgressIndicator());
+    }
+    if (_error != null) {
+      return Center(
+        child: Column(mainAxisSize: MainAxisSize.min, children: [
+          Text(_error!),
+          const SizedBox(height: 10),
+          ElevatedButton(onPressed: _fetchTicketDetails, child: const Text("Retry")),
+        ]),
+      );
+    }
+    if (_ticketDetails == null) {
+      return const Center(child: Text("No details available."));
+    }
+    return Column(
+      children: [
+        Expanded(
+          child: ListView.builder(
+            controller: _scrollController,
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 50),
+            itemCount: _sessionMessages.length + 1, // +1 for the header card
+            itemBuilder: (context, index) {
+              if (index == 0) {
+                return Padding(
+                  padding: const EdgeInsets.only(bottom: 16.0),
+                  child: CustomTicketDetailsBox(
+                    ticket: _ticketDetails!,
+                  ),
+                );
+              }
+              final message = _sessionMessages[index - 1];
+              return ChatBubble(message: message);
+            },
+          ),
+        ),
+        _buildInputArea(theme),
+      ],
     );
   }
 
@@ -233,10 +331,10 @@ class _TicketDetailsPageState extends State<TicketDetailsPage> {
           ),
           const SizedBox(width: 8),
           IconButton(
-            icon: Icon(Icons.send, color: theme.colorScheme.primary),
+            icon: Icon(Icons.send, color: _isSavingMessage ? Colors.grey : theme.colorScheme.primary),
             onPressed: _sendMessage,
           )
-        ],
+        ], 
       ),
     );
   }
@@ -252,6 +350,17 @@ class CustomTicketDetailsBox extends StatelessWidget {
     required this.ticket,
   });
 
+  Color _getPriorityColor(TicketPriority priority, ThemeData theme) {
+    switch (priority) {
+      case TicketPriority.high:
+        return theme.colorScheme.error;
+      case TicketPriority.medium:
+        return Colors.amber.shade700;
+      case TicketPriority.low:
+        return Colors.lightBlueAccent;
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -264,16 +373,15 @@ class CustomTicketDetailsBox extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Using a Wrap widget for responsive details
           Wrap(
-            spacing: 16.0, // Horizontal space between items
-            runSpacing: 16.0, // Vertical space between lines
+            spacing: 16.0, 
+            runSpacing: 16.0, 
             children: [
               _buildDetailColumn(theme, "Name", ticket.name),
               _buildDetailColumn(theme, "Category", ticket.category),
               _buildDetailColumn(theme, "Ticket ID", ticket.ticketId),
-              _buildDetailColumn(theme, "Status", ticket.status, valueColor: theme.colorScheme.secondary),
-              _buildPriorityStatus(theme, ticket.priority, ticket.priority == "High"),
+              _buildDetailColumn(theme, "Status", ticket.status.displayName, valueColor: theme.colorScheme.secondary),
+              _buildPriorityStatus(theme, ticket.priority),
             ],
           ),
           const Divider(height: 32, thickness: 1),
@@ -291,7 +399,7 @@ class CustomTicketDetailsBox extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       mainAxisSize: MainAxisSize.min,
       children: [
-        Text(title, style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onPrimary.withAlpha(150))),
+        Text(title, style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onPrimary.withAlpha(180))),
         const SizedBox(height: 2),
         Text(
           value,
@@ -303,24 +411,24 @@ class CustomTicketDetailsBox extends StatelessWidget {
     );
   }
 
-  Widget _buildPriorityStatus(ThemeData theme, String priority, bool isHigh) {
-    final priorityColor = isHigh ? theme.colorScheme.error : theme.colorScheme.secondary;
+  Widget _buildPriorityStatus(ThemeData theme, TicketPriority priority) {
+    final priorityColor = _getPriorityColor(priority, theme);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       mainAxisSize: MainAxisSize.min,
       children: [
         Text("Priority",
             style: theme.textTheme.bodySmall
-                ?.copyWith(color: theme.colorScheme.onPrimary.withAlpha(150))),
+                ?.copyWith(color: theme.colorScheme.onPrimary.withAlpha(180))),
         const SizedBox(height: 2),
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
           decoration: BoxDecoration(
-            color: priorityColor.withAlpha(35),
+            color: priorityColor.withAlpha(55),
             borderRadius: BorderRadius.circular(8),
           ),
           child: Text(
-            priority,
+            priority.displayName,
             style: theme.textTheme.labelMedium?.copyWith(color: priorityColor, fontWeight: FontWeight.bold),
           ),
         ),
@@ -329,7 +437,6 @@ class CustomTicketDetailsBox extends StatelessWidget {
   }
 }
 
-// New, reusable widget for displaying chat messages
 class ChatBubble extends StatelessWidget {
   final ChatMessage message;
 
@@ -345,7 +452,6 @@ class ChatBubble extends StatelessWidget {
         padding: const EdgeInsets.all(12),
         margin: const EdgeInsets.symmetric(vertical: 5),
         decoration: BoxDecoration(
-          // Using theme colors for a consistent look
           color: isUser ? theme.colorScheme.primary : theme.colorScheme.surface,
           borderRadius: BorderRadius.circular(12),
         ),

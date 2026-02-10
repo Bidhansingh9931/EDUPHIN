@@ -1,3 +1,6 @@
+import 'dart:async';
+import 'dart:convert';
+import 'package:eduphin/services/api_service.dart';
 import 'package:flutter/material.dart';
 
 class CreateNewClassPage extends StatefulWidget {
@@ -17,7 +20,6 @@ class _CreateNewClassPageState extends State<CreateNewClassPage> {
   bool _isLoading = false;
 
   Future<void> _createClass() async {
-    // Use form validation
     if (!_formKey.currentState!.validate()) {
       return;
     }
@@ -26,26 +28,61 @@ class _CreateNewClassPageState extends State<CreateNewClassPage> {
       _isLoading = true;
     });
 
-    // Simulate API call
-    await Future.delayed(const Duration(seconds: 2));
+    try {
+      final classData = {
+        'name': _classNameController.text,
+        'code': _classCodeController.text,
+        'description': _descriptionController.text,
+        'level': _selectedLevel!,
+      };
 
-    final classData = {
-      'name': _classNameController.text,
-      'code': _classCodeController.text,
-      'description': _descriptionController.text,
-      'level': _selectedLevel,
-    };
+      final response = await ApiService.post('manager/classes', classData);
+      final responseData = jsonDecode(response.body);
 
-    print('Creating class: $classData');
-
-    if (mounted) {
-      setState(() {
-        _isLoading = false;
-      });
+      if (mounted) {
+        if (response.statusCode == 201 && responseData['status'] == true) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(responseData['message'] ?? 'Class created successfully!'),
+              backgroundColor: Colors.green,
+            ),
+          );
+          Navigator.pop(context, true); // Pop with a true result to indicate success
+        } else {
+          throw Exception(responseData['message'] ?? 'Failed to create class.');
+        }
+      }
+    } on TimeoutException {
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Class created successfully!')),
+        const SnackBar(
+          content: Text('The connection timed out. Please check your network and try again.'),
+          backgroundColor: Colors.red,
+        ),
       );
-      Navigator.pop(context);
+    } on Exception catch (e) {
+      if (!mounted) return;
+      final message = e.toString().replaceFirst('Exception: ', '');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(message),
+          backgroundColor: Colors.red,
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('An unexpected error occurred: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
     }
   }
 

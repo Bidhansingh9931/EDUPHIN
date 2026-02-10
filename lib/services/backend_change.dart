@@ -21,7 +21,9 @@ class ApiService {
     debugPrint("API Response Body: ${response.body}");
 
     if (response.statusCode == 200) {
-      return json.decode(response.body);
+      // TEMPORARY FIX: Correct malformed 'nll' to 'null' from backend response
+      final sanitizedBody = response.body.replaceAll('nll', 'null');
+      return json.decode(sanitizedBody);
     } else {
       throw Exception('Failed to load custom data for screen: $screen');
     }
@@ -41,7 +43,9 @@ class ApiService {
     debugPrint("API Response Body: ${response.body}");
 
     if (response.statusCode == 200) {
-      final decoded = json.decode(response.body);
+      // TEMPORARY FIX: Correct malformed 'nll' to 'null' from backend response
+      final sanitizedBody = response.body.replaceAll('nll', 'null');
+      final decoded = json.decode(sanitizedBody);
       // Added null-safety: if 'components' is missing, return an empty list.
       final List? list = decoded['components'] as List?;
       if (list == null) return [];

@@ -1,3 +1,5 @@
+import 'dart:convert';
+import 'package:eduphin/services/api_service.dart';
 import 'package:flutter/material.dart';
 
 class CreateNewSubjectPage extends StatefulWidget {
@@ -27,28 +29,49 @@ class _CreateNewSubjectPageState extends State<CreateNewSubjectPage> {
       _isLoading = true;
     });
 
-    // Simulate API call
-    await Future.delayed(const Duration(seconds: 2));
+    try {
+      final body = {
+        'subject_name': _nameController.text,
+        'code': _codeController.text,
+        'description': _descriptionController.text,
+        'credit': _creditController.text,
+        'type': _selectedType,
+        'status': _selectedStatus?.toLowerCase(),
+      };
 
-    final subjectData = {
-      'name': _nameController.text,
-      'code': _codeController.text,
-      'description': _descriptionController.text,
-      'credit': _creditController.text,
-      'type': _selectedType,
-      'status': _selectedStatus,
-    };
+      final response = await ApiService.post('manager/subjects', body);
+      final responseData = jsonDecode(response.body);
 
-    print('Adding subject: $subjectData');
+      if (!mounted) return;
 
-    if (mounted) {
-      setState(() {
-        _isLoading = false;
-      });
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Subject added successfully!')),
-      );
-      Navigator.of(context).pop();
+      if (response.statusCode == 201 && responseData['status'] == true) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+              content: Text(responseData['message'] ?? 'Subject added successfully!')),
+        );
+        Navigator.of(context).pop(true); // Pop with success
+      } else {
+        String errorMessage = responseData['message'] ?? 'An unknown error occurred.';
+        if (responseData.containsKey('errors')) {
+          final errors = responseData['errors'] as Map<String, dynamic>;
+          errorMessage = errors.values.map((e) => e[0]).join('\n');
+        }
+        throw Exception(errorMessage);
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+              content: Text(e.toString().replaceFirst('Exception: ', '')),
+              backgroundColor: Colors.red),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
     }
   }
 
@@ -162,13 +185,12 @@ class _CreateNewSubjectPageState extends State<CreateNewSubjectPage> {
         const SizedBox(height: 16),
         _buildDropdownField(theme, "Type", _selectedType, [
           'Theory',
-          'Practical'
+          'Practical',
+          'Applied'
         ], (val) => setState(() => _selectedType = val)),
         const SizedBox(height: 16),
-        _buildDropdownField(theme, "Status", _selectedStatus, [
-          'Active',
-          'Inactive'
-        ], (val) => setState(() => _selectedStatus = val)),
+        _buildDropdownField(theme, "Status", _selectedStatus, ['Active', 'Inactive'],
+            (val) => setState(() => _selectedStatus = val)),
         const SizedBox(height: 80), // Padding for FAB
       ],
     );
@@ -205,7 +227,8 @@ class _CreateNewSubjectPageState extends State<CreateNewSubjectPage> {
             Expanded(
                 child: _buildDropdownField(theme, "Type", _selectedType, [
               'Theory',
-              'Practical'
+              'Practical',
+              'Applied'
             ], (val) => setState(() => _selectedType = val))),
             const SizedBox(width: 16),
             Expanded(

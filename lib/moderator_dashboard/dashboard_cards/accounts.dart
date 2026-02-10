@@ -1,5 +1,9 @@
 import 'dart:async';
+import 'dart:convert';
+import 'package:eduphin/moderator_dashboard/dashboard_cards/add_account.dart';
+import 'package:eduphin/services/api_service.dart';
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
 
 // 1. Data Model for an Account
 class Account {
@@ -10,25 +14,50 @@ class Account {
     required this.name,
     required this.email,
   });
-}
 
-// 2. Data Provider to fetch account data
-class AccountProvider {
-  Future<List<Account>> fetchAccounts() async {
-    await Future.delayed(const Duration(seconds: 2));
-    return List.generate(
-      20,
-      (index) => Account(
-        name: 'Account User ${index + 1}',
-        email: 'user${index + 1}@example.com',
-      ),
+  factory Account.fromJson(Map<String, dynamic> json) {
+    return Account(
+      name: json['name'] ?? 'No Name',
+      email: json['email'] ?? 'No Email',
     );
   }
 }
 
-// 3. Updated StatefulWidget to be dynamic
+// 2. Data Provider to fetch account data from the API
+class AccountProvider {
+  Future<List<Account>> fetchAccounts(String instituteId) async {
+    final token = await ApiService.getToken();
+
+    if (token == null) {
+      throw Exception('Authentication token not found.');
+    }
+
+    final response = await http.get(
+      Uri.parse('${ApiService.baseUrl}/moderator/institutes/$instituteId/accounts'),
+      headers: {
+        'Authorization': 'Bearer $token',
+        'Accept': 'application/json',
+      },
+    );
+
+    if (response.statusCode == 200) {
+      final data = jsonDecode(response.body);
+      if (data['success'] == true && data['accounts'] != null) {
+        final List<dynamic> accountsJson = data['accounts'];
+        return accountsJson.map((json) => Account.fromJson(json)).toList();
+      } else {
+        throw Exception(data['message'] ?? 'Failed to load accounts.');
+      }
+    } else {
+      throw Exception('Failed to load accounts. Status Code: ${response.statusCode}');
+    }
+  }
+}
+
+// 3. StatefulWidget now accepts instituteId
 class AccountsPage extends StatefulWidget {
-  const AccountsPage({super.key});
+  final String instituteId;
+  const AccountsPage({super.key, required this.instituteId});
 
   @override
   State<AccountsPage> createState() => _AccountsPageState();
@@ -37,11 +66,50 @@ class AccountsPage extends StatefulWidget {
 class _AccountsPageState extends State<AccountsPage> {
   final AccountProvider _provider = AccountProvider();
   late Future<List<Account>> _accountsFuture;
+  List<Account> _allAccounts = [];
+  List<Account> _filteredAccounts = [];
+  final TextEditingController _searchController = TextEditingController();
 
   @override
   void initState() {
     super.initState();
-    _accountsFuture = _provider.fetchAccounts();
+    _accountsFuture = _provider.fetchAccounts(widget.instituteId);
+    _accountsFuture.then((accounts) {
+      setState(() {
+        _allAccounts = accounts;
+        _filteredAccounts = accounts;
+      });
+    });
+    _searchController.addListener(_filterAccounts);
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  void _filterAccounts() {
+    final query = _searchController.text.toLowerCase();
+    setState(() {
+      _filteredAccounts = _allAccounts.where((account) {
+        final nameLower = account.name.toLowerCase();
+        final emailLower = account.email.toLowerCase();
+        return nameLower.contains(query) || emailLower.contains(query);
+      }).toList();
+    });
+  }
+
+  void _refreshAccounts() {
+    setState(() {
+      _accountsFuture = _provider.fetchAccounts(widget.instituteId);
+      _accountsFuture.then((accounts) {
+        setState(() {
+          _allAccounts = accounts;
+          _filterAccounts(); // Re-apply filter
+        });
+      });
+    });
   }
 
   @override
@@ -67,21 +135,46 @@ class _AccountsPageState extends State<AccountsPage> {
         backgroundColor: const Color(0xFF0D1B2A),
         elevation: 0,
         iconTheme: const IconThemeData(color: Colors.white),
+        bottom: PreferredSize(
+          preferredSize: const Size.fromHeight(kToolbarHeight),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16.0),
+            child: TextField(
+              controller: _searchController,
+              style: const TextStyle(color: Colors.white),
+              decoration: InputDecoration(
+                hintText: 'Search accounts...',
+                hintStyle: const TextStyle(color: Colors.white70),
+                prefixIcon: const Icon(Icons.search, color: Colors.white70),
+                filled: true,
+                fillColor: const Color(0xFF1B263B),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide.none,
+                ),
+              ),
+            ),
+          ),
+        ),
       ),
       body: FutureBuilder<List<Account>>(
         future: _accountsFuture,
         builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
+          if (snapshot.connectionState == ConnectionState.waiting && _allAccounts.isEmpty) {
             return const Center(child: CircularProgressIndicator());
           }
-          if (snapshot.hasError) {
+          if (snapshot.hasError && _allAccounts.isEmpty) {
             return Center(child: Text('Error: ${snapshot.error}', style: const TextStyle(color: Colors.white70)));
           }
-          if (!snapshot.hasData || snapshot.data!.isEmpty) {
-            return const Center(child: Text('No accounts found.', style: TextStyle(color: Colors.white70)));
+          if (_allAccounts.isEmpty) {
+            return const Center(child: Text('No accounts found.', style: const TextStyle(color: Colors.white70)));
           }
 
-          final accounts = snapshot.data!;
+          final accounts = _filteredAccounts;
+          if(accounts.isEmpty && _searchController.text.isNotEmpty) {
+            return const Center(child: Text('No accounts found for your search.', style: const TextStyle(color: Colors.white70)));
+          }
+
 
           return LayoutBuilder(
             builder: (context, constraints) {
@@ -118,6 +211,19 @@ class _AccountsPageState extends State<AccountsPage> {
             },
           );
         },
+      ),
+      floatingActionButton: FloatingActionButton(
+        onPressed: () async {
+          final result = await Navigator.push(
+            context,
+            MaterialPageRoute(builder: (context) => const AddAccountPage()),
+          );
+          if (result == true) {
+            _refreshAccounts();
+          }
+        },
+        backgroundColor: const Color(0xFF4A90E2),
+        child: const Icon(Icons.add),
       ),
     );
   }

@@ -1,7 +1,43 @@
+import 'dart:convert';
+
 import 'package:eduphin/manager_dashboard/manageClasses/timeTable/show_schedule.dart';
+import 'package:eduphin/services/api_service.dart';
 import 'package:flutter/material.dart';
 
 import 'add_new_schedule.dart';
+
+// ───────────────────────────────────────────────────────────
+//                          DATA MODELS
+// ───────────────────────────────────────────────────────────
+
+class Class {
+  final int id;
+  final String name;
+  final List<Section> sections;
+
+  Class({required this.id, required this.name, required this.sections});
+
+  factory Class.fromJson(Map<String, dynamic> json) {
+    var sectionsList = json['sections'] as List? ?? [];
+    List<Section> sections = sectionsList.map((i) => Section.fromJson(i)).toList();
+    return Class(id: json['id'], name: json['name'], sections: sections);
+  }
+}
+
+class Section {
+  final int id;
+  final String sectionName;
+
+  Section({required this.id, required this.sectionName});
+
+  factory Section.fromJson(Map<String, dynamic> json) {
+    return Section(id: json['id'], sectionName: json['section_name']);
+  }
+}
+
+// ───────────────────────────────────────────────────────────
+//                       TIME TABLE PAGE
+// ───────────────────────────────────────────────────────────
 
 class TimeTableClassesPage extends StatefulWidget {
   const TimeTableClassesPage({super.key});
@@ -13,10 +49,10 @@ class TimeTableClassesPage extends StatefulWidget {
 class _TimeTableClassesPageState extends State<TimeTableClassesPage> {
   final _formKey = GlobalKey<FormState>();
   bool _isLoading = true;
-  String? _selectedClass;
-  String? _selectedSection;
-  List<String> _classList = [];
-  List<String> _sectionList = [];
+  int? _selectedClassId;
+  int? _selectedSectionId;
+  List<Class> _classList = [];
+  List<Section> _sectionsForSelectedClass = [];
 
   @override
   void initState() {
@@ -25,34 +61,52 @@ class _TimeTableClassesPageState extends State<TimeTableClassesPage> {
   }
 
   Future<void> _fetchDropdownData() async {
-    // Simulate API call to fetch dropdown data.
-    await Future.delayed(const Duration(seconds: 1));
+    try {
+      final response = await ApiService.get('manager/classes');
+      if (mounted) {
+        if (response.statusCode == 200) {
+          final data = jsonDecode(response.body);
+          final List<dynamic> classData = data['data'];
+          final List<Class> fetchedClasses = classData.map((json) => Class.fromJson(json)).toList();
 
-    final List<String> fetchedClasses = [
-      "Class 1", "Class 2", "Class 3", "Class 4", "Class 5", "Class 6",
-    ];
-    final List<String> fetchedSections = ["A", "B", "C", "D"];
-
-    if (mounted) {
-      setState(() {
-        _classList = fetchedClasses;
-        _sectionList = fetchedSections;
-        // Set initial value only if lists are not empty
-        if (_classList.isNotEmpty) _selectedClass = _classList.first;
-        if (_sectionList.isNotEmpty) _selectedSection = _sectionList.first;
-        _isLoading = false;
-      });
+          setState(() {
+            _classList = fetchedClasses;
+            if (_classList.isNotEmpty) {
+              _selectedClassId = _classList.first.id;
+              _sectionsForSelectedClass = _classList.first.sections;
+              if (_sectionsForSelectedClass.isNotEmpty) {
+                _selectedSectionId = _sectionsForSelectedClass.first.id;
+              }
+            }
+            _isLoading = false;
+          });
+        } else {
+          throw Exception('Failed to load class data');
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString())));
+        setState(() {
+          _isLoading = false;
+        });
+      }
     }
   }
 
   void _showSchedule() {
     if (_formKey.currentState!.validate()) {
+      final className = _classList.firstWhere((c) => c.id == _selectedClassId).name;
+      final sectionName = _sectionsForSelectedClass.firstWhere((s) => s.id == _selectedSectionId).sectionName;
+
       Navigator.push(
         context,
         MaterialPageRoute(
           builder: (context) => ShowSchedulePage(
-            className: _selectedClass!,
-            section: _selectedSection!,
+            className: className,
+            section: sectionName,
+            classId: _selectedClassId!,
+            sectionId: _selectedSectionId!,
           ),
         ),
       );
@@ -127,18 +181,25 @@ class _TimeTableClassesPageState extends State<TimeTableClassesPage> {
                         _buildDropdown(
                           theme,
                           label: "Class",
-                          value: _selectedClass,
-                          items: _classList,
-                          onChanged: (value) => setState(() => _selectedClass = value),
+                          value: _selectedClassId,
+                          items: _classList.map((c) => DropdownMenuItem(value: c.id, child: Text(c.name))).toList(),
+                          onChanged: (value) {
+                            if (value == null) return;
+                            setState(() {
+                              _selectedClassId = value;
+                              _sectionsForSelectedClass = _classList.firstWhere((c) => c.id == value).sections;
+                              _selectedSectionId = _sectionsForSelectedClass.isNotEmpty ? _sectionsForSelectedClass.first.id : null;
+                            });
+                          },
                           hint: "--Select Class",
                         ),
                         const SizedBox(height: 16),
                         _buildDropdown(
                           theme,
                           label: "Section",
-                          value: _selectedSection,
-                          items: _sectionList,
-                          onChanged: (value) => setState(() => _selectedSection = value),
+                          value: _selectedSectionId,
+                          items: _sectionsForSelectedClass.map((s) => DropdownMenuItem(value: s.id, child: Text(s.sectionName))).toList(),
+                          onChanged: (value) => setState(() => _selectedSectionId = value),
                           hint: "--Select Section",
                         ),
                         const SizedBox(height: 80), // Padding for FAB
@@ -151,12 +212,12 @@ class _TimeTableClassesPageState extends State<TimeTableClassesPage> {
     );
   }
 
-  Widget _buildDropdown(
+  Widget _buildDropdown<T>(
     ThemeData theme,
       {required String label,
-      String? value,
-      required List<String> items,
-      required ValueChanged<String?> onChanged,
+      T? value,
+      required List<DropdownMenuItem<T>> items,
+      required ValueChanged<T?> onChanged,
       required String hint}) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -166,9 +227,9 @@ class _TimeTableClassesPageState extends State<TimeTableClassesPage> {
           style: theme.textTheme.labelLarge?.copyWith(fontWeight: FontWeight.bold),
         ),
         const SizedBox(height: 8),
-        DropdownButtonFormField<String>(
+        DropdownButtonFormField<T>(
           value: value,
-          items: items.map((e) => DropdownMenuItem(value: e, child: Text(e))).toList(),
+          items: items,
           onChanged: onChanged,
           decoration: InputDecoration(
             filled: true,
@@ -183,38 +244,5 @@ class _TimeTableClassesPageState extends State<TimeTableClassesPage> {
         ),
       ],
     );
-  }
-}
-
-
-// Kept original DropDownBox but it is no longer used. Can be removed.
-class DropDownBox extends StatelessWidget {
-  final String initialValue;
-  final List<String> items;
-  final ValueChanged<String?> onChanged;
-  final String? hintText;
-
-  const DropDownBox({
-    super.key,
-    required this.initialValue,
-    required this.items,
-    required this.onChanged,
-    this.hintText,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return DropdownButtonFormField(
-        value: initialValue,
-        isExpanded: true,
-        items:
-            items.map((e) => DropdownMenuItem(value: e, child: Text(e))).toList(),
-        onChanged: onChanged,
-        decoration: InputDecoration(
-          hintText: hintText,
-          border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(10.0),
-          ),
-        ));
   }
 }

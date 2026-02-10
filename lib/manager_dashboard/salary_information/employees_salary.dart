@@ -1,23 +1,56 @@
+import 'dart:convert';
+import 'package:eduphin/services/api_service.dart';
 import 'package:flutter/material.dart';
 
 import 'account_details.dart';
 
 class Employee {
+  final int id;
   final String name;
   final String info;
   final String role;
   final Color roleColor;
-  final String status;
-  final Color statusColor;
 
   Employee({
+    required this.id,
     required this.name,
     required this.info,
     required this.role,
     required this.roleColor,
-    required this.status,
-    required this.statusColor,
   });
+
+  static Color _getColorForRole(String role) {
+    switch (role.toLowerCase()) {
+      case 'teacher':
+        return Colors.blue;
+      case 'administrator':
+        return Colors.purple;
+      case 'support staff':
+        return Colors.indigo;
+      case 'librarian':
+        return Colors.teal;
+      case 'counselor':
+        return Colors.orange;
+      case 'accountant':
+        return Colors.red;
+      default:
+        return Colors.grey;
+    }
+  }
+
+  factory Employee.fromJson(Map<String, dynamic> json, Map<int, String> roleMap) {
+    final user = json['user'] ?? {};
+    final roleId = json['role_id'];
+    final roleName = roleMap[roleId] ?? 'Unknown';
+
+    return Employee(
+      id: json['id'] ?? 0,
+      name: user['name'] ?? 'No Name',
+      info: user['email'] ?? 'No Email',
+      role: roleName,
+      roleColor: _getColorForRole(roleName),
+    );
+  }
 }
 
 class EmployeesSalaryPage extends StatefulWidget {
@@ -28,10 +61,11 @@ class EmployeesSalaryPage extends StatefulWidget {
 }
 
 class _EmployeesSalaryPageState extends State<EmployeesSalaryPage> {
-  String? _selectedRole = "All";
+  String _selectedRole = "All";
   bool _isLoading = true;
   List<Employee> _allEmployees = [];
   List<Employee> _filteredEmployees = [];
+  List<String> _roles = ["All"]; // Dynamic list for roles
   final TextEditingController _searchController = TextEditingController();
 
   @override
@@ -48,66 +82,49 @@ class _EmployeesSalaryPageState extends State<EmployeesSalaryPage> {
   }
 
   Future<void> _fetchEmployees() async {
-    // Simulate API call to fetch employees.
-    // Replace this with your actual API call.
-    await Future.delayed(const Duration(seconds: 2));
-    final List<Employee> employees = [
-      Employee(
-        name: "Ananya Sharma",
-        info: "ananya.sharma@example.com",
-        role: "Teacher",
-        roleColor: Colors.blue,
-        status: "Full-time",
-        statusColor: Colors.green,
-      ),
-      Employee(
-        name: "Rohan Mehra",
-        info: "+91 98765 43210",
-        role: "Administrator",
-        roleColor: Colors.purple,
-        status: "Full-time",
-        statusColor: Colors.green,
-      ),
-      Employee(
-        name: "Priya Verma",
-        info: "priya.verma@example.com",
-        role: "Teacher",
-        roleColor: Colors.blue,
-        status: "Part-time",
-        statusColor: Colors.orange,
-      ),
-      Employee(
-        name: "Vikram Singh",
-        info: "+91 91234 56789",
-        role: "Support Staff",
-        roleColor: Colors.indigo,
-        status: "Full-time",
-        statusColor: Colors.green,
-      ),
-      Employee(
-        name: "Sonia Gupta",
-        info: "sonia.gupta@example.com",
-        role: "Librarian",
-        roleColor: Colors.teal,
-        status: "Full-time",
-        statusColor: Colors.green,
-      ),
-      Employee(
-        name: "Amit Kumar",
-        info: "+91 99887 76655",
-        role: "Teacher",
-        roleColor: Colors.blue,
-        status: "Part-time",
-        statusColor: Colors.orange,
-      ),
-    ];
+    if (!mounted) return;
+    setState(() {
+      _isLoading = true;
+    });
 
-    if (mounted) {
+    try {
+      final response = await ApiService.get('manager/salary/accounts');
+
+      if (!mounted) return;
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+
+        final List<dynamic> rolesData = data['roles'];
+        final Map<int, String> roleMap = {
+          for (var role in rolesData)
+            if (role['id'] != null && role['name'] != null)
+              role['id'] as int: role['name'] as String
+        };
+        final List<String> roleNames = ["All", ...roleMap.values.toSet()];
+
+        final List<dynamic> accountsData = data['accounts'];
+        final List<Employee> employees = accountsData
+            .map((account) => Employee.fromJson(account, roleMap))
+            .toList();
+
+        setState(() {
+          _allEmployees = employees;
+          _filteredEmployees = employees;
+          _roles = roleNames;
+          _isLoading = false;
+        });
+      } else {
+        throw Exception('Failed to load employees: ${response.statusCode}');
+      }
+    } catch (e) {
+      if (!mounted) return;
       setState(() {
-        _allEmployees = employees;
-        _filteredEmployees = employees;
         _isLoading = false;
       });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error: ${e.toString().replaceFirst("Exception: ", "")}')),
+      );
     }
   }
 
@@ -115,7 +132,7 @@ class _EmployeesSalaryPageState extends State<EmployeesSalaryPage> {
     List<Employee> results = _allEmployees;
 
     // Filter by role
-    if (_selectedRole != null && _selectedRole != "All") {
+    if (_selectedRole != "All") {
       results = results.where((employee) => employee.role == _selectedRole).toList();
     }
 
@@ -183,12 +200,14 @@ class _EmployeesSalaryPageState extends State<EmployeesSalaryPage> {
                 icon: Icon(Icons.keyboard_arrow_down, color: theme.hintColor),
                 style: theme.textTheme.bodyLarge,
                 onChanged: (String? newValue) {
-                  setState(() {
-                    _selectedRole = newValue;
-                    _filterEmployees();
-                  });
+                  if (newValue != null) {
+                    setState(() {
+                      _selectedRole = newValue;
+                      _filterEmployees();
+                    });
+                  }
                 },
-                items: <String>["All", "Teacher", "Administrator", "Support Staff", "Librarian"]
+                items: _roles
                     .map<DropdownMenuItem<String>>((String value) {
                   return DropdownMenuItem<String>(
                     value: value,
@@ -204,13 +223,15 @@ class _EmployeesSalaryPageState extends State<EmployeesSalaryPage> {
             Expanded(
               child: _isLoading
                   ? const Center(child: CircularProgressIndicator())
-                  : LayoutBuilder(builder: (context, constraints) {
-                      if (constraints.maxWidth > 600) {
-                        return _buildGridView();
-                      } else {
-                        return _buildListView();
-                      }
-                    }),
+                  : _filteredEmployees.isEmpty
+                      ? const Center(child: Text("No employees found."))
+                      : LayoutBuilder(builder: (context, constraints) {
+                          if (constraints.maxWidth > 600) {
+                            return _buildGridView();
+                          } else {
+                            return _buildListView();
+                          }
+                        }),
             )
           ],
         ),
@@ -223,15 +244,16 @@ class _EmployeesSalaryPageState extends State<EmployeesSalaryPage> {
       padding: const EdgeInsets.only(bottom: 50), // Added bottom padding
       itemCount: _filteredEmployees.length,
       itemBuilder: (context, index) {
+        final employee = _filteredEmployees[index];
         return InkWell(
           onTap: () {
             Navigator.push(
               context,
-              MaterialPageRoute(builder: (context) => const AccountDetailsPage()),
+              MaterialPageRoute(builder: (context) => AccountDetailsPage(employeeId: employee.id)),
             );
           },
           child: EmployeeCard(
-            employee: _filteredEmployees[index],
+            employee: employee,
           ),
         );
       },
@@ -247,18 +269,19 @@ class _EmployeesSalaryPageState extends State<EmployeesSalaryPage> {
         maxCrossAxisExtent: 400,
         mainAxisSpacing: 12,
         crossAxisSpacing: 12,
-        childAspectRatio: 2.8, // Adjust for better card shape
+        childAspectRatio: 3.2, // Adjust for better card shape
       ),
       itemBuilder: (context, index) {
+        final employee = _filteredEmployees[index];
         return InkWell(
           onTap: () {
             Navigator.push(
               context,
-              MaterialPageRoute(builder: (context) => const AccountDetailsPage()),
+              MaterialPageRoute(builder: (context) => AccountDetailsPage(employeeId: employee.id)),
             );
           },
           child: EmployeeCard(
-            employee: _filteredEmployees[index],
+            employee: employee,
           ),
         );
       },
@@ -297,27 +320,17 @@ class EmployeeCard extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisAlignment: MainAxisAlignment.center, // Center content for GridView
               children: [
-                Text(employee.name, style: theme.textTheme.titleMedium),
+                Text(employee.name, style: theme.textTheme.titleMedium, overflow: TextOverflow.ellipsis),
                 const SizedBox(height: 4),
-                Text(employee.info, style: theme.textTheme.bodySmall?.copyWith(color: theme.hintColor)),
+                Text(employee.info, style: theme.textTheme.bodySmall?.copyWith(color: theme.hintColor), overflow: TextOverflow.ellipsis),
                 const SizedBox(height: 8),
-                Row(
-                  children: [
-                    Chip(
-                      label: Text(employee.role),
-                      backgroundColor: employee.roleColor.withAlpha(35),
-                      labelStyle: TextStyle(color: employee.roleColor, fontWeight: FontWeight.bold),
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                    ),
-                    const SizedBox(width: 8),
-                    Chip(
-                      label: Text(employee.status),
-                      backgroundColor: employee.statusColor.withAlpha(35),
-                      labelStyle: TextStyle(color: employee.statusColor, fontWeight: FontWeight.bold),
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                    ),
-                  ],
-                )
+                Chip(
+                  label: Text(employee.role),
+                  backgroundColor: employee.roleColor.withAlpha(35),
+                  labelStyle: TextStyle(color: employee.roleColor, fontWeight: FontWeight.bold, fontSize: 12),
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 0),
+                  materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                ),
               ],
             ),
           ),

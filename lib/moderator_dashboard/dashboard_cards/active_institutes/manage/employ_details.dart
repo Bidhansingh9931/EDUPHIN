@@ -1,118 +1,7 @@
-import 'dart:async';
 import 'package:flutter/material.dart';
 
-import '../../../moderator_dashboard.dart';
-
-// 1. Data Model for detailed employee information
-class EmployeeDetails {
-  final String id;
-  String fullName;
-  String email;
-  String role;
-  String gender;
-  String dateOfBirth;
-  String relationshipStatus;
-  String phoneNumber;
-  String alternateNumber;
-  String address;
-  String city;
-  String state;
-  String pinCode;
-  String position;
-  String employmentType;
-  final String joiningDate;
-  String experience;
-  String status;
-  String reference;
-  String qualification;
-  String matriculationMarks;
-  String intermediateMarks;
-  String bankAccountNumber;
-  String ifscCode;
-  String bankName;
-  String branch;
-  String emergencyContactName;
-  String emergencyContactNumber;
-
-  EmployeeDetails({
-    required this.id,
-    required this.fullName,
-    required this.email,
-    required this.role,
-    required this.gender,
-    required this.dateOfBirth,
-    required this.relationshipStatus,
-    required this.phoneNumber,
-    required this.alternateNumber,
-    required this.address,
-    required this.city,
-    required this.state,
-    required this.pinCode,
-    required this.position,
-    required this.employmentType,
-    required this.joiningDate,
-    required this.experience,
-    required this.status,
-    required this.reference,
-    required this.qualification,
-    required this.matriculationMarks,
-    required this.intermediateMarks,
-    required this.bankAccountNumber,
-    required this.ifscCode,
-    required this.bankName,
-    required this.branch,
-    required this.emergencyContactName,
-    required this.emergencyContactNumber,
-  });
-}
-
-// 2. Data Provider to fetch and save employee details
-class EmployeeDetailsProvider {
-  // In the future, replace this with a real API call to fetch data
-  Future<EmployeeDetails> fetchEmployeeDetails(String employeeId) async {
-    await Future.delayed(const Duration(seconds: 2)); // Simulate network delay
-
-    // This is where you would fetch your data from an API based on the employeeId.
-    // For now, we are returning mock data.
-    return EmployeeDetails(
-      id: employeeId,
-      fullName: "Dr. Evelyn Reed",
-      email: "evelyn.reed@example.com",
-      role: "Teacher",
-      gender: "Female",
-      dateOfBirth: "15-08-1985",
-      relationshipStatus: "Single",
-      phoneNumber: "+91 1234567890",
-      alternateNumber: "+91 0987654321",
-      address: "123, Tech Park Road",
-      city: "Bengaluru",
-      state: "Karnataka",
-      pinCode: "560001",
-      position: "Senior Teacher",
-      employmentType: "Full-Time",
-      joiningDate: "01-07-2020",
-      experience: "5",
-      status: "Active",
-      reference: "N/A",
-      qualification: "M.Sc. Physics",
-      matriculationMarks: "92%",
-      intermediateMarks: "88%",
-      bankAccountNumber: "123456789012",
-      ifscCode: "BANK0001234",
-      bankName: "Example Bank",
-      branch: "Tech Park Branch",
-      emergencyContactName: "John Doe",
-      emergencyContactNumber: "+91 0987654321",
-    );
-  }
-
-  // In the future, replace this with a real API call to save data
-  Future<void> saveEmployeeDetails(EmployeeDetails details) async {
-    await Future.delayed(const Duration(seconds: 2)); // Simulate network delay
-    debugPrint("Saving data for ${details.fullName}...");
-    // In a real app, you would make a POST or PUT request here.
-  }
-}
+import 'employee_details.dart';
+import 'employee_details_provider.dart';
 
 // 3. Updated page to be dynamic
 class EmployeeDetailsPage extends StatefulWidget {
@@ -331,226 +220,134 @@ class _EmployeeDetailsPageState extends State<EmployeeDetailsPage> {
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
             Text('Employee Details', style: TextStyle(color: Colors.white, fontSize: responsiveFontSize(18))),
-            InkWell(
-                onTap: () => Navigator.pushReplacement(context,
-                    MaterialPageRoute(builder: (context) => const ModeratorDashboardPage())),
-                child: const Icon(
-                  Icons.home_sharp,
-                  size: 30,
-                  color: Colors.white,
-                )),
           ],
         ),
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
           : SingleChildScrollView(
-        padding: EdgeInsets.fromLTRB(screenWidth * 0.04, 16, screenWidth * 0.04, 80),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.center,
-          children: [
-            _buildProfileImage(context),
-            const SizedBox(height: 12),
-            Text(_fullNameController.text, style: TextStyle(color: Colors.white, fontSize: responsiveFontSize(22), fontWeight: FontWeight.bold)),
-            const SizedBox(height: 4),
-            Text(_emailController.text, style: TextStyle(color: Colors.white54, fontSize: responsiveFontSize(14))),
-            const SizedBox(height: 24),
-            _buildSection(
-              context: context,
-              title: "Personal Details",
-              children: [
-                _buildTextField(context, "Role", _roleController),
-                _buildTextField(context, "Gender", _genderController),
-                _buildTextField(context, "Date of Birth", _dateOfBirthController, readOnly: true),
-                _buildTextField(context, "Relationship Status", _relationshipStatusController),
-              ],
-            ),
-            _buildSection(
-              context: context,
-              title: "Contact Details",
-              children: [
-                _buildTextField(context, "Phone Number", _phoneNumberController),
-                _buildTextField(context, "Alternate Number", _alternateNumberController),
-              ],
-            ),
-            _buildSection(
-              context: context,
-              title: "Address Details",
-              children: [
-                _buildTextField(context, "Address", _addressController),
-                _buildTextField(context, "City", _cityController),
-                _buildTextField(context, "State", _stateController),
-                _buildTextField(context, "Pin Code", _pinCodeController),
-              ],
-            ),
-            _buildSection(
-              context: context,
-              title: "Professional Information",
-              children: [
-                _buildTextField(context, "Position", _positionController),
-                _buildTextField(context, "Employment Type", _employmentTypeController),
-                _buildTextField(context, "Joining Date", _joiningDateController, readOnly: true),
-                _buildTextField(context, "Experience (Years)", _experienceController),
-                _buildTextField(context, "Status", _statusController),
-                _buildTextField(context, "Reference", _referenceController),
-              ],
-            ),
-            _buildSection(
-              context: context,
-              title: "Education Details",
-              children: [
-                _buildTextField(context, "Qualification", _qualificationController),
-                _buildTextField(context, "Matriculation Marks (%)", _matriculationMarksController),
-                _buildTextField(context, "Intermediate Marks (%)", _intermediateMarksController),
-              ],
-            ),
-            _buildSection(
-              context: context,
-              title: "Banking Details",
-              children: [
-                _buildTextField(context, "Bank Account Number", _bankAccountNumberController),
-                _buildTextField(context, "IFSC Code", _ifscCodeController),
-                _buildTextField(context, "Bank Name", _bankNameController),
-                _buildTextField(context, "Branch", _branchController),
-              ],
-            ),
-            _buildSection(
-              context: context,
-              title: "Emergency Contact",
-              children: [
-                _buildTextField(context, "Emergency Contact Name", _emergencyContactNameController),
-                _buildTextField(context, "Emergency Contact Number", _emergencyContactNumberController),
-              ],
-            ),
-            const SizedBox(height: 30),
-            SizedBox(
-              width: double.infinity,
-              height: 50,
-              child: ElevatedButton(
-                onPressed: _isSaving ? null : _saveChanges,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF0E86D4),
-                  disabledBackgroundColor: const Color(0xFF0E86D4).withOpacity(0.5),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(15),
+              padding: const EdgeInsets.all(16.0),
+              child: Column(
+                children: [
+                  _buildSection(
+                    title: 'Personal Details',
+                    children: [
+                      _buildTextField(controller: _fullNameController, label: 'Full Name'),
+                      _buildTextField(controller: _emailController, label: 'Email'),
+                      _buildTextField(controller: _roleController, label: 'Role'),
+                      _buildTextField(controller: _genderController, label: 'Gender'),
+                      _buildTextField(controller: _dateOfBirthController, label: 'Date of Birth'),
+                      _buildTextField(controller: _relationshipStatusController, label: 'Relationship Status'),
+                    ],
                   ),
-                ),
-                child: _isSaving
-                    ? const CircularProgressIndicator(valueColor: AlwaysStoppedAnimation<Color>(Colors.white))
-                    : Text(
-                  "Save Changes",
-                  style: TextStyle(
-                      color: Colors.white,
-                      fontSize: responsiveFontSize(16),
-                      fontWeight: FontWeight.bold),
-                ),
+                  _buildSection(
+                    title: 'Contact Information',
+                    children: [
+                      _buildTextField(controller: _phoneNumberController, label: 'Phone Number'),
+                      _buildTextField(controller: _alternateNumberController, label: 'Alternate Number'),
+                      _buildTextField(controller: _addressController, label: 'Address'),
+                      _buildTextField(controller: _cityController, label: 'City'),
+                      _buildTextField(controller: _stateController, label: 'State'),
+                      _buildTextField(controller: _pinCodeController, label: 'Pincode'),
+                    ],
+                  ),
+                  _buildSection(
+                    title: 'Employment Details',
+                    children: [
+                      _buildTextField(controller: _positionController, label: 'Position'),
+                      _buildTextField(controller: _employmentTypeController, label: 'Employment Type'),
+                      _buildTextField(controller: _joiningDateController, label: 'Joining Date', readOnly: true),
+                      _buildTextField(controller: _experienceController, label: 'Experience (Years)'),
+                      _buildTextField(controller: _statusController, label: 'Status'),
+                      _buildTextField(controller: _referenceController, label: 'Reference'),
+                    ],
+                  ),
+                  _buildSection(
+                    title: 'Educational Qualification',
+                    children: [
+                      _buildTextField(controller: _qualificationController, label: 'Qualification'),
+                      _buildTextField(controller: _matriculationMarksController, label: 'Matriculation Marks'),
+                      _buildTextField(controller: _intermediateMarksController, label: 'Intermediate Marks'),
+                    ],
+                  ),
+                  _buildSection(
+                    title: 'Bank Details',
+                    children: [
+                      _buildTextField(controller: _bankAccountNumberController, label: 'Bank Account Number'),
+                      _buildTextField(controller: _ifscCodeController, label: 'IFSC Code'),
+                      _buildTextField(controller: _bankNameController, label: 'Bank Name'),
+                      _buildTextField(controller: _branchController, label: 'Branch'),
+                    ],
+                  ),
+                  _buildSection(
+                    title: 'Emergency Contact',
+                    children: [
+                      _buildTextField(controller: _emergencyContactNameController, label: 'Emergency Contact Name'),
+                      _buildTextField(controller: _emergencyContactNumberController, label: 'Emergency Contact Number'),
+                    ],
+                  ),
+                  const SizedBox(height: 20),
+                  ElevatedButton(
+                    onPressed: _isSaving ? null : _saveChanges,
+                    style: ElevatedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 15),
+                    ),
+                    child: _isSaving
+                        ? const CircularProgressIndicator(valueColor: AlwaysStoppedAnimation<Color>(Colors.white))
+                        : const Text('Save Changes'),
+                  ),
+                ],
               ),
             ),
-          ],
+    );
+  }
+
+  Widget _buildTextField({required TextEditingController controller, required String label, bool readOnly = false}) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8.0),
+      child: TextFormField(
+        controller: controller,
+        readOnly: readOnly,
+        style: const TextStyle(color: Colors.white),
+        decoration: InputDecoration(
+          labelText: label,
+          labelStyle: const TextStyle(color: Colors.white70),
+          filled: true,
+          fillColor: const Color(0xFF1B263B),
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(8),
+            borderSide: BorderSide.none,
+          ),
         ),
       ),
     );
   }
 
-  Widget _buildProfileImage(BuildContext context) {
-    final screenWidth = MediaQuery.of(context).size.width;
-    return Center(
-      child: Stack(
-        children: [
-          CircleAvatar(
-            radius: screenWidth * 0.15,
-            backgroundImage: const AssetImage("assets/images/man_image.png"),
-          ),
-          Positioned(
-            bottom: 4,
-            right: 4,
-            child: InkWell(
-              onTap: () {},
-              child: Container(
-                padding: const EdgeInsets.all(6),
-                decoration: const BoxDecoration(
-                  color: Color(0xFF0E86D4),
-                  shape: BoxShape.circle,
-                ),
-                child: const Icon(Icons.edit, color: Colors.white, size: 24),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildTextField(BuildContext context, String title, TextEditingController controller, {bool readOnly = false}) {
-    final screenWidth = MediaQuery.of(context).size.width;
-    double responsiveFontSize(double baseSize) {
-      if (screenWidth > 1200) return baseSize * 1.2;
-      if (screenWidth > 600) return baseSize * 1.1;
-      return baseSize;
-    }
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(title, style: TextStyle(color: Colors.white54, fontSize: responsiveFontSize(13))),
-        const SizedBox(height: 8),
-        TextField(
-          controller: controller,
-          readOnly: readOnly,
-          style: TextStyle(color: Colors.white, fontSize: responsiveFontSize(14)),
-          decoration: InputDecoration(
-            filled: true,
-            fillColor: readOnly ? const Color(0xFF0D1B2A).withOpacity(0.5) : const Color(0xFF0D1B2A),
-            contentPadding: const EdgeInsets.symmetric(vertical: 16.0, horizontal: 12.0),
-            border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide.none),
-            enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide.none),
-            focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: Color(0xFF0E86D4), width: 1.5)),
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildSection({required BuildContext context, required String title, required List<Widget> children}) {
-    final screenWidth = MediaQuery.of(context).size.width;
-    double responsiveFontSize(double baseSize) {
-      if (screenWidth > 1200) return baseSize * 1.2;
-      if (screenWidth > 600) return baseSize * 1.1;
-      return baseSize;
-    }
-
+  Widget _buildSection({required String title, required List<Widget> children}) {
     return Container(
-      margin: const EdgeInsets.only(bottom: 16),
+      margin: const EdgeInsets.only(bottom: 16.0),
       padding: const EdgeInsets.all(16.0),
       decoration: BoxDecoration(
         color: const Color(0xFF1B263B),
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(8.0),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(title, style: TextStyle(color: Colors.white, fontSize: responsiveFontSize(18), fontWeight: FontWeight.bold)),
-          const SizedBox(height: 16),
-          LayoutBuilder(builder: (context, constraints) {
-            if (constraints.maxWidth > 700) {
-              return GridView.builder(
-                shrinkWrap: true,
-                physics: const NeverScrollableScrollPhysics(),
-                itemCount: children.length,
-                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                  crossAxisCount: 2,
-                  crossAxisSpacing: 16,
-                  mainAxisSpacing: 16,
-                  childAspectRatio: 5,
-                ),
-                itemBuilder: (context, index) => children[index],
-              );
-            } else {
-              return Column(
-                children: children.map((widget) => Padding(padding: const EdgeInsets.only(bottom: 12), child: widget)).toList(),
-              );
-            }
-          }),
+          Text(
+            title,
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 18.0,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          const Divider(
+            color: Colors.white24,
+            height: 20,
+            thickness: 1,
+          ),
+          ...children,
         ],
       ),
     );

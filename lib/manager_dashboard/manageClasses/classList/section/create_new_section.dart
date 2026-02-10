@@ -1,7 +1,10 @@
+import 'dart:convert';
+import 'package:eduphin/services/api_service.dart';
 import 'package:flutter/material.dart';
 
 class CreateNewSectionPage extends StatefulWidget {
-  const CreateNewSectionPage({super.key});
+  final int classId;
+  const CreateNewSectionPage({super.key, required this.classId});
 
   @override
   State<CreateNewSectionPage> createState() => _CreateNewSectionPageState();
@@ -10,9 +13,66 @@ class CreateNewSectionPage extends StatefulWidget {
 class _CreateNewSectionPageState extends State<CreateNewSectionPage> {
   final _formKey = GlobalKey<FormState>(); // Add a form key for validation
   final _sectionNameController = TextEditingController();
-  final _mentorController = TextEditingController();
   final _limitController = TextEditingController();
   bool _isLoading = false;
+  bool _isFetchingMentors = true;
+
+  List<Map<String, dynamic>> _mentors = [];
+  String? _selectedMentorId;
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchMentors();
+  }
+
+  Future<void> _fetchMentors() async {
+    setState(() {
+      _isFetchingMentors = true;
+    });
+    try {
+      // This assumes you have a 'manager/teacher' endpoint that returns a list of teachers.
+      // You may need to adjust the endpoint and the data parsing based on your actual API response.
+      final response = await ApiService.get('manager/teacher');
+      if (mounted) {
+        final responseData = jsonDecode(response.body);
+        if (response.statusCode == 200 && responseData['status'] == true) {
+          final List<dynamic> teachersList = responseData['data'];
+          setState(() {
+            _mentors = teachersList.map((teacher) {
+              // Assuming the API returns teacher data with a 'user' object.
+              // Adjust if your API response structure is different.
+              return {
+                'id': teacher['user']['id'],
+                'name':
+                    '${teacher['user']['first_name']} ${teacher['user']['last_name']}',
+              };
+            }).toList();
+          });
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(responseData['message'] ?? 'Failed to load mentors.'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+              content: Text('An error occurred while fetching mentors: $e')),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isFetchingMentors = false;
+        });
+      }
+    }
+  }
 
   Future<void> _createSection() async {
     // Validate the form before proceeding
@@ -24,33 +84,54 @@ class _CreateNewSectionPageState extends State<CreateNewSectionPage> {
       _isLoading = true;
     });
 
-    // Simulate API call
-    await Future.delayed(const Duration(seconds: 2));
-
-    final sectionData = {
-      'name': _sectionNameController.text,
-      'mentor': _mentorController.text,
-      'limit': _limitController.text,
-    };
-
-    // In a real app, you would send this to your API
-    print('Creating section: $sectionData');
-
-    if (mounted) {
-      setState(() {
-        _isLoading = false;
+    try {
+      final response = await ApiService.post('manager/sections', {
+        'class_id': widget.classId,
+        'section_name': _sectionNameController.text,
+        'section_limit': int.tryParse(_limitController.text) ?? 0,
+        'mentor_id':
+            _selectedMentorId != null ? int.parse(_selectedMentorId!) : null,
       });
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Section created successfully!')),
-      );
-      Navigator.pop(context); // Go back after creation
+
+      if (mounted) {
+        final responseData = jsonDecode(response.body);
+        if (response.statusCode == 201 && responseData['status'] == true) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content:
+                  Text(responseData['message'] ?? 'Section created successfully!'),
+              backgroundColor: Colors.green,
+            ),
+          );
+          Navigator.pop(context, true); // Pop with true to indicate success
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content:
+                  Text(responseData['message'] ?? 'Failed to create section.'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('An error occurred: $e')),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
     }
   }
 
   @override
   void dispose() {
     _sectionNameController.dispose();
-    _mentorController.dispose();
     _limitController.dispose();
     super.dispose();
   }
@@ -68,7 +149,8 @@ class _CreateNewSectionPageState extends State<CreateNewSectionPage> {
         padding: const EdgeInsets.fromLTRB(16, 16, 16, 50),
         child: Center(
           child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 500), // Limits width on large screens
+            constraints:
+                const BoxConstraints(maxWidth: 500), // Limits width on large screens
             child: Form(
               key: _formKey,
               child: Container(
@@ -85,18 +167,12 @@ class _CreateNewSectionPageState extends State<CreateNewSectionPage> {
                       controller: _sectionNameController,
                       label: "Section Name",
                       hint: "e.g., Section A",
-                      validator: (value) =>
-                          value!.isEmpty ? 'Please enter a section name' : null,
+                      validator: (value) => value == null || value.isEmpty
+                          ? 'Please enter a section name'
+                          : null,
                     ),
                     const SizedBox(height: 16),
-                    _buildTextField(
-                      theme: theme,
-                      controller: _mentorController,
-                      label: "Mentor Teacher",
-                      hint: "e.g., Mrs. Anjali Sharma",
-                      validator: (value) =>
-                          value!.isEmpty ? 'Please assign a mentor' : null,
-                    ),
+                    _buildMentorDropdown(theme),
                     const SizedBox(height: 16),
                     _buildTextField(
                       theme: theme,
@@ -104,8 +180,9 @@ class _CreateNewSectionPageState extends State<CreateNewSectionPage> {
                       label: "Class Limit",
                       hint: "e.g., 40",
                       keyboardType: TextInputType.number,
-                      validator: (value) =>
-                          value!.isEmpty ? 'Please set a class limit' : null,
+                      validator: (value) => value == null || value.isEmpty
+                          ? 'Please set a class limit'
+                          : null,
                     ),
                     const SizedBox(height: 24),
                     // Responsive button row
@@ -131,8 +208,10 @@ class _CreateNewSectionPageState extends State<CreateNewSectionPage> {
                             onPressed: _isLoading ? null : _createSection,
                             style: ElevatedButton.styleFrom(
                               padding: const EdgeInsets.symmetric(vertical: 16),
-                              backgroundColor: theme.colorScheme.primaryContainer,
-                              foregroundColor: theme.colorScheme.onPrimaryContainer,
+                              backgroundColor:
+                                  theme.colorScheme.primaryContainer,
+                              foregroundColor:
+                                  theme.colorScheme.onPrimaryContainer,
                               shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(12),
                               ),
@@ -141,7 +220,8 @@ class _CreateNewSectionPageState extends State<CreateNewSectionPage> {
                                 ? const SizedBox(
                                     height: 24,
                                     width: 24,
-                                    child: CircularProgressIndicator(strokeWidth: 3),
+                                    child: CircularProgressIndicator(
+                                        strokeWidth: 3),
                                   )
                                 : const Text("Create Section"),
                           ),
@@ -158,6 +238,62 @@ class _CreateNewSectionPageState extends State<CreateNewSectionPage> {
     );
   }
 
+  Widget _buildMentorDropdown(ThemeData theme) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text("Mentor Teacher",
+            style: theme.textTheme.titleMedium
+                ?.copyWith(color: theme.colorScheme.onPrimary)),
+        const SizedBox(height: 8),
+        DropdownButtonFormField<String>(
+          initialValue: _selectedMentorId,
+          hint: _isFetchingMentors
+              ? const Text('Loading Mentors...')
+              : const Text('Select a Mentor'),
+          isExpanded: true,
+          decoration: InputDecoration(
+            filled: true,
+            fillColor: theme.scaffoldBackgroundColor,
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(10),
+              borderSide: BorderSide.none,
+            ),
+            errorBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(10),
+              borderSide: BorderSide(color: theme.colorScheme.error, width: 1),
+            ),
+            focusedErrorBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(10),
+              borderSide: BorderSide(color: theme.colorScheme.error, width: 2),
+            ),
+          ),
+          items: _isFetchingMentors
+              ? [
+                  const DropdownMenuItem(
+                    value: null,
+                    child: Center(child: CircularProgressIndicator()),
+                  )
+                ]
+              : _mentors.map<DropdownMenuItem<String>>((mentor) {
+                  return DropdownMenuItem<String>(
+                    value: mentor['id'].toString(),
+                    child: Text(mentor['name']),
+                  );
+                }).toList(),
+          onChanged: _isFetchingMentors
+              ? null
+              : (String? newValue) {
+                  setState(() {
+                    _selectedMentorId = newValue;
+                  });
+                },
+          validator: (value) => value == null ? 'Please select a mentor' : null,
+        ),
+      ],
+    );
+  }
+
   Widget _buildTextField({
     required ThemeData theme,
     required TextEditingController controller,
@@ -169,7 +305,9 @@ class _CreateNewSectionPageState extends State<CreateNewSectionPage> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(label, style: theme.textTheme.titleMedium?.copyWith(color: theme.colorScheme.onPrimary)),
+        Text(label,
+            style: theme.textTheme.titleMedium
+                ?.copyWith(color: theme.colorScheme.onPrimary)),
         const SizedBox(height: 8),
         TextFormField(
           controller: controller,

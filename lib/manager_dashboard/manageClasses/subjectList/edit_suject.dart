@@ -1,4 +1,7 @@
+import 'dart:convert';
+
 import 'package:eduphin/manager_dashboard/manageClasses/subjectList/subject_list.dart';
+import 'package:eduphin/services/api_service.dart';
 import 'package:flutter/material.dart';
 
 class UpdateSubjectPage extends StatefulWidget {
@@ -44,28 +47,48 @@ class _UpdateSubjectPageState extends State<UpdateSubjectPage> {
       _isSaving = true;
     });
 
-    // Simulate API call to update data
-    await Future.delayed(const Duration(seconds: 2));
+    try {
+      final body = {
+        'subject_name': _nameController.text,
+        'code': _codeController.text,
+        'description': _descriptionController.text,
+        'credit': _creditController.text,
+        'type': _selectedType,
+        'status': _selectedStatus?.toLowerCase(),
+      };
 
-    final updatedData = {
-      'name': _nameController.text,
-      'code': _codeController.text,
-      'description': _descriptionController.text,
-      'credit': _creditController.text,
-      'type': _selectedType,
-      'status': _selectedStatus,
-    };
+      final response = await ApiService.put('manager/subjects/${widget.subject.id}', body);
+      final responseData = jsonDecode(response.body);
 
-    print('Updating subject with data: $updatedData');
+      if (!mounted) return;
 
-    if (mounted) {
-      setState(() {
-        _isSaving = false;
-      });
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Subject updated successfully!')),
-      );
-      Navigator.of(context).pop();
+      if (response.statusCode == 200 && responseData['status'] == true) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(responseData['message'] ?? 'Subject updated successfully!')),
+        );
+        Navigator.of(context).pop(true); // Pop with success
+      } else {
+        String errorMessage = responseData['message'] ?? 'An unknown error occurred.';
+        if (responseData.containsKey('errors')) {
+          final errors = responseData['errors'] as Map<String, dynamic>;
+          errorMessage = errors.values.map((e) => e[0]).join('\n');
+        }
+        throw Exception(errorMessage);
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+              content: Text(e.toString().replaceFirst('Exception: ', '')),
+              backgroundColor: Colors.red),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isSaving = false;
+        });
+      }
     }
   }
 
@@ -164,26 +187,17 @@ class _UpdateSubjectPageState extends State<UpdateSubjectPage> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _buildTextField(theme, "Subject Name", _nameController, "Enter Subject Name"),
+        _buildTextField(theme, "Subject Name", _nameController, "Enter Subject Name", validator: (v) => v!.isEmpty ? 'This field is required' : null),
         const SizedBox(height: 16),
-        _buildTextField(theme, "Subject Code", _codeController, "Enter Subject Code"),
+        _buildTextField(theme, "Subject Code", _codeController, "Enter Subject Code", validator: (v) => v!.isEmpty ? 'This field is required' : null),
         const SizedBox(height: 16),
-        _buildTextField(theme, "Description (Optional)", _descriptionController,
-            "Enter a brief description...",
-            maxLines: 4),
+        _buildTextField(theme, "Description (Optional)", _descriptionController, "Enter a brief description...", maxLines: 4, validator: null),
         const SizedBox(height: 16),
-        _buildTextField(theme, "Credit", _creditController, "Enter Subject Credit",
-            keyboardType: TextInputType.number),
+        _buildTextField(theme, "Credit", _creditController, "Enter Subject Credit", keyboardType: TextInputType.number, validator: (v) => v!.isEmpty ? 'This field is required' : null),
         const SizedBox(height: 16),
-        _buildDropdownField(theme, "Type", _selectedType, [
-          'Theory',
-          'Practical'
-        ], (val) => setState(() => _selectedType = val)),
+        _buildDropdownField(theme, "Type", _selectedType, ['Theory', 'Practical', 'Applied'], (val) => setState(() => _selectedType = val)),
         const SizedBox(height: 16),
-        _buildDropdownField(theme, "Status", _selectedStatus, [
-          'Active',
-          'Inactive'
-        ], (val) => setState(() => _selectedStatus = val)),
+        _buildDropdownField(theme, "Status", _selectedStatus, ['Active', 'Inactive'], (val) => setState(() => _selectedStatus = val)),
         const SizedBox(height: 80), // Padding for FAB
       ],
     );
@@ -197,37 +211,28 @@ class _UpdateSubjectPageState extends State<UpdateSubjectPage> {
           children: [
             Expanded(
                 child: _buildTextField(
-                    theme, "Subject Name", _nameController, "Enter Subject Name")),
+                    theme, "Subject Name", _nameController, "Enter Subject Name", validator: (v) => v!.isEmpty ? 'This field is required' : null)),
             const SizedBox(width: 16),
             Expanded(
                 child: _buildTextField(
-                    theme, "Subject Code", _codeController, "Enter Subject Code")),
+                    theme, "Subject Code", _codeController, "Enter Subject Code", validator: (v) => v!.isEmpty ? 'This field is required' : null)),
           ],
         ),
         const SizedBox(height: 16),
-        _buildTextField(theme, "Description (Optional)", _descriptionController,
-            "Enter a brief description...",
-            maxLines: 3),
+        _buildTextField(theme, "Description (Optional)", _descriptionController, "Enter a brief description...", maxLines: 3, validator: null),
         const SizedBox(height: 16),
         Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Expanded(
                 child: _buildTextField(
-                    theme, "Credit", _creditController, "Enter Subject Credit",
-                    keyboardType: TextInputType.number)),
+                    theme, "Credit", _creditController, "Enter Subject Credit", keyboardType: TextInputType.number, validator: (v) => v!.isEmpty ? 'This field is required' : null)),
             const SizedBox(width: 16),
             Expanded(
-                child: _buildDropdownField(theme, "Type", _selectedType, [
-              'Theory',
-              'Practical'
-            ], (val) => setState(() => _selectedType = val))),
+                child: _buildDropdownField(theme, "Type", _selectedType, ['Theory', 'Practical', 'Applied'], (val) => setState(() => _selectedType = val))),
             const SizedBox(width: 16),
             Expanded(
-                child: _buildDropdownField(theme, "Status", _selectedStatus, [
-              'Active',
-              'Inactive'
-            ], (val) => setState(() => _selectedStatus = val))),
+                child: _buildDropdownField(theme, "Status", _selectedStatus, ['Active', 'Inactive'], (val) => setState(() => _selectedStatus = val))),
           ],
         ),
         const SizedBox(height: 80), // Padding for FAB
@@ -242,6 +247,7 @@ class _UpdateSubjectPageState extends State<UpdateSubjectPage> {
     String hint, {
     int maxLines = 1,
     TextInputType? keyboardType,
+    String? Function(String?)? validator,
   }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -272,12 +278,7 @@ class _UpdateSubjectPageState extends State<UpdateSubjectPage> {
               borderSide: BorderSide(color: theme.colorScheme.error, width: 2),
             ),
           ),
-          validator: (value) {
-            if (label.contains("Optional")) return null;
-            return value == null || value.isEmpty
-                ? 'This field is required'
-                : null;
-          },
+          validator: validator,
         ),
       ],
     );

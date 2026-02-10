@@ -1,18 +1,13 @@
 import 'dart:async';
+import 'dart:convert';
+import 'dart:io';
+
 import 'package:eduphin/moderator_dashboard/moderator_dashboard.dart';
-import 'package:eduphin/moderator_dashboard/dashboard_cards/active_institutes/institutes.dart';
+import 'package:eduphin/services/api_service.dart';
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
+import 'package:image_picker/image_picker.dart';
 
-// 1. Provider class to handle the data submission logic
-class InstituteAddProvider {
-  Future<Institute> addInstitute(Institute institute) async {
-    debugPrint('Submitting institute: ${institute.name}');
-    await Future.delayed(const Duration(seconds: 2));
-    return institute;
-  }
-}
-
-// AddInstitutePage: A form for adding a new institute.
 class AddNewInstitutePage extends StatefulWidget {
   const AddNewInstitutePage({super.key});
 
@@ -21,40 +16,58 @@ class AddNewInstitutePage extends StatefulWidget {
 }
 
 class _AddInstitutePageState extends State<AddNewInstitutePage> {
-  final _instituteNameController = TextEditingController();
-  final _chairmanController = TextEditingController();
-  final _instituteCodeController = TextEditingController();
-  final _addressController = TextEditingController();
-  final _emailController = TextEditingController();
-  final _phoneController = TextEditingController();
-  final _websiteController = TextEditingController();
-  final _affiliationController = TextEditingController();
-  final _panController = TextEditingController();
+  final _formKey = GlobalKey<FormState>();
 
-  final InstituteAddProvider _provider = InstituteAddProvider();
+  // Updated controllers to match the backend model
+  final _nameController = TextEditingController();
+  final _codeController = TextEditingController();
+  final _establishedYearController = TextEditingController();
+  final _addressController = TextEditingController();
+  final _cityController = TextEditingController();
+  final _stateController = TextEditingController();
+  final _pincodeController = TextEditingController();
+  final _contactEmailController = TextEditingController();
+  final _contactPhoneController = TextEditingController();
+  final _chairmanNameController = TextEditingController();
+  final _websiteController = TextEditingController();
+  final _affiliationDetailsController = TextEditingController();
+
+  File? _logo;
+  final ImagePicker _picker = ImagePicker();
   bool _isLoading = false;
 
   @override
   void dispose() {
-    _instituteNameController.dispose();
-    _chairmanController.dispose();
-    _instituteCodeController.dispose();
+    // Dispose all controllers
+    _nameController.dispose();
+    _codeController.dispose();
+    _establishedYearController.dispose();
     _addressController.dispose();
-    _emailController.dispose();
-    _phoneController.dispose();
+    _cityController.dispose();
+    _stateController.dispose();
+    _pincodeController.dispose();
+    _contactEmailController.dispose();
+    _contactPhoneController.dispose();
+    _chairmanNameController.dispose();
     _websiteController.dispose();
-    _affiliationController.dispose();
-    _panController.dispose();
+    _affiliationDetailsController.dispose();
     super.dispose();
   }
 
+  Future<void> _pickLogo() async {
+    final pickedFile = await _picker.pickImage(source: ImageSource.gallery);
+    if (pickedFile != null) {
+      setState(() {
+        _logo = File(pickedFile.path);
+      });
+    }
+  }
+
   Future<void> _addInstitute() async {
-    if (_instituteNameController.text.isEmpty ||
-        _instituteCodeController.text.isEmpty ||
-        _emailController.text.isEmpty) {
+    if (!_formKey.currentState!.validate()) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Please fill in Institute Name, Code, and Email.'),
+          content: Text('Please fill all required fields.'),
           backgroundColor: Colors.red,
         ),
       );
@@ -65,35 +78,77 @@ class _AddInstitutePageState extends State<AddNewInstitutePage> {
       _isLoading = true;
     });
 
-    final newInstitute = Institute(
-      name: _instituteNameController.text,
-      code: _instituteCodeController.text,
-      chairman: _chairmanController.text,
-      address: _addressController.text,
-      email: _emailController.text,
-      phone: _phoneController.text,
-      website: _websiteController.text,
-      affiliation: _affiliationController.text,
-      pan: _panController.text,
-    );
-
-    try {
-      final addedInstitute = await _provider.addInstitute(newInstitute);
-
+    final token = await ApiService.getToken();
+    if (token == null) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Institute added successfully!'),
-            backgroundColor: Colors.green,
-          ),
+          const SnackBar(content: Text('Authentication token not found.')),
         );
-        Navigator.of(context).pop(addedInstitute);
+        setState(() => _isLoading = false);
+      }
+      return;
+    }
+
+    var request = http.MultipartRequest(
+      'POST',
+      Uri.parse('${ApiService.baseUrl}/moderator/institutes'),
+    );
+
+    request.headers['Authorization'] = 'Bearer $token';
+    request.headers['Accept'] = 'application/json';
+
+    // Add all form fields
+    request.fields.addAll({
+      'name': _nameController.text,
+      'code': _codeController.text,
+      'established_year': _establishedYearController.text,
+      'address': _addressController.text,
+      'city': _cityController.text,
+      'state': _stateController.text,
+      'pincode': _pincodeController.text,
+      'contact_email': _contactEmailController.text,
+      'contact_phone': _contactPhoneController.text,
+      'chairman_name': _chairmanNameController.text,
+      'website': _websiteController.text,
+      'affiliation_details': _affiliationDetailsController.text,
+      'status': 'pending', // Default status
+    });
+
+    // Add logo file if selected
+    if (_logo != null) {
+      request.files.add(await http.MultipartFile.fromPath('logo', _logo!.path));
+    }
+
+    try {
+      var response = await request.send();
+      var responseBody = await response.stream.bytesToString();
+
+      if (response.statusCode == 201) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Institute added successfully!'),
+              backgroundColor: Colors.green,
+            ),
+          );
+          Navigator.of(context).pop(true); // Pop with success result
+        }
+      } else {
+        final error = jsonDecode(responseBody);
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Failed to add institute: ${error['message'] ?? 'Unknown error'}'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
       }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Failed to add institute: $e'),
+            content: Text('An error occurred: $e'),
             backgroundColor: Colors.red,
           ),
         );
@@ -119,49 +174,83 @@ class _AddInstitutePageState extends State<AddNewInstitutePage> {
 
     final formFields = [
       _buildTextField(
-        controller: _instituteNameController,
-        labelText: 'Institute Name',
+        controller: _nameController,
+        labelText: 'Institute Name *',
         icon: Icons.school_outlined,
+        validator: (value) => value!.isEmpty ? 'Name is required' : null,
       ),
       _buildTextField(
-        controller: _chairmanController,
-        labelText: 'Chairman',
-        icon: Icons.person_outline_sharp,
-      ),
-      _buildTextField(
-        controller: _instituteCodeController,
-        labelText: 'Institute Code',
+        controller: _codeController,
+        labelText: 'Institute Code *',
         icon: Icons.book_outlined,
+        validator: (value) => value!.isEmpty ? 'Code is required' : null,
+      ),
+      _buildTextField(
+        controller: _chairmanNameController,
+        labelText: 'Chairman Name *',
+        icon: Icons.person_outline_sharp,
+         validator: (value) => value!.isEmpty ? 'Chairman Name is required' : null,
+      ),
+      _buildTextField(
+        controller: _establishedYearController,
+        labelText: 'Established Year *',
+        icon: Icons.calendar_today_outlined,
+        keyboardType: TextInputType.number,
+         validator: (value) => value!.isEmpty ? 'Year is required' : null,
       ),
       _buildTextField(
         controller: _addressController,
-        labelText: 'Address',
+        labelText: 'Address *',
         icon: Icons.location_on_outlined,
+         validator: (value) => value!.isEmpty ? 'Address is required' : null,
+      ),
+        _buildTextField(
+        controller: _cityController,
+        labelText: 'City *',
+        icon: Icons.location_city_outlined,
+         validator: (value) => value!.isEmpty ? 'City is required' : null,
+      ),
+        _buildTextField(
+        controller: _stateController,
+        labelText: 'State *',
+        icon: Icons.map_outlined,
+         validator: (value) => value!.isEmpty ? 'State is required' : null,
+      ),
+        _buildTextField(
+        controller: _pincodeController,
+        labelText: 'Pincode *',
+        icon: Icons.pin_drop_outlined,
+        keyboardType: TextInputType.number,
+        validator: (value) => value!.isEmpty ? 'Pincode is required' : null,
       ),
       _buildTextField(
-        controller: _emailController,
-        labelText: 'Email',
+        controller: _contactEmailController,
+        labelText: 'Contact Email *',
         icon: Icons.email_outlined,
+        keyboardType: TextInputType.emailAddress,
+        validator: (value) {
+            if(value!.isEmpty) return 'Email is required';
+            if(!value.contains('@')) return 'Enter a valid email';
+            return null;
+        }
       ),
       _buildTextField(
-        controller: _phoneController,
-        labelText: 'Phone Number',
+        controller: _contactPhoneController,
+        labelText: 'Contact Phone *',
         icon: Icons.phone_outlined,
+        keyboardType: TextInputType.phone,
+         validator: (value) => value!.isEmpty ? 'Phone is required' : null,
       ),
       _buildTextField(
         controller: _websiteController,
         labelText: 'Website',
         icon: Icons.web_outlined,
+        keyboardType: TextInputType.url,
       ),
       _buildTextField(
-        controller: _affiliationController,
-        labelText: 'Affiliation',
+        controller: _affiliationDetailsController,
+        labelText: 'Affiliation Details',
         icon: Icons.corporate_fare_outlined,
-      ),
-      _buildTextField(
-        controller: _panController,
-        labelText: 'PAN',
-        icon: Icons.credit_card_outlined,
       ),
     ];
 
@@ -170,101 +259,112 @@ class _AddInstitutePageState extends State<AddNewInstitutePage> {
       appBar: AppBar(
         backgroundColor: const Color(0xFF0D1B2A),
         iconTheme: const IconThemeData(color: Colors.white),
-        title: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Text(
-              'Add Institute',
-              style: TextStyle(color: Colors.white, fontSize: responsiveFontSize(18)),
-            ),
-            InkWell(
-              onTap: () => Navigator.pushReplacement(
-                  context,
-                  MaterialPageRoute(
-                      builder: (context) => const ModeratorDashboardPage())),
-              child: const Icon(
-                Icons.home_sharp,
-                size: 30,
-                color: Colors.white,
-              ),
-            ),
-          ],
+        title: Text(
+          'Add New Institute',
+          style: TextStyle(color: Colors.white, fontSize: responsiveFontSize(18)),
         ),
-      ),
-      body: SingleChildScrollView(
-        child: Padding(
-          padding: EdgeInsets.fromLTRB(screenWidth * 0.04, 16, screenWidth * 0.04, 80),
-          child: Column(
-            children: [
-              Center(
-                child: Container(
-                  height: screenWidth * 0.25,
-                  width: screenWidth * 0.25,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: const Color(0xFF1B263B),
-                    border: Border.all(color: Colors.white24),
-                  ),
-                  child: Icon(
-                    Icons.school_outlined,
-                    size: screenWidth * 0.15,
-                    color: Colors.white70,
-                  ),
-                ),
+        actions: [
+          IconButton(
+            onPressed: () => Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(
+                builder: (context) => const ModeratorDashboardPage(),
               ),
-              const SizedBox(height: 30),
-              LayoutBuilder(builder: (context, constraints) {
-                if (constraints.maxWidth > 700) {
-                  return GridView.builder(
-                    shrinkWrap: true,
-                    physics: const NeverScrollableScrollPhysics(),
-                    itemCount: formFields.length,
-                    gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                      crossAxisCount: 2,
-                      crossAxisSpacing: 16,
-                      mainAxisSpacing: 16,
-                      childAspectRatio: 5,
-                    ),
-                    itemBuilder: (context, index) => formFields[index],
-                  );
-                } else {
-                  return Column(
-                    children: formFields.map((widget) {
-                      return Padding(
-                        padding: const EdgeInsets.only(bottom: 12),
-                        child: widget,
-                      );
-                    }).toList(),
-                  );
-                }
-              }),
-              const SizedBox(height: 30),
-              SizedBox(
-                width: double.infinity,
-                height: 50,
-                child: ElevatedButton(
-                  onPressed: _isLoading ? null : _addInstitute,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF0E86D4),
-                    disabledBackgroundColor: const Color(0xFF0E86D4).withOpacity(0.5),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(15),
+            ),
+            icon: const Icon(
+              Icons.home_sharp,
+              size: 30,
+              color: Colors.white,
+            ),
+          ),
+          const SizedBox(width: 10),
+        ],
+      ),
+      body: Form(
+        key: _formKey,
+        child: SingleChildScrollView(
+          child: Padding(
+            padding: EdgeInsets.fromLTRB(screenWidth * 0.04, 16, screenWidth * 0.04, 80),
+            child: Column(
+              children: [
+                GestureDetector(
+                  onTap: _pickLogo,
+                  child: Center(
+                    child: Container(
+                      height: screenWidth * 0.25,
+                      width: screenWidth * 0.25,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: const Color(0xFF1B263B),
+                        border: Border.all(color: Colors.white24),
+                        image: _logo != null ? DecorationImage(image: FileImage(_logo!), fit: BoxFit.cover) : null,
+                      ),
+                      child: _logo == null 
+                          ? Icon(
+                              Icons.add_a_photo_outlined,
+                              size: screenWidth * 0.12,
+                              color: Colors.white70,
+                            )
+                          : null,
                     ),
                   ),
-                  child: _isLoading
-                      ? const CircularProgressIndicator(
-                          valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                        )
-                      : Text(
-                          'Add Institute',
-                          style: TextStyle(
-                              color: Colors.white,
-                              fontSize: responsiveFontSize(16),
-                              fontWeight: FontWeight.bold),
-                        ),
                 ),
-              )
-            ],
+                const SizedBox(height: 8),
+                Text("Tap to upload logo", style: TextStyle(color: Colors.white54, fontSize: responsiveFontSize(12))),
+                const SizedBox(height: 30),
+                LayoutBuilder(builder: (context, constraints) {
+                  if (constraints.maxWidth > 700) {
+                    return GridView.builder(
+                      shrinkWrap: true,
+                      physics: const NeverScrollableScrollPhysics(),
+                      itemCount: formFields.length,
+                      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                        crossAxisCount: 2,
+                        crossAxisSpacing: 16,
+                        mainAxisSpacing: 16,
+                        childAspectRatio: 5.5, // Adjusted for validator text
+                      ),
+                      itemBuilder: (context, index) => formFields[index],
+                    );
+                  } else {
+                    return Column(
+                      children: formFields.map((widget) {
+                        return Padding(
+                          padding: const EdgeInsets.only(bottom: 12),
+                          child: widget,
+                        );
+                      }).toList(),
+                    );
+                  }
+                }),
+                const SizedBox(height: 30),
+                SizedBox(
+                  width: double.infinity,
+                  height: 50,
+                  child: ElevatedButton(
+                    onPressed: _isLoading ? null : _addInstitute,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF0E86D4),
+                      disabledBackgroundColor: const Color(0xFF0E86D4).withAlpha(128),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(15),
+                      ),
+                    ),
+                    child: _isLoading
+                        ? const CircularProgressIndicator(
+                            valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                          )
+                        : Text(
+                            'Add Institute',
+                            style: TextStyle(
+                                color: Colors.white,
+                                fontSize: responsiveFontSize(16),
+                                fontWeight: FontWeight.bold),
+                          ),
+                  ),
+                )
+              ],
+            ),
           ),
         ),
       ),
@@ -275,6 +375,8 @@ class _AddInstitutePageState extends State<AddNewInstitutePage> {
     required TextEditingController controller,
     required String labelText,
     required IconData icon,
+    TextInputType? keyboardType,
+    String? Function(String?)? validator,
   }) {
     final screenWidth = MediaQuery.of(context).size.width;
     double responsiveFontSize(double baseSize) {
@@ -283,9 +385,10 @@ class _AddInstitutePageState extends State<AddNewInstitutePage> {
       return baseSize;
     }
 
-    return TextField(
+    return TextFormField(
       controller: controller,
       style: TextStyle(color: Colors.white, fontSize: responsiveFontSize(14)),
+      keyboardType: keyboardType,
       decoration: InputDecoration(
         prefixIcon: Icon(icon, color: Colors.white54),
         labelText: labelText,
@@ -305,7 +408,16 @@ class _AddInstitutePageState extends State<AddNewInstitutePage> {
           borderRadius: BorderRadius.circular(8),
           borderSide: const BorderSide(color: Color(0xFF0E86D4), width: 1.5),
         ),
+        errorBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(8),
+          borderSide: const BorderSide(color: Colors.redAccent, width: 1),
+        ),
+        focusedErrorBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(8),
+          borderSide: const BorderSide(color: Colors.redAccent, width: 1.5),
+        ),
       ),
+      validator: validator,
     );
   }
 }

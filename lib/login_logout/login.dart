@@ -1,13 +1,16 @@
-import 'dart:async';
-import 'dart:convert';
-
 import 'package:eduphin/login_logout/ui_helper.dart';
+import 'package:eduphin/manager_dashboard/manager_dashboard.dart';
 import 'package:eduphin/moderator_dashboard/moderator_dashboard.dart';
 import 'package:flutter/material.dart';
 import 'package:eduphin/services/api_service.dart';
-import 'package:http/http.dart' as http;
 
 import 'forgot_password.dart';
+
+// Add a class for role constants
+class Roles {
+  static const int moderator = 2;
+  static const int manager = 3;
+}
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
@@ -39,61 +42,14 @@ class _LoginPageState extends State<LoginPage> {
     });
 
     try {
-      final response = await http
-          .post(
-            Uri.parse('${ApiService.baseUrl}/login'),
-            headers: {
-              'Content-Type': 'application/json',
-              'Accept': 'application/json',
-            },
-            body: jsonEncode({
-              'email': emailController.text.trim(),
-              'password': passwordController.text.trim(),
-            }),
-          )
-          .timeout(const Duration(seconds: 15));
-
-      // For debugging
-      debugPrint('Login response status: ${response.statusCode}');
-      debugPrint('Login response body: ${response.body}');
-
-      if (!mounted) return;
-
-      final data = jsonDecode(response.body);
-
-      if (response.statusCode == 200 && data['success'] == true) {
-        await ApiService.saveToken(data['token']);
-
-        if (data['user']['role_id'] == 2) {
-          // The lint `use_build_context_synchronously` is important here.
-          if (context.mounted) {
-            Navigator.pushReplacement(
-              context,
-              MaterialPageRoute(
-                builder: (_) => const ModeratorDashboardPage(),
-              ),
-            );
-          }
-        } else {
-          setState(() {
-            _error = 'Unauthorized role. Role ID: ${data['user']['role_id']}';
-          });
-        }
-      } else {
-        setState(() {
-          _error = data['message'] ?? 'Login failed. Please try again.';
-        });
-      }
-    } on TimeoutException {
-        if (!mounted) return;
-        setState(() {
-            _error = 'Connection timed out. Please check your network.';
-        });
+      final roleId = await ApiService.login(emailController.text.trim(), passwordController.text.trim());
+       if (!mounted) return;
+        _navigateToDashboard(roleId);
     } catch (e) {
       debugPrint('An error occurred during login: $e');
       if (!mounted) return;
       setState(() {
-        _error = 'An unexpected error occurred. Please try again later.';
+        _error = e.toString().replaceFirst('Exception: ', '');
       });
     } finally {
       if (mounted) {
@@ -104,7 +60,30 @@ class _LoginPageState extends State<LoginPage> {
     }
   }
 
+  void _navigateToDashboard(int roleId) {
+    if (!mounted) return;
 
+    Widget? destinationPage;
+    if (roleId == Roles.moderator) {
+      destinationPage = const ModeratorDashboardPage();
+    } else if (roleId == Roles.manager) {
+      destinationPage = const ManagerDashboardPage();
+    }
+
+    if (destinationPage != null) {
+      final page = destinationPage;
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(
+          builder: (_) => page,
+        ),
+      );
+    } else {
+      setState(() {
+        _error = 'Unauthorized role. Role ID: $roleId';
+      });
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -126,7 +105,7 @@ class _LoginPageState extends State<LoginPage> {
                 builder: (context, constraints) {
                   return Container(
                     width:
-                    constraints.maxWidth > 500 ? 500 : constraints.maxWidth,
+                        constraints.maxWidth > 500 ? 500 : constraints.maxWidth,
                     decoration: BoxDecoration(
                       color: theme.cardColor,
                       borderRadius: BorderRadius.circular(20),
@@ -177,11 +156,13 @@ class _LoginPageState extends State<LoginPage> {
                               });
                             },
                           ),
-                           if (_error.isNotEmpty) ...[
+                          if (_error.isNotEmpty) ...[
                             const SizedBox(height: 10),
                             Text(
                               _error,
-                              style: TextStyle(color: theme.colorScheme.error, fontSize: 12),
+                              style: TextStyle(
+                                  color: theme.colorScheme.error,
+                                  fontSize: 12),
                             ),
                           ],
                           const SizedBox(height: 10),
@@ -212,7 +193,7 @@ class _LoginPageState extends State<LoginPage> {
                                     context,
                                     MaterialPageRoute(
                                         builder: (context) =>
-                                        const ForgotPasswordPage()),
+                                            const ForgotPasswordPage()),
                                   );
                                 },
                                 child: Text(
@@ -236,27 +217,27 @@ class _LoginPageState extends State<LoginPage> {
                                   borderRadius: BorderRadius.circular(15),
                                 ),
                                 disabledBackgroundColor:
-                                theme.colorScheme.primary,
+                                    theme.colorScheme.primary,
                               ),
                               child: _isLoading
                                   ? const SizedBox(
-                                height: 24,
-                                width: 24,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 3,
-                                  valueColor:
-                                  AlwaysStoppedAnimation<Color>(
-                                      Colors.white),
-                                ),
-                              )
+                                      height: 24,
+                                      width: 24,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 3,
+                                        valueColor:
+                                            AlwaysStoppedAnimation<Color>(
+                                                Colors.white),
+                                      ),
+                                    )
                                   : Text(
-                                "LOGIN",
-                                style: theme.textTheme.titleMedium
-                                    ?.copyWith(
-                                    color:
-                                    theme.colorScheme.onPrimary,
-                                    fontWeight: FontWeight.bold),
-                              ),
+                                      "LOGIN",
+                                      style: theme.textTheme.titleMedium
+                                          ?.copyWith(
+                                              color:
+                                                  theme.colorScheme.onPrimary,
+                                              fontWeight: FontWeight.bold),
+                                    ),
                             ),
                           ),
                         ],

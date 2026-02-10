@@ -1,4 +1,62 @@
+import 'dart:convert';
+import 'package:eduphin/services/api_service.dart';
 import 'package:flutter/material.dart';
+
+// ───────────────────────────────────────────────────────────
+//                        DATA MODELS
+// ───────────────────────────────────────────────────────────
+
+class Class {
+  final int id;
+  final String name;
+  final List<Section> sections;
+
+  Class({required this.id, required this.name, required this.sections});
+
+  factory Class.fromJson(Map<String, dynamic> json) {
+    // Safely handle null 'sections' by providing an empty list as a fallback.
+    var sectionsList = json['sections'] as List? ?? [];
+    List<Section> sections = sectionsList.map((i) => Section.fromJson(i)).toList();
+    return Class(id: json['id'], name: json['name'], sections: sections);
+  }
+}
+
+class Section {
+  final int id;
+  final String name;
+
+  Section({required this.id, required this.name});
+
+  factory Section.fromJson(Map<String, dynamic> json) {
+    // Corrected to use 'name' to be consistent with other data models.
+    return Section(id: json['id'], name: json['name']);
+  }
+}
+
+class Subject {
+  final int id;
+  final String name;
+  Subject({required this.id, required this.name});
+
+  factory Subject.fromJson(Map<String, dynamic> json) {
+    return Subject(id: json['id'], name: json['name']);
+  }
+}
+
+class Teacher {
+  final int id;
+  final String name;
+  Teacher({required this.id, required this.name});
+
+  factory Teacher.fromJson(Map<String, dynamic> json) {
+    return Teacher(id: json['id'], name: json['name']);
+  }
+}
+
+
+// ───────────────────────────────────────────────────────────
+//                       ADD SCHEDULE PAGE
+// ───────────────────────────────────────────────────────────
 
 class AddNewSchedulePage extends StatefulWidget {
   const AddNewSchedulePage({super.key});
@@ -15,10 +73,10 @@ class _AddNewSchedulePageState extends State<AddNewSchedulePage> {
   bool _isSaving = false;
 
   // Dropdown list data
-  List<String> _classList = [];
-  List<String> _sectionList = [];
-  List<String> _subjectList = [];
-  List<String> _teacherList = [];
+  List<Class> _classList = [];
+  List<Section> _sectionList = [];
+  List<Subject> _subjectList = [];
+  List<Teacher> _teacherList = [];
   final List<String> _weekdayList = [
     "Monday",
     "Tuesday",
@@ -29,13 +87,13 @@ class _AddNewSchedulePageState extends State<AddNewSchedulePage> {
   ];
 
   // Selected values
-  String? selectedClass;
-  String? selectedSection;
-  String? selectedSubject;
-  String? selectedTeacher;
-  String? selectedWeekday;
-  TimeOfDay? startTime;
-  TimeOfDay? endTime;
+  int? _selectedClassId;
+  int? _selectedSectionId;
+  int? _selectedSubjectId;
+  int? _selectedTeacherId;
+  String? _selectedWeekday;
+  TimeOfDay? _startTime;
+  TimeOfDay? _endTime;
 
   @override
   void initState() {
@@ -44,22 +102,25 @@ class _AddNewSchedulePageState extends State<AddNewSchedulePage> {
   }
 
   Future<void> _fetchDropdownData() async {
-    // Simulate API call to fetch dropdown data
-    await Future.delayed(const Duration(seconds: 2));
+    try {
+      final response = await ApiService.get('manager/class-schedules/meta');
+      if (!mounted) return;
 
-    final fetchedClasses = ["Class 1", "Class 2", "Class 3", "Class 4"];
-    final fetchedSections = ["A", "B", "C", "D"];
-    final fetchedSubjects = ["Math", "Science", "History", "English"];
-    final fetchedTeachers = ["Mr. Smith", "Mrs. Jones", "Mr. Williams", "Ms. Brown"];
-
-    if (mounted) {
-      setState(() {
-        _classList = fetchedClasses;
-        _sectionList = fetchedSections;
-        _subjectList = fetchedSubjects;
-        _teacherList = fetchedTeachers;
-        _isLoading = false;
-      });
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        setState(() {
+          _classList = (data['classes'] as List).map((i) => Class.fromJson(i)).toList();
+          _subjectList = (data['subjects'] as List).map((i) => Subject.fromJson(i)).toList();
+          _teacherList = (data['teachers'] as List).map((i) => Teacher.fromJson(i)).toList();
+          _isLoading = false;
+        });
+      } else {
+        throw Exception('Failed to load dropdown data');
+      }
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString())));
+      setState(() => _isLoading = false);
     }
   }
 
@@ -71,39 +132,42 @@ class _AddNewSchedulePageState extends State<AddNewSchedulePage> {
       return;
     }
 
-    final scaffoldMessenger = ScaffoldMessenger.of(context);
-    final navigator = Navigator.of(context);
-    final startTimeFormatted = startTime!.format(context);
-    final endTimeFormatted = endTime!.format(context);
+    setState(() => _isSaving = true);
 
-    setState(() {
-      _isSaving = true;
-    });
+    try {
+      final body = {
+        'class_id': _selectedClassId,
+        'section_id': _selectedSectionId,
+        'subject_id': _selectedSubjectId,
+        'teacher_id': _selectedTeacherId,
+        'day': _selectedWeekday,
+        'start_time': '${_startTime!.hour.toString().padLeft(2, '0')}:${_startTime!.minute.toString().padLeft(2, '0')}',
+        'end_time': '${_endTime!.hour.toString().padLeft(2, '0')}:${_endTime!.minute.toString().padLeft(2, '0')}',
+      };
 
-    await Future.delayed(const Duration(seconds: 2));
+      final response = await ApiService.post('manager/class-schedules', body);
+      if (!mounted) return;
 
-    final newSchedule = {
-      'class': selectedClass,
-      'section': selectedSection,
-      'subject': selectedSubject,
-      'teacher': selectedTeacher,
-      'weekday': selectedWeekday,
-      'start_time': startTimeFormatted,
-      'end_time': endTimeFormatted,
-    };
-
-    print('Saving new schedule: $newSchedule');
-
-    if (!mounted) return;
-
-    setState(() {
-      _isSaving = false;
-    });
-
-    scaffoldMessenger.showSnackBar(
-      const SnackBar(content: Text('Schedule added successfully!')),
-    );
-    navigator.pop();
+      final responseData = jsonDecode(response.body);
+      if (response.statusCode == 201) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(responseData['message'] ?? 'Schedule added successfully!'), backgroundColor: Colors.green),
+        );
+        Navigator.of(context).pop();
+      } else {
+        throw Exception(responseData['message'] ?? 'Failed to add schedule');
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(e.toString().replaceFirst("Exception: ", "")), backgroundColor: Colors.red),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isSaving = false);
+      }
+    }
   }
 
   Future<void> _selectTime(BuildContext context, {required bool isStartTime}) async {
@@ -115,9 +179,9 @@ class _AddNewSchedulePageState extends State<AddNewSchedulePage> {
       if (!mounted) return;
       setState(() {
         if (isStartTime) {
-          startTime = picked;
+          _startTime = picked;
         } else {
-          endTime = picked;
+          _endTime = picked;
         }
       });
     }
@@ -168,27 +232,32 @@ class _AddNewSchedulePageState extends State<AddNewSchedulePage> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _buildDropdownField(theme, "Class", selectedClass, _classList,
-            (val) => setState(() => selectedClass = val)),
+        _buildDropdownField(theme, "Class", _selectedClassId, _classList.map((c) => DropdownMenuItem(value: c.id, child: Text(c.name))).toList(), (val) {
+          setState(() {
+            _selectedClassId = val;
+            _selectedSectionId = null; // Reset
+            if (val != null) {
+              _sectionList = _classList.firstWhere((c) => c.id == val).sections;
+            } else {
+              _sectionList = [];
+            }
+          });
+        }),
         const SizedBox(height: 16),
-        _buildDropdownField(theme, "Section", selectedSection, _sectionList,
-            (val) => setState(() => selectedSection = val)),
+        _buildDropdownField(theme, "Section", _selectedSectionId, _sectionList.map((s) => DropdownMenuItem(value: s.id, child: Text(s.name))).toList(), (val) => setState(() => _selectedSectionId = val), key: ValueKey(_selectedClassId), dependentParent: "Class"),
         const SizedBox(height: 16),
-        _buildDropdownField(theme, "Subject", selectedSubject, _subjectList,
-            (val) => setState(() => selectedSubject = val)),
+        _buildDropdownField(theme, "Subject", _selectedSubjectId, _subjectList.map((s) => DropdownMenuItem(value: s.id, child: Text(s.name))).toList(), (val) => setState(() => _selectedSubjectId = val)),
         const SizedBox(height: 16),
-        _buildDropdownField(theme, "Teacher", selectedTeacher, _teacherList,
-            (val) => setState(() => selectedTeacher = val)),
+        _buildDropdownField(theme, "Teacher", _selectedTeacherId, _teacherList.map((t) => DropdownMenuItem(value: t.id, child: Text(t.name))).toList(), (val) => setState(() => _selectedTeacherId = val)),
         const SizedBox(height: 16),
-        _buildDropdownField(theme, "Weekday", selectedWeekday, _weekdayList,
-            (val) => setState(() => selectedWeekday = val)),
+        _buildDropdownField(theme, "Weekday", _selectedWeekday, _weekdayList.map((d) => DropdownMenuItem(value: d, child: Text(d))).toList(), (val) => setState(() => _selectedWeekday = val)),
         const SizedBox(height: 16),
         Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Expanded(child: _buildTimeField(theme, "Start Time", startTime, isStartTime: true)),
+            Expanded(child: _buildTimeField(theme, "Start Time", _startTime, isStartTime: true)),
             const SizedBox(width: 16),
-            Expanded(child: _buildTimeField(theme, "End Time", endTime, isStartTime: false)),
+            Expanded(child: _buildTimeField(theme, "End Time", _endTime, isStartTime: false)),
           ],
         ),
         const SizedBox(height: 80), // For FAB
@@ -203,29 +272,39 @@ class _AddNewSchedulePageState extends State<AddNewSchedulePage> {
         Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Expanded(child: _buildDropdownField(theme, "Class", selectedClass, _classList, (val) => setState(() => selectedClass = val))),
+            Expanded(child: _buildDropdownField(theme, "Class", _selectedClassId, _classList.map((c) => DropdownMenuItem(value: c.id, child: Text(c.name))).toList(), (val) {
+              setState(() {
+                _selectedClassId = val;
+                _selectedSectionId = null; // Reset
+                if (val != null) {
+                  _sectionList = _classList.firstWhere((c) => c.id == val).sections;
+                } else {
+                  _sectionList = [];
+                }
+              });
+            })),
             const SizedBox(width: 16),
-            Expanded(child: _buildDropdownField(theme, "Section", selectedSection, _sectionList, (val) => setState(() => selectedSection = val))),
+            Expanded(child: _buildDropdownField(theme, "Section", _selectedSectionId, _sectionList.map((s) => DropdownMenuItem(value: s.id, child: Text(s.name))).toList(), (val) => setState(() => _selectedSectionId = val), key: ValueKey(_selectedClassId), dependentParent: "Class")),
             const SizedBox(width: 16),
-            Expanded(child: _buildDropdownField(theme, "Weekday", selectedWeekday, _weekdayList, (val) => setState(() => selectedWeekday = val))),
+            Expanded(child: _buildDropdownField(theme, "Weekday", _selectedWeekday, _weekdayList.map((d) => DropdownMenuItem(value: d, child: Text(d))).toList(), (val) => setState(() => _selectedWeekday = val))),
           ],
         ),
         const SizedBox(height: 16),
         Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Expanded(child: _buildDropdownField(theme, "Subject", selectedSubject, _subjectList, (val) => setState(() => selectedSubject = val))),
+            Expanded(child: _buildDropdownField(theme, "Subject", _selectedSubjectId, _subjectList.map((s) => DropdownMenuItem(value: s.id, child: Text(s.name))).toList(), (val) => setState(() => _selectedSubjectId = val))),
             const SizedBox(width: 16),
-            Expanded(child: _buildDropdownField(theme, "Teacher", selectedTeacher, _teacherList, (val) => setState(() => selectedTeacher = val))),
+            Expanded(child: _buildDropdownField(theme, "Teacher", _selectedTeacherId, _teacherList.map((t) => DropdownMenuItem(value: t.id, child: Text(t.name))).toList(), (val) => setState(() => _selectedTeacherId = val))),
           ],
         ),
         const SizedBox(height: 16),
         Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Expanded(child: _buildTimeField(theme, "Start Time", startTime, isStartTime: true)),
+            Expanded(child: _buildTimeField(theme, "Start Time", _startTime, isStartTime: true)),
             const SizedBox(width: 16),
-            Expanded(child: _buildTimeField(theme, "End Time", endTime, isStartTime: false)),
+            Expanded(child: _buildTimeField(theme, "End Time", _endTime, isStartTime: false)),
           ],
         ),
         const SizedBox(height: 80), // For FAB
@@ -233,23 +312,42 @@ class _AddNewSchedulePageState extends State<AddNewSchedulePage> {
     );
   }
 
-  Widget _buildDropdownField(ThemeData theme, String label, String? value, List<String> items, ValueChanged<String?> onChanged) {
+  /// A reusable and robust dropdown form field widget.
+  Widget _buildDropdownField<T>(ThemeData theme, String label, T? currentValue, List<DropdownMenuItem<T>> items, ValueChanged<T?> onChanged, {Key? key, String? hint, String? dependentParent}) {
+    final bool isDisabled = items.isEmpty;
+
+    String getHintText() {
+      if (isDisabled) {
+        return dependentParent != null ? "--Select a $dependentParent first--" : "--No options available--";
+      }
+      return hint ?? "--Select $label--";
+    }
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(label, style: theme.textTheme.titleMedium?.copyWith(color: theme.colorScheme.onPrimary)),
         const SizedBox(height: 8),
-        DropdownButtonFormField<String>(
-          initialValue: value,
-          items: items.map((e) => DropdownMenuItem(value: e, child: Text(e))).toList(),
-          onChanged: onChanged,
+        DropdownButtonFormField<T>(
+          key: key,
+          value: currentValue,
+          items: items,
+          onChanged: isDisabled ? null : onChanged,
+          isExpanded: true,
           decoration: InputDecoration(
-            hintText: "--Select $label",
+            hintText: getHintText(),
             filled: true,
             fillColor: theme.scaffoldBackgroundColor,
             border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide.none),
+            disabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(10),
+              borderSide: BorderSide(color: theme.dividerColor.withAlpha(128)),
+            ),
           ),
-          validator: (val) => val == null ? "Please select a $label" : null,
+          validator: (val) {
+            if (isDisabled && dependentParent != null) return null;
+            return val == null ? "Please select a $label" : null;
+          },
         ),
       ],
     );

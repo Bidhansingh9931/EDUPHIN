@@ -1,9 +1,13 @@
 import 'dart:async';
+import 'dart:convert';
+
 import 'package:eduphin/login_logout/updated_password.dart';
+import 'package:eduphin/services/api_service.dart';
 import 'package:flutter/material.dart';
 
 class VerifyPasswordPage extends StatefulWidget {
-  const VerifyPasswordPage({super.key});
+  final String email;
+  const VerifyPasswordPage({super.key, required this.email});
 
   @override
   State<VerifyPasswordPage> createState() => _VerifyPasswordPageState();
@@ -55,19 +59,72 @@ class _VerifyPasswordPageState extends State<VerifyPasswordPage> {
       _isLoading = true;
     });
 
-    // Simulate a network request for verification
-    await Future.delayed(const Duration(seconds: 2));
-
-    if (mounted) {
-      setState(() {
-        _isLoading = false;
+    try {
+      final response = await ApiService.post('verify-otp', {
+        'email': widget.email,
+        'token': otp,
       });
-      // In a real app, you would validate the OTP.
-      // For now, we'll navigate on success.
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (context) => const UpdatedPasswordPage()),
-      );
+
+      if (mounted) {
+        final responseData = jsonDecode(response.body);
+        if (response.statusCode == 200 && responseData['status'] == true) {
+           ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+                content: Text(responseData['message'] ?? 'OTP verified successfully!'),
+                backgroundColor: Colors.green),
+          );
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(builder: (context) => UpdatedPasswordPage(email: widget.email, otp: otp)),
+          );
+        } else {
+          throw Exception(responseData['message'] ?? 'Failed to verify OTP.');
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+              content: Text(e.toString().replaceFirst('Exception: ', '')),
+              backgroundColor: Colors.red),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _resendCode() async {
+    startResendTimer();
+    try {
+      final response = await ApiService.post('forgot-password', {
+        'email': widget.email,
+      });
+
+      if (mounted) {
+        final responseData = jsonDecode(response.body);
+        if (response.statusCode == 200 && responseData['status'] == true) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+                content: Text(responseData['message'] ?? 'A new code has been sent.'),
+                backgroundColor: Colors.green),
+          );
+        } else {
+          throw Exception(responseData['message'] ?? 'Failed to resend code.');
+        }
+      }
+    } catch (e) {
+       if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+              content: Text(e.toString().replaceFirst('Exception: ', '')),
+              backgroundColor: Colors.red),
+        );
+      }
     }
   }
 
@@ -165,7 +222,7 @@ class _VerifyPasswordPageState extends State<VerifyPasswordPage> {
                         const SizedBox(height: 10),
 
                         TextButton(
-                          onPressed: isResendEnabled ? startResendTimer : null,
+                          onPressed: isResendEnabled ? _resendCode : null,
                           child: Text(
                             isResendEnabled
                                 ? "Resend CODE"
