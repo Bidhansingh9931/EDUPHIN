@@ -1,14 +1,24 @@
+import 'dart:typed_data';
+
+class AppFile {
+  final String name;
+  final String? path; // Not null for mobile
+  final Uint8List? bytes; // Not null for web
+
+  AppFile({required this.name, this.path, this.bytes});
+}
+
 class NewStudent {
   String firstName = '';
   String middleName = '';
   String lastName = '';
-  String profileImage = '';
+  AppFile? profileImage;
   String aadhaarNumber = '';
-  String aadhaarFile = '';
-  String marksheet10 = '';
-  String marksheet12 = '';
-  String transferCertificate = '';
-  String idProof = '';
+  AppFile? aadhaarFile;
+  AppFile? marksheet10;
+  AppFile? marksheet12;
+  AppFile? transferCertificate;
+  AppFile? idProof;
   String rollNo = '';
   String registrationNo = '';
   int? classId;

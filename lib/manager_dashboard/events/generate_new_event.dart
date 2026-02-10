@@ -1,6 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
-import 'dart:io';
+import 'dart:typed_data';
 
 import 'package:dotted_border/dotted_border.dart';
 import 'package:eduphin/services/api_service.dart';
@@ -27,7 +27,8 @@ class _GenerateNewEventState extends State<GenerateNewEvent> {
   final _ticketPriceController = TextEditingController();
   final _maxParticipantsController = TextEditingController();
 
-  File? _eventPoster;
+  XFile? _eventPosterFile;
+  Uint8List? _eventPosterBytes;
   TimeOfDay? _selectedStartTime;
   TimeOfDay? _selectedEndTime;
   bool isTicked = false;
@@ -58,8 +59,7 @@ class _GenerateNewEventState extends State<GenerateNewEvent> {
     final pickedFile = await picker.pickImage(source: ImageSource.gallery);
 
     if (pickedFile != null) {
-      final imageFile = File(pickedFile.path);
-      final imageSize = await imageFile.length();
+      final imageSize = await pickedFile.length();
       if (imageSize > 5 * 1024 * 1024) {
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
@@ -70,8 +70,10 @@ class _GenerateNewEventState extends State<GenerateNewEvent> {
         );
         return;
       }
+      final bytes = await pickedFile.readAsBytes();
       setState(() {
-        _eventPoster = imageFile;
+        _eventPosterFile = pickedFile;
+        _eventPosterBytes = bytes;
       });
     }
   }
@@ -81,7 +83,7 @@ class _GenerateNewEventState extends State<GenerateNewEvent> {
       return;
     }
 
-    if (_eventPoster == null) {
+    if (_eventPosterFile == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Please select an event poster.'),
@@ -96,8 +98,10 @@ class _GenerateNewEventState extends State<GenerateNewEvent> {
     });
 
     try {
-      final startTime = '${_selectedStartTime!.hour.toString().padLeft(2, '0')}:${_selectedStartTime!.minute.toString().padLeft(2, '0')}:00';
-      final endTime = '${_selectedEndTime!.hour.toString().padLeft(2, '0')}:${_selectedEndTime!.minute.toString().padLeft(2, '0')}:00';
+      final startTime =
+          '${_selectedStartTime!.hour.toString().padLeft(2, '0')}:${_selectedStartTime!.minute.toString().padLeft(2, '0')}:00';
+      final endTime =
+          '${_selectedEndTime!.hour.toString().padLeft(2, '0')}:${_selectedEndTime!.minute.toString().padLeft(2, '0')}:00';
       final date = DateFormat('dd-MM-yyyy').parse(_dateController.text);
       final formattedDate = DateFormat('yyyy-MM-dd').format(date);
 
@@ -129,12 +133,23 @@ class _GenerateNewEventState extends State<GenerateNewEvent> {
         fields['audience[$i]'] = selectedAudiences[i];
       }
 
-      final streamedResponse = await ApiService.postWithFile(
-        'manager/events',
-        fields,
-        _eventPoster!,
+      final url = Uri.parse('${ApiService.baseUrl}/api/manager/events');
+      final request = http.MultipartRequest('POST', url);
+      final token = await ApiService.getToken();
+      if (token != null) {
+        request.headers['Authorization'] = 'Bearer $token';
+      }
+      request.headers['Accept'] = 'application/json';
+
+      request.fields.addAll(fields);
+
+      request.files.add(http.MultipartFile.fromBytes(
         'image',
-      );
+        _eventPosterBytes!,
+        filename: _eventPosterFile!.name,
+      ));
+
+      final streamedResponse = await request.send();
 
       final response = await http.Response.fromStream(streamedResponse);
       final responseData = jsonDecode(response.body);
@@ -144,7 +159,8 @@ class _GenerateNewEventState extends State<GenerateNewEvent> {
       if (response.statusCode == 201 && responseData['status'] == true) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(responseData['message'] ?? 'Event generated successfully!'),
+            content: Text(
+                responseData['message'] ?? 'Event generated successfully!'),
             backgroundColor: Colors.green,
           ),
         );
@@ -159,7 +175,8 @@ class _GenerateNewEventState extends State<GenerateNewEvent> {
             throw Exception(firstError.toString());
           }
         } else {
-          throw Exception(responseData['message'] ?? 'Failed to generate event. Status code: ${response.statusCode}');
+          throw Exception(responseData['message'] ??
+              'Failed to generate event. Status code: ${response.statusCode}');
         }
       }
     } catch (e) {
@@ -198,12 +215,14 @@ class _GenerateNewEventState extends State<GenerateNewEvent> {
 
     if (pickedDate != null) {
       setState(() {
-        _dateController.text = "${pickedDate.day.toString().padLeft(2, '0')}-${pickedDate.month.toString().padLeft(2, '0')}-${pickedDate.year}";
+        _dateController.text =
+            "${pickedDate.day.toString().padLeft(2, '0')}-${pickedDate.month.toString().padLeft(2, '0')}-${pickedDate.year}";
       });
     }
   }
 
-  Future<void> selectTime(TextEditingController controller, Function(TimeOfDay) onTimeSelected) async {
+  Future<void> selectTime(TextEditingController controller,
+      Function(TimeOfDay) onTimeSelected) async {
     TimeOfDay? pickedTime = await showTimePicker(
       context: context,
       initialTime: TimeOfDay.now(),
@@ -273,10 +292,12 @@ class _GenerateNewEventState extends State<GenerateNewEvent> {
         const SizedBox(height: 8),
         TextFormField(
           controller: _titleController,
-          validator: (value) => value == null || value.isEmpty ? 'Please enter a title' : null,
+          validator: (value) =>
+              value == null || value.isEmpty ? 'Please enter a title' : null,
           decoration: InputDecoration(
             hintText: "Enter Event Title",
-            hintStyle: theme.textTheme.bodyMedium?.copyWith(color: theme.hintColor),
+            hintStyle:
+                theme.textTheme.bodyMedium?.copyWith(color: theme.hintColor),
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
             ),
@@ -285,7 +306,6 @@ class _GenerateNewEventState extends State<GenerateNewEvent> {
           ),
         ),
         const SizedBox(height: 16),
-        if (_eventPoster != null) Text(_eventPoster!.path),
         const Text("Event Poster"),
         const SizedBox(height: 8),
         GestureDetector(
@@ -303,10 +323,10 @@ class _GenerateNewEventState extends State<GenerateNewEvent> {
                 color: theme.primaryColor,
                 borderRadius: BorderRadius.circular(12),
               ),
-              child: _eventPoster != null
+              child: _eventPosterBytes != null
                   ? ClipRRect(
                       borderRadius: BorderRadius.circular(12),
-                      child: Image.file(_eventPoster!, fit: BoxFit.cover),
+                      child: Image.memory(_eventPosterBytes!, fit: BoxFit.cover),
                     )
                   : Column(
                       mainAxisAlignment: MainAxisAlignment.center,
@@ -341,10 +361,13 @@ class _GenerateNewEventState extends State<GenerateNewEvent> {
         TextFormField(
           controller: _descriptionController,
           maxLines: 5,
-          validator: (value) => value == null || value.isEmpty ? 'Please enter a description' : null,
+          validator: (value) => value == null || value.isEmpty
+              ? 'Please enter a description'
+              : null,
           decoration: InputDecoration(
             hintText: "Enter a detailed Description for the event",
-            hintStyle: theme.textTheme.bodyMedium?.copyWith(color: theme.hintColor),
+            hintStyle:
+                theme.textTheme.bodyMedium?.copyWith(color: theme.hintColor),
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
             ),
@@ -357,13 +380,16 @@ class _GenerateNewEventState extends State<GenerateNewEvent> {
         const SizedBox(height: 8),
         TextFormField(
           controller: _venueController,
-          validator: (value) => value == null || value.isEmpty ? 'Please enter a venue' : null,
+          validator: (value) =>
+              value == null || value.isEmpty ? 'Please enter a venue' : null,
           decoration: InputDecoration(
-            prefixIcon: Icon(Icons.location_on, color: theme.colorScheme.onPrimary),
+            prefixIcon:
+                Icon(Icons.location_on, color: theme.colorScheme.onPrimary),
             filled: true,
             fillColor: theme.primaryColor,
             hintText: "Enter the Venue",
-            hintStyle: theme.textTheme.bodyMedium?.copyWith(color: theme.hintColor),
+            hintStyle:
+                theme.textTheme.bodyMedium?.copyWith(color: theme.hintColor),
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
             ),
@@ -376,13 +402,16 @@ class _GenerateNewEventState extends State<GenerateNewEvent> {
           controller: _dateController,
           readOnly: true,
           onTap: () => selectDate(),
-          validator: (value) => value == null || value.isEmpty ? 'Please select a date' : null,
+          validator: (value) =>
+              value == null || value.isEmpty ? 'Please select a date' : null,
           decoration: InputDecoration(
-            prefixIcon: Icon(Icons.calendar_month, color: theme.colorScheme.onPrimary),
+            prefixIcon: Icon(Icons.calendar_month,
+                color: theme.colorScheme.onPrimary),
             filled: true,
             fillColor: theme.primaryColor,
             hintText: "Select Event Date",
-            hintStyle: theme.textTheme.bodyMedium?.copyWith(color: theme.hintColor),
+            hintStyle:
+                theme.textTheme.bodyMedium?.copyWith(color: theme.hintColor),
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
             ),
@@ -397,13 +426,17 @@ class _GenerateNewEventState extends State<GenerateNewEvent> {
           onTap: () => selectTime(_startTimeController, (time) {
             _selectedStartTime = time;
           }),
-          validator: (value) => value == null || value.isEmpty ? 'Please select a start time' : null,
+          validator: (value) => value == null || value.isEmpty
+              ? 'Please select a start time'
+              : null,
           decoration: InputDecoration(
-            prefixIcon: Icon(Icons.access_time_rounded, color: theme.colorScheme.onPrimary),
+            prefixIcon: Icon(Icons.access_time_rounded,
+                color: theme.colorScheme.onPrimary),
             filled: true,
             fillColor: theme.primaryColor,
             hintText: "Select Start Time",
-            hintStyle: theme.textTheme.bodyMedium?.copyWith(color: theme.hintColor),
+            hintStyle:
+                theme.textTheme.bodyMedium?.copyWith(color: theme.hintColor),
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
             ),
@@ -423,8 +456,10 @@ class _GenerateNewEventState extends State<GenerateNewEvent> {
               return 'Please select an end time';
             }
             if (_selectedStartTime != null && _selectedEndTime != null) {
-              final startTimeInMinutes = _selectedStartTime!.hour * 60 + _selectedStartTime!.minute;
-              final endTimeInMinutes = _selectedEndTime!.hour * 60 + _selectedEndTime!.minute;
+              final startTimeInMinutes =
+                  _selectedStartTime!.hour * 60 + _selectedStartTime!.minute;
+              final endTimeInMinutes =
+                  _selectedEndTime!.hour * 60 + _selectedEndTime!.minute;
               if (endTimeInMinutes <= startTimeInMinutes) {
                 return 'End time must be after start time';
               }
@@ -432,11 +467,13 @@ class _GenerateNewEventState extends State<GenerateNewEvent> {
             return null;
           },
           decoration: InputDecoration(
-            prefixIcon: Icon(Icons.access_time_rounded, color: theme.colorScheme.onPrimary),
+            prefixIcon: Icon(Icons.access_time_rounded,
+                color: theme.colorScheme.onPrimary),
             filled: true,
             fillColor: theme.primaryColor,
             hintText: "Select End Time",
-            hintStyle: theme.textTheme.bodyMedium?.copyWith(color: theme.hintColor),
+            hintStyle:
+                theme.textTheme.bodyMedium?.copyWith(color: theme.hintColor),
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
             ),
@@ -457,12 +494,15 @@ class _GenerateNewEventState extends State<GenerateNewEvent> {
           runSpacing: 8.0,
           children: [
             ...audienceSelection.keys.map((key) {
-              return CustomCheckbox(label: key, value: audienceSelection[key]!, onChanged: (val) {
-                setState(() {
-                  audienceSelection[key] = val!;
-                  _updateOpenForAll();
-                });
-              });
+              return CustomCheckbox(
+                  label: key,
+                  value: audienceSelection[key]!,
+                  onChanged: (val) {
+                    setState(() {
+                      audienceSelection[key] = val!;
+                      _updateOpenForAll();
+                    });
+                  });
             }),
             CustomCheckbox(
               label: "Open for all",
@@ -501,7 +541,8 @@ class _GenerateNewEventState extends State<GenerateNewEvent> {
         SwitchListTile(
           title: Text(
             "Ticketed Event?",
-            style: theme.textTheme.titleMedium?.copyWith(color: theme.colorScheme.onSurface),
+            style: theme.textTheme.titleMedium
+                ?.copyWith(color: theme.colorScheme.onSurface),
           ),
           value: isTicked,
           onChanged: (val) {
@@ -518,11 +559,15 @@ class _GenerateNewEventState extends State<GenerateNewEvent> {
           TextFormField(
             controller: _ticketPriceController,
             keyboardType: TextInputType.number,
-            validator: (value) => isTicked && (value == null || value.isEmpty) ? 'Please enter a ticket price' : null,
+            validator: (value) => isTicked && (value == null || value.isEmpty)
+                ? 'Please enter a ticket price'
+                : null,
             decoration: InputDecoration(
-              prefixIcon: Icon(Icons.currency_rupee, color: theme.colorScheme.onPrimary),
+              prefixIcon:
+                  Icon(Icons.currency_rupee, color: theme.colorScheme.onPrimary),
               hintText: "Enter Ticket Price",
-              hintStyle: theme.textTheme.bodyMedium?.copyWith(color: theme.hintColor),
+              hintStyle:
+                  theme.textTheme.bodyMedium?.copyWith(color: theme.hintColor),
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12),
               ),
@@ -580,7 +625,9 @@ class CustomCheckbox extends StatelessWidget {
           color: value ? theme.colorScheme.primaryContainer : theme.primaryColor,
           borderRadius: BorderRadius.circular(8),
           border: Border.all(
-            color: value ? theme.colorScheme.primaryContainer : theme.hintColor.withAlpha((255 * 0.4).round()),
+            color: value
+                ? theme.colorScheme.primaryContainer
+                : theme.hintColor.withAlpha((255 * 0.4).round()),
           ),
         ),
         child: Row(
@@ -588,13 +635,17 @@ class CustomCheckbox extends StatelessWidget {
           children: [
             Icon(
               value ? Icons.check_box : Icons.check_box_outline_blank,
-              color: value ? theme.colorScheme.onPrimaryContainer : theme.hintColor,
+              color: value
+                  ? theme.colorScheme.onPrimaryContainer
+                  : theme.hintColor,
             ),
             const SizedBox(width: 8),
             Text(
               label,
               style: theme.textTheme.bodyMedium?.copyWith(
-                color: value ? theme.colorScheme.onPrimaryContainer : theme.colorScheme.onSurface,
+                color: value
+                    ? theme.colorScheme.onPrimaryContainer
+                    : theme.colorScheme.onSurface,
               ),
             ),
           ],
