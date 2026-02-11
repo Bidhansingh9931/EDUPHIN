@@ -286,7 +286,7 @@ class _AssignmentsPageState extends State<AssignmentsPage> {
         const SizedBox(height: 6),
         DropdownButtonFormField<String>(
           isExpanded: true, // Fix: Allow dropdown to expand and truncate text
-          value: dropdownValue,
+          initialValue: dropdownValue,
           dropdownColor: theme.cardColor,
           style: theme.textTheme.bodyLarge,
           decoration: InputDecoration(

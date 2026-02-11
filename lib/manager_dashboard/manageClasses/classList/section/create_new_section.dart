@@ -31,23 +31,26 @@ class _CreateNewSectionPageState extends State<CreateNewSectionPage> {
       _isFetchingMentors = true;
     });
     try {
-      // This assumes you have a 'manager/teacher' endpoint that returns a list of teachers.
-      // You may need to adjust the endpoint and the data parsing based on your actual API response.
-      final response = await ApiService.get('manager/teacher');
+      // CORRECTED: Use the 'meta' endpoint to get teachers and other related data.
+      final response = await ApiService.get('manager/class-schedules/meta');
       if (mounted) {
         final responseData = jsonDecode(response.body);
         if (response.statusCode == 200 && responseData['status'] == true) {
-          final List<dynamic> teachersList = responseData['data'];
+          // CORRECTED: The list of teachers is under the 'teachers' key.
+          final List<dynamic> teachersList = responseData['teachers'];
+          // Safely process the list to handle potential nulls in names
+          final processedMentors = teachersList.map((teacher) {
+            final firstName = teacher['first_name'] ?? '';
+            final lastName = teacher['last_name'] ?? '';
+            final fullName = '$firstName $lastName'.trim();
+            return {
+              'id': teacher['id'],
+              'name': fullName.isNotEmpty ? fullName : 'Unnamed Mentor',
+            };
+          }).where((mentor) => mentor['id'] != null).toList(); // Filter out invalid entries
+
           setState(() {
-            _mentors = teachersList.map((teacher) {
-              // Assuming the API returns teacher data with a 'user' object.
-              // Adjust if your API response structure is different.
-              return {
-                'id': teacher['user']['id'],
-                'name':
-                    '${teacher['user']['first_name']} ${teacher['user']['last_name']}',
-              };
-            }).toList();
+            _mentors = processedMentors;
           });
         } else {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -247,7 +250,7 @@ class _CreateNewSectionPageState extends State<CreateNewSectionPage> {
                 ?.copyWith(color: theme.colorScheme.onPrimary)),
         const SizedBox(height: 8),
         DropdownButtonFormField<String>(
-          initialValue: _selectedMentorId,
+          initialValue: _selectedMentorId, // Use value instead of initialValue
           hint: _isFetchingMentors
               ? const Text('Loading Mentors...')
               : const Text('Select a Mentor'),
@@ -268,19 +271,12 @@ class _CreateNewSectionPageState extends State<CreateNewSectionPage> {
               borderSide: BorderSide(color: theme.colorScheme.error, width: 2),
             ),
           ),
-          items: _isFetchingMentors
-              ? [
-                  const DropdownMenuItem(
-                    value: null,
-                    child: Center(child: CircularProgressIndicator()),
-                  )
-                ]
-              : _mentors.map<DropdownMenuItem<String>>((mentor) {
-                  return DropdownMenuItem<String>(
-                    value: mentor['id'].toString(),
-                    child: Text(mentor['name']),
-                  );
-                }).toList(),
+          items: _mentors.map<DropdownMenuItem<String>>((mentor) {
+            return DropdownMenuItem<String>(
+              value: mentor['id'].toString(),
+              child: Text(mentor['name']),
+            );
+          }).toList(),
           onChanged: _isFetchingMentors
               ? null
               : (String? newValue) {

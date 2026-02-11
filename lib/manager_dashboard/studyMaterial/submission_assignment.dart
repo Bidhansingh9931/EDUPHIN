@@ -76,6 +76,10 @@ class _AssignmentSubmissionsScreenState
 
     try {
       final response = await ApiService.get('manager/study/assignment/${widget.assignmentId}/submissions');
+      // Log the status code and response body
+      print('API Status Code: ${response.statusCode}');
+      print('API Response Body: ${response.body}');
+
       if (response.statusCode == 200) {
         final responseData = jsonDecode(response.body)['data'];
 
@@ -94,9 +98,13 @@ class _AssignmentSubmissionsScreenState
           });
         }
       } else {
+        // Log the error for non-200 responses
+        print('Failed to load submissions. Status code: ${response.statusCode}');
         throw Exception('Failed to load submissions');
       }
     } catch (e) {
+      // Log any other exceptions
+      print('Error fetching submissions: $e');
       if (mounted) {
         setState(() {
           isLoading = false;

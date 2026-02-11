@@ -51,7 +51,7 @@ class _SectionsPageState extends State<SectionsPage> {
       if (response.statusCode == 200 && responseData['status'] == true) {
         final allClasses = responseData['data']['classes'] as List? ?? [];
         final currentClass = allClasses.firstWhere(
-          (classData) => classData['id'] == widget.classId,
+              (classData) => classData['id'] == widget.classId,
           orElse: () => null,
         );
 
@@ -385,13 +385,13 @@ class _DeleteSectionDialogState extends State<DeleteSectionDialog> {
                     onPressed: _isDeleting ? null : _deleteSection,
                     child: _isDeleting
                         ? const SizedBox(
-                            height: 24,
-                            width: 24,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 3,
-                              valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                            ),
-                          )
+                      height: 24,
+                      width: 24,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 3,
+                        valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                      ),
+                    )
                         : const Text("Yes, Delete"),
                   ),
                 ),

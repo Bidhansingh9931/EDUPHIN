@@ -4,7 +4,7 @@ import 'package:eduphin/moderator_dashboard/moderator_dashboard.dart';
 import 'package:flutter/material.dart';
 import 'package:eduphin/services/api_service.dart';
 
-import 'forgot_password.dart';
+// import 'forgot_password.dart';
 
 // Add a class for role constants
 class Roles {
@@ -187,21 +187,21 @@ class _LoginPageState extends State<LoginPage> {
                                   ),
                                 ],
                               ),
-                              TextButton(
-                                onPressed: () {
-                                  Navigator.push(
-                                    context,
-                                    MaterialPageRoute(
-                                        builder: (context) =>
-                                            const ForgotPasswordPage()),
-                                  );
-                                },
-                                child: Text(
-                                  "Forgot password?",
-                                  style: TextStyle(
-                                      color: theme.colorScheme.primary),
-                                ),
-                              ),
+                              // TextButton(
+                              //   onPressed: () {
+                              //     Navigator.push(
+                              //       context,
+                              //       MaterialPageRoute(
+                              //           builder: (context) =>
+                              //               const ForgotPasswordPage()),
+                              //     );
+                              //   },
+                              //   child: Text(
+                              //     "Forgot password?",
+                              //     style: TextStyle(
+                              //         color: theme.colorScheme.primary),
+                              //   ),
+                              // ),
                             ],
                           ),
                           const SizedBox(height: 20),

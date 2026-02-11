@@ -73,22 +73,17 @@ class _ClassScheduleSearchPageState extends State<ClassScheduleSearchPage> {
         final data = jsonDecode(response.body);
         if (data['status'] == true) {
           final List<dynamic> classData = data['classes'] ?? [];
-          final List<dynamic> sectionData = data['sections'] ?? [];
 
           final List<String> fetchedClasses = classData
               .map((json) => ApiClass.fromJson(json).name)
               .whereType<String>()
               .toList();
-          final List<String> fetchedSections = sectionData
-              .map((json) => ApiSection.fromJson(json).name)
-              .whereType<String>()
-              .toList();
 
           setState(() {
             _classList = fetchedClasses;
-            _sectionList = fetchedSections;
+            _sectionList = ['A', 'B', 'C', 'D'];
             _selectedClass = fetchedClasses.isNotEmpty ? fetchedClasses.first : null;
-            _selectedSection = fetchedSections.isNotEmpty ? fetchedSections.first : null;
+            _selectedSection = null;
           });
         } else {
           throw Exception('API returned an error: ${data['message'] ?? 'Unknown error'}');
@@ -275,7 +270,7 @@ class _ClassScheduleSearchPageState extends State<ClassScheduleSearchPage> {
           ),
           const SizedBox(height: 8),
           DropdownButtonFormField<String>(
-            initialValue: value,
+            value: value,
             isExpanded: true,
             items: items.map((e) => DropdownMenuItem(value: e, child: Text(e, overflow: TextOverflow.ellipsis))).toList(),
             onChanged: onChanged,

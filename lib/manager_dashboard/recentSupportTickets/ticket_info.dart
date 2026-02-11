@@ -9,11 +9,19 @@ import 'ticket_details.dart';
 enum TicketStatus {
   open,
   inProgress,
-  onHold,
   resolved,
   closed;
 
   String get displayName => toBeginningOfSentenceCase(name.replaceAll('InProgress', 'In Progress'))!;
+
+  String get apiName {
+    switch (this) {
+      case TicketStatus.inProgress:
+        return 'in_progress';
+      default:
+        return name.toLowerCase();
+    }
+  }
 }
 
 enum TicketPriority {
@@ -82,7 +90,7 @@ class Ticket {
     }
 
     return Ticket(
-      serial: json['serial']?.toString() ?? 'N/A',
+      serial: json['id']?.toString() ?? 'N/A',
       title: json['title']?.toString() ?? 'No Title',
       category: (json['category'] is Map<String, dynamic> ? json['category']['name']?.toString() : null) ?? 'Uncategorized',
       issuedBy: (json['user'] is Map<String, dynamic> ? json['user']['name']?.toString() : null) ?? 'Unknown User',
@@ -104,11 +112,14 @@ extension on String {
   }
 
   TicketStatus toTicketStatus() {
-    final formattedString = toLowerCase().replaceAll('-', '');
-    return TicketStatus.values.firstWhere(
-      (e) => e.name.toLowerCase() == formattedString,
-      orElse: () => TicketStatus.open,
-    );
+    const statusMap = {
+      'open': TicketStatus.open,
+      'in_progress': TicketStatus.inProgress,
+      'inprogress': TicketStatus.inProgress,
+      'resolved': TicketStatus.resolved,
+      'closed': TicketStatus.closed,
+    };
+    return statusMap[toLowerCase()] ?? TicketStatus.open;
   }
 }
 
@@ -141,34 +152,35 @@ class _TicketInfoPageState extends State<TicketInfoPage> {
     try {
       final response = await ApiService.get('manager/tickets');
 
-      if (mounted) {
-        if (response.statusCode == 200) {
-          final data = jsonDecode(response.body);
+      if (!mounted) return;
 
-          final List<dynamic> ticketsList = data['tickets'] as List? ?? [];
-          final ticketsData = ticketsList.whereType<Map<String, dynamic>>().map(Ticket.fromJson).toList();
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
 
-          final List<dynamic> usersList = data['assignable_users'] as List? ?? [];
-          final usersData = usersList.whereType<Map<String, dynamic>>().map(AssignableUser.fromJson).toList();
+        final List<dynamic> ticketsList = data['tickets'] as List? ?? [];
+        final ticketsData =
+            ticketsList.whereType<Map<String, dynamic>>().map(Ticket.fromJson).toList();
 
-          setState(() {
-            _tickets = ticketsData;
-            _assignableUsers = usersData;
-            _isLoading = false;
-          });
-        } else {
-          throw Exception('Failed to load tickets');
-        }
-      }
-    } catch (e) {
-      if (mounted) {
+        final List<dynamic> usersList = data['assignable_users'] as List? ?? [];
+        final usersData =
+            usersList.whereType<Map<String, dynamic>>().map(AssignableUser.fromJson).toList();
+
         setState(() {
+          _tickets = ticketsData;
+          _assignableUsers = usersData;
           _isLoading = false;
         });
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(e.toString())),
-        );
+      } else {
+        throw Exception('Failed to load tickets');
       }
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _isLoading = false;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(e.toString())),
+      );
     }
   }
 
@@ -213,6 +225,7 @@ class _TicketInfoPageState extends State<TicketInfoPage> {
           key: ValueKey(_tickets[index].serial),
           ticket: _tickets[index],
           assignableUsers: _assignableUsers,
+          onUpdate: _fetchTickets,
         );
       },
       separatorBuilder: (context, index) => const SizedBox(height: 16),
@@ -234,6 +247,7 @@ class _TicketInfoPageState extends State<TicketInfoPage> {
           key: ValueKey(_tickets[index].serial),
           ticket: _tickets[index],
           assignableUsers: _assignableUsers,
+          onUpdate: _fetchTickets,
         );
       },
     );
@@ -245,11 +259,13 @@ class _TicketInfoPageState extends State<TicketInfoPage> {
 class TicketCard extends StatefulWidget {
   final Ticket ticket;
   final List<AssignableUser> assignableUsers;
+  final VoidCallback onUpdate;
 
   const TicketCard({
     super.key,
     required this.ticket,
     required this.assignableUsers,
+    required this.onUpdate,
   });
 
   @override
@@ -280,41 +296,39 @@ class _TicketCardState extends State<TicketCard> {
 
   Future<void> _updateTicketStatus(TicketStatus newStatus) async {
     try {
-      final response = await ApiService.post('manager/tickets/${widget.ticket.serial}/status', {'status': newStatus.name.replaceAll('InProgress', 'in_progress').toLowerCase()});
-      if(mounted) {
-        if (response.statusCode == 200) {
-          setState(() {
-            _selectedStatus = newStatus;
-          });
-          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Status updated!")));
-        } else {
-          throw Exception('Failed to update status');
-        }
+      final response = await ApiService.post(
+          'manager/tickets/${widget.ticket.serial}/status', {'status': newStatus.apiName});
+      if (!mounted) return;
+      if (response.statusCode == 200) {
+        widget.onUpdate();
+        ScaffoldMessenger.of(context)
+            .showSnackBar(const SnackBar(content: Text("Status updated!")));
+      } else {
+        final error = jsonDecode(response.body)['message'] ?? 'Failed to update status';
+        throw Exception(error);
       }
     } catch (e) {
-      if(mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString())));
-      }
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString())));
     }
   }
 
   Future<void> _updateTicketPriority(TicketPriority newPriority) async {
     try {
-      final response = await ApiService.post('manager/tickets/${widget.ticket.serial}/priority', {'priority': newPriority.name.toLowerCase()});
-      if(mounted) {
-        if (response.statusCode == 200) {
-          setState(() {
-            _selectedPriority = newPriority;
-          });
-          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Priority updated!")));
-        } else {
-          throw Exception('Failed to update priority');
-        }
+      final response = await ApiService.post(
+          'manager/tickets/${widget.ticket.serial}/priority', {'priority': newPriority.name.toLowerCase()});
+      if (!mounted) return;
+      if (response.statusCode == 200) {
+        widget.onUpdate();
+        ScaffoldMessenger.of(context)
+            .showSnackBar(const SnackBar(content: Text("Priority updated!")));
+      } else {
+        final error = jsonDecode(response.body)['message'] ?? 'Failed to update priority';
+        throw Exception(error);
       }
     } catch (e) {
-      if(mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString())));
-      }
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString())));
     }
   }
 
@@ -348,7 +362,10 @@ class _TicketCardState extends State<TicketCard> {
           Text("Assigned to", style: TextStyle(color: theme.hintColor)),
           const SizedBox(height: 6),
           Row(
-            children: widget.assignableUsers.where((user) => widget.ticket.assignedUsers.contains(user.id)).map((e) => _avatar(theme, e.name.substring(0, 2).toUpperCase())).toList(),
+            children: widget.assignableUsers
+                .where((user) => widget.ticket.assignedUsers.contains(user.id))
+                .map((e) => _avatar(theme, e.name.substring(0, 2).toUpperCase()))
+                .toList(),
           ),
           const SizedBox(height: 12),
           Text("Created At", style: TextStyle(color: theme.hintColor)),
@@ -375,10 +392,11 @@ class _TicketCardState extends State<TicketCard> {
                 theme,
                 text: "View",
                 onTap: () {
-                   Navigator.push(
+                  Navigator.push(
                       context,
                       MaterialPageRoute(
-                          builder: (context) => TicketDetailsPage(ticketId: widget.ticket.serial,)));
+                          builder: (context) =>
+                              TicketDetailsPage(ticketId: widget.ticket.serial)));
                 },
                 isPrimary: true,
               ),
@@ -438,7 +456,7 @@ class _TicketCardState extends State<TicketCard> {
     required String title,
     required Widget Function(StateSetter) contentBuilder,
     required String buttonText,
-    required VoidCallback onConfirm,
+    required Future<void> Function() onConfirm,
   }) {
     final theme = Theme.of(context);
     showModalBottomSheet(
@@ -461,9 +479,11 @@ class _TicketCardState extends State<TicketCard> {
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton(
-                  onPressed: () {
-                    onConfirm();
-                    Navigator.pop(context);
+                  onPressed: () async {
+                    await onConfirm();
+                    if (context.mounted) {
+                      Navigator.pop(context);
+                    }
                   },
                   style: ElevatedButton.styleFrom(
                     backgroundColor: theme.colorScheme.primary,
@@ -471,7 +491,13 @@ class _TicketCardState extends State<TicketCard> {
                     shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(14)),
                   ),
-                  child: Text(buttonText,style: const TextStyle(color: Colors.white,fontWeight: FontWeight.bold,fontSize: 16),),
+                  child: Text(
+                    buttonText,
+                    style: const TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 16),
+                  ),
                 ),
               ),
             ]),
@@ -490,15 +516,15 @@ class _TicketCardState extends State<TicketCard> {
         color: theme.colorScheme.surface,
         borderRadius: BorderRadius.circular(12),
       ),
-      child: ListTile(
-        title: Text(text, style: theme.textTheme.bodyLarge),
-        leading: Radio<T>(
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(12),
+        child: RadioListTile<T>(
+          title: Text(text, style: theme.textTheme.bodyLarge),
           value: value,
           groupValue: groupValue,
           onChanged: onChanged,
           activeColor: theme.colorScheme.primary,
         ),
-        onTap: () => onChanged(value),
       ),
     );
   }
@@ -527,7 +553,8 @@ class _TicketCardState extends State<TicketCard> {
         borderRadius: BorderRadius.circular(20),
       ),
       child: Text(_selectedPriority.displayName,
-          style: theme.textTheme.labelLarge?.copyWith(color: color, fontWeight: FontWeight.w600)),
+          style: theme.textTheme.labelLarge
+              ?.copyWith(color: color, fontWeight: FontWeight.w600)),
     );
   }
 
@@ -541,20 +568,30 @@ class _TicketCardState extends State<TicketCard> {
         shape: BoxShape.circle,
       ),
       alignment: Alignment.center,
-      child: Text(text, style: theme.textTheme.labelLarge?.copyWith(color: theme.colorScheme.onSecondary, fontWeight: FontWeight.bold)),
+      child: Text(text,
+          style: theme.textTheme.labelLarge?.copyWith(
+              color: theme.colorScheme.onSecondary,
+              fontWeight: FontWeight.bold)),
     );
   }
 
-  Widget _actionButton(ThemeData theme, {required String text, required VoidCallback onTap, required bool isPrimary}) {
-    final Color textColor = isPrimary ? theme.colorScheme.onPrimary : theme.colorScheme.onSecondaryContainer;
+  Widget _actionButton(ThemeData theme,
+      {required String text, required VoidCallback onTap, required bool isPrimary}) {
+    final Color textColor =
+        isPrimary ? theme.colorScheme.onPrimary : theme.colorScheme.onSecondaryContainer;
     return Expanded(
       child: ElevatedButton(
         onPressed: onTap,
         style: ElevatedButton.styleFrom(
-          backgroundColor: isPrimary ? theme.colorScheme.primary : theme.colorScheme.secondaryContainer,
-          foregroundColor: isPrimary ? theme.colorScheme.onPrimary : theme.colorScheme.onSecondaryContainer,
+          backgroundColor: isPrimary
+              ? theme.colorScheme.primary
+              : theme.colorScheme.secondaryContainer,
+          foregroundColor: isPrimary
+              ? theme.colorScheme.onPrimary
+              : theme.colorScheme.onSecondaryContainer,
           padding: const EdgeInsets.symmetric(vertical: 16),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         ),
         child: Text(
           text,
