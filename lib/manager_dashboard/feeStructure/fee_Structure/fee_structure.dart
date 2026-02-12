@@ -31,7 +31,7 @@ class InstituteFee {
       title: json['fee_name']?.toString() ?? 'N/A',
       mandatoryOrOptional: (json['is_optional'] == true || json['is_optional'] == 1) ? "Optional" : "Mandatory",
       detail: json['description']?.toString() ?? '',
-      amount: int.tryParse(json['amount']?.toString() ?? '0') ?? 0,
+      amount: (double.tryParse(json['amount']?.toString().replaceAll(RegExp(r'[₹,]'), '') ?? '0') ?? 0).toInt(),
     );
   }
 }
@@ -61,7 +61,7 @@ class ClassFee {
       subHeading: json['fee_name']?.toString() ?? 'N/A',
       isOptional: (json['is_optional'] == true || json['is_optional'] == 1) ? "Optional" : "Mandatory",
       details: json['description']?.toString() ?? '',
-      fee: int.tryParse(json['amount']?.toString() ?? '0') ?? 0,
+      fee: (double.tryParse(json['amount']?.toString().replaceAll(RegExp(r'[₹,]'), '') ?? '0') ?? 0).toInt(),
     );
   }
 }

@@ -254,7 +254,25 @@ class _SubmissionCard extends StatelessWidget {
               padding: const EdgeInsets.only(top: 4.0),
               child: InkWell(
                 onTap: () {
-                  // TODO: Implement a dialog or navigation to show full text
+                  showDialog(
+                    context: context,
+                    builder: (BuildContext dialogContext) {
+                      return AlertDialog(
+                        title: const Text("Full Typed Answer"),
+                        content: SingleChildScrollView(
+                          child: Text(submission.typedAnswer),
+                        ),
+                        actions: [
+                          TextButton(
+                            onPressed: () {
+                              Navigator.of(dialogContext).pop();
+                            },
+                            child: const Text("Close"),
+                          ),
+                        ],
+                      );
+                    },
+                  );
                 },
                 child: Text(
                   "Read more",

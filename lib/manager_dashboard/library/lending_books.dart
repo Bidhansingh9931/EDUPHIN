@@ -1,3 +1,6 @@
+import 'dart:convert';
+
+import 'package:eduphin/services/api_service.dart';
 import 'package:flutter/material.dart';
 
 class LendingBooksScreen extends StatefulWidget {
@@ -17,52 +20,33 @@ class _LendingBooksScreenState extends State<LendingBooksScreen> {
     _fetchLendingBooks();
   }
 
-  // TODO: Replace this with your actual API call
   Future<void> _fetchLendingBooks() async {
-    // Simulate network delay
-    await Future.delayed(const Duration(seconds: 1));
+    setState(() {
+      isLoading = true;
+    });
+    try {
+      final response = await ApiService.get('manager/library/lending-books');
 
-    final List<Map<String, dynamic>> dummyData = [
-      {
-        "title": "The Principles of Quantum Mechanics",
-        "issueNo": "B00123",
-        "issuedAt": "15 Jul 2024",
-        "dueDate": "30 Jul 2024",
-        "overdueDays": 0,
-        "status": "Pending"
-      },
-      {
-        "title": "Introduction to Algorithms",
-        "issueNo": "B00124",
-        "issuedAt": "01 Jul 2024",
-        "dueDate": "16 Jul 2024",
-        "overdueDays": 10,
-        "status": "Overdue"
-      },
-      {
-        "title": "The Art of Computer Programming",
-        "issueNo": "B00125",
-        "issuedAt": "20 Jun 2024",
-        "dueDate": "05 Jul 2024",
-        "overdueDays": 0,
-        "status": "Returned"
-      },
-      {
-        "title": "Cosmos",
-        "issueNo": "B00126",
-        "issuedAt": "10 Jul 2024",
-        "dueDate": "25 Jul 2024",
-        "overdueDays": 0,
-        "status": "Pending"
-      },
-    ];
-
-    if (mounted) {
-      setState(() {
-        lendingBooks =
-            dummyData.map((data) => LendingBook.fromJson(data)).toList();
-        isLoading = false;
-      });
+      if (response.statusCode == 200) {
+        final List<dynamic> data = json.decode(response.body)['data'];
+        if (mounted) {
+          setState(() {
+            lendingBooks = data.map((json) => LendingBook.fromJson(json)).toList();
+            isLoading = false;
+          });
+        }
+      } else {
+        throw Exception('Failed to load lending books');
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          isLoading = false;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(e.toString())),
+        );
+      }
     }
   }
 
@@ -262,14 +246,14 @@ class LendingBook {
     required this.status,
   });
 
-  factory LendingBook.fromJson(Map<String, dynamic> json) {
+ factory LendingBook.fromJson(Map<String, dynamic> json) {
     return LendingBook(
-      title: json['title'] as String,
-      issueNo: json['issueNo'] as String,
-      issuedAt: json['issuedAt'] as String,
-      dueDate: json['dueDate'] as String,
-      overdueDays: json['overdueDays'] as int,
-      status: json['status'] as String,
+      title: json['book']?['title'] ?? 'N/A',
+      issueNo: json['issue_no'] ?? 'N/A',
+      issuedAt: json['issued_at'] ?? 'N/A',
+      dueDate: json['due_date'] ?? 'N/A',
+      overdueDays: json['overdue_days'] ?? 0,
+      status: json['status'] ?? 'N/A',
     );
   }
 }

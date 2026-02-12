@@ -2,11 +2,17 @@ import 'dart:convert';
 import 'dart:io';
 import 'package:eduphin/services/api_service.dart';
 import 'package:flutter/material.dart';
-import 'package:http/http.dart' as http;
 import 'package:image_picker/image_picker.dart';
 
 class AddAccountPage extends StatefulWidget {
-  const AddAccountPage({super.key});
+  final String instituteId;
+  final String roleId;
+
+  const AddAccountPage({
+    super.key,
+    required this.instituteId,
+    required this.roleId,
+  });
 
   @override
   State<AddAccountPage> createState() => _AddAccountPageState();
@@ -47,24 +53,7 @@ class _AddAccountPageState extends State<AddAccountPage> {
       return;
     }
 
-    final token = await ApiService.getToken();
-    if (token == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Authentication token not found.')),
-      );
-      return;
-    }
-
-    var request = http.MultipartRequest(
-      'POST',
-      Uri.parse('${ApiService.baseUrl}/moderator/accounts'),
-    );
-
-    request.headers['Authorization'] = 'Bearer $token';
-    request.headers['Accept'] = 'application/json';
-
-    // TODO: The institute and role IDs are hardcoded. You should pass these dynamically.
-    request.fields.addAll({
+    final fields = {
       'name': _nameController.text,
       'email': _emailController.text,
       'password': _passwordController.text,
@@ -75,42 +64,46 @@ class _AddAccountPageState extends State<AddAccountPage> {
       'phone': _phoneController.text,
       'alternate_phone': _altPhoneController.text,
       'bank_account_number': _bankAccountController.text,
-      'institute_id': '1',
-      'role_id': '3', // Assuming '3' is the role for managers
-    });
+      'institute_id': widget.instituteId,
+      'role_id': widget.roleId,
+    };
 
+    final files = <String, File>{};
     if (_photo != null) {
-      request.files.add(await http.MultipartFile.fromPath('photo', _photo!.path));
+      files['photo'] = _photo!;
     }
     if (_aadharPhoto != null) {
-      request.files.add(await http.MultipartFile.fromPath('aadhar_photo', _aadharPhoto!.path));
+      files['aadhar_photo'] = _aadharPhoto!;
     }
     if (_xMarksheet != null) {
-      request.files.add(await http.MultipartFile.fromPath('x_marksheet_photo', _xMarksheet!.path));
+      files['x_marksheet_photo'] = _xMarksheet!;
     }
     if (_xiiMarksheet != null) {
-      request.files.add(await http.MultipartFile.fromPath('xii_marksheet_photo', _xiiMarksheet!.path));
+      files['xii_marksheet_photo'] = _xiiMarksheet!;
     }
     if (_resume != null) {
-      request.files.add(await http.MultipartFile.fromPath('resume', _resume!.path));
+      files['resume'] = _resume!;
     }
 
     try {
-      var response = await request.send();
-      var responseBody = await response.stream.bytesToString();
+      final response = await ApiService.postMultipart('moderator/accounts', fields, files: files);
+      final responseBody = await response.stream.bytesToString();
 
-      if (response.statusCode == 201) {
+      if (response.statusCode == 201 || response.statusCode == 200) {
+        if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Account created successfully')),
         );
         Navigator.pop(context, true); // Go back and indicate success
       } else {
+        if (!mounted) return;
         final error = jsonDecode(responseBody);
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Failed to create account: ${error['message']}')),
         );
       }
     } catch (e) {
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('An error occurred: $e')),
       );

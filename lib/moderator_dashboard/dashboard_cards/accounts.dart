@@ -1,22 +1,25 @@
 import 'dart:async';
 import 'dart:convert';
 import 'package:eduphin/moderator_dashboard/dashboard_cards/add_account.dart';
+import 'package:eduphin/moderator_dashboard/dashboard_cards/active_institutes/manage/employ_details.dart';
 import 'package:eduphin/services/api_service.dart';
 import 'package:flutter/material.dart';
-import 'package:http/http.dart' as http;
 
 // 1. Data Model for an Account
 class Account {
+  final int id;
   final String name;
   final String email;
 
   Account({
+    required this.id,
     required this.name,
     required this.email,
   });
 
   factory Account.fromJson(Map<String, dynamic> json) {
     return Account(
+      id: json['id'],
       name: json['name'] ?? 'No Name',
       email: json['email'] ?? 'No Email',
     );
@@ -26,30 +29,22 @@ class Account {
 // 2. Data Provider to fetch account data from the API
 class AccountProvider {
   Future<List<Account>> fetchAccounts(String instituteId) async {
-    final token = await ApiService.getToken();
+    try {
+      final response = await ApiService.get('moderator/institutes/$instituteId/accounts');
 
-    if (token == null) {
-      throw Exception('Authentication token not found.');
-    }
-
-    final response = await http.get(
-      Uri.parse('${ApiService.baseUrl}/moderator/institutes/$instituteId/accounts'),
-      headers: {
-        'Authorization': 'Bearer $token',
-        'Accept': 'application/json',
-      },
-    );
-
-    if (response.statusCode == 200) {
-      final data = jsonDecode(response.body);
-      if (data['success'] == true && data['accounts'] != null) {
-        final List<dynamic> accountsJson = data['accounts'];
-        return accountsJson.map((json) => Account.fromJson(json)).toList();
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        if (data['success'] == true && data['accounts'] != null) {
+          final List<dynamic> accountsJson = data['accounts'];
+          return accountsJson.map((json) => Account.fromJson(json)).toList();
+        } else {
+          throw Exception(data['message'] ?? 'Failed to load accounts.');
+        }
       } else {
-        throw Exception(data['message'] ?? 'Failed to load accounts.');
+        throw Exception('Failed to load accounts. Status Code: ${response.statusCode}');
       }
-    } else {
-      throw Exception('Failed to load accounts. Status Code: ${response.statusCode}');
+    } catch (e) {
+      throw Exception('Failed to fetch accounts: $e');
     }
   }
 }
@@ -73,14 +68,26 @@ class _AccountsPageState extends State<AccountsPage> {
   @override
   void initState() {
     super.initState();
+    _fetchAccounts();
+    _searchController.addListener(_filterAccounts);
+  }
+
+  void _fetchAccounts() {
     _accountsFuture = _provider.fetchAccounts(widget.instituteId);
     _accountsFuture.then((accounts) {
-      setState(() {
-        _allAccounts = accounts;
-        _filteredAccounts = accounts;
-      });
+      if (mounted) {
+        setState(() {
+          _allAccounts = accounts;
+          _filteredAccounts = accounts;
+        });
+      }
+    }).catchError((error) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error fetching accounts: $error')),
+        );
+      }
     });
-    _searchController.addListener(_filterAccounts);
   }
 
   @override
@@ -101,15 +108,61 @@ class _AccountsPageState extends State<AccountsPage> {
   }
 
   void _refreshAccounts() {
-    setState(() {
-      _accountsFuture = _provider.fetchAccounts(widget.instituteId);
-      _accountsFuture.then((accounts) {
+    final future = _provider.fetchAccounts(widget.instituteId);
+    if (mounted) {
+      setState(() {
+        _accountsFuture = future;
+      });
+    }
+    future.then((accounts) {
+      if (mounted) {
         setState(() {
           _allAccounts = accounts;
           _filterAccounts(); // Re-apply filter
         });
-      });
+      }
+    }).catchError((error) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error refreshing accounts: $error')),
+        );
+      }
     });
+  }
+
+  Future<String?> _selectRoleDialog() async {
+    return showDialog<String>(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('Select Role'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              ListTile(title: const Text('Manager'), onTap: () => Navigator.of(context).pop('2')),
+              ListTile(title: const Text('Teacher'), onTap: () => Navigator.of(context).pop('3')),
+              ListTile(title: const Text('Librarian'), onTap: () => Navigator.of(context).pop('4')),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  void _navigateToAddAccount() async {
+    final selectedRoleId = await _selectRoleDialog();
+    if (selectedRoleId == null || !mounted) return;
+
+    final result = await Navigator.push(
+      context,
+      MaterialPageRoute(builder: (context) => AddAccountPage(
+        instituteId: widget.instituteId,
+        roleId: selectedRoleId,
+      )),
+    );
+    if (result == true && mounted) {
+      _refreshAccounts();
+    }
   }
 
   @override
@@ -167,12 +220,12 @@ class _AccountsPageState extends State<AccountsPage> {
             return Center(child: Text('Error: ${snapshot.error}', style: const TextStyle(color: Colors.white70)));
           }
           if (_allAccounts.isEmpty) {
-            return const Center(child: Text('No accounts found.', style: const TextStyle(color: Colors.white70)));
+            return const Center(child: Text('No accounts found.', style: TextStyle(color: Colors.white70)));
           }
 
           final accounts = _filteredAccounts;
           if(accounts.isEmpty && _searchController.text.isNotEmpty) {
-            return const Center(child: Text('No accounts found for your search.', style: const TextStyle(color: Colors.white70)));
+            return const Center(child: Text('No accounts found for your search.', style: TextStyle(color: Colors.white70)));
           }
 
 
@@ -213,15 +266,7 @@ class _AccountsPageState extends State<AccountsPage> {
         },
       ),
       floatingActionButton: FloatingActionButton(
-        onPressed: () async {
-          final result = await Navigator.push(
-            context,
-            MaterialPageRoute(builder: (context) => const AddAccountPage()),
-          );
-          if (result == true) {
-            _refreshAccounts();
-          }
-        },
+        onPressed: _navigateToAddAccount,
         backgroundColor: const Color(0xFF4A90E2),
         child: const Icon(Icons.add),
       ),
@@ -308,7 +353,14 @@ class AccountCard extends StatelessWidget {
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       margin: isGridView ? EdgeInsets.zero : EdgeInsets.symmetric(horizontal: screenWidth * 0.04, vertical: 8),
       child: InkWell(
-        onTap: () {},
+        onTap: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => EmployeeDetailsPage(employeeId: account.id.toString()),
+            ),
+          );
+        },
         borderRadius: BorderRadius.circular(12),
         child: Padding(
           padding: EdgeInsets.all(isGridView ? 16 : 8),

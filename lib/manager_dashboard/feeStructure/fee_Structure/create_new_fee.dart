@@ -99,9 +99,12 @@ class _CreateNewFeePageState extends State<CreateNewFeePage> {
     });
 
     try {
+      final String cleanedAmount = _amountController.text.replaceAll(RegExp(r'[₹,]'), '');
+      final int amount = (double.tryParse(cleanedAmount) ?? 0).toInt();
+
       final body = {
         'fee_name': _feeNameController.text,
-        'amount': _amountController.text,
+        'amount': amount.toString(),
         'description': _descriptionController.text,
         'is_optional': _isOptional == 'Yes',
         if (_applyTo == 'class') 'class_id': _selectedClassId.toString(),

@@ -131,12 +131,13 @@ class _EditFeePageState extends State<EditFeePage> {
     });
 
     try {
-      // THE FIX: Sanitize the amount to remove any commas or symbols.
-      final String sanitizedAmount = _amountController.text.replaceAll(RegExp(r'[^0-9]'), '');
+      // THE FIX: Sanitize the amount to remove any commas or symbols, then parse.
+      final String cleanedAmount = _amountController.text.replaceAll(RegExp(r'[₹,]'), '');
+      final int amount = (double.tryParse(cleanedAmount) ?? 0).toInt();
 
       final body = {
         'fee_name': _feeNameController.text,
-        'amount': sanitizedAmount,
+        'amount': amount.toString(),
         'description': _descriptionController.text,
         'is_optional': _isOptional == 'Yes',
         if (_applyTo == 'class') 'class_id': _selectedClassId!.toString(),

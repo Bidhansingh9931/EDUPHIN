@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:eduphin/manager_dashboard/examinations/add_schedule.dart';
 import 'package:eduphin/services/api_service.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
@@ -130,19 +131,19 @@ class _ManageSchedulePageState extends State<ManageSchedulePage> {
   }
 
   void _navigateToAddSchedule() {
-    // TODO: Create and navigate to an AddScheduleScreen
-    // Example:
-    // Navigator.push(context, MaterialPageRoute(builder: (context) => AddScheduleScreen(examId: widget.examId)))
-    //   .then((value) {
-    //     if (value == true) { // If a schedule was added, refresh the list
-    //       setState(() {
-    //         _scheduleFuture = _fetchSchedule();
-    //       });
-    //     }
-    // });
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Navigation to Add Schedule page not implemented yet.')),
-    );
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => AddScheduleScreen(examId: widget.examId),
+      ),
+    ).then((value) {
+      if (value == true) {
+        // If a schedule was added, refresh the list
+        setState(() {
+          _scheduleFuture = _fetchSchedule();
+        });
+      }
+    });
   }
 
   @override
