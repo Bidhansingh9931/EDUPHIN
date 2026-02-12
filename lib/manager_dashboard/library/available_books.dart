@@ -1,39 +1,38 @@
+import 'dart:convert';
+import 'package:eduphin/services/api_service.dart';
 import 'package:flutter/material.dart';
 
 class Book {
   final String title;
   final String author;
-  final String publisher;
-  final String year;
-  final String edition;
-  final String volume;
-  final String category;
-  final String format;
-  final String language;
+  final String? isbn;
+  final String? publicationYear;
+  final String? category;
+  final String? language;
+  final String? format;
+  final int? availableCopies;
 
   Book({
     required this.title,
     required this.author,
-    required this.publisher,
-    required this.year,
-    required this.edition,
-    required this.volume,
-    required this.category,
-    required this.format,
-    required this.language,
+    this.isbn,
+    this.publicationYear,
+    this.category,
+    this.language,
+    this.format,
+    this.availableCopies,
   });
 
   factory Book.fromMap(Map<String, dynamic> map) {
     return Book(
       title: map['title'] ?? '',
       author: map['author'] ?? '',
-      publisher: map['publisher'] ?? '',
-      year: map['year'] ?? '',
-      edition: map['edition'] ?? '',
-      volume: map['volume'] ?? '',
-      category: map['category'] ?? '',
-      format: map['format'] ?? '',
-      language: map['language'] ?? '',
+      isbn: map['isbn'],
+      publicationYear: map['publication_year']?.toString(),
+      category: map['category'],
+      language: map['language'],
+      format: map['format'],
+      availableCopies: map['available_copies'],
     );
   }
 }
@@ -48,6 +47,7 @@ class AvailableBooksScreen extends StatefulWidget {
 class _AvailableBooksScreenState extends State<AvailableBooksScreen> {
   final searchController = TextEditingController();
   bool _isLoading = true;
+  String _error = '';
 
   List<Book> _allBooks = [];
   List<Book> _filteredBooks = [];
@@ -59,62 +59,39 @@ class _AvailableBooksScreenState extends State<AvailableBooksScreen> {
   }
 
   Future<void> _fetchBooks() async {
-    // Simulate API call
-    await Future.delayed(const Duration(seconds: 1));
+    try {
+      final response = await ApiService.get('manager/books');
 
-    final List<Map<String, dynamic>> bookData = [
-      {
-        "title": "The Principles of Quantum Mechanics",
-        "author": "P.A.M. Dirac",
-        "publisher": "Oxford University Press",
-        "year": "1930",
-        "edition": "4th",
-        "volume": "1",
-        "category": "Physics",
-        "format": "Hardcover",
-        "language": "English"
-      },
-      {
-        "title": "Introduction to Algorithms",
-        "author": "Thomas H. Cormen",
-        "publisher": "MIT Press",
-        "year": "2009",
-        "edition": "3rd",
-        "volume": "1",
-        "category": "Computer Science",
-        "format": "Paperback",
-        "language": "English"
-      },
-      {
-        "title": "The Art of Computer Programming",
-        "author": "Donald E. Knuth",
-        "publisher": "Addison-Wesley",
-        "year": "1968",
-        "edition": "1st",
-        "volume": "2",
-        "category": "Computer Science",
-        "format": "eBook",
-        "language": "English"
-      },
-      {
-        "title": "Cosmos",
-        "author": "Carl Sagan",
-        "publisher": "Random House",
-        "year": "1980",
-        "edition": "1st",
-        "volume": "1",
-        "category": "Astronomy",
-        "format": "Paperback",
-        "language": "English"
-      },
-    ];
-
-    if (mounted) {
-      setState(() {
-        _allBooks = bookData.map((data) => Book.fromMap(data)).toList();
-        _filteredBooks = _allBooks;
-        _isLoading = false;
-      });
+      if (response.statusCode == 200) {
+        final body = json.decode(response.body);
+        if (body['status'] == true) {
+          final List<dynamic> bookData = body['data']['data'];
+          if (mounted) {
+            setState(() {
+              _allBooks = bookData.map((data) => Book.fromMap(data)).toList();
+              _filteredBooks = _allBooks;
+              _isLoading = false;
+            });
+          }
+        } else {
+          setState(() {
+            _error = 'Failed to load books: ${body['message']}';
+            _isLoading = false;
+          });
+        }
+      } else {
+        setState(() {
+          _error = 'Failed to load books. Status code: ${response.statusCode}';
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _error = 'An error occurred: $e';
+          _isLoading = false;
+        });
+      }
     }
   }
 
@@ -124,7 +101,7 @@ class _AvailableBooksScreenState extends State<AvailableBooksScreen> {
       _filteredBooks = _allBooks.where((book) {
         final titleMatch = book.title.toLowerCase().contains(lowerCaseQuery);
         final authorMatch = book.author.toLowerCase().contains(lowerCaseQuery);
-        final categoryMatch = book.category.toLowerCase().contains(lowerCaseQuery);
+        final categoryMatch = book.category?.toLowerCase().contains(lowerCaseQuery) ?? false;
         return titleMatch || authorMatch || categoryMatch;
       }).toList();
     });
@@ -169,15 +146,17 @@ class _AvailableBooksScreenState extends State<AvailableBooksScreen> {
             Expanded(
               child: _isLoading
                   ? const Center(child: CircularProgressIndicator())
-                  : LayoutBuilder(
-                      builder: (context, constraints) {
-                        if (constraints.maxWidth > 600) {
-                          return _buildGridView(_filteredBooks);
-                        } else {
-                          return _buildListView(_filteredBooks);
-                        }
-                      },
-                    ),
+                  : _error.isNotEmpty
+                      ? Center(child: Text(_error, style: const TextStyle(color: Colors.red)))
+                      : LayoutBuilder(
+                          builder: (context, constraints) {
+                            if (constraints.maxWidth > 600) {
+                              return _buildGridView(_filteredBooks);
+                            } else {
+                              return _buildListView(_filteredBooks);
+                            }
+                          },
+                        ),
             )
           ],
         ),
@@ -204,7 +183,7 @@ class _AvailableBooksScreenState extends State<AvailableBooksScreen> {
         maxCrossAxisExtent: 500,
         mainAxisSpacing: 16,
         crossAxisSpacing: 16,
-        childAspectRatio: 1.6, // Adjust for content
+        childAspectRatio: 2.2, // Adjust for content
       ),
       itemBuilder: (context, index) {
         return _BookCard(book: books[index], index: index);
@@ -249,9 +228,9 @@ class _BookCard extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     _buildInfoField(theme, "Author", book.author),
-                    _buildInfoField(theme, "Year", book.year),
-                    _buildInfoField(theme, "Volume", book.volume),
-                    _buildInfoField(theme, "Format", book.format),
+                    _buildInfoField(theme, "Year", book.publicationYear ?? '-'),
+                    _buildInfoField(theme, "ISBN", book.isbn ?? '-'),
+                    _buildInfoField(theme, "Format", book.format ?? '-'),
                   ],
                 ),
               ),
@@ -260,10 +239,9 @@ class _BookCard extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    _buildInfoField(theme, "Publisher", book.publisher),
-                    _buildInfoField(theme, "Edition", book.edition),
-                    _buildInfoField(theme, "Category", book.category),
-                    _buildInfoField(theme, "Language", book.language),
+                    _buildInfoField(theme, "Category", book.category ?? '-'),
+                    _buildInfoField(theme, "Language", book.language ?? '-'),
+                    _buildInfoField(theme, "Available Copies", book.availableCopies?.toString() ?? '-'),
                   ],
                 ),
               ),

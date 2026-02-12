@@ -52,7 +52,7 @@ class _EditSectionPageState extends State<EditSectionPage> {
 
         // Find the mentor whose name matches the section's mentor name.
         final currentMentor = _mentors.firstWhere(
-          (m) => m['name'] == widget.section.mentor,
+              (m) => m['name'] == widget.section.mentor,
           orElse: () => {'id': null}, // Return a map with a null id if not found
         );
 
@@ -181,8 +181,8 @@ class _EditSectionPageState extends State<EditSectionPage> {
                             onPressed: _isSaving ? null : _updateSection,
                             child: _isSaving
                                 ? const SizedBox(
-                                    height: 24, width: 24,
-                                    child: CircularProgressIndicator(strokeWidth: 3, color: Colors.white,))
+                                height: 24, width: 24,
+                                child: CircularProgressIndicator(strokeWidth: 3, color: Colors.white,))
                                 : const Text("Update"),
                           ),
                         ),

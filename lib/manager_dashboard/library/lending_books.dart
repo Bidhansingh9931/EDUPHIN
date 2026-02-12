@@ -25,18 +25,28 @@ class _LendingBooksScreenState extends State<LendingBooksScreen> {
       isLoading = true;
     });
     try {
-      final response = await ApiService.get('manager/library/lending-books');
+      final response = await ApiService.get('manager/lending');
 
       if (response.statusCode == 200) {
-        final List<dynamic> data = json.decode(response.body)['data'];
-        if (mounted) {
-          setState(() {
-            lendingBooks = data.map((json) => LendingBook.fromJson(json)).toList();
-            isLoading = false;
-          });
+        final Map<String, dynamic> body = json.decode(response.body);
+
+        if (body['status'] == true &&
+            body['data'] != null &&
+            body['data']['data'] != null) {
+          final List<dynamic> data = body['data']['data'];
+          if (mounted) {
+            setState(() {
+              lendingBooks =
+                  data.map((json) => LendingBook.fromJson(json)).toList();
+              isLoading = false;
+            });
+          }
+        } else {
+          throw Exception(body['message'] ?? 'Failed to parse lending books data');
         }
       } else {
-        throw Exception('Failed to load lending books');
+        throw Exception(
+            'Failed to load lending books. Status code: ${response.statusCode}');
       }
     } catch (e) {
       if (mounted) {
@@ -44,7 +54,7 @@ class _LendingBooksScreenState extends State<LendingBooksScreen> {
           isLoading = false;
         });
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(e.toString())),
+          SnackBar(content: Text('Error: ${e.toString()}')),
         );
       }
     }
@@ -66,15 +76,17 @@ class _LendingBooksScreenState extends State<LendingBooksScreen> {
       ),
       body: isLoading
           ? const Center(child: CircularProgressIndicator())
-          : LayoutBuilder(
-              builder: (context, constraints) {
-                if (constraints.maxWidth > 600) {
-                  return _buildGridView(lendingBooks);
-                } else {
-                  return _buildListView(lendingBooks);
-                }
-              },
-            ),
+          : lendingBooks.isEmpty
+              ? const Center(child: Text("No lending records found."))
+              : LayoutBuilder(
+                  builder: (context, constraints) {
+                    if (constraints.maxWidth > 600) {
+                      return _buildGridView(lendingBooks);
+                    } else {
+                      return _buildListView(lendingBooks);
+                    }
+                  },
+                ),
     );
   }
 
@@ -100,7 +112,7 @@ class _LendingBooksScreenState extends State<LendingBooksScreen> {
         maxCrossAxisExtent: 500, // Adjust as needed
         mainAxisSpacing: 16,
         crossAxisSpacing: 16,
-        childAspectRatio: 2, // Adjust for content
+        childAspectRatio: 2.2, // Adjust for content
       ),
       itemBuilder: (context, index) {
         final book = books[index];
@@ -246,14 +258,45 @@ class LendingBook {
     required this.status,
   });
 
- factory LendingBook.fromJson(Map<String, dynamic> json) {
+  factory LendingBook.fromJson(Map<String, dynamic> json) {
+    final dueDateString = json['due_date'] as String?;
+    final returnedAt = json['returned_at'];
+    DateTime? dueDate;
+    if (dueDateString != null) {
+      dueDate = DateTime.tryParse(dueDateString);
+    }
+
+    int overdueDays = 0;
+    if (returnedAt == null && dueDate != null && DateTime.now().isAfter(dueDate)) {
+      overdueDays = DateTime.now().difference(dueDate).inDays;
+    }
+
+    String status;
+    if (returnedAt != null) {
+      status = "Returned";
+    } else if (overdueDays > 0) {
+      status = "Overdue";
+    } else {
+      status = "Pending";
+    }
+
+    String formatDate(String? dateString) {
+      if (dateString == null) return 'N/A';
+      try {
+        final date = DateTime.parse(dateString);
+        return date.toIso8601String().substring(0, 10);
+      } catch (e) {
+        return dateString;
+      }
+    }
+
     return LendingBook(
       title: json['book']?['title'] ?? 'N/A',
-      issueNo: json['issue_no'] ?? 'N/A',
-      issuedAt: json['issued_at'] ?? 'N/A',
-      dueDate: json['due_date'] ?? 'N/A',
-      overdueDays: json['overdue_days'] ?? 0,
-      status: json['status'] ?? 'N/A',
+      issueNo: json['id']?.toString() ?? 'N/A',
+      issuedAt: formatDate(json['issued_at'] as String?),
+      dueDate: formatDate(dueDateString),
+      overdueDays: overdueDays,
+      status: status,
     );
   }
 }

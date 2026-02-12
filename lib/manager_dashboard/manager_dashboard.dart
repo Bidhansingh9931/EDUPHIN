@@ -1,5 +1,6 @@
 import 'dart:convert';
 
+import 'package:eduphin/manager_dashboard/recentSupportTickets/assigned_ticket.dart';
 import 'package:eduphin/services/api_service.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
@@ -266,7 +267,7 @@ class DashboardData {
       ],
       recentSupportTickets: [
         RecentSupportTicket(title: "Ticket Info", onTap: () => navigate(const TicketInfoPage())),
-        RecentSupportTicket(title: "Assigned Ticket", onTap: () {}),
+        RecentSupportTicket(title: "Assigned Ticket", onTap: () => navigate(const AssignedTicketsScreen())),
       ],
     );
   }
@@ -467,7 +468,7 @@ class CustomProfileBox extends StatelessWidget {
                           return Icon(
                             Icons.person,
                             size: 40,
-                            color: theme.colorScheme.onPrimary,
+                            color: theme.colorScheme.primary,
                           );
                         },
                       ),
@@ -475,7 +476,7 @@ class CustomProfileBox extends StatelessWidget {
                   : Icon(
                       Icons.person,
                       size: 40,
-                      color: theme.colorScheme.onPrimary,
+                      color: theme.colorScheme.primary,
                     ),
             ),
             const SizedBox(height: 8),

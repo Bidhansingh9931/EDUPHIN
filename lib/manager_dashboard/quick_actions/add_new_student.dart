@@ -506,7 +506,7 @@ class _AddNewStudentPageState extends State<AddNewStudentPage> {
         label,
         value,
         items
-            .map((e) => DropdownMenuItem(value: e.id, child: Text(e.sectionName)))
+            .map((e) => DropdownMenuItem(value: e.id, child: Text(e.name)))
             .toList(),
         onChanged);
   }
