@@ -10,6 +10,7 @@ class AddScheduleScreen extends StatefulWidget {
   const AddScheduleScreen({super.key, required this.examId});
 
   @override
+  // ignore: library_private_types_in_public_api
   _AddScheduleScreenState createState() => _AddScheduleScreenState();
 }
 
@@ -44,12 +45,16 @@ class _AddScheduleScreenState extends State<AddScheduleScreen> {
     try {
       final response = await ApiService.get('manager/classes');
       if (response.statusCode == 200) {
+        if (!mounted) return;
         setState(() {
           _classes = json.decode(response.body)['data'];
         });
       }
     } catch (e) {
-      // Handle error
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Failed to load classes: $e')),
+      );
     }
   }
 
@@ -57,12 +62,16 @@ class _AddScheduleScreenState extends State<AddScheduleScreen> {
     try {
       final response = await ApiService.get('manager/classes/$classId/sections');
       if (response.statusCode == 200) {
+        if (!mounted) return;
         setState(() {
           _sections = json.decode(response.body)['data'];
         });
       }
     } catch (e) {
-      // Handle error
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Failed to load sections: $e')),
+      );
     }
   }
 
@@ -71,12 +80,16 @@ class _AddScheduleScreenState extends State<AddScheduleScreen> {
     try {
       final response = await ApiService.get('manager/classes/$classId/subjects');
       if (response.statusCode == 200) {
+        if (!mounted) return;
         setState(() {
           _subjects = json.decode(response.body)['data'];
         });
       }
     } catch (e) {
-      // Handle error
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Failed to load subjects: $e')),
+      );
     }
   }
 
@@ -153,9 +166,11 @@ class _AddScheduleScreenState extends State<AddScheduleScreen> {
           SnackBar(content: Text('An error occurred: $e')),
         );
       } finally {
-        setState(() {
-          _isLoading = false;
-        });
+        if (mounted) {
+          setState(() {
+            _isLoading = false;
+          });
+        }
       }
     }
   }

@@ -336,7 +336,7 @@ class _ManagerDashboardPageState extends State<ManagerDashboardPage> {
           children: [
             CircleAvatar(
                 backgroundColor: theme.primaryColor,
-                child: Image.asset('assets/images/eduphin_logo_bg.png', height: 40, width: 40)),
+                child: Icon(Icons.school, color: theme.colorScheme.onPrimary)),
             const Icon(Icons.notifications),
           ],
         ),
@@ -704,7 +704,7 @@ class CustomManageClassesSectionBox extends StatelessWidget {
                 child: Container(
                   decoration: BoxDecoration(color: theme.scaffoldBackgroundColor, borderRadius: BorderRadius.circular(10)),
                   padding: const EdgeInsets.all(8),
-                  child: Row(children: [const Icon(Icons.class_, color: Colors.blue), const SizedBox(width: 8), Flexible(child: Text(item.title, style: theme.textTheme.labelLarge, overflow: TextOverflow.ellipsis))]),
+                  child: Row(children: [Icon(Icons.class_, color: theme.colorScheme.primary), const SizedBox(width: 8), Flexible(child: Text(item.title, style: theme.textTheme.labelLarge, overflow: TextOverflow.ellipsis))]),
                 ),
               );
             },

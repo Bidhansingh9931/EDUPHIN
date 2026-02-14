@@ -63,12 +63,13 @@ class _EditFinePageState extends State<EditFinePage> {
       final response = await ApiService.post('manager/fees/fine', body);
 
       if (!mounted) return;
+      final theme = Theme.of(context);
 
       final responseData = jsonDecode(response.body);
 
       if (response.statusCode == 200 && responseData['status'] == true) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(responseData['message'] ?? 'Fine updated successfully!'), backgroundColor: Colors.green),
+          SnackBar(content: Text(responseData['message'] ?? 'Fine updated successfully!'), backgroundColor: theme.colorScheme.primary),
         );
         Navigator.pop(context, true); // Return true to indicate success and trigger a refresh
       } else {
@@ -76,8 +77,9 @@ class _EditFinePageState extends State<EditFinePage> {
       }
     } catch (e) {
       if (mounted) {
+        final theme = Theme.of(context);
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(e.toString().replaceFirst("Exception: ", "")), backgroundColor: Colors.red),
+          SnackBar(content: Text(e.toString().replaceFirst("Exception: ", "")), backgroundColor: theme.colorScheme.error),
         );
       }
     } finally {
@@ -128,7 +130,7 @@ class _EditFinePageState extends State<EditFinePage> {
                   ),
                 ),
                 child: _isSaving
-                    ? const SizedBox(height: 24, width: 24, child: CircularProgressIndicator(strokeWidth: 3, valueColor: AlwaysStoppedAnimation(Colors.white)))
+                    ? const SizedBox(height: 24, width: 24, child: CircularProgressIndicator(strokeWidth: 3))
                     : Text("Update Fine", style: theme.textTheme.labelLarge?.copyWith(color: theme.colorScheme.onPrimary)),
               ),
             ),

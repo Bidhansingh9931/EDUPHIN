@@ -40,11 +40,12 @@ class _CreateNewClassPageState extends State<CreateNewClassPage> {
       final responseData = jsonDecode(response.body);
 
       if (mounted) {
+        final theme = Theme.of(context);
         if (response.statusCode == 201 && responseData['status'] == true) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text(responseData['message'] ?? 'Class created successfully!'),
-              backgroundColor: Colors.green,
+              backgroundColor: theme.colorScheme.primary,
             ),
           );
           Navigator.pop(context, true); // Pop with a true result to indicate success
@@ -54,27 +55,30 @@ class _CreateNewClassPageState extends State<CreateNewClassPage> {
       }
     } on TimeoutException {
       if (!mounted) return;
+      final theme = Theme.of(context);
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('The connection timed out. Please check your network and try again.'),
-          backgroundColor: Colors.red,
+        SnackBar(
+          content: const Text('The connection timed out. Please check your network and try again.'),
+          backgroundColor: theme.colorScheme.error,
         ),
       );
     } on Exception catch (e) {
       if (!mounted) return;
+      final theme = Theme.of(context);
       final message = e.toString().replaceFirst('Exception: ', '');
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(message),
-          backgroundColor: Colors.red,
+          backgroundColor: theme.colorScheme.error,
         ),
       );
     } catch (e) {
       if (!mounted) return;
+      final theme = Theme.of(context);
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('An unexpected error occurred: $e'),
-          backgroundColor: Colors.red,
+          backgroundColor: theme.colorScheme.error,
         ),
       );
     } finally {
@@ -244,7 +248,7 @@ class _CreateNewClassPageState extends State<CreateNewClassPage> {
         Text("Level", style: theme.textTheme.titleMedium?.copyWith(color: theme.colorScheme.onPrimary)),
         const SizedBox(height: 8),
         DropdownButtonFormField<String>(
-          initialValue: _selectedLevel,
+          value: _selectedLevel,
           hint: Text("Select Level", style: TextStyle(color: theme.hintColor)),
           decoration: InputDecoration(
             filled: true,

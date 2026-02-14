@@ -182,7 +182,7 @@ class _ClassScheduleSearchPageState extends State<ClassScheduleSearchPage> {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Text('Error: $_error', style: const TextStyle(color: Colors.red), textAlign: TextAlign.center,),
+              Text('Error: $_error', style: TextStyle(color: theme.colorScheme.error), textAlign: TextAlign.center,),
               const SizedBox(height: 16),
               ElevatedButton(onPressed: _fetchDropdownData, child: const Text("Retry"))
             ],

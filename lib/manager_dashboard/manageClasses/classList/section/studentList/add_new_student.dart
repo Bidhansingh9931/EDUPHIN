@@ -75,9 +75,9 @@ class _AddNewStudentPageState extends State<AddNewStudentPage> {
     }
      if (_imageFile == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Please select an image.'),
-          backgroundColor: Colors.red,
+        SnackBar(
+          content: const Text('Please select an image.'),
+          backgroundColor: Theme.of(context).colorScheme.error,
         ),
       );
       return;
@@ -108,11 +108,12 @@ class _AddNewStudentPageState extends State<AddNewStudentPage> {
 
 
       if (mounted) {
+        final theme = Theme.of(context);
         if (response.statusCode == 201 && responseData['status'] == true) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text(responseData['message'] ?? 'Student added successfully!'),
-              backgroundColor: Colors.green,
+              backgroundColor: theme.colorScheme.primary,
             ),
           );
           Navigator.pop(context, true); // Pop with true to refresh previous page
@@ -127,19 +128,21 @@ class _AddNewStudentPageState extends State<AddNewStudentPage> {
       }
     } on TimeoutException {
       if (mounted) {
+        final theme = Theme.of(context);
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('The connection timed out. Please check your network.'),
-            backgroundColor: Colors.red,
+          SnackBar(
+            content: const Text('The connection timed out. Please check your network.'),
+            backgroundColor: theme.colorScheme.error,
           ),
         );
       }
     } on Exception catch (e) {
       if (mounted) {
+        final theme = Theme.of(context);
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(e.toString().replaceFirst('Exception: ', '')),
-            backgroundColor: Colors.red,
+            backgroundColor: theme.colorScheme.error,
           ),
         );
       }
@@ -232,7 +235,6 @@ class _AddNewStudentPageState extends State<AddNewStudentPage> {
                             width: 24,
                             child: CircularProgressIndicator(
                               strokeWidth: 3,
-                              valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
                             ),
                           )
                         : const Text("Add Student"),
@@ -332,6 +334,7 @@ class _AddNewStudentPageState extends State<AddNewStudentPage> {
   }
 
   Widget _buildImagePicker() {
+  final theme = Theme.of(context);
   return Row(
     crossAxisAlignment: CrossAxisAlignment.end,
     children: [
@@ -343,7 +346,7 @@ class _AddNewStudentPageState extends State<AddNewStudentPage> {
           decoration: InputDecoration(
             labelText: 'Student Image',
             filled: true,
-            fillColor: Theme.of(context).colorScheme.surface,
+            fillColor: theme.colorScheme.surface,
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
               borderSide: BorderSide.none,
@@ -363,9 +366,9 @@ class _AddNewStudentPageState extends State<AddNewStudentPage> {
         height: 60,
         width: 60,
         decoration: BoxDecoration(
-          color: Theme.of(context).colorScheme.surface,
+          color: theme.colorScheme.surface,
           borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: Colors.grey.shade300),
+          border: Border.all(color: theme.dividerColor),
         ),
         child: _imageFile != null
             ? ClipRRect(
@@ -377,7 +380,7 @@ class _AddNewStudentPageState extends State<AddNewStudentPage> {
                   height: 60,
                 ),
               )
-            : const Icon(Icons.person, size: 30, color: Colors.grey),
+            : Icon(Icons.person, size: 30, color: theme.hintColor),
       ),
     ],
   );

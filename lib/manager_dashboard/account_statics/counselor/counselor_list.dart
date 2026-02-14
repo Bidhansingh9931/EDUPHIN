@@ -84,7 +84,7 @@ class _CounselorListPageState extends State<CounselorListPage> {
             await _fetchCounselorsForRole(_selectedRoleId!); // Fetch counselors for the default role
           }
         } else {
-          setState(() => _isLoading = false); // No counselor roles found
+          if(mounted) setState(() => _isLoading = false); // No counselor roles found
         }
       } else {
         throw Exception('Failed to load roles');
@@ -128,47 +128,38 @@ class _CounselorListPageState extends State<CounselorListPage> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final screenSize = MediaQuery.of(context).size;
     return Scaffold(
-        floatingActionButton: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16.0),
-          child: SizedBox(
-            width: double.infinity,
-            child: FloatingActionButton.extended(
-              onPressed: () async {
-                final result = await Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (context) => const AddCounselorPage()),
-                );
-                if (result == true && mounted) {
-                  _fetchCounselorsForRole(_selectedRoleId!); // Refresh list on return
-                }
-              },
-              label: const Text("Add Counselor"),
-              icon: const Icon(Icons.add),
-            ),
-          ),
+        floatingActionButton: FloatingActionButton.extended(
+          onPressed: () async {
+            final result = await Navigator.push(
+              context,
+              MaterialPageRoute(builder: (context) => const AddCounselorPage()),
+            );
+            if (result == true && mounted) {
+              _fetchCounselorsForRole(_selectedRoleId!); // Refresh list on return
+            }
+          },
+          label: Text("Add Counselor", style: TextStyle(color: theme.colorScheme.onPrimary)),
+          icon: Icon(Icons.add, color: theme.colorScheme.onPrimary),
+          backgroundColor: theme.colorScheme.primary,
         ),
         floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
         backgroundColor: theme.scaffoldBackgroundColor,
         appBar: AppBar(
-          title: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                "Counselor List",
-                style: theme.textTheme.titleLarge?.copyWith(
-                    color: theme.colorScheme.onSurface,
-                    fontWeight: FontWeight.bold),
-              ),
-              const Icon(
-                Icons.download,
-              ),
-            ],
-          ),
+          title: const Text("Counselor List"),
+          actions: [
+            IconButton(
+              icon: const Icon(Icons.download),
+              onPressed: () {
+                // TODO: Implement download functionality
+              },
+            ),
+          ],
         ),
         body: SingleChildScrollView(
           child: Padding(
-            padding: const EdgeInsets.fromLTRB(16, 16, 16, 50),
+            padding: EdgeInsets.fromLTRB(screenSize.width * 0.04, screenSize.width * 0.04, screenSize.width * 0.04, 50),
             child: CustomCounselorListBox(
               isLoading: _isLoading,
               counselors: _counselors,
@@ -211,11 +202,14 @@ class CustomCounselorListBox extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final screenSize = MediaQuery.of(context).size;
+    final isDarkMode = theme.brightness == Brightness.dark;
+    
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(16.0),
+      padding: EdgeInsets.all(screenSize.width * 0.04),
       decoration: BoxDecoration(
-        color: theme.primaryColor,
+        color: theme.cardColor,
         borderRadius: BorderRadius.circular(12),
       ),
       child: Column(
@@ -224,14 +218,14 @@ class CustomCounselorListBox extends StatelessWidget {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 12),
             decoration: BoxDecoration(
-              color: theme.colorScheme.onPrimary.withAlpha(25),
+              color: isDarkMode ? theme.scaffoldBackgroundColor : const Color(0xFFF3F3F3),
               borderRadius: BorderRadius.circular(12),
             ),
             child: DropdownButton<int>(
               value: selectedRoleId,
               underline: const SizedBox(),
               isExpanded: true,
-              icon: Icon(Icons.arrow_drop_down, color: theme.colorScheme.onPrimary),
+              icon: Icon(Icons.arrow_drop_down, color: theme.colorScheme.onSurface),
               onChanged: onRoleChanged,
               items: roles.map<DropdownMenuItem<int>>((Role role) {
                 return DropdownMenuItem<int>(
@@ -256,7 +250,7 @@ class CustomCounselorListBox extends StatelessWidget {
               : LayoutBuilder(
                   builder: (context, constraints) {
                     if (counselors.isEmpty) {
-                      return const Center(child: Text("No counselors found for this role.", style: TextStyle(color: Colors.white),));
+                      return Center(child: Text("No counselors found for this role.", style: TextStyle(color: theme.colorScheme.onSurfaceVariant),));
                     }
 
                     final isLargeScreen = constraints.maxWidth > 600;
@@ -265,7 +259,8 @@ class CustomCounselorListBox extends StatelessWidget {
                         shrinkWrap: true,
                         physics: const NeverScrollableScrollPhysics(),
                         itemCount: counselors.length,
-                        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                        gridDelegate:
+                            const SliverGridDelegateWithFixedCrossAxisCount(
                           crossAxisCount: 2,
                           crossAxisSpacing: 16,
                           mainAxisSpacing: 16,
@@ -297,10 +292,12 @@ class CustomCounselorListBox extends StatelessWidget {
   Widget _buildCounselorItem(BuildContext context, Counselor counselor) {
     final theme = Theme.of(context);
     final textTheme = theme.textTheme;
+    final isDarkMode = theme.brightness == Brightness.dark;
+
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: theme.colorScheme.onPrimary.withAlpha(25),
+        color: isDarkMode ? theme.scaffoldBackgroundColor : const Color(0xFFF3F3F3),
         borderRadius: BorderRadius.circular(12),
       ),
       child: Row(
@@ -319,13 +316,13 @@ class CustomCounselorListBox extends StatelessWidget {
                 Text(
                   counselor.name,
                   style: textTheme.titleMedium
-                      ?.copyWith(color: theme.colorScheme.onPrimary),
+                      ?.copyWith(color: theme.colorScheme.onSurface),
                 ),
                 const SizedBox(height: 4),
                 Text(
                   counselor.designation,
                   style: textTheme.bodyMedium
-                      ?.copyWith(color: theme.colorScheme.onPrimary.withAlpha(180)),
+                      ?.copyWith(color: theme.hintColor),
                 )
               ],
             ),

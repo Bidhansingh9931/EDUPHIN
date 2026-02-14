@@ -150,18 +150,16 @@ class _CreateNewFeePageState extends State<CreateNewFeePage> {
               child: ElevatedButton.icon(
                 icon: _isSaving
                     ? const SizedBox.shrink()
-                    : const Icon(Icons.add, color: Colors.white),
+                    : const Icon(Icons.add),
                 label: _isSaving
                     ? const CircularProgressIndicator(
-                        valueColor: AlwaysStoppedAnimation(Colors.white),
                         strokeWidth: 2,
                       )
-                    : Text("Add Fee",
-                        style: theme.textTheme.labelLarge
-                            ?.copyWith(color: Colors.white)),
+                    : const Text("Add Fee"),
                 onPressed: _isSaving ? null : _saveFee,
                 style: ElevatedButton.styleFrom(
                   backgroundColor: theme.colorScheme.primary,
+                  foregroundColor: theme.colorScheme.onPrimary,
                   padding: const EdgeInsets.symmetric(vertical: 16),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(12),
@@ -289,7 +287,7 @@ class _CreateNewFeePageState extends State<CreateNewFeePage> {
     return Container(
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(10),
-        color: theme.primaryColor,
+        color: theme.cardColor,
       ),
       padding: const EdgeInsets.all(16),
       child: Column(
@@ -306,11 +304,11 @@ class _CreateNewFeePageState extends State<CreateNewFeePage> {
             Text(
               "Select Class",
               style: theme.textTheme.titleMedium
-                  ?.copyWith(color: theme.colorScheme.onPrimary),
+                  ?.copyWith(color: theme.colorScheme.onSurface),
             ),
             const SizedBox(height: 8),
             DropdownButtonFormField<int>(
-              initialValue: _selectedClassId,
+              value: _selectedClassId,
               items: _classes.map((apiClass) {
                 return DropdownMenuItem<int>(
                   value: apiClass.id,
@@ -325,7 +323,7 @@ class _CreateNewFeePageState extends State<CreateNewFeePage> {
               hint: const Text("Select a Class"),
               decoration: InputDecoration(
                 filled: true,
-                fillColor: theme.scaffoldBackgroundColor,
+                fillColor: theme.colorScheme.surface,
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(10),
                   borderSide: BorderSide.none,
@@ -425,7 +423,7 @@ class _CreateNewFeePageState extends State<CreateNewFeePage> {
       children: [
         Text(
           label,
-          style: theme.textTheme.titleMedium?.copyWith(color: theme.colorScheme.onPrimary),
+          style: theme.textTheme.titleMedium?.copyWith(color: theme.colorScheme.onSurface),
         ),
         const SizedBox(height: 8),
         TextFormField(
@@ -440,7 +438,7 @@ class _CreateNewFeePageState extends State<CreateNewFeePage> {
               borderRadius: BorderRadius.circular(10),
             ),
             filled: true,
-            fillColor: theme.scaffoldBackgroundColor,
+            fillColor: theme.colorScheme.surface,
           ),
         ),
       ],

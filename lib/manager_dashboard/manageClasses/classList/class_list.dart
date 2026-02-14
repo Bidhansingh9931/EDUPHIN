@@ -101,6 +101,8 @@ class _ClassListPageState extends State<ClassListPage> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final screenSize = MediaQuery.of(context).size;
+
     return Scaffold(
       backgroundColor: theme.scaffoldBackgroundColor,
       appBar: AppBar(
@@ -124,9 +126,9 @@ class _ClassListPageState extends State<ClassListPage> {
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
           : _classes.isEmpty
-              ? const Center(child: Text("No classes found."))
+              ? Center(child: Text("No classes found.", style: TextStyle(color: theme.colorScheme.onSurfaceVariant)))
               : ListView.builder(
-                  padding: const EdgeInsets.all(16.0),
+                  padding: EdgeInsets.all(screenSize.width * 0.04),
                   itemCount: _classes.length,
                   itemBuilder: (context, index) {
                     return _buildClassCard(theme, _classes[index]);
@@ -148,7 +150,7 @@ class _ClassListPageState extends State<ClassListPage> {
       },
       child: Card(
         margin: const EdgeInsets.only(bottom: 16),
-        color: theme.primaryColor,
+        color: theme.cardColor,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         child: Padding(
           padding: const EdgeInsets.all(16.0),
@@ -160,20 +162,18 @@ class _ClassListPageState extends State<ClassListPage> {
                 children: [
                   Text(
                     classItem.name,
-                    style: theme.textTheme.titleLarge
-                        ?.copyWith(color: Colors.white),
+                    style: theme.textTheme.titleLarge,
                   ),
-                  const Icon(Icons.edit, color: Colors.white),
+                  Icon(Icons.edit, color: theme.colorScheme.onSurface),
                 ],
               ),
               const SizedBox(height: 10),
               Text(
                 "${classItem.sections.length} Sections",
-                style: theme.textTheme.titleMedium
-                    ?.copyWith(color: Colors.white70),
+                style: theme.textTheme.titleMedium,
               ),
               const SizedBox(height: 10),
-              const Divider(color: Colors.white24),
+              Divider(color: theme.dividerColor),
               const SizedBox(height: 10),
               ...classItem.sections
                   .map((section) => _buildSectionRow(theme, section)),
@@ -193,11 +193,11 @@ class _ClassListPageState extends State<ClassListPage> {
                       _fetchClasses(); // Refresh the list if a section was created
                     }
                   },
-                  icon: const Icon(Icons.add, color: Colors.white, size: 20),
-                  label: const Text("Add Section",
-                      style: TextStyle(color: Colors.white)),
+                  icon: Icon(Icons.add, color: theme.colorScheme.primary, size: 20),
+                  label: Text("Add Section",
+                      style: TextStyle(color: theme.colorScheme.primary)),
                   style: TextButton.styleFrom(
-                      backgroundColor: Colors.white.withAlpha(26)),
+                      backgroundColor: theme.colorScheme.primary.withOpacity(0.1)),
                 ),
               ),
             ],
@@ -217,18 +217,18 @@ class _ClassListPageState extends State<ClassListPage> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text("Section ${section.name}",
-                  style: const TextStyle(color: Colors.white)),
+                  style: theme.textTheme.bodyLarge),
               Text("Limit: ${section.sectionLimit}",
-                  style: const TextStyle(color: Colors.white70, fontSize: 12)),
+                  style: theme.textTheme.bodySmall),
             ],
           ),
           Column(
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
               Text(section.mentorName,
-                  style: const TextStyle(color: Colors.white)),
-              const Text("Class Mentor",
-                  style: TextStyle(color: Colors.white70, fontSize: 12)),
+                  style: theme.textTheme.bodyLarge),
+              Text("Class Mentor",
+                  style: theme.textTheme.bodySmall),
             ],
           ),
         ],

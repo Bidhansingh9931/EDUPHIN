@@ -150,10 +150,11 @@ class _ShowSchedulePageState extends State<ShowSchedulePage> {
     try {
       final response = await ApiService.delete('manager/class-schedules/$scheduleId');
       if (!mounted) return;
+      final theme = Theme.of(context);
 
       if (response.statusCode == 200) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Schedule deleted successfully!'), backgroundColor: Colors.green),
+            SnackBar(content: const Text('Schedule deleted successfully!'), backgroundColor: theme.colorScheme.primary),
           );
           _fetchSchedule(); // Refresh the schedule list
       } else {
@@ -161,8 +162,9 @@ class _ShowSchedulePageState extends State<ShowSchedulePage> {
       }
     } catch (e) {
        if (mounted) {
+        final theme = Theme.of(context);
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(e.toString().replaceFirst('Exception: ', '')), backgroundColor: Colors.red),
+          SnackBar(content: Text(e.toString().replaceFirst('Exception: ', '')), backgroundColor: theme.colorScheme.error),
         );
       }
     }

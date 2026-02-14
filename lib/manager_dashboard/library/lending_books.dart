@@ -132,11 +132,11 @@ class _LendingBookCard extends StatelessWidget {
     final theme = Theme.of(context);
     switch (status) {
       case "Pending":
-        return Colors.amber.shade600;
+        return theme.colorScheme.secondary;
       case "Overdue":
         return theme.colorScheme.error;
       case "Returned":
-        return Colors.green.shade600;
+        return theme.colorScheme.primary;
       default:
         return theme.colorScheme.onSurface;
     }

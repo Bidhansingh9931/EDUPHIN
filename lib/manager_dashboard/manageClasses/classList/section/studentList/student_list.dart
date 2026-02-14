@@ -116,6 +116,7 @@ class _StudentListPageState extends State<StudentListPage> {
   }
 
   Widget _buildBody() {
+    final theme = Theme.of(context);
     if (_isLoading) {
       return const Center(child: CircularProgressIndicator());
     }
@@ -126,7 +127,7 @@ class _StudentListPageState extends State<StudentListPage> {
           child: Text(
             _error,
             textAlign: TextAlign.center,
-            style: const TextStyle(color: Colors.red),
+            style: TextStyle(color: theme.colorScheme.error),
           ),
         ),
       );

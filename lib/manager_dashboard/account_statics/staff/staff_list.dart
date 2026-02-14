@@ -143,48 +143,39 @@ class _StaffListPageState extends State<StaffListPage> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final screenSize = MediaQuery.of(context).size;
+
     return Scaffold(
       floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
-      floatingActionButton: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16.0),
-        child: SizedBox(
-          width: double.infinity,
-          height: 50,
-          child: FloatingActionButton.extended(
-            onPressed: () async {
-              final result = await Navigator.push(
-                context,
-                MaterialPageRoute(builder: (context) => const AddStaffPage()),
-              );
-              if (result == true && mounted) {
-                _fetchStaffForRole(_selectedRoleId!); // Refresh list on return
-              }
-            },
-            label: Text("Add Staff", style: theme.textTheme.labelLarge),
-            icon: const Icon(Icons.add),
-          ),
-        ),
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: () async {
+          final result = await Navigator.push(
+            context,
+            MaterialPageRoute(builder: (context) => const AddStaffPage()),
+          );
+          if (result == true && mounted) {
+            _fetchStaffForRole(_selectedRoleId!); // Refresh list on return
+          }
+        },
+        label: Text("Add Staff", style: TextStyle(color: theme.colorScheme.onPrimary)),
+        icon: Icon(Icons.add, color: theme.colorScheme.onPrimary),
+        backgroundColor: theme.colorScheme.primary,
       ),
       backgroundColor: theme.scaffoldBackgroundColor,
       appBar: AppBar(
-        title: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Text(
-              "Staff List",
-              style: theme.textTheme.titleLarge?.copyWith(
-                  color: theme.colorScheme.onSurface,
-                  fontWeight: FontWeight.bold),
-            ),
-            const Icon(
-              Icons.download,
+        title: const Text("Staff List"),
+         actions: [
+            IconButton(
+              icon: const Icon(Icons.download),
+              onPressed: () {
+                // TODO: Implement download functionality
+              },
             ),
           ],
-        ),
       ),
       body: SingleChildScrollView(
         child: Padding(
-          padding: const EdgeInsets.fromLTRB(16, 16, 16, 50),
+          padding: EdgeInsets.fromLTRB(screenSize.width * 0.04, screenSize.width * 0.04, screenSize.width * 0.04, 50),
           child: CustomStaffListBox(
             isLoading: _isLoading,
             staff: _staff,
@@ -224,11 +215,14 @@ class CustomStaffListBox extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final screenSize = MediaQuery.of(context).size;
+    final isDarkMode = theme.brightness == Brightness.dark;
+
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(16.0),
+      padding: EdgeInsets.all(screenSize.width * 0.04),
       decoration: BoxDecoration(
-        color: theme.primaryColor,
+        color: theme.cardColor,
         borderRadius: BorderRadius.circular(12),
       ),
       child: Column(
@@ -237,21 +231,21 @@ class CustomStaffListBox extends StatelessWidget {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 12),
             decoration: BoxDecoration(
-              color: theme.colorScheme.onPrimary.withAlpha(25),
+              color: isDarkMode ? theme.scaffoldBackgroundColor : const Color(0xFFF3F3F3),
               borderRadius: BorderRadius.circular(12),
             ),
             child: DropdownButton<int>(
               value: selectedRoleId,
               underline: const SizedBox(),
               isExpanded: true,
-              icon: Icon(Icons.arrow_drop_down, color: theme.colorScheme.onPrimary),
+              icon: Icon(Icons.arrow_drop_down, color: theme.colorScheme.onSurface),
               onChanged: onRoleChanged,
               items: roles.map<DropdownMenuItem<int>>((Role role) {
                 return DropdownMenuItem<int>(
                   value: role.id,
                   child: Row(
                     children: [
-                      const Icon(Icons.person_outline),
+                      const Icon(Icons.person_outline), // Prefix icon
                       const SizedBox(width: 8),
                       Text(
                         role.name,
@@ -261,7 +255,6 @@ class CustomStaffListBox extends StatelessWidget {
                   ),
                 );
               }).toList(),
-              dropdownColor: theme.cardColor,
             ),
           ),
           const SizedBox(height: 16),
@@ -269,53 +262,79 @@ class CustomStaffListBox extends StatelessWidget {
               ? const Center(child: CircularProgressIndicator())
               : LayoutBuilder(
                   builder: (context, constraints) {
-                    if (staff.isEmpty) {
-                      return const Center(child: Text("No staff found for this role.", style: TextStyle(color: Colors.white)));
+                     if (staff.isEmpty) {
+                      return Center(child: Text("No staff found for this role.", style: TextStyle(color: theme.colorScheme.onSurfaceVariant),));
                     }
-
-                    return ListView.separated(
+                    
+                    final isLargeScreen = constraints.maxWidth > 600;
+                    if (isLargeScreen) {
+                      return GridView.builder(
+                        shrinkWrap: true,
+                        physics: const NeverScrollableScrollPhysics(),
+                        itemCount: staff.length,
+                        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                          crossAxisCount: 2,
+                          crossAxisSpacing: 16,
+                          mainAxisSpacing: 16,
+                          childAspectRatio: 3.5,
+                        ),
+                        itemBuilder: (context, index) {
+                          return _buildStaffItem(context, staff[index]);
+                        },
+                      );
+                    } else {
+                      return ListView.separated(
                         shrinkWrap: true,
                         physics: const NeverScrollableScrollPhysics(),
                         itemCount: staff.length,
                         separatorBuilder: (context, index) => const SizedBox(height: 16),
                         itemBuilder: (context, index) {
-                          final staffMember = staff[index];
-                          return Container(
-                            padding: const EdgeInsets.all(12),
-                            decoration: BoxDecoration(
-                              color: theme.colorScheme.onPrimary.withAlpha(25),
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            child: Row(
-                              children: [
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      Text(
-                                        staffMember.name,
-                                        style: theme.textTheme.titleMedium?.copyWith(
-                                          color: theme.colorScheme.onPrimary,
-                                          fontWeight: FontWeight.bold,
-                                        ),
-                                      ),
-                                      const SizedBox(height: 4),
-                                      Text(
-                                        staffMember.designation,
-                                        style: theme.textTheme.bodyMedium?.copyWith(
-                                          color: theme.colorScheme.onPrimary.withAlpha(180),
-                                        ),
-                                      )
-                                    ],
-                                  ),
-                                )
-                              ],
-                            ),
-                          );
+                          return _buildStaffItem(context, staff[index]);
                         },
                       );
+                    }
                   },
                 ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildStaffItem(BuildContext context, Staff staffMember) {
+    final theme = Theme.of(context);
+    final textTheme = theme.textTheme;
+    final isDarkMode = theme.brightness == Brightness.dark;
+
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: isDarkMode ? theme.scaffoldBackgroundColor : const Color(0xFFF3F3F3),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Row(
+        children: [
+          CircleAvatar(
+            backgroundColor: theme.colorScheme.primaryContainer,
+            child: Icon(Icons.person, color: theme.colorScheme.onPrimaryContainer),
+          ),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Text(
+                  staffMember.name,
+                  style: textTheme.titleMedium?.copyWith(color: theme.colorScheme.onSurface),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  staffMember.designation,
+                  style: textTheme.bodyMedium?.copyWith(color: theme.hintColor),
+                )
+              ],
+            ),
+          )
         ],
       ),
     );

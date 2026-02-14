@@ -202,7 +202,7 @@ class SubjectCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final statusColor = subject.isActive ? Colors.green.shade600 : Colors.red.shade500;
+    final statusColor = subject.isActive ? theme.colorScheme.primary : theme.colorScheme.error;
     final statusText = subject.isActive ? "Active" : "Inactive";
 
     return Container(
@@ -297,7 +297,7 @@ void showDeleteDialog(BuildContext context, String subjectName, VoidCallback onC
     context: context,
     barrierDismissible: true,
     barrierLabel: "Delete",
-    barrierColor: const Color.fromRGBO(0, 0, 0, 0.6),
+    barrierColor: Theme.of(context).colorScheme.scrim,
     transitionDuration: const Duration(milliseconds: 200),
     pageBuilder: (_, __, ___) {
       return DeleteSubjectDialog(

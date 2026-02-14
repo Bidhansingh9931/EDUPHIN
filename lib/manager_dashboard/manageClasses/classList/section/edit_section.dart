@@ -93,11 +93,12 @@ class _EditSectionPageState extends State<EditSectionPage> {
       if (!mounted) return;
 
       final responseData = jsonDecode(response.body);
+      final theme = Theme.of(context);
       if (response.statusCode == 200 && responseData['status'] == true) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(responseData['message'] ?? 'Section updated successfully!'),
-            backgroundColor: Colors.green,
+            backgroundColor: theme.colorScheme.primary,
           ),
         );
         Navigator.pop(context, true); // Pop with true to indicate success
@@ -116,8 +117,9 @@ class _EditSectionPageState extends State<EditSectionPage> {
   }
 
   void _showErrorSnackbar(String message) {
+    final theme = Theme.of(context);
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message), backgroundColor: Colors.red),
+      SnackBar(content: Text(message), backgroundColor: theme.colorScheme.error),
     );
   }
 
@@ -179,10 +181,14 @@ class _EditSectionPageState extends State<EditSectionPage> {
                         Expanded(
                           child: ElevatedButton(
                             onPressed: _isSaving ? null : _updateSection,
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: theme.colorScheme.primary,
+                              foregroundColor: theme.colorScheme.onPrimary,
+                            ),
                             child: _isSaving
                                 ? const SizedBox(
                                 height: 24, width: 24,
-                                child: CircularProgressIndicator(strokeWidth: 3, color: Colors.white,))
+                                child: CircularProgressIndicator(strokeWidth: 3,))
                                 : const Text("Update"),
                           ),
                         ),

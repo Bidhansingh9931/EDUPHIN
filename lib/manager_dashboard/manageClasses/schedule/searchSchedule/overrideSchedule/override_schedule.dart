@@ -261,7 +261,6 @@ class _OverrideSchedulePageState extends State<OverrideSchedulePage>{
                         width: 24,
                         child: CircularProgressIndicator(
                           strokeWidth: 3,
-                          valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
                         ),
                       )
                     : const Text("Override"),
@@ -286,7 +285,7 @@ class _OverrideSchedulePageState extends State<OverrideSchedulePage>{
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Text('Error: $_error', style: const TextStyle(color: Colors.red), textAlign: TextAlign.center,),
+              Text('Error: $_error', style: TextStyle(color: theme.colorScheme.error), textAlign: TextAlign.center,),
               const SizedBox(height: 16),
               ElevatedButton(onPressed: _fetchData, child: const Text("Retry"))
             ],
@@ -432,7 +431,7 @@ class _OverrideSchedulePageState extends State<OverrideSchedulePage>{
         Text(label, style: theme.textTheme.titleMedium),
         const SizedBox(height: 8),
         DropdownButtonFormField<String>(
-          initialValue: items.contains(value) ? value : null,
+          value: items.contains(value) ? value : null,
           items: items.map((e) => DropdownMenuItem(value: e, child: Text(e))).toList(),
           onChanged: onChanged,
           decoration: InputDecoration(

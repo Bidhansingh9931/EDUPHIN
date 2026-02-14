@@ -1,6 +1,4 @@
 import 'dart:convert';
-import 'dart:io';
-
 import 'package:eduphin/services/api_service.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
@@ -23,8 +21,7 @@ class _AddAssignmentPageState extends State<AddAssignmentPage> {
   int? _selectedClassId;
   int? _selectedSectionId;
   int? _selectedSubjectId;
-  File? _selectedFile;
-  String? _selectedFileName;
+  PlatformFile? _selectedFile;
 
   bool _isLoading = true;
   bool _isSaving = false;
@@ -53,19 +50,35 @@ class _AddAssignmentPageState extends State<AddAssignmentPage> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString())));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(e.toString()),
+            backgroundColor: Theme.of(context).colorScheme.error,
+          ),
+        );
         setState(() => _isLoading = false);
       }
     }
   }
 
   Future<void> _pickFile() async {
-    FilePickerResult? result = await FilePicker.platform.pickFiles();
-    if (result != null) {
-      setState(() {
-        _selectedFile = File(result.files.single.path!);
-        _selectedFileName = result.files.single.name;
-      });
+    try {
+      FilePickerResult? result = await FilePicker.platform.pickFiles(withData: true);
+      if (result != null) {
+        if (!mounted) return;
+        setState(() {
+          _selectedFile = result.files.first;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error picking file: ${e.toString()}'),
+            backgroundColor: Theme.of(context).colorScheme.error,
+          ),
+        );
+      }
     }
   }
 
@@ -89,6 +102,7 @@ class _AddAssignmentPageState extends State<AddAssignmentPage> {
     }
 
     setState(() => _isSaving = true);
+    final theme = Theme.of(context);
 
     try {
       final token = await ApiService.getToken();
@@ -110,15 +124,30 @@ class _AddAssignmentPageState extends State<AddAssignmentPage> {
       }
 
       if (_selectedFile != null) {
-        request.files.add(await http.MultipartFile.fromPath('file', _selectedFile!.path));
+        if (_selectedFile!.path != null) {
+          request.files.add(await http.MultipartFile.fromPath(
+            'file',
+            _selectedFile!.path!,
+            filename: _selectedFile!.name,
+          ));
+        } else if (_selectedFile!.bytes != null) {
+          request.files.add(http.MultipartFile.fromBytes(
+            'file',
+            _selectedFile!.bytes!,
+            filename: _selectedFile!.name,
+          ));
+        }
       }
 
       var response = await request.send();
 
       if (response.statusCode == 201) {
-        if(mounted){
-           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Assignment added successfully!'), backgroundColor: Colors.green),
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: const Text('Assignment added successfully!'),
+              backgroundColor: theme.colorScheme.primary,
+            ),
           );
           Navigator.pop(context, true);
         }
@@ -130,11 +159,14 @@ class _AddAssignmentPageState extends State<AddAssignmentPage> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(e.toString().replaceFirst('Exception: ', '')), backgroundColor: Colors.red),
+          SnackBar(
+            content: Text(e.toString().replaceFirst('Exception: ', '')),
+            backgroundColor: theme.colorScheme.error,
+          ),
         );
       }
     } finally {
-      if(mounted){
+      if (mounted) {
         setState(() => _isSaving = false);
       }
     }
@@ -142,6 +174,7 @@ class _AddAssignmentPageState extends State<AddAssignmentPage> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     return Scaffold(
       appBar: AppBar(title: const Text("Add New Assignment")),
       body: _isLoading
@@ -149,16 +182,21 @@ class _AddAssignmentPageState extends State<AddAssignmentPage> {
           : Form(
               key: _formKey,
               child: ListView(
-                padding: const EdgeInsets.all(16.0),
+                padding: const EdgeInsets.fromLTRB(16, 16, 16, 80),
                 children: [
                   TextFormField(
                     controller: _titleController,
-                    decoration: const InputDecoration(labelText: 'Title'),
-                    validator: (value) => value!.isEmpty ? 'Please enter a title' : null,
+                    decoration: InputDecoration(
+                      labelText: 'Title',
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                    ),
+                    validator: (value) => (value == null || value.isEmpty) ? 'Please enter a title' : null,
                   ),
                   const SizedBox(height: 16),
                   DropdownButtonFormField<int>(
-                    initialValue: _selectedClassId,
+                    value: _selectedClassId,
                     items: _classes.map<DropdownMenuItem<int>>((c) => DropdownMenuItem(value: c['id'], child: Text(c['name'] ?? ''))).toList(),
                     onChanged: (value) {
                       setState(() {
@@ -172,58 +210,104 @@ class _AddAssignmentPageState extends State<AddAssignmentPage> {
                         }
                       });
                     },
-                    decoration: const InputDecoration(labelText: 'Class'),
+                    decoration: InputDecoration(
+                      labelText: 'Class',
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                    ),
                     validator: (value) => value == null ? 'Please select a class' : null,
                   ),
                   const SizedBox(height: 16),
                   DropdownButtonFormField<int>(
                     key: ValueKey('section_$_selectedClassId'),
-                    initialValue: _selectedSectionId,
-                    items: _sections.map<DropdownMenuItem<int>>((s) => DropdownMenuItem(value: s['id'], child: Text(s['section_name'] ?? ''))).toList(),
+                    value: _selectedSectionId,
+                    items: _sections.map<DropdownMenuItem<int>>((s) => DropdownMenuItem(value: s['id'], child: Text(s['name'] ?? ''))).toList(),
                     onChanged: (value) => setState(() => _selectedSectionId = value),
-                    decoration: const InputDecoration(labelText: 'Section'),
+                    decoration: InputDecoration(
+                      labelText: 'Section',
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                    ),
                     validator: (value) => value == null ? 'Please select a section' : null,
                   ),
-                   const SizedBox(height: 16),
+                  const SizedBox(height: 16),
                   DropdownButtonFormField<int>(
-                    initialValue: _selectedSubjectId,
-                    items: _subjects.map<DropdownMenuItem<int>>((s) => DropdownMenuItem(value: s['id'], child: Text(s['subject_name'] ?? ''))).toList(),
+                    value: _selectedSubjectId,
+                    items: _subjects.map<DropdownMenuItem<int>>((s) => DropdownMenuItem(value: s['id'], child: Text(s['name'] ?? ''))).toList(),
                     onChanged: (value) => setState(() => _selectedSubjectId = value),
-                    decoration: const InputDecoration(labelText: 'Subject'),
+                    decoration: InputDecoration(
+                      labelText: 'Subject',
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                    ),
                     validator: (value) => value == null ? 'Please select a subject' : null,
                   ),
                   const SizedBox(height: 16),
                   TextFormField(
                     controller: _descriptionController,
-                    decoration: const InputDecoration(labelText: 'Description'),
-                     maxLines: 3,
-                    validator: (value) => value!.isEmpty ? 'Please enter a description' : null,
+                    decoration: InputDecoration(
+                      labelText: 'Description',
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                    ),
+                    maxLines: 3,
+                    validator: (value) => (value == null || value.isEmpty) ? 'Please enter a description' : null,
                   ),
                   const SizedBox(height: 16),
-                   ListTile(
+                  ListTile(
                     title: Text(_dueDate == null ? 'Select Due Date' : DateFormat('yyyy-MM-dd').format(_dueDate!)),
-                    trailing: const Icon(Icons.calendar_today),
+                    trailing: Icon(Icons.calendar_today, color: theme.colorScheme.primary),
                     onTap: _selectDueDate,
+                    shape: RoundedRectangleBorder(
+                      side: BorderSide(color: theme.dividerColor),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
                   ),
                   const SizedBox(height: 16),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: Text(_selectedFileName ?? 'No file selected'),
-                      ),
-                      IconButton(
-                        icon: const Icon(Icons.attach_file),
-                        onPressed: _pickFile,
-                      ),
-                    ],
+                  ListTile(
+                    leading: Icon(Icons.attach_file, color: theme.colorScheme.primary),
+                    title: Text(_selectedFile?.name ?? 'No file selected'),
+                    onTap: _pickFile,
+                    shape: RoundedRectangleBorder(
+                      side: BorderSide(color: theme.dividerColor),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
                   ),
                 ],
               ),
             ),
-       floatingActionButton: ElevatedButton(
-         onPressed: _isSaving ? null : _saveAssignment,
-         child: _isSaving ? const CircularProgressIndicator(valueColor: AlwaysStoppedAnimation(Colors.white)) : const Text('Save Assignment'),
-       ),
+      floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
+      floatingActionButton: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16.0),
+        child: SizedBox(
+          width: double.infinity,
+          child: ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: theme.colorScheme.primary,
+              foregroundColor: theme.colorScheme.onPrimary,
+              padding: const EdgeInsets.symmetric(vertical: 16),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(10),
+              ),
+            ),
+            onPressed: _isSaving ? null : _saveAssignment,
+            child: _isSaving
+                ? SizedBox(
+                    height: 20,
+                    width: 20,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: theme.colorScheme.onPrimary,
+                    ),
+                  )
+                : const Text('Save Assignment'),
+          ),
+        ),
+      ),
     );
   }
 }

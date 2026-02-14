@@ -174,33 +174,36 @@ class _EditFeePageState extends State<EditFeePage> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final screenSize = MediaQuery.of(context).size;
+
     return Scaffold(
       floatingActionButton: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16.0),
+        padding: EdgeInsets.symmetric(horizontal: screenSize.width * 0.04),
         child: Row(
           children: [
             Expanded(
               child: ElevatedButton.icon(
-                icon: _isSaving ? const SizedBox.shrink() : const Icon(Icons.check, color: Colors.white),
+                icon: _isSaving ? const SizedBox.shrink() : const Icon(Icons.check),
                 label: _isSaving
-                    ? const CircularProgressIndicator(valueColor: AlwaysStoppedAnimation(Colors.white), strokeWidth: 2)
-                    : Text("Update Fee", style: theme.textTheme.labelLarge?.copyWith(color: Colors.white)),
+                    ? const CircularProgressIndicator()
+                    : const Text("Update Fee"),
                 onPressed: _isSaving ? null : _updateFee,
                 style: ElevatedButton.styleFrom(
                   backgroundColor: theme.colorScheme.primary,
-                  padding: const EdgeInsets.symmetric(vertical: 16),
+                  foregroundColor: theme.colorScheme.onPrimary,
+                  padding: EdgeInsets.symmetric(vertical: screenSize.height * 0.02),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(12),
                   ),
                 ),
               ),
             ),
-            const SizedBox(width: 16),
+            SizedBox(width: screenSize.width * 0.04),
             Expanded(
               child: OutlinedButton(
                 onPressed: _isSaving ? null : () => Navigator.pop(context),
                 style: OutlinedButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(vertical: 16),
+                  padding: EdgeInsets.symmetric(vertical: screenSize.height * 0.02),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(12),
                   ),
@@ -220,9 +223,9 @@ class _EditFeePageState extends State<EditFeePage> {
       body: _isLoadingClasses
           ? const Center(child: CircularProgressIndicator())
           : _error.isNotEmpty
-              ? Center(child: Text(_error))
+              ? Center(child: Text(_error, style: TextStyle(color: theme.colorScheme.error)))
               : Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 16, 16, 50),
+                  padding: EdgeInsets.fromLTRB(screenSize.width * 0.04, screenSize.width * 0.04, screenSize.width * 0.04, screenSize.height * 0.1),
                   child: Form(
                     key: _formKey,
                     child: LayoutBuilder(builder: (context, constraints) {
@@ -237,20 +240,22 @@ class _EditFeePageState extends State<EditFeePage> {
   }
 
   Widget _buildNarrowLayout(ThemeData theme) {
+    final screenSize = MediaQuery.of(context).size;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         _buildApplyToCard(theme),
-        const SizedBox(height: 16),
+        SizedBox(height: screenSize.height * 0.02),
         _buildFeeDetailsCard(theme),
-        const SizedBox(height: 16),
+        SizedBox(height: screenSize.height * 0.02),
         _buildIsOptionalCard(theme),
-        const SizedBox(height: 80), // Padding for FAB
+        SizedBox(height: screenSize.height * 0.1), // Padding for FAB
       ],
     );
   }
 
   Widget _buildWideLayout(ThemeData theme) {
+    final screenSize = MediaQuery.of(context).size;
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -258,13 +263,13 @@ class _EditFeePageState extends State<EditFeePage> {
           flex: 2,
           child: _buildFeeDetailsCard(theme),
         ),
-        const SizedBox(width: 16),
+        SizedBox(width: screenSize.width * 0.04),
         Expanded(
           flex: 1,
           child: Column(
             children: [
               _buildApplyToCard(theme),
-              const SizedBox(height: 16),
+              SizedBox(height: screenSize.height * 0.02),
               _buildIsOptionalCard(theme),
             ],
           ),
@@ -308,10 +313,11 @@ class _EditFeePageState extends State<EditFeePage> {
   }
 
   Widget _buildFeeDetailsCard(ThemeData theme) {
+    final screenSize = MediaQuery.of(context).size;
     return Container(
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(10),
-        color: theme.primaryColor,
+        color: theme.cardColor,
       ),
       padding: const EdgeInsets.all(16),
       child: Column(
@@ -319,16 +325,16 @@ class _EditFeePageState extends State<EditFeePage> {
         children: [
           _buildTextField(theme, "Fee Name", _feeNameController, "e.g., Annual Tuition Fee",
               (value) => value!.isEmpty ? 'Fee name is required' : null),
-          const SizedBox(height: 16),
+          SizedBox(height: screenSize.height * 0.02),
            if (_applyTo == 'class') ...[
             Text(
               "Select Class",
               style: theme.textTheme.titleMedium
-                  ?.copyWith(color: theme.colorScheme.onPrimary),
+                  ?.copyWith(color: theme.colorScheme.onSurface),
             ),
-            const SizedBox(height: 8),
+            SizedBox(height: screenSize.height * 0.01),
             DropdownButtonFormField<int>(
-              initialValue: _selectedClassId,
+              value: _selectedClassId,
               items: _classes.map((apiClass) {
                 return DropdownMenuItem<int>(
                   value: apiClass.id,
@@ -343,7 +349,7 @@ class _EditFeePageState extends State<EditFeePage> {
               hint: const Text("Select a Class"),
               decoration: InputDecoration(
                 filled: true,
-                fillColor: theme.scaffoldBackgroundColor,
+                fillColor: theme.colorScheme.surface,
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(10),
                   borderSide: BorderSide.none,
@@ -356,12 +362,12 @@ class _EditFeePageState extends State<EditFeePage> {
                 return null;
               },
             ),
-            const SizedBox(height: 16),
+            SizedBox(height: screenSize.height * 0.02),
           ],
           _buildTextField(theme, "Amount", _amountController, "75,000",
               (value) => value!.isEmpty ? 'Amount is required' : null,
               keyboardType: TextInputType.number),
-          const SizedBox(height: 16),
+          SizedBox(height: screenSize.height * 0.02),
           _buildTextField(theme, "Description", _descriptionController, "Enter a brief description", null,
               maxLines: 3),
         ],
@@ -406,11 +412,11 @@ class _EditFeePageState extends State<EditFeePage> {
         child: Container(
           padding: const EdgeInsets.symmetric(vertical: 14),
           decoration: BoxDecoration(
-            color: isSelected ? theme.colorScheme.primary : theme.colorScheme.surfaceContainerHighest,
+            color: isSelected ? theme.colorScheme.primary : theme.scaffoldBackgroundColor,
             borderRadius: BorderRadius.circular(14),
             border: isSelected
                 ? Border.all(color: theme.colorScheme.primaryContainer, width: 2)
-                : null,
+                : Border.all(color: theme.dividerColor, width: 1),
           ),
           child: Center(
             child: Text(
@@ -429,14 +435,15 @@ class _EditFeePageState extends State<EditFeePage> {
 
   Widget _buildTextField(ThemeData theme, String label, TextEditingController controller, String hintText,
       String? Function(String?)? validator, {int? maxLines = 1, TextInputType? keyboardType}) {
+    final screenSize = MediaQuery.of(context).size;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
           label,
-          style: theme.textTheme.titleMedium?.copyWith(color: theme.colorScheme.onPrimary),
+          style: theme.textTheme.titleMedium?.copyWith(color: theme.colorScheme.onSurface),
         ),
-        const SizedBox(height: 8),
+        SizedBox(height: screenSize.height * 0.01),
         TextFormField(
           controller: controller,
           validator: validator,
@@ -447,9 +454,10 @@ class _EditFeePageState extends State<EditFeePage> {
             hintStyle: TextStyle(color: theme.hintColor),
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(10),
+              borderSide: BorderSide.none,
             ),
             filled: true,
-            fillColor: theme.scaffoldBackgroundColor,
+            fillColor: theme.colorScheme.surface,
           ),
         ),
       ],

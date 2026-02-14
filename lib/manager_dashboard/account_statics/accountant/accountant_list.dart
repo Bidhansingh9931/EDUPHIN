@@ -84,7 +84,7 @@ class _AccountantListPageState extends State<AccountantListPage> {
             await _fetchAccountantsForRole(_selectedRoleId!); // Fetch accountants for the default role
           }
         } else {
-          setState(() => _isLoading = false); // No accountant roles found
+          if (mounted) setState(() => _isLoading = false); // No accountant roles found
         }
       } else {
         throw Exception('Failed to load roles');
@@ -128,6 +128,7 @@ class _AccountantListPageState extends State<AccountantListPage> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final screenSize = MediaQuery.of(context).size;
     return Scaffold(
         floatingActionButton: FloatingActionButton.extended(
           onPressed: () async {
@@ -139,29 +140,30 @@ class _AccountantListPageState extends State<AccountantListPage> {
               _fetchAccountantsForRole(_selectedRoleId!); // Refresh list on return
             }
           },
-          label: const Text("Add Accountant"),
-          icon: const Icon(Icons.add),
+          label: Text("Add Accountant", style: TextStyle(color: theme.colorScheme.onPrimary)),
+          icon: Icon(Icons.add, color: theme.colorScheme.onPrimary),
+          backgroundColor: theme.colorScheme.primary,
         ),
         backgroundColor: theme.scaffoldBackgroundColor,
         appBar: AppBar(
           title: Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(
+              const Text(
                 "Accountant List",
-                style: theme.textTheme.titleLarge?.copyWith(
-                    color: theme.colorScheme.onSurface,
-                    fontWeight: FontWeight.bold),
               ),
-              const Icon(
-                Icons.download,
+              IconButton(
+                icon: const Icon(Icons.download),
+                onPressed: () {
+                  // TODO: Implement download functionality
+                },
               ),
             ],
           ),
         ),
         body: SingleChildScrollView(
           child: Padding(
-            padding: const EdgeInsets.fromLTRB(16, 16, 16, 50),
+            padding: EdgeInsets.fromLTRB(screenSize.width * 0.04, screenSize.width * 0.04, screenSize.width * 0.04, 50),
             child: CustomAccountantListBox(
               isLoading: _isLoading,
               accountants: _accountants,
@@ -204,11 +206,14 @@ class CustomAccountantListBox extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final screenSize = MediaQuery.of(context).size;
+    final isDarkMode = theme.brightness == Brightness.dark;
+
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(16.0),
+      padding: EdgeInsets.all(screenSize.width * 0.04),
       decoration: BoxDecoration(
-        color: theme.primaryColor,
+        color: theme.cardColor,
         borderRadius: BorderRadius.circular(12),
       ),
       child: Column(
@@ -217,14 +222,14 @@ class CustomAccountantListBox extends StatelessWidget {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 12),
             decoration: BoxDecoration(
-              color: theme.colorScheme.onPrimary.withAlpha(25),
+              color: isDarkMode ? theme.scaffoldBackgroundColor : const Color(0xFFF3F3F3),
               borderRadius: BorderRadius.circular(12),
             ),
             child: DropdownButton<int>(
               value: selectedRoleId,
               underline: const SizedBox(),
               isExpanded: true,
-              icon: Icon(Icons.arrow_drop_down, color: theme.colorScheme.onPrimary),
+              icon: Icon(Icons.arrow_drop_down, color: theme.colorScheme.onSurface),
               onChanged: onRoleChanged,
               items: roles.map<DropdownMenuItem<int>>((Role role) {
                 return DropdownMenuItem<int>(
@@ -249,7 +254,7 @@ class CustomAccountantListBox extends StatelessWidget {
               : LayoutBuilder(
                   builder: (context, constraints) {
                     if (accountants.isEmpty) {
-                      return const Center(child: Text("No accountants found for this role.", style: TextStyle(color: Colors.white),));
+                      return Center(child: Text("No accountants found for this role.", style: TextStyle(color: theme.colorScheme.onSurfaceVariant),));
                     }
 
                     final isLargeScreen = constraints.maxWidth > 600;
@@ -291,10 +296,12 @@ class CustomAccountantListBox extends StatelessWidget {
   Widget _buildAccountantItem(BuildContext context, Accountant accountant) {
     final theme = Theme.of(context);
     final textTheme = theme.textTheme;
+    final isDarkMode = theme.brightness == Brightness.dark;
+
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: theme.colorScheme.onPrimary.withAlpha(25),
+        color: isDarkMode ? theme.scaffoldBackgroundColor : const Color(0xFFF3F3F3),
         borderRadius: BorderRadius.circular(12),
       ),
       child: Row(
@@ -313,13 +320,13 @@ class CustomAccountantListBox extends StatelessWidget {
                 Text(
                   accountant.name,
                   style: textTheme.titleMedium
-                      ?.copyWith(color: theme.colorScheme.onPrimary),
+                      ?.copyWith(color: theme.colorScheme.onSurface),
                 ),
                 const SizedBox(height: 4),
                 Text(
                   accountant.designation,
                   style: textTheme.bodyMedium
-                      ?.copyWith(color: theme.colorScheme.onPrimary.withAlpha(180)),
+                      ?.copyWith(color: theme.hintColor),
                 )
               ],
             ),

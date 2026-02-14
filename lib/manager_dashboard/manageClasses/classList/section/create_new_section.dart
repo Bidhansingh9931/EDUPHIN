@@ -12,13 +12,15 @@ class CreateNewSectionPage extends StatefulWidget {
 
 class _CreateNewSectionPageState extends State<CreateNewSectionPage> {
   final _formKey = GlobalKey<FormState>(); // Add a form key for validation
-  final _sectionNameController = TextEditingController();
   final _limitController = TextEditingController();
   bool _isLoading = false;
   bool _isFetchingMentors = true;
 
   List<Map<String, dynamic>> _mentors = [];
   String? _selectedMentorId;
+  String? _selectedSectionName;
+  final List<String> _sectionNames = ['A', 'B', 'C', 'D'];
+
 
   @override
   void initState() {
@@ -34,18 +36,28 @@ class _CreateNewSectionPageState extends State<CreateNewSectionPage> {
       // CORRECTED: Use the 'meta' endpoint to get teachers and other related data.
       final response = await ApiService.get('manager/class-schedules/meta');
       if (mounted) {
+        final theme = Theme.of(context);
         final responseData = jsonDecode(response.body);
         if (response.statusCode == 200 && responseData['status'] == true) {
           // CORRECTED: The list of teachers is under the 'teachers' key.
           final List<dynamic> teachersList = responseData['teachers'];
           // Safely process the list to handle potential nulls in names
           final processedMentors = teachersList.map((teacher) {
-            final firstName = teacher['first_name'] ?? '';
-            final lastName = teacher['last_name'] ?? '';
-            final fullName = '$firstName $lastName'.trim();
+            // --- THIS IS THE MODIFIED PART ---
+            // Try to get the full name from a 'name' field first.
+            String fullName = teacher['name'] ?? '';
+
+            // If 'name' is not present or empty, fall back to 'first_name' and 'last_name'.
+            if (fullName.isEmpty) {
+                final firstName = teacher['first_name'] ?? '';
+                final lastName = teacher['last_name'] ?? '';
+                fullName = '$firstName $lastName'.trim();
+            }
+            
             return {
-              'id': teacher['id'],
-              'name': fullName.isNotEmpty ? fullName : 'Unnamed Mentor',
+                'id': teacher['id'],
+                // If after all attempts the name is still empty, use 'Unnamed Mentor'.
+                'name': fullName.isNotEmpty ? fullName : 'Unnamed Mentor',
             };
           }).where((mentor) => mentor['id'] != null).toList(); // Filter out invalid entries
 
@@ -56,16 +68,17 @@ class _CreateNewSectionPageState extends State<CreateNewSectionPage> {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text(responseData['message'] ?? 'Failed to load mentors.'),
-              backgroundColor: Colors.red,
+              backgroundColor: theme.colorScheme.error,
             ),
           );
         }
       }
     } catch (e) {
       if (mounted) {
+        final theme = Theme.of(context);
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-              content: Text('An error occurred while fetching mentors: $e')),
+              content: Text('An error occurred while fetching mentors: $e'), backgroundColor: theme.colorScheme.error),
         );
       }
     } finally {
@@ -90,20 +103,21 @@ class _CreateNewSectionPageState extends State<CreateNewSectionPage> {
     try {
       final response = await ApiService.post('manager/sections', {
         'class_id': widget.classId,
-        'section_name': _sectionNameController.text,
+        'section_name': _selectedSectionName,
         'section_limit': int.tryParse(_limitController.text) ?? 0,
         'mentor_id':
             _selectedMentorId != null ? int.parse(_selectedMentorId!) : null,
       });
 
       if (mounted) {
+        final theme = Theme.of(context);
         final responseData = jsonDecode(response.body);
         if (response.statusCode == 201 && responseData['status'] == true) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content:
                   Text(responseData['message'] ?? 'Section created successfully!'),
-              backgroundColor: Colors.green,
+              backgroundColor: theme.colorScheme.primary,
             ),
           );
           Navigator.pop(context, true); // Pop with true to indicate success
@@ -112,15 +126,16 @@ class _CreateNewSectionPageState extends State<CreateNewSectionPage> {
             SnackBar(
               content:
                   Text(responseData['message'] ?? 'Failed to create section.'),
-              backgroundColor: Colors.red,
+              backgroundColor: theme.colorScheme.error,
             ),
           );
         }
       }
     } catch (e) {
       if (mounted) {
+        final theme = Theme.of(context);
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('An error occurred: $e')),
+          SnackBar(content: Text('An error occurred: $e'), backgroundColor: theme.colorScheme.error),
         );
       }
     } finally {
@@ -134,7 +149,6 @@ class _CreateNewSectionPageState extends State<CreateNewSectionPage> {
 
   @override
   void dispose() {
-    _sectionNameController.dispose();
     _limitController.dispose();
     super.dispose();
   }
@@ -165,15 +179,7 @@ class _CreateNewSectionPageState extends State<CreateNewSectionPage> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    _buildTextField(
-                      theme: theme,
-                      controller: _sectionNameController,
-                      label: "Section Name",
-                      hint: "e.g., Section A",
-                      validator: (value) => value == null || value.isEmpty
-                          ? 'Please enter a section name'
-                          : null,
-                    ),
+                    _buildSectionDropdown(theme),
                     const SizedBox(height: 16),
                     _buildMentorDropdown(theme),
                     const SizedBox(height: 16),
@@ -201,8 +207,7 @@ class _CreateNewSectionPageState extends State<CreateNewSectionPage> {
                               shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(12),
                               ),
-                            ),
-                            child: const Text("Cancel"),
+                            ),                            child: const Text("Cancel"),
                           ),
                         ),
                         const SizedBox(width: 16),
@@ -241,6 +246,52 @@ class _CreateNewSectionPageState extends State<CreateNewSectionPage> {
     );
   }
 
+  Widget _buildSectionDropdown(ThemeData theme) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text("Section Name",
+            style: theme.textTheme.titleMedium
+                ?.copyWith(color: theme.colorScheme.onPrimary)),
+        const SizedBox(height: 8),
+        DropdownButtonFormField<String>(
+          value: _selectedSectionName,
+          hint: const Text('Select a Section'),
+          isExpanded: true,
+          decoration: InputDecoration(
+            filled: true,
+            fillColor: theme.scaffoldBackgroundColor,
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(10),
+              borderSide: BorderSide.none,
+            ),
+            errorBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(10),
+              borderSide: BorderSide(color: theme.colorScheme.error, width: 1),
+            ),
+            focusedErrorBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(10),
+              borderSide: BorderSide(color: theme.colorScheme.error, width: 2),
+            ),
+          ),
+          items: _sectionNames.map<DropdownMenuItem<String>>((String value) {
+            return DropdownMenuItem<String>(
+              value: value,
+              child: Text(value),
+            );
+          }).toList(),
+          onChanged: (String? newValue) {
+            setState(() {
+              _selectedSectionName = newValue;
+            });
+          },
+          validator: (value) =>
+              value == null ? 'Please select a section' : null,
+        ),
+      ],
+    );
+  }
+
   Widget _buildMentorDropdown(ThemeData theme) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -250,7 +301,7 @@ class _CreateNewSectionPageState extends State<CreateNewSectionPage> {
                 ?.copyWith(color: theme.colorScheme.onPrimary)),
         const SizedBox(height: 8),
         DropdownButtonFormField<String>(
-          initialValue: _selectedMentorId, // Use value instead of initialValue
+          value: _selectedMentorId,
           hint: _isFetchingMentors
               ? const Text('Loading Mentors...')
               : const Text('Select a Mentor'),

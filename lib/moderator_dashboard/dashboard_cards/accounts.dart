@@ -131,17 +131,19 @@ class _AccountsPageState extends State<AccountsPage> {
   }
 
   Future<String?> _selectRoleDialog() async {
+    final theme = Theme.of(context);
     return showDialog<String>(
       context: context,
       builder: (context) {
         return AlertDialog(
-          title: const Text('Select Role'),
+          backgroundColor: theme.cardColor,
+          title: Text('Select Role', style: theme.textTheme.titleLarge),
           content: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              ListTile(title: const Text('Manager'), onTap: () => Navigator.of(context).pop('2')),
-              ListTile(title: const Text('Teacher'), onTap: () => Navigator.of(context).pop('3')),
-              ListTile(title: const Text('Librarian'), onTap: () => Navigator.of(context).pop('4')),
+              ListTile(title: Text('Manager', style: theme.textTheme.bodyLarge), onTap: () => Navigator.of(context).pop('2')),
+              ListTile(title: Text('Teacher', style: theme.textTheme.bodyLarge), onTap: () => Navigator.of(context).pop('3')),
+              ListTile(title: Text('Librarian', style: theme.textTheme.bodyLarge), onTap: () => Navigator.of(context).pop('4')),
             ],
           ),
         );
@@ -167,40 +169,27 @@ class _AccountsPageState extends State<AccountsPage> {
 
   @override
   Widget build(BuildContext context) {
-    final screenWidth = MediaQuery.of(context).size.width;
-
-    double responsiveFontSize(double baseSize) {
-      if (screenWidth > 1200) {
-        return baseSize * 1.2;
-      } else if (screenWidth > 600) {
-        return baseSize * 1.1;
-      }
-      return baseSize;
-    }
+    final theme = Theme.of(context);
+    final isDarkMode = theme.brightness == Brightness.dark;
+    final screenSize = MediaQuery.of(context).size;
 
     return Scaffold(
-      backgroundColor: const Color(0xFF0D1B2A),
+      backgroundColor: theme.scaffoldBackgroundColor,
       appBar: AppBar(
-        title: Text(
-          'Accounts',
-          style: TextStyle(fontSize: responsiveFontSize(20), color: Colors.white),
-        ),
-        backgroundColor: const Color(0xFF0D1B2A),
-        elevation: 0,
-        iconTheme: const IconThemeData(color: Colors.white),
+        title: const Text('Accounts'),
         bottom: PreferredSize(
           preferredSize: const Size.fromHeight(kToolbarHeight),
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16.0),
             child: TextField(
               controller: _searchController,
-              style: const TextStyle(color: Colors.white),
+              style: TextStyle(color: theme.colorScheme.onSurface),
               decoration: InputDecoration(
                 hintText: 'Search accounts...',
-                hintStyle: const TextStyle(color: Colors.white70),
-                prefixIcon: const Icon(Icons.search, color: Colors.white70),
+                hintStyle: TextStyle(color: theme.hintColor),
+                prefixIcon: Icon(Icons.search, color: theme.hintColor),
                 filled: true,
-                fillColor: const Color(0xFF1B263B),
+                fillColor: isDarkMode ? theme.colorScheme.surface : Colors.grey.shade200,
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
                   borderSide: BorderSide.none,
@@ -217,15 +206,15 @@ class _AccountsPageState extends State<AccountsPage> {
             return const Center(child: CircularProgressIndicator());
           }
           if (snapshot.hasError && _allAccounts.isEmpty) {
-            return Center(child: Text('Error: ${snapshot.error}', style: const TextStyle(color: Colors.white70)));
+            return Center(child: Text('Error: ${snapshot.error}', style: TextStyle(color: theme.colorScheme.onSurfaceVariant)));
           }
           if (_allAccounts.isEmpty) {
-            return const Center(child: Text('No accounts found.', style: TextStyle(color: Colors.white70)));
+            return Center(child: Text('No accounts found.', style: TextStyle(color: theme.colorScheme.onSurfaceVariant)));
           }
 
           final accounts = _filteredAccounts;
           if(accounts.isEmpty && _searchController.text.isNotEmpty) {
-            return const Center(child: Text('No accounts found for your search.', style: TextStyle(color: Colors.white70)));
+            return Center(child: Text('No accounts found for your search.', style: TextStyle(color: theme.colorScheme.onSurfaceVariant)));
           }
 
 
@@ -234,7 +223,7 @@ class _AccountsPageState extends State<AccountsPage> {
               if (constraints.maxWidth > 600) {
                 int crossAxisCount = constraints.maxWidth > 1200 ? 4 : (constraints.maxWidth > 900 ? 3 : 2);
                 return GridView.builder(
-                  padding: EdgeInsets.fromLTRB(screenWidth * 0.04, screenWidth * 0.04, screenWidth * 0.04, 50),
+                  padding: EdgeInsets.fromLTRB(screenSize.width * 0.04, screenSize.width * 0.04, screenSize.width * 0.04, 50),
                   itemCount: accounts.length,
                   gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
                     crossAxisCount: crossAxisCount,
@@ -267,8 +256,8 @@ class _AccountsPageState extends State<AccountsPage> {
       ),
       floatingActionButton: FloatingActionButton(
         onPressed: _navigateToAddAccount,
-        backgroundColor: const Color(0xFF4A90E2),
-        child: const Icon(Icons.add),
+        backgroundColor: theme.colorScheme.primary,
+        child: const Icon(Icons.add, color: Colors.white),
       ),
     );
   }
@@ -286,10 +275,11 @@ class AccountCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final screenWidth = MediaQuery.of(context).size.width;
+    final theme = Theme.of(context);
+    final screenSize = MediaQuery.of(context).size;
     double responsiveFontSize(double baseSize) {
-      if (screenWidth > 1200) return baseSize * 1.2;
-      if (screenWidth > 600) return baseSize * 1.1;
+      if (screenSize.width > 1200) return baseSize * 1.2;
+      if (screenSize.width > 600) return baseSize * 1.1;
       return baseSize;
     }
 
@@ -299,15 +289,14 @@ class AccountCard extends StatelessWidget {
             children: [
               CircleAvatar(
                 radius: responsiveFontSize(22),
-                backgroundColor: const Color(0xFF0D1B2A),
-                child: Icon(Icons.person_outline, color: Colors.white, size: responsiveFontSize(24)),
+                backgroundColor: theme.scaffoldBackgroundColor,
+                child: Icon(Icons.person_outline, color: theme.colorScheme.onSurface, size: responsiveFontSize(24)),
               ),
               const SizedBox(height: 12),
               Text(
                 account.name,
                 textAlign: TextAlign.center,
-                style: TextStyle(
-                  color: Colors.white,
+                style: theme.textTheme.titleMedium?.copyWith(
                   fontWeight: FontWeight.bold,
                   fontSize: responsiveFontSize(14),
                 ),
@@ -317,8 +306,7 @@ class AccountCard extends StatelessWidget {
               Text(
                 account.email,
                 textAlign: TextAlign.center,
-                style: TextStyle(
-                  color: Colors.white70,
+                style: theme.textTheme.bodyMedium?.copyWith(
                   fontSize: responsiveFontSize(12),
                 ),
                 overflow: TextOverflow.ellipsis,
@@ -327,31 +315,29 @@ class AccountCard extends StatelessWidget {
           )
         : ListTile(
             leading: CircleAvatar(
-              backgroundColor: const Color(0xFF0D1B2A),
-              child: Icon(Icons.person_outline, color: Colors.white, size: responsiveFontSize(22)),
+              backgroundColor: theme.scaffoldBackgroundColor,
+              child: Icon(Icons.person_outline, color: theme.colorScheme.onSurface, size: responsiveFontSize(22)),
             ),
             title: Text(
               account.name,
-              style: TextStyle(
-                color: Colors.white,
+              style: theme.textTheme.titleMedium?.copyWith(
                 fontWeight: FontWeight.bold,
                 fontSize: responsiveFontSize(16),
               ),
             ),
             subtitle: Text(
               account.email,
-              style: TextStyle(
-                color: Colors.white70,
+              style: theme.textTheme.bodyMedium?.copyWith(
                 fontSize: responsiveFontSize(14),
               ),
             ),
           );
 
     return Card(
-      color: const Color(0xFF1B263B),
+      color: theme.cardColor,
       elevation: 2,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      margin: isGridView ? EdgeInsets.zero : EdgeInsets.symmetric(horizontal: screenWidth * 0.04, vertical: 8),
+      margin: isGridView ? EdgeInsets.zero : EdgeInsets.symmetric(horizontal: screenSize.width * 0.04, vertical: 8),
       child: InkWell(
         onTap: () {
           Navigator.push(

@@ -154,6 +154,7 @@ class _RemarksPageState extends State<RemarksPage> {
   }
 
   Widget _buildBody() {
+    final theme = Theme.of(context);
     if (_isLoading) {
       return const Center(child: CircularProgressIndicator());
     }
@@ -164,7 +165,7 @@ class _RemarksPageState extends State<RemarksPage> {
           child: Text(
             _error,
             textAlign: TextAlign.center,
-            style: const TextStyle(color: Colors.red),
+            style: TextStyle(color: theme.colorScheme.error),
           ),
         ),
       );
@@ -216,7 +217,7 @@ class RemarkCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final isPositive = remark.type == "Positive";
-    final typeColor = isPositive ? Colors.green.shade600 : Colors.red.shade600;
+    final typeColor = isPositive ? theme.colorScheme.primary : theme.colorScheme.error;
 
     return Container(
       width: double.infinity,
@@ -324,22 +325,24 @@ class _DeleteRemarkDialogState extends State<DeleteRemarkDialog> {
     try {
       await ApiService.delete('manager/students/remarks/${widget.remark.id}');
       if (mounted) {
+        final theme = Theme.of(context);
         Navigator.of(context).pop();
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Remark deleted successfully!'),
-            backgroundColor: Colors.green,
+          SnackBar(
+            content: const Text('Remark deleted successfully!'),
+            backgroundColor: theme.colorScheme.primary,
           ),
         );
         widget.onUpdate();
       }
     } on Exception catch (e) {
       if (mounted) {
+        final theme = Theme.of(context);
         Navigator.of(context).pop();
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(e.toString().replaceFirst('Exception: ', '')),
-            backgroundColor: Colors.red,
+            backgroundColor: theme.colorScheme.error,
           ),
         );
       }
@@ -365,12 +368,12 @@ class _DeleteRemarkDialogState extends State<DeleteRemarkDialog> {
         ),
         ElevatedButton(
           onPressed: _isDeleting ? null : _deleteRemark,
-          style: ElevatedButton.styleFrom(backgroundColor: theme.colorScheme.error),
+          style: ElevatedButton.styleFrom(backgroundColor: theme.colorScheme.error, foregroundColor: theme.colorScheme.onError),
           child: _isDeleting
               ? const SizedBox(
                   width: 24,
                   height: 24,
-                  child: CircularProgressIndicator(strokeWidth: 3, valueColor: AlwaysStoppedAnimation(Colors.white)),
+                  child: CircularProgressIndicator(strokeWidth: 3),
                 )
               : const Text('Delete'),
         ),

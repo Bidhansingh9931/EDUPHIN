@@ -43,6 +43,7 @@ class ClassFee {
   final String isOptional;
   final String details;
   final int fee;
+  final int classId;
 
   ClassFee({
     required this.id,
@@ -51,6 +52,7 @@ class ClassFee {
     required this.isOptional,
     required this.details,
     required this.fee,
+    required this.classId,
   });
 
   factory ClassFee.fromJson(Map<String, dynamic> json) {
@@ -62,6 +64,7 @@ class ClassFee {
       isOptional: (json['is_optional'] == true || json['is_optional'] == 1) ? "Optional" : "Mandatory",
       details: json['description']?.toString() ?? '',
       fee: (double.tryParse(json['amount']?.toString().replaceAll(RegExp(r'[₹,]'), '') ?? '0') ?? 0).toInt(),
+      classId: (json['class'] is Map<String, dynamic>) ? json['class']['id'] ?? 0 : 0,
     );
   }
 }
@@ -99,7 +102,6 @@ class _FeeStructurePageState extends State<FeeStructurePage> {
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
         
-        // Fix: Safely handle null lists from the API
         final List<dynamic> instituteFeesData = data['institute_fees'] as List? ?? [];
         final List<dynamic> classFeesData = data['class_fees'] as List? ?? [];
 
@@ -134,7 +136,7 @@ class _FeeStructurePageState extends State<FeeStructurePage> {
       if (response.statusCode == 200 || response.statusCode == 204) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Fee deleted successfully'), backgroundColor: Colors.green),
+            SnackBar(content: const Text('Fee deleted successfully'), backgroundColor: Theme.of(context).colorScheme.primary),
           );
           _fetchData(); // Refresh the data
         }
@@ -145,7 +147,7 @@ class _FeeStructurePageState extends State<FeeStructurePage> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(e.toString()), backgroundColor: Colors.red),
+          SnackBar(content: Text(e.toString()), backgroundColor: Theme.of(context).colorScheme.error),
         );
       }
     }
@@ -154,10 +156,12 @@ class _FeeStructurePageState extends State<FeeStructurePage> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final screenSize = MediaQuery.of(context).size;
+
     return Scaffold(
       backgroundColor: theme.scaffoldBackgroundColor,
       floatingActionButton: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16.0),
+        padding: EdgeInsets.symmetric(horizontal: screenSize.width * 0.04),
         child: FloatingActionButton.extended(
           onPressed: () async {
             final result = await Navigator.push(
@@ -168,12 +172,10 @@ class _FeeStructurePageState extends State<FeeStructurePage> {
               _fetchData();
             }
           },
-          backgroundColor: Colors.blue.shade900,
-          icon: const Icon(Icons.add, color: Colors.white),
-          label: Text(
-            "Create New Fee",
-            style: theme.textTheme.labelLarge?.copyWith(color: Colors.white),
-          ),
+          backgroundColor: theme.colorScheme.primary,
+          foregroundColor: theme.colorScheme.onPrimary,
+          icon: const Icon(Icons.add),
+          label: const Text("Create New Fee"),
         ),
       ),
       floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
@@ -186,7 +188,7 @@ class _FeeStructurePageState extends State<FeeStructurePage> {
           : RefreshIndicator(
               onRefresh: _fetchData,
               child: Padding(
-                padding: const EdgeInsets.fromLTRB(16, 16, 16, 120),
+                padding: EdgeInsets.fromLTRB(screenSize.width * 0.04, screenSize.width * 0.04, screenSize.width * 0.04, screenSize.height * 0.15),
                 child: LayoutBuilder(builder: (context, constraints) {
                   if (constraints.maxWidth > 800) {
                     return _buildWideLayout();
@@ -324,6 +326,7 @@ class _FeeStructurePageState extends State<FeeStructurePage> {
                           description: fee.details,
                           applyTo: "class",
                           isOptional: fee.isOptional == "Optional",
+                          classId: fee.classId,
                         ),
                       ),
                     );
@@ -355,7 +358,7 @@ void showDeleteFeeDialog(
     context: context,
     barrierDismissible: true,
     barrierLabel: "Delete",
-    barrierColor: const Color.fromRGBO(0, 0, 0, 0.6),
+    barrierColor: Theme.of(context).colorScheme.scrim,
     transitionDuration: const Duration(milliseconds: 200),
     pageBuilder: (_, __, ___) {
       return DeleteFeeDialog(
@@ -392,19 +395,18 @@ class DeleteFeeDialog extends StatelessWidget {
               margin: const EdgeInsets.symmetric(horizontal: 24),
               padding: const EdgeInsets.all(20),
               decoration: BoxDecoration(
-                color: const Color(0xFF1F2937),
+                color: theme.cardColor,
                 borderRadius: BorderRadius.circular(20),
               ),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Text("Delete Fee", style: theme.textTheme.titleLarge?.copyWith(color: Colors.white)),
+                  Text("Delete Fee", style: theme.textTheme.titleLarge),
                   const SizedBox(height: 12),
-                   // Fix: Use RichText for better text handling and styling
                   RichText(
                     textAlign: TextAlign.center,
                     text: TextSpan(
-                      style: theme.textTheme.bodyMedium?.copyWith(color: Colors.grey.shade400),
+                      style: theme.textTheme.bodyMedium,
                       children: <TextSpan>[
                         const TextSpan(text: 'Are you sure you want to delete '),
                         TextSpan(text: '"$feeName"', style: const TextStyle(fontWeight: FontWeight.bold)),
@@ -417,7 +419,7 @@ class DeleteFeeDialog extends StatelessWidget {
                     width: double.infinity,
                     child: ElevatedButton(
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFFC5392A),
+                        backgroundColor: theme.colorScheme.error,
                         padding: const EdgeInsets.symmetric(vertical: 14),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(12),
@@ -427,7 +429,7 @@ class DeleteFeeDialog extends StatelessWidget {
                         Navigator.pop(context);
                         onConfirm();
                       },
-                      child: Text("Yes, Delete", style: theme.textTheme.labelLarge?.copyWith(color: Colors.white)),
+                      child: Text("Yes, Delete", style: theme.textTheme.labelLarge?.copyWith(color: theme.colorScheme.onError)),
                     ),
                   ),
                   const SizedBox(height: 12),
@@ -435,7 +437,7 @@ class DeleteFeeDialog extends StatelessWidget {
                     width: double.infinity,
                     child: TextButton(
                       onPressed: () => Navigator.pop(context),
-                      child: Text("Cancel", style: theme.textTheme.labelLarge?.copyWith(color: Colors.white)),
+                      child: Text("Cancel", style: theme.textTheme.labelLarge?.copyWith(color: theme.colorScheme.onSurface)),
                     ),
                   )
                 ],
@@ -475,7 +477,7 @@ class CustomInstituteContainerBox extends StatelessWidget {
     final theme = Theme.of(context);
     return Container(
       decoration: BoxDecoration(
-        color: theme.primaryColor,
+        color: theme.cardColor,
         borderRadius: BorderRadius.circular(10),
       ),
       padding: const EdgeInsets.all(16.0),
@@ -486,17 +488,16 @@ class CustomInstituteContainerBox extends StatelessWidget {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Fix: Wrap title in Flexible to prevent overflow
               Flexible(
                 child: Text(
                   title,
-                  style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w600, color: Colors.white),
+                  style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w600),
                 ),
               ),
               const SizedBox(width: 8),
               Text(
                 "₹$amount",
-                style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w600, color: Colors.white),
+                style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w600),
               ),
             ],
           ),
@@ -504,13 +505,13 @@ class CustomInstituteContainerBox extends StatelessWidget {
           Text(
             mandatoryOrOptional,
             style: theme.textTheme.bodyMedium?.copyWith(
-              color: mandatoryOrOptional == "Mandatory" ? Colors.redAccent : Colors.green,
+              color: mandatoryOrOptional == "Mandatory" ? theme.colorScheme.error : theme.colorScheme.primary,
             ),
           ),
           const SizedBox(height: 8),
           Text(
             detail,
-            style: theme.textTheme.bodyMedium?.copyWith(color: Colors.grey.shade400),
+            style: theme.textTheme.bodySmall,
           ),
           const SizedBox(height: 16),
           Row(
@@ -518,10 +519,10 @@ class CustomInstituteContainerBox extends StatelessWidget {
               Expanded(
                 child: ElevatedButton.icon(
                   onPressed: onEdit,
-                  icon: const Icon(Icons.edit, size: 16, color: Colors.white),
-                  label: Text("Edit", style: theme.textTheme.labelLarge?.copyWith(color: Colors.white)),
+                  icon: Icon(Icons.edit, size: 16, color: theme.colorScheme.primary),
+                  label: Text("Edit", style: theme.textTheme.labelLarge?.copyWith(color: theme.colorScheme.primary)),
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.blue.withAlpha(51),
+                    backgroundColor: theme.colorScheme.primary.withOpacity(0.1),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(10),
                     ),
@@ -532,10 +533,10 @@ class CustomInstituteContainerBox extends StatelessWidget {
               Expanded(
                 child: ElevatedButton.icon(
                   onPressed: onDelete,
-                  icon: const Icon(Icons.delete, size: 16, color: Colors.white),
-                  label: Text("Delete", style: theme.textTheme.labelLarge?.copyWith(color: Colors.white)),
+                  icon: Icon(Icons.delete, size: 16, color: theme.colorScheme.error),
+                  label: Text("Delete", style: theme.textTheme.labelLarge?.copyWith(color: theme.colorScheme.error)),
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.red.withAlpha(51),
+                    backgroundColor: theme.colorScheme.error.withOpacity(0.1),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(10),
                     ),
@@ -575,29 +576,28 @@ class CustomSpecificContainerBox extends StatelessWidget {
     final theme = Theme.of(context);
     return Container(
       decoration: BoxDecoration(
-        color: theme.primaryColor,
+        color: theme.cardColor,
         borderRadius: BorderRadius.circular(10),
       ),
       padding: const EdgeInsets.all(16.0),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(heading, style: theme.textTheme.bodyMedium?.copyWith(color: Colors.grey.shade400)),
+          Text(heading, style: theme.textTheme.bodySmall),
           const SizedBox(height: 4),
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              // Fix: Wrap title in Flexible to prevent overflow
               Flexible(
                 child: Text(
                   subHeading,
-                  style: theme.textTheme.titleLarge?.copyWith(color: Colors.white, fontWeight: FontWeight.w600),
+                  style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w600),
                 ),
               ),
               const SizedBox(width: 8),
               Text(
                 "₹$fee",
-                style: theme.textTheme.titleLarge?.copyWith(color: Colors.white, fontWeight: FontWeight.w600),
+                style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w600),
               ),
             ],
           ),
@@ -605,13 +605,13 @@ class CustomSpecificContainerBox extends StatelessWidget {
           Text(
             isOptional,
             style: theme.textTheme.bodyMedium?.copyWith(
-              color: isOptional == "Mandatory" ? Colors.redAccent : Colors.green,
+              color: isOptional == "Mandatory" ? theme.colorScheme.error : theme.colorScheme.primary,
             ),
           ),
           const SizedBox(height: 8),
           Text(
             details,
-            style: theme.textTheme.bodyMedium?.copyWith(color: Colors.grey.shade400),
+            style: theme.textTheme.bodySmall,
           ),
           const SizedBox(height: 16),
           Row(
@@ -619,10 +619,10 @@ class CustomSpecificContainerBox extends StatelessWidget {
               Expanded(
                 child: ElevatedButton.icon(
                   onPressed: onEdit,
-                  icon: const Icon(Icons.edit, size: 16, color: Colors.white),
-                  label: Text("Edit", style: theme.textTheme.labelLarge?.copyWith(color: Colors.white)),
+                  icon: Icon(Icons.edit, size: 16, color: theme.colorScheme.primary),
+                  label: Text("Edit", style: theme.textTheme.labelLarge?.copyWith(color: theme.colorScheme.primary)),
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.blue.withAlpha(51),
+                    backgroundColor: theme.colorScheme.primary.withOpacity(0.1),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(10),
                     ),
@@ -633,10 +633,10 @@ class CustomSpecificContainerBox extends StatelessWidget {
               Expanded(
                 child: ElevatedButton.icon(
                   onPressed: onDelete,
-                  icon: const Icon(Icons.delete, size: 16, color: Colors.white),
-                  label: Text("Delete", style: theme.textTheme.labelLarge?.copyWith(color: Colors.white)),
+                  icon: Icon(Icons.delete, size: 16, color: theme.colorScheme.error),
+                  label: Text("Delete", style: theme.textTheme.labelLarge?.copyWith(color: theme.colorScheme.error)),
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.red.withAlpha(51),
+                    backgroundColor: theme.colorScheme.error.withOpacity(0.1),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(10),
                     ),

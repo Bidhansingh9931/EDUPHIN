@@ -144,76 +144,91 @@ class _EnterMarksPageState extends State<EnterMarksPage> {
           : _error.isNotEmpty
               ? Center(child: Text(_error))
               : SingleChildScrollView(
-                  padding: const EdgeInsets.all(16.0),
-                  child: Table(
-                    border: TableBorder.all(),
-                    columnWidths: const {
-                      0: FlexColumnWidth(2),
-                      1: FlexColumnWidth(1),
-                      2: FlexColumnWidth(1),
-                      3: FlexColumnWidth(1),
-                      4: FlexColumnWidth(2),
-                    },
-                    children: [
-                      const TableRow(
-                        children: [
-                          Padding(
-                            padding: EdgeInsets.all(8.0),
-                            child: Text('Student Name', style: TextStyle(fontWeight: FontWeight.bold)),
-                          ),
-                          Padding(
-                            padding: EdgeInsets.all(8.0),
-                            child: Text('Obtained', style: TextStyle(fontWeight: FontWeight.bold)),
-                          ),
-                          Padding(
-                            padding: EdgeInsets.all(8.0),
-                            child: Text('Max', style: TextStyle(fontWeight: FontWeight.bold)),
-                          ),
-                          Padding(
-                            padding: EdgeInsets.all(8.0),
-                            child: Text('Grade', style: TextStyle(fontWeight: FontWeight.bold)),
-                          ),
-                          Padding(
-                            padding: EdgeInsets.all(8.0),
-                            child: Text('Remark', style: TextStyle(fontWeight: FontWeight.bold)),
-                          ),
-                        ],
-                      ),
-                      ..._students.map((student) {
-                        final mark = _marks[student.registrationId]!;
-                        return TableRow(
+                  scrollDirection: Axis.horizontal,
+                  child: SingleChildScrollView(
+                    padding: const EdgeInsets.all(16.0),
+                    child: Table(
+                      border: TableBorder.all(),
+                      columnWidths: const {
+                        0: IntrinsicColumnWidth(),
+                        1: IntrinsicColumnWidth(),
+                        2: IntrinsicColumnWidth(),
+                        3: IntrinsicColumnWidth(),
+                        4: IntrinsicColumnWidth(),
+                      },
+                      children: [
+                        const TableRow(
                           children: [
                             Padding(
-                              padding: const EdgeInsets.all(8.0),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  Text(student.studentName),
-                                  Text('(Roll: ${student.rollNo})'),
-                                ],
-                              ),
+                              padding: EdgeInsets.all(8.0),
+                              child: Text('Student Name', style: TextStyle(fontWeight: FontWeight.bold)),
                             ),
                             Padding(
-                              padding: const EdgeInsets.symmetric(horizontal: 8.0),
-                              child: TextFormField(controller: mark.obtainedController),
+                              padding: EdgeInsets.all(8.0),
+                              child: Text('Obtained', style: TextStyle(fontWeight: FontWeight.bold)),
                             ),
                             Padding(
-                              padding: const EdgeInsets.symmetric(horizontal: 8.0),
-                              child: TextFormField(controller: mark.maxController),
+                              padding: EdgeInsets.all(8.0),
+                              child: Text('Max', style: TextStyle(fontWeight: FontWeight.bold)),
                             ),
                             Padding(
-                              padding: const EdgeInsets.symmetric(horizontal: 8.0),
-                              child: TextFormField(controller: mark.gradeController),
+                              padding: EdgeInsets.all(8.0),
+                              child: Text('Grade', style: TextStyle(fontWeight: FontWeight.bold)),
                             ),
                             Padding(
-                              padding: const EdgeInsets.symmetric(horizontal: 8.0),
-                              child: TextFormField(controller: mark.remarkController),
+                              padding: EdgeInsets.all(8.0),
+                              child: Text('Remark', style: TextStyle(fontWeight: FontWeight.bold)),
                             ),
                           ],
-                        );
-                      }),
-                    ],
+                        ),
+                        ..._students.map((student) {
+                          final mark = _marks[student.registrationId]!;
+                          return TableRow(
+                            children: [
+                              Padding(
+                                padding: const EdgeInsets.all(8.0),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Text(student.studentName),
+                                    Text('(Roll: ${student.rollNo})'),
+                                  ],
+                                ),
+                              ),
+                              Padding(
+                                padding: const EdgeInsets.symmetric(horizontal: 8.0),
+                                child: SizedBox(
+                                  width: 80,
+                                  child: TextFormField(controller: mark.obtainedController),
+                                ),
+                              ),
+                              Padding(
+                                padding: const EdgeInsets.symmetric(horizontal: 8.0),
+                                child: SizedBox(
+                                  width: 80,
+                                  child: TextFormField(controller: mark.maxController),
+                                ),
+                              ),
+                              Padding(
+                                padding: const EdgeInsets.symmetric(horizontal: 8.0),
+                                child: SizedBox(
+                                  width: 80,
+                                  child: TextFormField(controller: mark.gradeController),
+                                ),
+                              ),
+                              Padding(
+                                padding: const EdgeInsets.symmetric(horizontal: 8.0),
+                                child: SizedBox(
+                                  width: 120,
+                                  child: TextFormField(controller: mark.remarkController),
+                                ),
+                              ),
+                            ],
+                          );
+                        }),
+                      ],
+                    ),
                   ),
                 ),
     );

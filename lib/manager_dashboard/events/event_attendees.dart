@@ -264,7 +264,7 @@ class _EventAttendeesState extends State<EventAttendees> {
   Widget _buildAttendeeTile(Attendee attendee) {
     final theme = Theme.of(context);
     final isAttended = attendee.attendance == 'Attended';
-    final statusColor = isAttended ? Colors.green : Colors.red;
+    final statusColor = isAttended ? theme.colorScheme.primary : theme.colorScheme.error;
 
     return ListTile(
       title: Text(

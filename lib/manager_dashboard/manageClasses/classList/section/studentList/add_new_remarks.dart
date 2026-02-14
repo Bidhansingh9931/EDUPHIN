@@ -42,12 +42,13 @@ class _AddNewRemarksPageState extends State<AddNewRemarksPage> {
       final response = await ApiService.post('manager/students/remarks', remarkData);
 
       if (mounted) {
+        final theme = Theme.of(context);
         final responseData = jsonDecode(response.body);
         if (response.statusCode == 201 && responseData['status'] == true) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text(responseData['message'] ?? 'Remark added successfully!'),
-              backgroundColor: Colors.green,
+              backgroundColor: theme.colorScheme.primary,
             ),
           );
           Navigator.of(context).pop(true);
@@ -57,20 +58,22 @@ class _AddNewRemarksPageState extends State<AddNewRemarksPage> {
       }
     } on TimeoutException {
       if (mounted) {
+        final theme = Theme.of(context);
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('The connection timed out. Please try again.'),
-            backgroundColor: Colors.red,
+          SnackBar(
+            content: const Text('The connection timed out. Please try again.'),
+            backgroundColor: theme.colorScheme.error,
           ),
         );
       }
     } on Exception catch (e) {
       if (mounted) {
+        final theme = Theme.of(context);
         final message = e.toString().replaceFirst('Exception: ', '');
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(message),
-            backgroundColor: Colors.red,
+            backgroundColor: theme.colorScheme.error,
           ),
         );
       }
@@ -121,7 +124,6 @@ class _AddNewRemarksPageState extends State<AddNewRemarksPage> {
                     width: 24,
                     child: CircularProgressIndicator(
                       strokeWidth: 3,
-                      valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
                     ),
                   )
                 : const Text("Add Remark"),
@@ -199,7 +201,7 @@ class _AddNewRemarksPageState extends State<AddNewRemarksPage> {
         Text("Remark Type", style: theme.textTheme.titleMedium),
         const SizedBox(height: 8),
         DropdownButtonFormField<String>(
-          initialValue: _selectedRemarkType,
+          value: _selectedRemarkType,
           items: ['Positive', 'Negative'].map((String value) {
             return DropdownMenuItem<String>(
               value: value,

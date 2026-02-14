@@ -170,6 +170,7 @@ class ViewAttendancePageState extends State<ViewAttendancePage> {
   }
 
   Widget _buildBody() {
+    final theme = Theme.of(context);
     if (_isLoading) {
       return const Center(child: CircularProgressIndicator());
     }
@@ -183,7 +184,7 @@ class ViewAttendancePageState extends State<ViewAttendancePage> {
               Text(
                 _error,
                 textAlign: TextAlign.center,
-                style: const TextStyle(color: Colors.red),
+                style: TextStyle(color: theme.colorScheme.error),
               ),
               const SizedBox(height: 16),
               ElevatedButton(
@@ -295,11 +296,11 @@ class AttendanceRecordCard extends StatelessWidget {
         : 0.0;
     final Color progressColor;
     if (percentage >= 0.8) {
-      progressColor = Colors.green.shade400;
+      progressColor = theme.colorScheme.primary;
     } else if (percentage >= 0.5) {
-      progressColor = Colors.orange.shade400;
+      progressColor = theme.colorScheme.secondary;
     } else {
-      progressColor = Colors.red.shade400;
+      progressColor = theme.colorScheme.error;
     }
 
     return Container(

@@ -111,6 +111,7 @@ class AssignedTicketsScreenState extends State<AssignedTicketsScreen> {
   }
 
   Future<void> _updateTicketStatus(AssignedTicket ticket, String newStatus) async {
+    final theme = Theme.of(context);
     try {
       final response = await ApiService.post(
         'manager/tickets/${ticket.id}/status',
@@ -126,7 +127,10 @@ class AssignedTicketsScreenState extends State<AssignedTicketsScreen> {
             ticket.status = newStatus;
           });
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Ticket #${ticket.id} status updated to $newStatus')),
+            SnackBar(
+              content: Text('Ticket #${ticket.id} status updated to $newStatus'),
+              backgroundColor: theme.colorScheme.primary,
+            ),
           );
         } else {
           throw Exception(responseData['message'] ?? 'Failed to update status');
@@ -137,19 +141,21 @@ class AssignedTicketsScreenState extends State<AssignedTicketsScreen> {
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error updating status: $e')),
+        SnackBar(
+          content: Text('Error updating status: $e'),
+          backgroundColor: theme.colorScheme.error,
+        ),
       );
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     return Scaffold(
       appBar: AppBar(
         title: const Text('Assigned Tickets'),
-        elevation: 0,
-        backgroundColor: Colors.transparent,
-        foregroundColor: Theme.of(context).textTheme.titleLarge?.color,
+        centerTitle: true,
       ),
       body: FutureBuilder<List<AssignedTicket>>(
         future: _ticketsFuture,
@@ -216,7 +222,7 @@ class AssignedTicketsScreenState extends State<AssignedTicketsScreen> {
                           DataColumn(label: Text('ACTION')),
                         ],
                         // Use the filtered list to build the rows
-                        rows: filteredTickets.map((ticket) => _buildDataRow(ticket)).toList(),
+                        rows: filteredTickets.map((ticket) => _buildDataRow(ticket, theme)).toList(),
                       ),
                     ),
                   ),
@@ -229,13 +235,13 @@ class AssignedTicketsScreenState extends State<AssignedTicketsScreen> {
     );
   }
 
-  DataRow _buildDataRow(AssignedTicket ticket) {
+  DataRow _buildDataRow(AssignedTicket ticket, ThemeData theme) {
     return DataRow(cells: [
       DataCell(Text(ticket.id.toString())),
       DataCell(Text(ticket.issueBy)),
       DataCell(Text(ticket.title, overflow: TextOverflow.ellipsis)),
-      DataCell(_buildPriorityChip(ticket.priority)),
-      DataCell(_buildStatusDropdown(ticket)),
+      DataCell(_buildPriorityChip(ticket.priority, theme)),
+      DataCell(_buildStatusDropdown(ticket, theme)),
       DataCell(Text(ticket.category)),
       DataCell(Text(DateFormat('dd MMM, yyyy').format(ticket.createdAt))),
       DataCell(
@@ -244,43 +250,51 @@ class AssignedTicketsScreenState extends State<AssignedTicketsScreen> {
           onPressed: () {
             Navigator.of(context).push(MaterialPageRoute(builder: (context) => TicketDetailsPage(ticketId: ticket.id.toString())));
           },
+          style: ElevatedButton.styleFrom(
+            backgroundColor: theme.colorScheme.primary,
+            foregroundColor: theme.colorScheme.onPrimary,
+          ),
         ),
       ),
     ]);
   }
 
-  Widget _buildPriorityChip(String priority) {
+  Widget _buildPriorityChip(String priority, ThemeData theme) {
     Color color;
     String label = priority.isNotEmpty ? priority[0].toUpperCase() + priority.substring(1) : '';
     switch (priority.toLowerCase()) {
       case 'high':
-        color = Colors.red;
+        color = theme.colorScheme.error;
         break;
       case 'medium':
-        color = Colors.orange;
+        color = theme.colorScheme.secondary;
         break;
       case 'low':
-        color = Colors.blue;
+        color = theme.colorScheme.primary;
         break;
       default:
         color = Colors.grey;
     }
     return Chip(
-      label: Text(label, style: const TextStyle(color: Colors.white, fontSize: 12)),
+      label: Text(label, style: TextStyle(color: theme.colorScheme.onError, fontSize: 12)),
       backgroundColor: color,
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
     );
   }
   
-  Widget _buildStatusDropdown(AssignedTicket ticket) {
+  Widget _buildStatusDropdown(AssignedTicket ticket, ThemeData theme) {
     const statusOptions = ['open', 'in_progress', 'resolved', 'closed'];
 
     return DropdownButton<String>(
       value: ticket.status,
+      dropdownColor: theme.cardColor,
       items: statusOptions.map((String value) {
         return DropdownMenuItem<String>(
           value: value,
-          child: Text(value.replaceAll('_', ' ').split(' ').map((l) => l[0].toUpperCase() + l.substring(1)).join(' ')),
+          child: Text(
+            value.replaceAll('_', ' ').split(' ').map((l) => l[0].toUpperCase() + l.substring(1)).join(' '),
+            style: theme.textTheme.bodyMedium,
+          ),
         );
       }).toList(),
       onChanged: (newValue) {

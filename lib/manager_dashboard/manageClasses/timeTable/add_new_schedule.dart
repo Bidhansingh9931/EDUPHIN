@@ -149,9 +149,10 @@ class _AddNewSchedulePageState extends State<AddNewSchedulePage> {
       if (!mounted) return;
 
       final responseData = jsonDecode(response.body);
+      final theme = Theme.of(context);
       if (response.statusCode == 201) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(responseData['message'] ?? 'Schedule added successfully!'), backgroundColor: Colors.green),
+          SnackBar(content: Text(responseData['message'] ?? 'Schedule added successfully!'), backgroundColor: theme.colorScheme.primary),
         );
         Navigator.of(context).pop();
       } else {
@@ -159,8 +160,9 @@ class _AddNewSchedulePageState extends State<AddNewSchedulePage> {
       }
     } catch (e) {
       if (mounted) {
+        final theme = Theme.of(context);
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(e.toString().replaceFirst("Exception: ", "")), backgroundColor: Colors.red),
+          SnackBar(content: Text(e.toString().replaceFirst("Exception: ", "")), backgroundColor: theme.colorScheme.error),
         );
       }
     } finally {
@@ -428,7 +430,6 @@ class _AddNewSchedulePageState extends State<AddNewSchedulePage> {
                       width: 24,
                       child: CircularProgressIndicator(
                         strokeWidth: 3,
-                        valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
                       ),
                     )
                   : const Text("Add Schedule"),

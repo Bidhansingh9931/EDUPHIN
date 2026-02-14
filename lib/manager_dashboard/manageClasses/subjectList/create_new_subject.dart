@@ -43,11 +43,12 @@ class _CreateNewSubjectPageState extends State<CreateNewSubjectPage> {
       final responseData = jsonDecode(response.body);
 
       if (!mounted) return;
+      final theme = Theme.of(context);
 
       if (response.statusCode == 201 && responseData['status'] == true) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-              content: Text(responseData['message'] ?? 'Subject added successfully!')),
+              content: Text(responseData['message'] ?? 'Subject added successfully!'), backgroundColor: theme.colorScheme.primary),
         );
         Navigator.of(context).pop(true); // Pop with success
       } else {
@@ -60,10 +61,11 @@ class _CreateNewSubjectPageState extends State<CreateNewSubjectPage> {
       }
     } catch (e) {
       if (mounted) {
+        final theme = Theme.of(context);
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
               content: Text(e.toString().replaceFirst('Exception: ', '')),
-              backgroundColor: Colors.red),
+              backgroundColor: theme.colorScheme.error),
         );
       }
     } finally {
@@ -130,7 +132,6 @@ class _CreateNewSubjectPageState extends State<CreateNewSubjectPage> {
                         width: 24,
                         child: CircularProgressIndicator(
                           strokeWidth: 3,
-                          valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
                         ),
                       )
                     : const Text("Add Subject"),
@@ -306,7 +307,7 @@ class _CreateNewSubjectPageState extends State<CreateNewSubjectPage> {
                 ?.copyWith(color: theme.colorScheme.onPrimary)),
         const SizedBox(height: 8),
         DropdownButtonFormField<String>(
-          initialValue: value,
+          value: value,
           items: items
               .map((String item) =>
                   DropdownMenuItem<String>(value: item, child: Text(item)))

@@ -52,12 +52,13 @@ class _AddNewFineState extends State<AddNewFine> {
       final response = await ApiService.post('manager/fees/fine', body);
 
       if (!mounted) return;
+      final theme = Theme.of(context);
 
       final responseData = jsonDecode(response.body);
 
       if (response.statusCode == 200 && responseData['status'] == true) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(responseData['message'] ?? 'Fine added successfully!'), backgroundColor: Colors.green),
+          SnackBar(content: Text(responseData['message'] ?? 'Fine added successfully!'), backgroundColor: theme.colorScheme.primary),
         );
         Navigator.pop(context, true); // Return true to indicate success
       } else {
@@ -70,8 +71,9 @@ class _AddNewFineState extends State<AddNewFine> {
       }
     } catch (e) {
       if (mounted) {
+        final theme = Theme.of(context);
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(e.toString().replaceFirst("Exception: ", "")), backgroundColor: Colors.red),
+          SnackBar(content: Text(e.toString().replaceFirst("Exception: ", "")), backgroundColor: theme.colorScheme.error),
         );
       }
     } finally {
@@ -121,7 +123,7 @@ class _AddNewFineState extends State<AddNewFine> {
                   ),
                 ),
                 child: _isSaving
-                    ? const SizedBox(height: 24, width: 24, child: CircularProgressIndicator(strokeWidth: 3, valueColor: AlwaysStoppedAnimation(Colors.white)))
+                    ? const SizedBox(height: 24, width: 24, child: CircularProgressIndicator(strokeWidth: 3))
                     : Text("Save", style: theme.textTheme.labelLarge?.copyWith(color: theme.colorScheme.onPrimary)),
               ),
             ),

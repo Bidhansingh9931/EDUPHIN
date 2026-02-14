@@ -95,14 +95,20 @@ class _EditExamPageState extends State<EditExamPage> {
     setState(() => _isSaving = true);
 
     try {
-      // Workaround: Only send fields supported by the backend's update method.
-      // Code, description, and dates are excluded to prevent a validation error.
-      final fields = {
+      final fields = <String, String>{
         '_method': 'PUT',
         'exam_name': _examNameController.text,
         'exam_type': _examTypeController.text,
+        'exam_code': _examCodeController.text,
+        'description': _descriptionController.text,
         'status': _isActive ? 'active' : 'inactive',
       };
+      if (_startDate != null) {
+        fields['start_date'] = DateFormat('yyyy-MM-dd').format(_startDate!);
+      }
+      if (_endDate != null) {
+        fields['end_date'] = DateFormat('yyyy-MM-dd').format(_endDate!);
+      }
 
       final response = await ApiService.postMultipart('manager/exams/${widget.examId}', fields);
       final responseBody = await response.stream.bytesToString();
@@ -110,12 +116,13 @@ class _EditExamPageState extends State<EditExamPage> {
       if (!mounted) return;
 
       final responseData = jsonDecode(responseBody);
+      final theme = Theme.of(context);
 
       if (response.statusCode == 200 && responseData['status'] == true) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
               content: Text(responseData['message'] ?? 'Exam updated successfully!'),
-              backgroundColor: Colors.green),
+              backgroundColor: theme.colorScheme.primary),
         );
         Navigator.pop(context, true);
       } else {
@@ -129,10 +136,11 @@ class _EditExamPageState extends State<EditExamPage> {
       }
     } catch (e) {
       if (mounted) {
+        final theme = Theme.of(context);
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
               content: Text(e.toString().replaceFirst("Exception: ", "")),
-              backgroundColor: Colors.red),
+              backgroundColor: theme.colorScheme.error),
         );
       }
     } finally {
@@ -144,12 +152,13 @@ class _EditExamPageState extends State<EditExamPage> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     return Scaffold(
       appBar: AppBar(title: const Text('Edit Exam')),
       body: Form(
         key: _formKey,
         child: ListView(
-          padding: const EdgeInsets.all(16),
+          padding: const EdgeInsets.fromLTRB(16, 16, 16, 80),
           children: [
             TextFormField(
               controller: _examNameController,
@@ -166,6 +175,8 @@ class _EditExamPageState extends State<EditExamPage> {
             TextFormField(
               controller: _examCodeController,
               decoration: const InputDecoration(labelText: 'Exam Code'),
+              validator: (value) =>
+                  value!.isEmpty ? 'Please enter an exam code' : null,
             ),
             TextFormField(
               controller: _descriptionController,
@@ -176,31 +187,53 @@ class _EditExamPageState extends State<EditExamPage> {
               title: const Text('Is Active'),
               value: _isActive,
               onChanged: (value) => setState(() => _isActive = value),
+              activeColor: theme.colorScheme.primary,
             ),
             ListTile(
               title: Text(_startDate == null
                   ? 'Select Start Date'
                   : DateFormat('yyyy-MM-dd').format(_startDate!)),
-              trailing: const Icon(Icons.calendar_today),
+              trailing: Icon(Icons.calendar_today, color: theme.colorScheme.primary),
               onTap: () => _selectDate(context, true),
             ),
             ListTile(
               title: Text(_endDate == null
                   ? 'Select End Date'
                   : DateFormat('yyyy-MM-dd').format(_endDate!)),
-              trailing: const Icon(Icons.calendar_today),
+              trailing: Icon(Icons.calendar_today, color: theme.colorScheme.primary),
               onTap: () => _selectDate(context, false),
             ),
           ],
         ),
       ),
-      floatingActionButton: ElevatedButton(
-        onPressed: _isSaving ? null : _updateExam,
-        child: _isSaving
-            ? const CircularProgressIndicator(
-                valueColor: AlwaysStoppedAnimation(Colors.white))
-            : const Text('Update Exam'),
+      floatingActionButton: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16.0),
+        child: SizedBox(
+          width: double.infinity,
+          child: ElevatedButton(
+            onPressed: _isSaving ? null : _updateExam,
+            style: ElevatedButton.styleFrom(
+              backgroundColor: theme.colorScheme.primary,
+              foregroundColor: theme.colorScheme.onPrimary,
+              padding: const EdgeInsets.symmetric(vertical: 16),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(10),
+              ),
+            ),
+            child: _isSaving
+                ? SizedBox(
+                    height: 20,
+                    width: 20,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: theme.colorScheme.onPrimary,
+                    ),
+                  )
+                : const Text('Update Exam'),
+          ),
+        ),
       ),
+      floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
     );
   }
 }

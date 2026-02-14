@@ -147,7 +147,7 @@ class _AvailableBooksScreenState extends State<AvailableBooksScreen> {
               child: _isLoading
                   ? const Center(child: CircularProgressIndicator())
                   : _error.isNotEmpty
-                      ? Center(child: Text(_error, style: const TextStyle(color: Colors.red)))
+                      ? Center(child: Text(_error, style: TextStyle(color: theme.colorScheme.error)))
                       : LayoutBuilder(
                           builder: (context, constraints) {
                             if (constraints.maxWidth > 600) {
@@ -204,7 +204,7 @@ class _BookCard extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: theme.primaryColor,
+        color: theme.cardColor,
         borderRadius: BorderRadius.circular(18),
       ),
       child: Column(
@@ -213,7 +213,7 @@ class _BookCard extends StatelessWidget {
           Text(
             "${index + 1}.  ${book.title}",
             style: theme.textTheme.titleMedium?.copyWith(
-              color: theme.colorScheme.onPrimary,
+              color: theme.colorScheme.onSurface,
               fontWeight: FontWeight.bold,
             ),
             maxLines: 2,
@@ -261,12 +261,12 @@ class _BookCard extends StatelessWidget {
           Text(
             label,
             style: theme.textTheme.bodySmall
-                ?.copyWith(color: theme.colorScheme.onPrimary.withOpacity(0.7)),
+                ?.copyWith(color: theme.colorScheme.onSurface.withOpacity(0.7)),
           ),
           Text(
             value,
             style: theme.textTheme.bodyMedium
-                ?.copyWith(color: theme.colorScheme.onPrimary),
+                ?.copyWith(color: theme.colorScheme.onSurface),
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
           ),

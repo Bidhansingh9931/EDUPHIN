@@ -142,7 +142,10 @@ class _AssignmentsPageState extends State<AssignmentsPage> {
           isLoading = false;
         });
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error fetching data: $e')),
+          SnackBar(
+            content: Text('Error fetching data: $e'),
+            backgroundColor: Theme.of(context).colorScheme.error,
+          ),
         );
       }
     }
@@ -169,14 +172,21 @@ class _AssignmentsPageState extends State<AssignmentsPage> {
   }
 
   Future<void> _deleteAssignment(int assignmentId) async {
+    final theme = Theme.of(context);
     final confirm = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Delete Assignment'),
         content: const Text('Are you sure you want to delete this assignment?'),
         actions: [
-          TextButton(onPressed: () => Navigator.of(context).pop(false), child: const Text('Cancel')),
-          TextButton(onPressed: () => Navigator.of(context).pop(true), child: const Text('Delete')),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: Text('Cancel', style: TextStyle(color: theme.colorScheme.onSurface)),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: Text('Delete', style: TextStyle(color: theme.colorScheme.error)),
+          ),
         ],
       ),
     );
@@ -186,7 +196,10 @@ class _AssignmentsPageState extends State<AssignmentsPage> {
         final response = await ApiService.delete('manager/study/assignments/$assignmentId');
         if (response.statusCode == 200) {
            if(mounted){
-            ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Assignment deleted successfully'), backgroundColor: Colors.green));
+            ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+              content: const Text('Assignment deleted successfully'),
+              backgroundColor: theme.colorScheme.primary,
+            ));
             _fetchData(); // Refresh list
           }
         } else {
@@ -194,7 +207,10 @@ class _AssignmentsPageState extends State<AssignmentsPage> {
         }
       } catch (e) {
         if(mounted){
-           ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString())));
+           ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+             content: Text(e.toString()),
+             backgroundColor: theme.colorScheme.error,
+           ));
         }
       }
     }
@@ -207,20 +223,29 @@ class _AssignmentsPageState extends State<AssignmentsPage> {
     return Scaffold(
       backgroundColor: theme.scaffoldBackgroundColor,
       appBar: AppBar(
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        leading: BackButton(color: theme.colorScheme.onSurface),
-        title: Text("Assignments", style: TextStyle(color: theme.colorScheme.onSurface)),
+        title: const Text("Assignments"),
+        centerTitle: true,
       ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: () async {
-          final result = await Navigator.push(context, MaterialPageRoute(builder: (context) => const AddAssignmentPage()));
-          if (result == true) {
-            _fetchData(); // Refresh list
-          }
-        },
-        label: const Text('Create New'),
-        icon: const Icon(Icons.add),
+      floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
+      floatingActionButton: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16.0),
+        child: SizedBox(
+          width: double.infinity,
+          child: FloatingActionButton.extended(
+            onPressed: () async {
+              final result = await Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => const AddAssignmentPage()),
+              );
+              if (result == true) {
+                _fetchData(); // Refresh list
+              }
+            },
+            label: Text('Create New', style: TextStyle(color: theme.colorScheme.onPrimary)),
+            icon: Icon(Icons.add, color: theme.colorScheme.onPrimary),
+            backgroundColor: theme.colorScheme.primary,
+          ),
+        ),
       ),
       body: isLoading
           ? const Center(child: CircularProgressIndicator())
@@ -249,27 +274,55 @@ class _AssignmentsPageState extends State<AssignmentsPage> {
       decoration: BoxDecoration(
         color: theme.colorScheme.surface,
         borderRadius: BorderRadius.circular(20),
-      ),
-      child: Row(
-        children: [
-          Expanded(
-            child: _buildDropdown(theme, "Select Class *", selectedClass, classes.map((c) => c.name).toList(), (v) {
-              if (v != null) {
-                setState(() => selectedClass = v);
-                _filterAssignments();
-              }
-            }),
-          ),
-          const SizedBox(width: 16),
-          Expanded(
-            child: _buildDropdown(theme, "Select Section *", selectedSection, sections.map((s) => s.name).toList(), (v) {
-              if (v != null) {
-                setState(() => selectedSection = v);
-                _filterAssignments();
-              }
-            }),
+        boxShadow: [
+          BoxShadow(
+            color: theme.shadowColor.withAlpha(25),
+            spreadRadius: 1,
+            blurRadius: 3,
+            offset: const Offset(0, 1),
           ),
         ],
+      ),
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          if (constraints.maxWidth > 400) {
+            return Row(
+              children: [
+                Expanded(child: _buildDropdown(theme, "Select Class *", selectedClass, classes.map((c) => c.name).toList(), (v) {
+                  if (v != null) {
+                    setState(() => selectedClass = v);
+                    _filterAssignments();
+                  }
+                })),
+                const SizedBox(width: 16),
+                Expanded(child: _buildDropdown(theme, "Select Section *", selectedSection, sections.map((s) => s.name).toList(), (v) {
+                  if (v != null) {
+                    setState(() => selectedSection = v);
+                    _filterAssignments();
+                  }
+                })),
+              ],
+            );
+          } else {
+            return Column(
+              children: [
+                _buildDropdown(theme, "Select Class *", selectedClass, classes.map((c) => c.name).toList(), (v) {
+                  if (v != null) {
+                    setState(() => selectedClass = v);
+                    _filterAssignments();
+                  }
+                }),
+                const SizedBox(height: 16),
+                _buildDropdown(theme, "Select Section *", selectedSection, sections.map((s) => s.name).toList(), (v) {
+                  if (v != null) {
+                    setState(() => selectedSection = v);
+                    _filterAssignments();
+                  }
+                }),
+              ],
+            );
+          }
+        },
       ),
     );
   }
@@ -285,8 +338,8 @@ class _AssignmentsPageState extends State<AssignmentsPage> {
         Text(label, style: theme.textTheme.labelMedium?.copyWith(color: theme.colorScheme.onSurface.withAlpha(153))),
         const SizedBox(height: 6),
         DropdownButtonFormField<String>(
-          isExpanded: true, // Fix: Allow dropdown to expand and truncate text
-          initialValue: dropdownValue,
+          isExpanded: true,
+          value: dropdownValue,
           dropdownColor: theme.cardColor,
           style: theme.textTheme.bodyLarge,
           decoration: InputDecoration(
@@ -349,75 +402,75 @@ class _AssignmentCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    return Container(
+    return Card(
+      elevation: 2,
       margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: theme.colorScheme.surface,
-        borderRadius: BorderRadius.circular(18),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Flexible(
-                child: Text(
-                  assignment.title,
-                  style: theme.textTheme.titleMedium?.copyWith(
-                  color: theme.colorScheme.secondary,
-                  fontWeight: FontWeight.w700,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Flexible(
+                  child: Text(
+                    assignment.title,
+                    style: theme.textTheme.titleMedium?.copyWith(
+                    color: theme.colorScheme.primary,
+                    fontWeight: FontWeight.w700,
+                  ),
+                  ),
                 ),
+                 Row(
+                  children: [
+                    IconButton(icon: Icon(Icons.edit, size: 20, color: theme.colorScheme.secondary), onPressed: onEdit, constraints: const BoxConstraints()),
+                    IconButton(icon: Icon(Icons.delete, size: 20, color: theme.colorScheme.error), onPressed: onDelete, constraints: const BoxConstraints()),
+                  ],
                 ),
-              ),
-               Row(
-                children: [
-                  IconButton(icon: Icon(Icons.edit, size: 20, color: theme.colorScheme.onSurface.withAlpha(153)), onPressed: onEdit, constraints: const BoxConstraints()),
-                  IconButton(icon: Icon(Icons.delete, size: 20, color: theme.colorScheme.error), onPressed: onDelete, constraints: const BoxConstraints()),
-                ],
-              ),
-            ],
-          ),
-          const SizedBox(height: 10),
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Expanded(
-                child: _buildInfoColumn(
-                    theme, "Uploaded by", assignment.uploadedBy),
-              ),
-              Expanded(
-                child: _buildInfoColumn(
-                    theme, "Uploaded Date", assignment.uploadedDate),
-              ),
-            ],
-          ),
-          _buildInfoColumn(theme, "Due Date", assignment.dueDate),
-          const SizedBox(height: 12),
-          SizedBox(
-            width: double.infinity,
-            child: ElevatedButton(
-              onPressed: () {
-                Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                        builder: (context) =>
-                            AssignmentSubmissionsScreen(assignmentId: assignment.id)));
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: theme.colorScheme.primary,
-                foregroundColor: theme.colorScheme.onPrimary,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                padding: const EdgeInsets.symmetric(vertical: 12),
-              ),
-              child: const Text("View Submission"),
+              ],
             ),
-          )
-        ],
+            const SizedBox(height: 10),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(
+                  child: _buildInfoColumn(
+                      theme, "Uploaded by", assignment.uploadedBy),
+                ),
+                Expanded(
+                  child: _buildInfoColumn(
+                      theme, "Uploaded Date", assignment.uploadedDate),
+                ),
+              ],
+            ),
+            _buildInfoColumn(theme, "Due Date", assignment.dueDate),
+            const SizedBox(height: 12),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                onPressed: () {
+                  Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                          builder: (context) =>
+                              AssignmentSubmissionsScreen(assignmentId: assignment.id)));
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: theme.colorScheme.primary,
+                  foregroundColor: theme.colorScheme.onPrimary,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                ),
+                child: const Text("View Submission"),
+              ),
+            )
+          ],
+        ),
       ),
     );
   }

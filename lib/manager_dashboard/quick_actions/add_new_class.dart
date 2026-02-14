@@ -146,8 +146,14 @@ class _AddNewClassPageState extends State<AddNewClassPage> {
   }
 
   Widget _buildForm(ThemeData theme, List<String> levels) {
+    final screenSize = MediaQuery.of(context).size;
     return SingleChildScrollView(
-      padding: const EdgeInsets.fromLTRB(16, 16, 16, 120),
+      padding: EdgeInsets.fromLTRB(
+        screenSize.width * 0.04,
+        screenSize.width * 0.04,
+        screenSize.width * 0.04,
+        screenSize.height * 0.15, // Space for floating action buttons
+      ),
       child: Center(
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 600),
@@ -155,9 +161,9 @@ class _AddNewClassPageState extends State<AddNewClassPage> {
             key: _formKey,
             child: Container(
               width: double.infinity,
-              padding: const EdgeInsets.all(16.0),
+              padding: EdgeInsets.all(screenSize.width * 0.04),
               decoration: BoxDecoration(
-                color: theme.primaryColor,
+                color: theme.cardColor,
                 borderRadius: BorderRadius.circular(12),
               ),
               child: Column(
@@ -171,7 +177,7 @@ class _AddNewClassPageState extends State<AddNewClassPage> {
                     validator: (value) =>
                         value!.isEmpty ? 'Class name is required' : null,
                   ),
-                  const SizedBox(height: 16),
+                  SizedBox(height: screenSize.height * 0.02),
                   _buildTextField(
                     theme: theme,
                     label: "Class Code",
@@ -180,7 +186,7 @@ class _AddNewClassPageState extends State<AddNewClassPage> {
                     validator: (value) =>
                         value!.isEmpty ? 'Class code is required' : null,
                   ),
-                  const SizedBox(height: 16),
+                  SizedBox(height: screenSize.height * 0.02),
                   _buildTextField(
                     theme: theme,
                     label: "Description (Optional)",
@@ -188,9 +194,9 @@ class _AddNewClassPageState extends State<AddNewClassPage> {
                     onChanged: (value) => _newClass.description = value,
                     maxLines: 5,
                   ),
-                  const SizedBox(height: 16),
+                  SizedBox(height: screenSize.height * 0.02),
                   _buildDropdown(theme, levels),
-                  const SizedBox(height: 80),
+                  SizedBox(height: screenSize.height * 0.1),
                 ],
               ),
             ),
@@ -208,15 +214,16 @@ class _AddNewClassPageState extends State<AddNewClassPage> {
     String? Function(String?)? validator,
     int maxLines = 1,
   }) {
+    final isDarkMode = theme.brightness == Brightness.dark;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
           label,
           style: theme.textTheme.titleMedium
-              ?.copyWith(color: theme.colorScheme.onPrimary),
+              ?.copyWith(color: theme.colorScheme.onSurface),
         ),
-        const SizedBox(height: 8),
+        SizedBox(height: MediaQuery.of(context).size.height * 0.01),
         TextFormField(
           onChanged: onChanged,
           maxLines: maxLines,
@@ -225,7 +232,7 @@ class _AddNewClassPageState extends State<AddNewClassPage> {
             hintText: hint,
             hintStyle: TextStyle(color: theme.hintColor),
             filled: true,
-            fillColor: theme.scaffoldBackgroundColor,
+            fillColor: isDarkMode ? theme.scaffoldBackgroundColor : const Color(0xFFF3F3F3),
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(10.0),
               borderSide: BorderSide.none,
@@ -237,21 +244,22 @@ class _AddNewClassPageState extends State<AddNewClassPage> {
   }
 
   Widget _buildDropdown(ThemeData theme, List<String> levels) {
+    final isDarkMode = theme.brightness == Brightness.dark;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
           "Level",
           style: theme.textTheme.titleMedium
-              ?.copyWith(color: theme.colorScheme.onPrimary),
+              ?.copyWith(color: theme.colorScheme.onSurface),
         ),
-        const SizedBox(height: 8),
+        SizedBox(height: MediaQuery.of(context).size.height * 0.01),
         DropdownButtonFormField<String>(
           value: _newClass.level,
           hint: Text("Select Level", style: TextStyle(color: theme.hintColor)),
           decoration: InputDecoration(
             filled: true,
-            fillColor: theme.scaffoldBackgroundColor,
+            fillColor: isDarkMode ? theme.scaffoldBackgroundColor : const Color(0xFFF3F3F3),
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(10.0),
               borderSide: BorderSide.none,
@@ -272,8 +280,9 @@ class _AddNewClassPageState extends State<AddNewClassPage> {
   }
 
   Widget _buildActionButtons(ThemeData theme) {
+    final screenSize = MediaQuery.of(context).size;
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16.0),
+      padding: EdgeInsets.symmetric(horizontal: screenSize.width * 0.04),
       child: Row(
         children: [
           Expanded(
@@ -282,7 +291,7 @@ class _AddNewClassPageState extends State<AddNewClassPage> {
                 Navigator.of(context).pop();
               },
               style: OutlinedButton.styleFrom(
-                padding: const EdgeInsets.symmetric(vertical: 16),
+                padding: EdgeInsets.symmetric(vertical: screenSize.height * 0.02),
                 side: BorderSide(color: theme.dividerColor),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(12.0),
@@ -291,12 +300,12 @@ class _AddNewClassPageState extends State<AddNewClassPage> {
               child: Text("Cancel", style: theme.textTheme.labelLarge?.copyWith(color: theme.colorScheme.onSurface)),
             ),
           ),
-          const SizedBox(width: 16),
+          SizedBox(width: screenSize.width * 0.04),
           Expanded(
             child: ElevatedButton.icon(
               onPressed: _isSubmitting ? null : _submitForm,
               style: ElevatedButton.styleFrom(
-                padding: const EdgeInsets.symmetric(vertical: 16),
+                padding: EdgeInsets.symmetric(vertical: screenSize.height * 0.02),
                 backgroundColor: theme.colorScheme.primary,
                 foregroundColor: theme.colorScheme.onPrimary,
                 shape: RoundedRectangleBorder(

@@ -85,7 +85,7 @@ class _ManagerListPageState extends State<ManagerListPage> {
             await _fetchManagersForRole(_selectedRoleId!); // Fetch managers for the default role
           }
         } else {
-          setState(() => _isLoading = false); // No manager roles found
+          if(mounted) setState(() => _isLoading = false); // No manager roles found
         }
       } else {
         throw Exception('Failed to load roles');
@@ -129,6 +129,8 @@ class _ManagerListPageState extends State<ManagerListPage> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final screenSize = MediaQuery.of(context).size;
+
     return Scaffold(
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () async {
@@ -140,26 +142,25 @@ class _ManagerListPageState extends State<ManagerListPage> {
             _fetchManagersForRole(_selectedRoleId!); // Refresh list on return
           }
         },
-        label: const Text("Add Manager"),
-        icon: const Icon(Icons.add),
+        label: Text("Add Manager", style: TextStyle(color: theme.colorScheme.onPrimary)),
+        icon: Icon(Icons.add, color: theme.colorScheme.onPrimary),
+        backgroundColor: theme.colorScheme.primary,
       ),
       backgroundColor: theme.scaffoldBackgroundColor,
       appBar: AppBar(
-        title: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Text(
-              "Manager List",
-              style: theme.textTheme.titleLarge?.copyWith(
-                  color: theme.colorScheme.onSurface, fontWeight: FontWeight.bold),
+        title: const Text("Manager List"),
+        actions: [
+            IconButton(
+              icon: const Icon(Icons.download),
+              onPressed: () {
+                // TODO: Implement download functionality
+              },
             ),
-            const Icon(Icons.download),
           ],
-        ),
       ),
       body: SingleChildScrollView(
         child: Padding(
-          padding: const EdgeInsets.fromLTRB(16, 16, 16, 50),
+          padding: EdgeInsets.fromLTRB(screenSize.width * 0.04, screenSize.width * 0.04, screenSize.width * 0.04, 50),
           child: CustomManagerListBox(
             isLoading: _isLoading,
             managers: _managers,
@@ -203,11 +204,14 @@ class CustomManagerListBox extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final screenSize = MediaQuery.of(context).size;
+    final isDarkMode = theme.brightness == Brightness.dark;
+
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(16.0),
+      padding: EdgeInsets.all(screenSize.width * 0.04),
       decoration: BoxDecoration(
-        color: theme.primaryColor,
+        color: theme.cardColor,
         borderRadius: BorderRadius.circular(12),
       ),
       child: Column(
@@ -216,14 +220,14 @@ class CustomManagerListBox extends StatelessWidget {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 12),
             decoration: BoxDecoration(
-              color: theme.colorScheme.onPrimary.withAlpha(25),
+              color: isDarkMode ? theme.scaffoldBackgroundColor : const Color(0xFFF3F3F3),
               borderRadius: BorderRadius.circular(12),
             ),
             child: DropdownButton<int>(
               value: selectedRoleId,
               underline: const SizedBox(),
               isExpanded: true,
-              icon: Icon(Icons.arrow_drop_down, color: theme.colorScheme.onPrimary),
+              icon: Icon(Icons.arrow_drop_down, color: theme.colorScheme.onSurface),
               onChanged: onRoleChanged,
               items: roles.map<DropdownMenuItem<int>>((Role role) {
                 return DropdownMenuItem<int>(
@@ -248,7 +252,7 @@ class CustomManagerListBox extends StatelessWidget {
               : LayoutBuilder(
                   builder: (context, constraints) {
                     if (managers.isEmpty) {
-                      return const Center(child: Text("No managers found for this role.", style: TextStyle(color: Colors.white),));
+                      return Center(child: Text("No managers found for this role.", style: TextStyle(color: theme.colorScheme.onSurfaceVariant),));
                     }
 
                     final isLargeScreen = constraints.maxWidth > 600;
@@ -288,10 +292,12 @@ class CustomManagerListBox extends StatelessWidget {
   Widget _buildManagerItem(BuildContext context, Manager manager) {
     final theme = Theme.of(context);
     final textTheme = theme.textTheme;
+    final isDarkMode = theme.brightness == Brightness.dark;
+
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: theme.colorScheme.onPrimary.withAlpha(25),
+        color: isDarkMode ? theme.scaffoldBackgroundColor : const Color(0xFFF3F3F3),
         borderRadius: BorderRadius.circular(12),
       ),
       child: Row(
@@ -308,12 +314,12 @@ class CustomManagerListBox extends StatelessWidget {
               children: [
                 Text(
                   manager.name,
-                  style: textTheme.titleMedium,
+                  style: textTheme.titleMedium?.copyWith(color: theme.colorScheme.onSurface),
                 ),
                 const SizedBox(height: 4),
                 Text(
                   manager.designation,
-                  style: textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onSurface.withAlpha(180)),
+                  style: textTheme.bodyMedium?.copyWith(color: theme.hintColor),
                 )
               ],
             ),

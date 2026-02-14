@@ -72,7 +72,7 @@ class ManagerProfile {
       name: json['name']?.toString() ?? 'N/A',
       role: json['role']?['name']?.toString() ?? 'Manager',
       email: json['email']?.toString() ?? 'N/A',
-      // Corrected logic: Avatar is the URL from the API or an empty string.
+      // Construct the full image URL from the base URL and the path from the API.
       avatar: rawImageUrl.isNotEmpty ? '${ApiService.baseImageUrl}/storage/$rawImageUrl' : '',
       gender: json['gender']?.toString() ?? '',
       dob: json['date_of_birth']?.toString() ?? '',
@@ -406,33 +406,9 @@ class _ManagerProfilePageState extends State<ManagerProfilePage> {
                 child: Column(
                   children: [
                     const SizedBox(height: 16),
-                    CircleAvatar(
+                    ProfileAvatar(
+                      avatarUrl: data.avatar,
                       radius: screenWidth * 0.12,
-                      backgroundColor: const Color(0xFF1B2A41),
-                      child: ClipOval(
-                        // Simplified and robust image loading logic
-                        child: data.avatar.isNotEmpty
-                            ? Image.network(
-                                data.avatar,
-                                fit: BoxFit.cover,
-                                width: screenWidth * 0.24,
-                                height: screenWidth * 0.24,
-                                loadingBuilder: (context, child, loadingProgress) {
-                                  if (loadingProgress == null) return child;
-                                  return const Center(child: CircularProgressIndicator());
-                                },
-                                errorBuilder: (context, error, stackTrace) {
-                                  // Fallback for network errors
-                                  return Image.asset('assets/images/girl_image.webp', fit: BoxFit.cover);
-                                },
-                              )
-                            : Image.asset( // Fallback for no API image
-                                'assets/images/girl_image.webp',
-                                fit: BoxFit.cover,
-                                width: screenWidth * 0.24,
-                                height: screenWidth * 0.24,
-                              ),
-                      ),
                     ),
                     const SizedBox(height: 12),
                     Text(data.name, style: TextStyle(color: Colors.white, fontSize: responsiveFontSize(22), fontWeight: FontWeight.bold)),
@@ -470,86 +446,84 @@ class _ManagerProfilePageState extends State<ManagerProfilePage> {
                       ),
                       CustomDropdown(label: "Marriage Status", value: _marriageStatusValue, items: _marriageStatusOptions, onChanged: (v) => setState(() => _marriageStatusValue = v)),
                     ]),
-                    const SizedBox(height: 20),
-                    SectionCard(title: "Address Information", icon: Icons.location_on, children: [
-                      CustomTextField(
-                        label: "Address Line 1",
-                        controller: _address1Controller,
-                        validator: (value) => value == null || value.isEmpty ? 'Address is required' : null,
-                      ),
-                      CustomTextField(
-                        label: "City",
-                        controller: _cityController,
-                        validator: (value) => value == null || value.isEmpty ? 'City is required' : null,
-                      ),
-                      CustomTextField(
-                        label: "State/District",
-                        controller: _districtController,
-                        validator: (value) => value == null || value.isEmpty ? 'State is required' : null,
-                      ),
-                      CustomTextField(
-                        label: "Pincode",
-                        controller: _pincodeController,
-                        validator: (value) => value == null || value.isEmpty ? 'Pincode is required' : null,
-                      ),
-                    ]),
-                    const SizedBox(height: 20),
-                    SectionCard(title: "Banking Information", icon: Icons.account_balance, children: [
-                      CustomTextField(label: "Bank Account Number", controller: _bankAccountController, editable: false),
-                      CustomTextField(label: "IFSC Code", controller: _ifscController, editable: false),
-                      CustomTextField(label: "Bank Name", controller: _bankNameController, editable: false),
-                      CustomTextField(label: "Employer Branch", controller: _employerBranchController, editable: false),
-                      CustomTextField(label: "Zone / Sector", controller: _zoneController, editable: false),
-                    ]),
-                    const SizedBox(height: 20),
-                    SectionCard(title: "Emergency Contact", icon: Icons.phone_in_talk, children: [
-                      CustomTextField(label: "Contact Name", controller: _emergencyContactNameController, editable: false),
-                      CustomTextField(label: "Contact Number", controller: _emergencyContactNumberController, editable: false),
-                    ]),
-                    const SizedBox(height: 20),
-                    SectionCard(title: "Professional Information", icon: Icons.work, children: [
-                      CustomTextField(label: "Username", controller: _userNameController, editable: false),
-                      CustomTextField(label: "Email", controller: _emailController, editable: false),
-                      CustomTextField(label: "Position", controller: _positionController, editable: false),
-                      CustomTextField(label: "Employment Type", controller: _employmentTypeController, editable: false),
-                      CustomTextField(label: "Joining Date", controller: _joiningDateController, editable: false),
-                      CustomTextField(label: "Experience", controller: _experienceController, editable: false),
-                      CustomTextField(label: "Status", controller: _statusController, editable: false),
-                    ]),
-                     const SizedBox(height: 20),
-                    SectionCard(title: "Change Password", icon: Icons.lock, children: [
-                      CustomTextField(label: "New Password", controller: _newPasswordController, isPassword: true),
-                      CustomTextField(label: "Confirm Password", controller: _confirmPasswordController, isPassword: true),
-                    ]),
-                    const SizedBox(height: 40),
-                    ElevatedButton(
-                      onPressed: _isSaving ? null : () => _saveChanges(data),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.blueAccent,
-                        minimumSize: const Size(double.infinity, 50),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                      ),
-                      child: _isSaving
-                          ? const CircularProgressIndicator(valueColor: AlwaysStoppedAnimation<Color>(Colors.white))
-                          : const Text("Save Changes", style: TextStyle(color: Colors.white, fontSize: 16)),
+                    const SizedBox(height: 16),
+                    SectionCard(
+                      title: 'Address Details',
+                      icon: Icons.location_city,
+                      children: [
+                        CustomTextField(label: "Address", controller: _address1Controller),
+                        CustomTextField(label: "City", controller: _cityController),
+                        CustomTextField(label: "District", controller: _districtController),
+                        CustomTextField(label: "Pincode", controller: _pincodeController),
+                      ],
                     ),
+                    const SizedBox(height: 16),
+                    SectionCard(
+                      title: 'Bank Details',
+                      icon: Icons.account_balance,
+                      children: [
+                        CustomTextField(label: "Bank Account No.", controller: _bankAccountController, enabled: false),
+                        CustomTextField(label: "IFSC Code", controller: _ifscController, enabled: false),
+                        CustomTextField(label: "Bank Name", controller: _bankNameController, enabled: false),
+                        CustomTextField(label: "Employer Branch", controller: _employerBranchController, enabled: false),
+                      ],
+                    ),
+                     const SizedBox(height: 16),
+                    SectionCard(
+                      title: 'Emergency Contact',
+                      icon: Icons.contact_emergency,
+                      children: [
+                        CustomTextField(label: "Contact Person", controller: _emergencyContactNameController),
+                        CustomTextField(label: "Contact Number", controller: _emergencyContactNumberController),
+                      ],
+                    ),
+                     const SizedBox(height: 16),
+                    SectionCard(
+                      title: 'Employment Details',
+                      icon: Icons.work,
+                      children: [
+                        CustomTextField(label: "User Name", controller: _userNameController, enabled: false),
+                        CustomTextField(label: "Position", controller: _positionController, enabled: false),
+                        CustomTextField(label: "Employment Type", controller: _employmentTypeController, enabled: false),
+                        CustomTextField(label: "Joining Date", controller: _joiningDateController, enabled: false),
+                        CustomTextField(label: "Experience", controller: _experienceController, enabled: false),
+                        CustomTextField(label: "Status", controller: _statusController, enabled: false),
+                      ],
+                    ),
+                     const SizedBox(height: 16),
+                    SectionCard(
+                      title: 'Security',
+                      icon: Icons.security,
+                      children: [
+                        CustomTextField(label: "New Password", controller: _newPasswordController, obscureText: true),
+                        CustomTextField(label: "Confirm Password", controller: _confirmPasswordController, obscureText: true),
+                      ],
+                    ),
+                    const SizedBox(height: 30),
+                     _isSaving
+                        ? const CircularProgressIndicator()
+                        : ElevatedButton(
+                            onPressed: () => _saveChanges(data),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: const Color(0xFF4A90E2),
+                              padding: EdgeInsets.symmetric(horizontal: screenWidth * 0.2, vertical: 15),
+                              textStyle: TextStyle(fontSize: responsiveFontSize(16)),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
+                            ),
+                            child: const Text("Save Changes", style: TextStyle(color: Colors.white)),
+                          ),
                     const SizedBox(height: 20),
-                    OutlinedButton(
+                    TextButton(
                       onPressed: _logout,
-                      style: OutlinedButton.styleFrom(
-                        minimumSize: const Size(double.infinity, 50),
-                        side: const BorderSide(color: Colors.redAccent),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                      ),
-                      child: const Text("Logout", style: TextStyle(color: Colors.redAccent, fontSize: 16)),
+                      child: const Text('Logout', style: TextStyle(color: Colors.red, fontSize: 16)),
                     ),
-                    const SizedBox(height: 40),
+                     const SizedBox(height: 50),
                   ],
                 ),
               ),
             );
           } else {
-            return const Center(child: Text('No profile data found.', style: TextStyle(color: Colors.white)));
+            return const Center(child: Text('No profile data available.', style: TextStyle(color: Colors.white)));
           }
         },
       ),
@@ -558,33 +532,102 @@ class _ManagerProfilePageState extends State<ManagerProfilePage> {
 }
 
 // ───────────────────────────────────────────────────────────
-//                      REUSABLE WIDGETS
+//                         CUSTOM WIDGETS
 // ───────────────────────────────────────────────────────────
+
+class ProfileAvatar extends StatelessWidget {
+  final String avatarUrl;
+  final double radius;
+
+  const ProfileAvatar({
+    super.key,
+    required this.avatarUrl,
+    required this.radius,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    // Print the URL for debugging purposes.
+    // Check your console output to see what URL is being used.
+    print('Attempting to load avatar from URL: $avatarUrl');
+
+    return CircleAvatar(
+      radius: radius,
+      backgroundColor: const Color(0xFF1B2A41),
+      child: ClipOval(
+        child: avatarUrl.isNotEmpty
+            ? Image.network(
+                avatarUrl,
+                fit: BoxFit.cover,
+                width: radius * 2,
+                height: radius * 2,
+                loadingBuilder: (context, child, loadingProgress) {
+                  if (loadingProgress == null) return child;
+                  return Center(
+                    child: CircularProgressIndicator(
+                      value: loadingProgress.expectedTotalBytes != null
+                          ? loadingProgress.cumulativeBytesLoaded /
+                              loadingProgress.expectedTotalBytes!
+                          : null,
+                    ),
+                  );
+                },
+                errorBuilder: (context, error, stackTrace) {
+                  // Log error for easier debugging
+                  print('Failed to load profile image: $error'); 
+                  return _buildPlaceholder();
+                },
+              )
+            : _buildPlaceholder(),
+      ),
+    );
+  }
+
+  Widget _buildPlaceholder() {
+    return Image.asset(
+      'assets/images/man_image.png', // Your placeholder asset
+      fit: BoxFit.cover,
+      width: radius * 2,
+      height: radius * 2,
+    );
+  }
+}
+
 
 class SectionCard extends StatelessWidget {
   final String title;
   final IconData icon;
   final List<Widget> children;
 
-  const SectionCard({super.key, required this.title, required this.icon, required this.children});
+  const SectionCard({
+    super.key,
+    required this.title,
+    required this.icon,
+    required this.children,
+  });
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: const Color(0xFF1B2A41),
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [Icon(icon, color: Colors.white), const SizedBox(width: 8), Text(title, style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold))],
-          ),
-          const Divider(color: Colors.white24, height: 24),
-          ...children,
-        ],
+    return Card(
+      color: const Color(0xFF1B2A41),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      elevation: 4,
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(icon, color: Colors.white70),
+                const SizedBox(width: 10),
+                Text(title, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white)),
+              ],
+            ),
+            const Divider(color: Colors.white24, thickness: 1, height: 20),
+            ...children,
+          ],
+        ),
       ),
     );
   }
@@ -593,19 +636,19 @@ class SectionCard extends StatelessWidget {
 class CustomTextField extends StatelessWidget {
   final String label;
   final TextEditingController controller;
+  final bool obscureText;
+  final bool enabled;
   final IconData? icon;
   final String? Function(String?)? validator;
-  final bool editable;
-  final bool isPassword;
 
   const CustomTextField({
     super.key,
     required this.label,
     required this.controller,
+    this.obscureText = false,
+    this.enabled = true,
     this.icon,
     this.validator,
-    this.editable = true,
-    this.isPassword = false,
   });
 
   @override
@@ -614,21 +657,22 @@ class CustomTextField extends StatelessWidget {
       padding: const EdgeInsets.symmetric(vertical: 8.0),
       child: TextFormField(
         controller: controller,
-        validator: validator,
-        readOnly: !editable,
-        obscureText: isPassword,
-        style: TextStyle(color: editable ? Colors.white : Colors.white54),
+        obscureText: obscureText,
+        enabled: enabled,
+        style: TextStyle(color: enabled ? Colors.white : Colors.grey[400]),
         decoration: InputDecoration(
           labelText: label,
           labelStyle: const TextStyle(color: Colors.white70),
           filled: true,
-          fillColor: editable ? const Color(0xFF0D1B2A) : Colors.transparent,
-          suffixIcon: icon != null ? Icon(icon, color: Colors.white70) : null,
+          fillColor: enabled ? const Color(0xFF0D1B2A) : Colors.grey[800],
           border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-          enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: Colors.white38)),
-          focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: Colors.blueAccent)),
-          disabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide(color: editable ? Colors.white38 : Colors.transparent)),
+          focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(8),
+            borderSide: const BorderSide(color: Color(0xFF4A90E2), width: 2),
+          ),
+          prefixIcon: icon != null ? Icon(icon, color: Colors.white70) : null,
         ),
+        validator: validator,
       ),
     );
   }
@@ -638,10 +682,17 @@ class CustomDropdown extends StatelessWidget {
   final String label;
   final String? value;
   final List<String> items;
-  final ValueChanged<String?>? onChanged;
-    final String? Function(String?)? validator;
+  final ValueChanged<String?> onChanged;
+  final String? Function(String?)? validator;
 
-  const CustomDropdown({super.key, required this.label, this.value, required this.items, this.onChanged, this.validator});
+  const CustomDropdown({
+    super.key,
+    required this.label,
+    required this.value,
+    required this.items,
+    required this.onChanged,
+    this.validator,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -651,17 +702,16 @@ class CustomDropdown extends StatelessWidget {
         value: value,
         items: items.map((item) => DropdownMenuItem(value: item, child: Text(item))).toList(),
         onChanged: onChanged,
-        validator: validator,
         decoration: InputDecoration(
           labelText: label,
           labelStyle: const TextStyle(color: Colors.white70),
           filled: true,
           fillColor: const Color(0xFF0D1B2A),
           border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-          enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: Colors.white38)),
         ),
-        dropdownColor: const Color(0xFF1B2A41),
         style: const TextStyle(color: Colors.white),
+        dropdownColor: const Color(0xFF1B2A41),
+        validator: validator,
       ),
     );
   }

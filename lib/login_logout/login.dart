@@ -43,8 +43,8 @@ class _LoginPageState extends State<LoginPage> {
 
     try {
       final roleId = await ApiService.login(emailController.text.trim(), passwordController.text.trim());
-       if (!mounted) return;
-        _navigateToDashboard(roleId);
+      if (!mounted) return;
+      _navigateToDashboard(roleId);
     } catch (e) {
       debugPrint('An error occurred during login: $e');
       if (!mounted) return;
@@ -105,7 +105,7 @@ class _LoginPageState extends State<LoginPage> {
                 builder: (context, constraints) {
                   return Container(
                     width:
-                        constraints.maxWidth > 500 ? 500 : constraints.maxWidth,
+                    constraints.maxWidth > 500 ? 500 : constraints.maxWidth,
                     decoration: BoxDecoration(
                       color: theme.cardColor,
                       borderRadius: BorderRadius.circular(20),
@@ -217,27 +217,27 @@ class _LoginPageState extends State<LoginPage> {
                                   borderRadius: BorderRadius.circular(15),
                                 ),
                                 disabledBackgroundColor:
-                                    theme.colorScheme.primary,
+                                theme.colorScheme.primary,
                               ),
                               child: _isLoading
                                   ? const SizedBox(
-                                      height: 24,
-                                      width: 24,
-                                      child: CircularProgressIndicator(
-                                        strokeWidth: 3,
-                                        valueColor:
-                                            AlwaysStoppedAnimation<Color>(
-                                                Colors.white),
-                                      ),
-                                    )
+                                height: 24,
+                                width: 24,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 3,
+                                  valueColor:
+                                  AlwaysStoppedAnimation<Color>(
+                                      Colors.white),
+                                ),
+                              )
                                   : Text(
-                                      "LOGIN",
-                                      style: theme.textTheme.titleMedium
-                                          ?.copyWith(
-                                              color:
-                                                  theme.colorScheme.onPrimary,
-                                              fontWeight: FontWeight.bold),
-                                    ),
+                                "LOGIN",
+                                style: theme.textTheme.titleMedium
+                                    ?.copyWith(
+                                    color:
+                                    theme.colorScheme.onPrimary,
+                                    fontWeight: FontWeight.bold),
+                              ),
                             ),
                           ),
                         ],

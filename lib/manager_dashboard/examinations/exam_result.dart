@@ -153,10 +153,10 @@ class _ExamResultPageState extends State<ExamResultPage> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Row(children: [
-                        Icon(Icons.book, color: theme.colorScheme.onPrimary, size: 18),
+                        Icon(Icons.book, color: theme.colorScheme.onSurface, size: 18),
                         const SizedBox(width: 5),
                         Flexible(
-                            child: Text(examWithPapers.exam.name, style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onPrimary, fontSize: 18))),
+                            child: Text(examWithPapers.exam.name, style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onSurface, fontSize: 18))),
                       ]),
                       Text(
                         "Papers assigned for this exam, grouped by class and section.",
@@ -305,7 +305,7 @@ class CustomExamResultContainerBox extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text("Date", style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onPrimary.withAlpha(150))),
-                      Text(date, style: theme.textTheme.bodyMedium?.copyWith(color: Colors.blue)),
+                      Text(date, style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onPrimary)),
                     ],
                   ),
                 ),
@@ -315,7 +315,7 @@ class CustomExamResultContainerBox extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text("Time", style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onPrimary.withAlpha(150))),
-                      Text(time, style: theme.textTheme.bodyMedium?.copyWith(color: Colors.blue)),
+                      Text(time, style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onPrimary)),
                     ],
                   ),
                 ),
@@ -342,7 +342,8 @@ class CustomExamResultContainerBox extends StatelessWidget {
                             )));
               },
               style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.blue.withAlpha(55),
+                backgroundColor: theme.colorScheme.secondary,
+                foregroundColor: theme.colorScheme.onSecondary,
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(10),
                 ),
@@ -350,10 +351,9 @@ class CustomExamResultContainerBox extends StatelessWidget {
               ),
               icon: const Icon(
                 Icons.edit,
-                color: Colors.white,
                 size: 16,
               ),
-              label: Text("Enter Marks", style: theme.textTheme.labelLarge?.copyWith(color: Colors.white)),
+              label: const Text("Enter Marks"),
             ),
           ],
         ),

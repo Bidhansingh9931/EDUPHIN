@@ -102,14 +102,15 @@ class _ExamInfoPageState extends State<ExamInfoPage> {
                 _refreshExams();
               }
             },
-            backgroundColor: Colors.blue.shade900,
+            backgroundColor: theme.colorScheme.primary,
             label: Text(
               "Create New Exam",
               style: theme.textTheme.titleMedium
                   ?.copyWith(color: theme.colorScheme.onPrimary),
             ),
-            icon: const Icon(
+            icon: Icon(
               Icons.add_circle_sharp,
+              color: theme.colorScheme.onPrimary,
             ),
           ),
         ),
@@ -269,12 +270,21 @@ class CustomExamListContainerBox extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final isDarkMode = theme.brightness == Brightness.dark;
     final isActiveStatus = isActive == "Active";
 
     return Container(
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(10),
-        color: theme.primaryColor,
+        color: isDarkMode ? theme.colorScheme.surfaceContainerHighest : theme.colorScheme.surface,
+        boxShadow: [
+          BoxShadow(
+            color: theme.shadowColor.withAlpha(25),
+            spreadRadius: 1,
+            blurRadius: 3,
+            offset: const Offset(0, 1),
+          ),
+        ],
       ),
       child: Padding(
         padding: const EdgeInsets.all(16),
@@ -290,12 +300,12 @@ class CustomExamListContainerBox extends StatelessWidget {
                   children: [
                     Text(heading,
                         style: theme.textTheme.bodyMedium?.copyWith(
-                            color: theme.colorScheme.onPrimary.withAlpha(150))),
+                            color: theme.colorScheme.onSurface.withAlpha(150))),
                     Container(
                         decoration: BoxDecoration(
                           color: isActiveStatus
-                              ? Colors.green
-                              : Colors.blue.withAlpha(25),
+                              ? theme.colorScheme.primary
+                              : theme.colorScheme.error.withAlpha(178),
                           borderRadius: BorderRadius.circular(10),
                         ),
                         child: Padding(
@@ -304,7 +314,7 @@ class CustomExamListContainerBox extends StatelessWidget {
                           child: Text(
                             isActive,
                             style: theme.textTheme.labelSmall?.copyWith(
-                                color: Colors.white,
+                                color: isActiveStatus ? theme.colorScheme.onPrimary: theme.colorScheme.onError,
                                 fontWeight: FontWeight.bold),
                           ),
                         )),
@@ -312,7 +322,7 @@ class CustomExamListContainerBox extends StatelessWidget {
                 ),
                 Text(subHeading,
                     style: theme.textTheme.titleLarge
-                        ?.copyWith(color: theme.colorScheme.onPrimary)),
+                        ?.copyWith(color: theme.colorScheme.onSurface)),
                 const SizedBox(
                   height: 5,
                 ),
@@ -326,11 +336,11 @@ class CustomExamListContainerBox extends StatelessWidget {
                         children: [
                           Text("Type",
                               style: theme.textTheme.bodyMedium?.copyWith(
-                                  color: theme.colorScheme.onPrimary
+                                  color: theme.colorScheme.onSurface
                                       .withAlpha(150))),
                           Text(type,
                               style: theme.textTheme.bodyMedium?.copyWith(
-                                  color: theme.colorScheme.onPrimary)),
+                                  color: theme.colorScheme.onSurface)),
                         ],
                       ),
                     ),
@@ -340,11 +350,11 @@ class CustomExamListContainerBox extends StatelessWidget {
                         children: [
                           Text("Exam Code",
                               style: theme.textTheme.bodyMedium?.copyWith(
-                                  color: theme.colorScheme.onPrimary
+                                  color: theme.colorScheme.onSurface
                                       .withAlpha(150))),
                           Text(examCode,
                               style: theme.textTheme.bodyMedium?.copyWith(
-                                  color: theme.colorScheme.onPrimary)),
+                                  color: theme.colorScheme.onSurface)),
                         ],
                       ),
                     ),
@@ -358,11 +368,11 @@ class CustomExamListContainerBox extends StatelessWidget {
                   children: [
                     Text("Start Date - End Date",
                         style: theme.textTheme.bodyMedium?.copyWith(
-                            color: theme.colorScheme.onPrimary
+                            color: theme.colorScheme.onSurface
                                 .withAlpha(150))),
                     Text(startEndDate,
                         style: theme.textTheme.bodyMedium
-                            ?.copyWith(color: Colors.blue)),
+                            ?.copyWith(color: theme.colorScheme.secondary)),
                   ],
                 ),
               ],
@@ -371,7 +381,7 @@ class CustomExamListContainerBox extends StatelessWidget {
               children: [
                 const SizedBox(height: 8),
                 Divider(
-                  color: theme.colorScheme.onPrimary.withAlpha(180),
+                  color: theme.dividerColor,
                   thickness: 1,
                 ),
                 Row(
@@ -380,20 +390,20 @@ class CustomExamListContainerBox extends StatelessWidget {
                       child: ElevatedButton.icon(
                         onPressed: onEdit,
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.grey.withAlpha(55),
+                          backgroundColor: theme.colorScheme.secondary.withAlpha(25),
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(10),
                           ),
                           padding: const EdgeInsets.symmetric(vertical: 12),
                         ),
-                        icon: const Icon(
+                        icon: Icon(
                           Icons.edit,
-                          color: Colors.white,
+                          color: theme.colorScheme.secondary,
                           size: 16,
                         ),
                         label: Text("Edit",
                             style: theme.textTheme.labelLarge
-                                ?.copyWith(color: Colors.white)),
+                                ?.copyWith(color: theme.colorScheme.secondary)),
                       ),
                     ),
                     const SizedBox(
@@ -403,7 +413,7 @@ class CustomExamListContainerBox extends StatelessWidget {
                       child: ElevatedButton(
                         onPressed: onManageSchedule,
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.blue.withAlpha(55),
+                          backgroundColor: theme.colorScheme.primary.withAlpha(25),
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(10),
                           ),
@@ -413,7 +423,7 @@ class CustomExamListContainerBox extends StatelessWidget {
                           "Manage Schedule",
                           textAlign: TextAlign.center,
                           style: theme.textTheme.labelLarge
-                              ?.copyWith(color: Colors.white),
+                              ?.copyWith(color: theme.colorScheme.primary),
                         ),
                       ),
                     ),

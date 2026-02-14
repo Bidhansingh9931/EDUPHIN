@@ -1,5 +1,4 @@
 import 'dart:convert';
-import 'dart:io';
 
 import 'package:eduphin/services/api_service.dart';
 import 'package:file_picker/file_picker.dart';
@@ -24,7 +23,7 @@ class _EditNotePageState extends State<EditNotePage> {
 
   int? _selectedClassId;
   int? _selectedSectionId;
-  File? _selectedFile;
+  PlatformFile? _selectedFile;
 
   bool _isLoading = true;
   bool _isSaving = false;
@@ -35,7 +34,8 @@ class _EditNotePageState extends State<EditNotePage> {
   void initState() {
     super.initState();
     _titleController = TextEditingController(text: widget.material.title);
-    _descriptionController = TextEditingController(text: widget.material.description);
+    _descriptionController =
+        TextEditingController(text: widget.material.description);
     _fetchClassesAndSetInitialValues();
   }
 
@@ -47,11 +47,15 @@ class _EditNotePageState extends State<EditNotePage> {
         setState(() {
           _classes = data;
           // Find class and section IDs from names
-          final initialClass = _classes.firstWhere((c) => c['name'] == widget.material.className, orElse: () => null);
+          final initialClass = _classes.firstWhere(
+              (c) => c['name'] == widget.material.className,
+              orElse: () => null);
           if (initialClass != null) {
             _selectedClassId = initialClass['id'];
             _sections = initialClass['sections'];
-            final initialSection = _sections.firstWhere((s) => s['section_name'] == widget.material.section, orElse: () => null);
+            final initialSection = _sections.firstWhere(
+                (s) => s['section_name'] == widget.material.section,
+                orElse: () => null);
             if (initialSection != null) {
               _selectedSectionId = initialSection['id'];
             }
@@ -63,17 +67,19 @@ class _EditNotePageState extends State<EditNotePage> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString())));
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text(e.toString())));
         setState(() => _isLoading = false);
       }
     }
   }
 
   Future<void> _pickFile() async {
-    FilePickerResult? result = await FilePicker.platform.pickFiles();
+    FilePickerResult? result =
+        await FilePicker.platform.pickFiles(withReadStream: true);
     if (result != null) {
       setState(() {
-        _selectedFile = File(result.files.single.path!);
+        _selectedFile = result.files.single;
       });
     }
   }
@@ -87,7 +93,10 @@ class _EditNotePageState extends State<EditNotePage> {
 
     try {
       final token = await ApiService.getToken();
-      var request = http.MultipartRequest('POST', Uri.parse('${ApiService.baseUrl}/manager/study/notes/${widget.material.id}')); // Using POST for update as Laravel uses this for multipart form-data with _method
+      var request = http.MultipartRequest(
+          'POST',
+          Uri.parse(
+              '${ApiService.baseUrl}/manager/study/notes/${widget.material.id}')); // Using POST for update as Laravel uses this for multipart form-data with _method
       request.headers['Authorization'] = 'Bearer $token';
       request.fields['_method'] = 'PUT'; // Method spoofing
       request.fields['title'] = _titleController.text;
@@ -96,15 +105,22 @@ class _EditNotePageState extends State<EditNotePage> {
       request.fields['section_id'] = _selectedSectionId.toString();
 
       if (_selectedFile != null) {
-        request.files.add(await http.MultipartFile.fromPath('file', _selectedFile!.path));
+        request.files.add(http.MultipartFile(
+          'file',
+          _selectedFile!.readStream!,
+          _selectedFile!.size,
+          filename: _selectedFile!.name,
+        ));
       }
 
       var response = await request.send();
 
       if (response.statusCode == 200) {
-         if(mounted){
-           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Note updated successfully!'), backgroundColor: Colors.green),
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+                content: Text('Note updated successfully!'),
+                backgroundColor: Colors.green),
           );
           Navigator.pop(context, true);
         }
@@ -114,13 +130,15 @@ class _EditNotePageState extends State<EditNotePage> {
         throw Exception(responseData['message'] ?? 'Failed to update note');
       }
     } catch (e) {
-       if (mounted) {
+      if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(e.toString().replaceFirst('Exception: ', '')), backgroundColor: Colors.red),
+          SnackBar(
+              content: Text(e.toString().replaceFirst('Exception: ', '')),
+              backgroundColor: Colors.red),
         );
       }
     } finally {
-       if(mounted){
+      if (mounted) {
         setState(() => _isSaving = false);
       }
     }
@@ -140,42 +158,54 @@ class _EditNotePageState extends State<EditNotePage> {
                   TextFormField(
                     controller: _titleController,
                     decoration: const InputDecoration(labelText: 'Title'),
-                    validator: (value) => value!.isEmpty ? 'Please enter a title' : null,
+                    validator: (value) =>
+                        value!.isEmpty ? 'Please enter a title' : null,
                   ),
                   const SizedBox(height: 16),
-                   DropdownButtonFormField<int>(
+                  DropdownButtonFormField<int>(
                     value: _selectedClassId,
-                    items: _classes.map<DropdownMenuItem<int>>((c) => DropdownMenuItem(value: c['id'], child: Text(c['name']))).toList(),
+                    items: _classes
+                        .map<DropdownMenuItem<int>>((c) =>
+                            DropdownMenuItem(value: c['id'], child: Text(c['name'])))
+                        .toList(),
                     onChanged: (value) {
                       setState(() {
                         _selectedClassId = value;
                         _selectedSectionId = null;
-                        _sections = _classes.firstWhere((c) => c['id'] == value)['sections'];
+                        _sections = _classes
+                            .firstWhere((c) => c['id'] == value)['sections'];
                       });
                     },
                     decoration: const InputDecoration(labelText: 'Class'),
-                    validator: (value) => value == null ? 'Please select a class' : null,
+                    validator: (value) =>
+                        value == null ? 'Please select a class' : null,
                   ),
                   const SizedBox(height: 16),
                   DropdownButtonFormField<int>(
                     value: _selectedSectionId,
-                    items: _sections.map<DropdownMenuItem<int>>((s) => DropdownMenuItem(value: s['id'], child: Text(s['section_name']))).toList(),
-                    onChanged: (value) => setState(() => _selectedSectionId = value),
+                    items: _sections
+                        .map<DropdownMenuItem<int>>((s) => DropdownMenuItem(
+                            value: s['id'], child: Text(s['section_name'])))
+                        .toList(),
+                    onChanged: (value) =>
+                        setState(() => _selectedSectionId = value),
                     decoration: const InputDecoration(labelText: 'Section'),
-                     validator: (value) => value == null ? 'Please select a section' : null,
+                    validator: (value) =>
+                        value == null ? 'Please select a section' : null,
                   ),
                   const SizedBox(height: 16),
                   TextFormField(
                     controller: _descriptionController,
                     decoration: const InputDecoration(labelText: 'Description'),
                     maxLines: 3,
-                     validator: (value) => value!.isEmpty ? 'Please enter a description' : null,
+                    validator: (value) =>
+                        value!.isEmpty ? 'Please enter a description' : null,
                   ),
                   const SizedBox(height: 16),
                   Row(
                     children: [
                       Expanded(
-                        child: Text(_selectedFile?.path.split('/').last ?? 'No file selected'),
+                        child: Text(_selectedFile?.name ?? 'No file selected'),
                       ),
                       IconButton(
                         icon: const Icon(Icons.attach_file),
@@ -188,7 +218,10 @@ class _EditNotePageState extends State<EditNotePage> {
             ),
       floatingActionButton: ElevatedButton(
         onPressed: _isSaving ? null : _updateNote,
-        child: _isSaving ? const CircularProgressIndicator(valueColor: AlwaysStoppedAnimation(Colors.white)) : const Text('Update Note'),
+        child: _isSaving
+            ? const CircularProgressIndicator(
+                valueColor: AlwaysStoppedAnimation(Colors.white))
+            : const Text('Update Note'),
       ),
     );
   }

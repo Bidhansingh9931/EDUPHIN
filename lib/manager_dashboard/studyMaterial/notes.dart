@@ -167,7 +167,8 @@ class _NotesPageState extends State<NotesPage> {
         final response = await ApiService.delete('manager/study/notes/$noteId');
         if (response.statusCode == 200) {
           if(mounted){
-            ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Note deleted successfully'), backgroundColor: Colors.green));
+            final theme = Theme.of(context);
+            ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: const Text('Note deleted successfully'), backgroundColor: theme.colorScheme.primary));
             _fetchData(); // Refresh list
           }
         } else {

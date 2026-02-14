@@ -77,10 +77,11 @@ class _UpdateSubjectPageState extends State<UpdateSubjectPage> {
       }
     } catch (e) {
       if (mounted) {
+        final theme = Theme.of(context);
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
               content: Text(e.toString().replaceFirst('Exception: ', '')),
-              backgroundColor: Colors.red),
+              backgroundColor: theme.colorScheme.error),
         );
       }
     } finally {
@@ -147,7 +148,6 @@ class _UpdateSubjectPageState extends State<UpdateSubjectPage> {
                         width: 24,
                         child: CircularProgressIndicator(
                           strokeWidth: 3,
-                          valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
                         ),
                       )
                     : const Text("Update Subject"),
@@ -299,7 +299,7 @@ class _UpdateSubjectPageState extends State<UpdateSubjectPage> {
                 ?.copyWith(color: theme.colorScheme.onPrimary)),
         const SizedBox(height: 8),
         DropdownButtonFormField<String>(
-          initialValue: value,
+          value: value,
           items: items
               .map((String item) =>
                   DropdownMenuItem<String>(value: item, child: Text(item)))

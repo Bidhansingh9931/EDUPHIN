@@ -1,11 +1,11 @@
 import 'dart:convert';
-import 'dart:ui';
-
+import 'dart:io';
+import 'package:eduphin/manager_dashboard/manager_dashboard.dart';
 import 'package:eduphin/services/api_service.dart';
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
-
-import '../../manager_dashboard.dart';
 
 class AddTeacherPage extends StatefulWidget {
   const AddTeacherPage({super.key});
@@ -18,7 +18,7 @@ class _AddTeacherPageState extends State<AddTeacherPage> {
   final _formKey = GlobalKey<FormState>();
   bool _isLoading = false;
 
-  // Controllers for text fields
+  // Controllers
   final _fullNameController = TextEditingController();
   final _emailController = TextEditingController();
   final _newPasswordController = TextEditingController();
@@ -42,17 +42,21 @@ class _AddTeacherPageState extends State<AddTeacherPage> {
   final _emergencyContactNameController = TextEditingController();
   final _emergencyContactNumberController = TextEditingController();
 
-  // State for dropdowns and date pickers
+  // State variables
   String? _gender;
   DateTime? _dateOfBirth;
   String? _relationshipStatus;
   String? _employmentType;
   DateTime? _joiningDate;
   String? _status;
+  File? _profileImage;
+  PlatformFile? _matriculationMarksheet;
+  PlatformFile? _intermediateMarksheet;
+  PlatformFile? _resume;
 
   @override
   void dispose() {
-    // Dispose all controllers to free up resources
+    // Dispose all controllers
     _fullNameController.dispose();
     _emailController.dispose();
     _newPasswordController.dispose();
@@ -78,6 +82,33 @@ class _AddTeacherPageState extends State<AddTeacherPage> {
     super.dispose();
   }
 
+  Future<void> _pickImage() async {
+    final picker = ImagePicker();
+    final pickedFile = await picker.pickImage(source: ImageSource.gallery);
+    if (pickedFile != null) {
+      setState(() {
+        _profileImage = File(pickedFile.path);
+      });
+    }
+  }
+
+  Future<void> _pickFile(Function(PlatformFile) onFilePicked) async {
+    try {
+      FilePickerResult? result = await FilePicker.platform.pickFiles();
+      if (result != null) {
+        setState(() {
+          onFilePicked(result.files.single);
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error picking file: $e')),
+        );
+      }
+    }
+  }
+
   void _addTeacher() async {
     if (!_formKey.currentState!.validate()) {
       return;
@@ -93,7 +124,7 @@ class _AddTeacherPageState extends State<AddTeacherPage> {
         'email': _emailController.text,
         'password': _newPasswordController.text,
         'role_id': '5', // Teacher Role ID
-        'institute_id': '1', // This should be dynamic based on the logged-in user
+        'institute_id': '1', // This should be dynamic
         'gender': _gender,
         'date_of_birth': _dateOfBirth != null ? DateFormat('yyyy-MM-dd').format(_dateOfBirth!) : null,
         'marital_status': _relationshipStatus,
@@ -121,6 +152,20 @@ class _AddTeacherPageState extends State<AddTeacherPage> {
         'emergency_contact_phone': _emergencyContactNumberController.text,
       };
 
+      if (_profileImage != null) {
+        final bytes = await _profileImage!.readAsBytes();
+        teacherData['photo'] = base64Encode(bytes);
+      }
+       if (_matriculationMarksheet != null) {
+        teacherData['matriculation_marksheet'] = base64Encode(_matriculationMarksheet!.bytes!);
+      }
+      if (_intermediateMarksheet != null) {
+        teacherData['intermediate_marksheet'] = base64Encode(_intermediateMarksheet!.bytes!);
+      }
+      if (_resume != null) {
+        teacherData['resume'] = base64Encode(_resume!.bytes!);
+      }
+
       final response = await ApiService.post('manager/users', teacherData);
 
       if (!mounted) return;
@@ -130,7 +175,7 @@ class _AddTeacherPageState extends State<AddTeacherPage> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text(responseData['message'] ?? 'Teacher added successfully!')),
         );
-        Navigator.pop(context, true); // Return true to indicate success
+        Navigator.pop(context, true);
       } else {
         throw Exception(responseData['message'] ?? 'Failed to add teacher');
       }
@@ -152,24 +197,21 @@ class _AddTeacherPageState extends State<AddTeacherPage> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final screenSize = MediaQuery.of(context).size;
+
     return Scaffold(
       floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
       floatingActionButton: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16.0),
+        padding: EdgeInsets.symmetric(horizontal: screenSize.width * 0.04),
         child: SizedBox(
           width: double.infinity,
           child: FloatingActionButton.extended(
             heroTag: 'addTeacherBtn',
             onPressed: _isLoading ? null : _addTeacher,
             label: _isLoading
-                ? const CircularProgressIndicator(
-                    valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                  )
-                : Text(
-                    "Add Teacher",
-                    style: theme.textTheme.labelLarge?.copyWith(color: Colors.white),
-                  ),
-            icon: _isLoading ? null : const Icon(Icons.add, color: Colors.white),
+                ? const CircularProgressIndicator(valueColor: AlwaysStoppedAnimation<Color>(Colors.white))
+                : Text("Add Teacher", style: theme.textTheme.labelLarge?.copyWith(color: theme.colorScheme.onPrimary)),
+            icon: _isLoading ? null : Icon(Icons.add, color: theme.colorScheme.onPrimary),
           ),
         ),
       ),
@@ -181,28 +223,18 @@ class _AddTeacherPageState extends State<AddTeacherPage> {
             const Text('Add Teacher'),
             InkWell(
                 onTap: () => Navigator.pushReplacement(
-                    context,
-                    MaterialPageRoute(
-                        builder: (context) => const ManagerDashboardPage())),
-                child: const Icon(
-                  Icons.home_sharp,
-                  size: 30,
-                )),
+                    context, MaterialPageRoute(builder: (context) => const ManagerDashboardPage())),
+                child: const Icon(Icons.home_sharp, size: 30)),
           ],
         ),
-        backgroundColor: theme.appBarTheme.backgroundColor,
       ),
       body: Form(
         key: _formKey,
         child: Padding(
-          padding: const EdgeInsets.fromLTRB(16, 16, 16, 120),
+          padding: EdgeInsets.fromLTRB(screenSize.width * 0.04, screenSize.width * 0.04, screenSize.width * 0.04, screenSize.height * 0.15),
           child: LayoutBuilder(
             builder: (context, constraints) {
-              if (constraints.maxWidth > 800) {
-                return _buildWideLayout();
-              } else {
-                return _buildNarrowLayout();
-              }
+              return constraints.maxWidth > 800 ? _buildWideLayout() : _buildNarrowLayout();
             },
           ),
         ),
@@ -211,42 +243,42 @@ class _AddTeacherPageState extends State<AddTeacherPage> {
   }
 
   Widget _buildNarrowLayout() {
+    final screenSize = MediaQuery.of(context).size;
     return SingleChildScrollView(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const CustomProfileBox(),
-          const SizedBox(height: 20),
-          _buildEditableInfoTile(context, "Full Name", _fullNameController),
-          _buildEditableInfoTile(context, "Email", _emailController, keyboardType: TextInputType.emailAddress),
-          _buildEditableInfoTile(context, "New Password", _newPasswordController, isPassword: true),
-          const SizedBox(height: 20),
-          _buildPersonalDetailsSection(context),
-          const SizedBox(height: 20),
-          _buildContactDetailsSection(context),
-          const SizedBox(height: 20),
-          _buildAddressDetailsSection(context),
-          const SizedBox(height: 20),
-          _buildProfessionalInformationSection(context),
-          const SizedBox(height: 20),
-          _buildEducationDetailsSection(context),
-          const SizedBox(height: 20),
-          _buildBankingDetailsSection(context),
-          const SizedBox(height: 20),
-          _buildEmergencyContactDetailsSection(context),
+          _AddTeacherProfileBox(image: _profileImage, onPickImage: _pickImage),
+          SizedBox(height: screenSize.height * 0.02),
+          _buildSectionCard(title: "Account Details", children: _buildAccountDetailsSection()),
+          SizedBox(height: screenSize.height * 0.02),
+          _buildSectionCard(title: "Personal Details", children: _buildPersonalDetailsSection()),
+          SizedBox(height: screenSize.height * 0.02),
+          _buildSectionCard(title: "Contact Details", children: _buildContactDetailsSection()),
+          SizedBox(height: screenSize.height * 0.02),
+          _buildSectionCard(title: "Address Details", children: _buildAddressDetailsSection()),
+          SizedBox(height: screenSize.height * 0.02),
+          _buildSectionCard(title: "Professional Information", children: _buildProfessionalInformationSection()),
+          SizedBox(height: screenSize.height * 0.02),
+          _buildSectionCard(title: "Education & Documents", children: _buildEducationDetailsSection()),
+          SizedBox(height: screenSize.height * 0.02),
+          _buildSectionCard(title: "Banking Details", children: _buildBankingDetailsSection()),
+          SizedBox(height: screenSize.height * 0.02),
+          _buildSectionCard(title: "Emergency Contact Details", children: _buildEmergencyContactDetailsSection()),
         ],
       ),
     );
   }
 
   Widget _buildWideLayout() {
+    final screenSize = MediaQuery.of(context).size;
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Expanded(
           child: SingleChildScrollView(
             child: Padding(
-              padding: const EdgeInsets.only(right: 8.0),
+              padding: EdgeInsets.only(right: screenSize.width * 0.01),
               child: _buildLeftColumn(),
             ),
           ),
@@ -254,7 +286,7 @@ class _AddTeacherPageState extends State<AddTeacherPage> {
         Expanded(
           child: SingleChildScrollView(
             child: Padding(
-              padding: const EdgeInsets.only(left: 8.0),
+              padding: EdgeInsets.only(left: screenSize.width * 0.01),
               child: _buildRightColumn(),
             ),
           ),
@@ -264,40 +296,40 @@ class _AddTeacherPageState extends State<AddTeacherPage> {
   }
 
   Widget _buildLeftColumn() {
+    final screenSize = MediaQuery.of(context).size;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const CustomProfileBox(),
-        const SizedBox(height: 20),
-        _buildEditableInfoTile(context, "Full Name", _fullNameController),
-        _buildEditableInfoTile(context, "Email", _emailController, keyboardType: TextInputType.emailAddress),
-        _buildEditableInfoTile(context, "New Password", _newPasswordController, isPassword: true),
-        const SizedBox(height: 20),
-        _buildPersonalDetailsSection(context),
-        const SizedBox(height: 20),
-        _buildContactDetailsSection(context),
-        const SizedBox(height: 20),
-        _buildAddressDetailsSection(context),
+        _AddTeacherProfileBox(image: _profileImage, onPickImage: _pickImage),
+        SizedBox(height: screenSize.height * 0.02),
+        _buildSectionCard(title: "Account Details", children: _buildAccountDetailsSection()),
+        SizedBox(height: screenSize.height * 0.02),
+        _buildSectionCard(title: "Personal Details", children: _buildPersonalDetailsSection()),
+        SizedBox(height: screenSize.height * 0.02),
+        _buildSectionCard(title: "Contact Details", children: _buildContactDetailsSection()),
+        SizedBox(height: screenSize.height * 0.02),
+        _buildSectionCard(title: "Address Details", children: _buildAddressDetailsSection()),
       ],
     );
   }
 
   Widget _buildRightColumn() {
+    final screenSize = MediaQuery.of(context).size;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _buildProfessionalInformationSection(context),
-        const SizedBox(height: 20),
-        _buildEducationDetailsSection(context),
-        const SizedBox(height: 20),
-        _buildBankingDetailsSection(context),
-        const SizedBox(height: 20),
-        _buildEmergencyContactDetailsSection(context),
+        _buildSectionCard(title: "Professional Information", children: _buildProfessionalInformationSection()),
+        SizedBox(height: screenSize.height * 0.02),
+        _buildSectionCard(title: "Education & Documents", children: _buildEducationDetailsSection()),
+        SizedBox(height: screenSize.height * 0.02),
+        _buildSectionCard(title: "Banking Details", children: _buildBankingDetailsSection()),
+        SizedBox(height: screenSize.height * 0.02),
+        _buildSectionCard(title: "Emergency Contact Details", children: _buildEmergencyContactDetailsSection()),
       ],
     );
   }
 
-  Widget _buildEditableInfoTile(BuildContext context, String title, TextEditingController controller, {bool isPassword = false, TextInputType keyboardType = TextInputType.text}) {
+  Widget _buildEditableInfoTile(String title, TextEditingController controller, {bool isPassword = false, TextInputType keyboardType = TextInputType.text}) {
     final theme = Theme.of(context);
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 8.0),
@@ -317,7 +349,7 @@ class _AddTeacherPageState extends State<AddTeacherPage> {
     );
   }
   
-  Widget _buildDropdownField<T>(BuildContext context, String title, T? value, List<T> items, ValueChanged<T?> onChanged) {
+  Widget _buildDropdownField<T>(String title, T? value, List<T> items, ValueChanged<T?> onChanged) {
     final theme = Theme.of(context);
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 8.0),
@@ -331,7 +363,7 @@ class _AddTeacherPageState extends State<AddTeacherPage> {
     );
   }
 
-  Widget _buildDatePickerField(BuildContext context, String title, DateTime? selectedDate, ValueChanged<DateTime?> onDateChanged) {
+  Widget _buildDatePickerField(String title, DateTime? selectedDate, ValueChanged<DateTime?> onDateChanged) {
     final theme = Theme.of(context);
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 8.0),
@@ -347,6 +379,16 @@ class _AddTeacherPageState extends State<AddTeacherPage> {
             initialDate: selectedDate ?? DateTime.now(),
             firstDate: DateTime(1950),
             lastDate: DateTime.now(),
+             builder: (context, child) {
+              return Theme(
+                data: theme.copyWith(
+                  colorScheme: theme.colorScheme.copyWith(
+                    primary: theme.primaryColor,
+                  ),
+                ),
+                child: child!,
+              );
+            },
           );
           if (picked != null) {
             onDateChanged(picked);
@@ -357,206 +399,154 @@ class _AddTeacherPageState extends State<AddTeacherPage> {
     );
   }
 
+  Widget _buildFilePickerTile(String title, PlatformFile? file, VoidCallback onPickFile) {
+    final theme = Theme.of(context);
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8.0),
+      child: TextFormField(
+        readOnly: true,
+        controller: TextEditingController(text: file?.name ?? 'No file selected'),
+        decoration: _inputDecoration(theme, title).copyWith(
+          suffixIcon: IconButton(
+            icon: const Icon(Icons.upload_file),
+            onPressed: onPickFile,
+          ),
+        ),
+        onTap: onPickFile,
+      ),
+    );
+  }
+
   InputDecoration _inputDecoration(ThemeData theme, String label) {
+    final isDarkMode = theme.brightness == Brightness.dark;
      return InputDecoration(
           labelText: label,
           labelStyle: theme.textTheme.bodyMedium?.copyWith(color: theme.hintColor),
           filled: true,
-          fillColor: theme.cardColor,
+          fillColor: isDarkMode ? theme.scaffoldBackgroundColor : const Color(0xFFF3F3F3),
           contentPadding: const EdgeInsets.symmetric(vertical: 16.0, horizontal: 12.0),
-          border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(8),
-            borderSide: BorderSide(color: theme.dividerColor, width: 1.0),
-          ),
-          enabledBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(8),
-            borderSide: BorderSide(color: theme.dividerColor, width: 1.0),
-          ),
-          focusedBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(8),
-            borderSide: BorderSide(color: theme.primaryColor, width: 1.5),
-          ),
+          border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide.none),
+          enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide.none),
+          focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide(color: theme.primaryColor, width: 1.5)),
         );
+  }
+
+  Widget _buildSectionCard({required String title, required List<Widget> children}) {
+    final theme = Theme.of(context);
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(color: theme.cardColor, borderRadius: BorderRadius.circular(12)),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(title, style: theme.textTheme.titleLarge), const Divider(height: 24), ...children]),
+    );
   }
 
   // --- SECTION BUILDERS ---
 
-  Widget _buildPersonalDetailsSection(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        _buildSectionTitle(context, "Personal Details"),
-        // Role is fixed for this page
-        _buildEditableInfoTile(context, "Aadhaar Number", _aadharController),
-        _buildDropdownField(context, "Gender", _gender, ['Male', 'Female', 'Other'], (val) => setState(() => _gender = val)),
-        _buildDatePickerField(context, "Date of Birth", _dateOfBirth, (val) => setState(() => _dateOfBirth = val)),
-        _buildDropdownField(context, "Relationship Status", _relationshipStatus, ['Single', 'Married'], (val) => setState(() => _relationshipStatus = val)),
-      ],
-    );
+   List<Widget> _buildAccountDetailsSection() {
+    return [
+      _buildEditableInfoTile("Full Name", _fullNameController),
+      _buildEditableInfoTile("Email", _emailController, keyboardType: TextInputType.emailAddress),
+      _buildEditableInfoTile("New Password", _newPasswordController, isPassword: true),
+    ];
   }
 
-  Widget _buildContactDetailsSection(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        _buildSectionTitle(context, "Contact Details"),
-        _buildEditableInfoTile(context, "Phone Number", _phoneNumberController, keyboardType: TextInputType.phone),
-        _buildEditableInfoTile(context, "Alternate Number", _alternateNumberController, keyboardType: TextInputType.phone),
-      ],
-    );
+  List<Widget> _buildPersonalDetailsSection() {
+    return [
+      _buildEditableInfoTile("Aadhaar Number", _aadharController),
+      _buildDropdownField("Gender", _gender, ['Male', 'Female', 'Other'], (val) => setState(() => _gender = val)),
+      _buildDatePickerField("Date of Birth", _dateOfBirth, (val) => setState(() => _dateOfBirth = val)),
+      _buildDropdownField("Relationship Status", _relationshipStatus, ['Single', 'Married'], (val) => setState(() => _relationshipStatus = val)),
+    ];
   }
 
-  Widget _buildAddressDetailsSection(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        _buildSectionTitle(context, "Address Details"),
-        _buildEditableInfoTile(context, "Address", _addressController),
-        _buildEditableInfoTile(context, "City", _cityController),
-        _buildEditableInfoTile(context, "State", _stateController),
-        _buildEditableInfoTile(context, "Pin code", _pinCodeController, keyboardType: TextInputType.number),
-      ],
-    );
+  List<Widget> _buildContactDetailsSection() {
+    return [
+      _buildEditableInfoTile("Phone Number", _phoneNumberController, keyboardType: TextInputType.phone),
+      _buildEditableInfoTile("Alternate Number", _alternateNumberController, keyboardType: TextInputType.phone),
+    ];
   }
 
-  Widget _buildProfessionalInformationSection(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        _buildSectionTitle(context, "Professional Information"),
-        _buildEditableInfoTile(context, "Position", _positionController),
-        _buildDropdownField(context, "Employment Type", _employmentType, ['full-time', 'part-time', 'internship', 'contract-based', 'other'], (val) => setState(() => _employmentType = val)),
-        _buildDatePickerField(context, "Joining Date", _joiningDate, (val) => setState(() => _joiningDate = val)),
-        _buildEditableInfoTile(context, "Experience (Years)", _experienceController, keyboardType: TextInputType.number),
-        _buildDropdownField(context, "Status", _status, ['live', 'expired'], (val) => setState(() => _status = val)),
-        _buildEditableInfoTile(context, "Reference", _referenceController),
-      ],
-    );
+  List<Widget> _buildAddressDetailsSection() {
+    return [
+      _buildEditableInfoTile("Address", _addressController),
+      _buildEditableInfoTile("City", _cityController),
+      _buildEditableInfoTile("State", _stateController),
+      _buildEditableInfoTile("Pin code", _pinCodeController, keyboardType: TextInputType.number),
+    ];
   }
 
-  Widget _buildEducationDetailsSection(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        _buildSectionTitle(context, "Education & Documents"),
-        _buildEditableInfoTile(context, "Qualification", _qualificationController),
-        _buildEditableInfoTile(context, "Matriculation Marks (%)", _matriculationMarksController, keyboardType: TextInputType.number),
-        _buildEditableInfoTile(context, "Intermediate Marks (%)", _intermediateMarksController, keyboardType: TextInputType.number),
-      ],
-    );
+  List<Widget> _buildProfessionalInformationSection() {
+    return [
+      _buildEditableInfoTile("Position", _positionController),
+      _buildDropdownField("Employment Type", _employmentType, ['full-time', 'part-time', 'internship', 'contract-based', 'other'], (val) => setState(() => _employmentType = val)),
+      _buildDatePickerField("Joining Date", _joiningDate, (val) => setState(() => _joiningDate = val)),
+      _buildEditableInfoTile("Experience (Years)", _experienceController, keyboardType: TextInputType.number),
+      _buildDropdownField("Status", _status, ['live', 'expired'], (val) => setState(() => _status = val)),
+      _buildEditableInfoTile("Reference", _referenceController),
+    ];
   }
 
-  Widget _buildBankingDetailsSection(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        _buildSectionTitle(context, "Banking Details"),
-        _buildEditableInfoTile(context, "Bank Account Number", _bankAccountNumberController, keyboardType: TextInputType.number),
-        _buildEditableInfoTile(context, "IFSC Code", _ifscCodeController),
-        _buildEditableInfoTile(context, "Bank Name", _bankNameController),
-        _buildEditableInfoTile(context, "Branch", _branchController),
-      ],
-    );
+  List<Widget> _buildEducationDetailsSection() {
+    return [
+      _buildEditableInfoTile("Qualification", _qualificationController),
+      _buildEditableInfoTile("Matriculation Marks (%)", _matriculationMarksController, keyboardType: TextInputType.number),
+      _buildEditableInfoTile("Intermediate Marks (%)", _intermediateMarksController, keyboardType: TextInputType.number),
+      _buildFilePickerTile("Matriculation Marksheet", _matriculationMarksheet, () => _pickFile((file) => _matriculationMarksheet = file)),
+      _buildFilePickerTile("Intermediate Marksheet", _intermediateMarksheet, () => _pickFile((file) => _intermediateMarksheet = file)),
+      _buildFilePickerTile("Resume", _resume, () => _pickFile((file) => _resume = file)),
+    ];
   }
 
-  Widget _buildEmergencyContactDetailsSection(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        _buildSectionTitle(context, "Emergency Contact"),
-        _buildEditableInfoTile(context, "Contact Name", _emergencyContactNameController),
-        _buildEditableInfoTile(context, "Contact Number", _emergencyContactNumberController, keyboardType: TextInputType.phone),
-      ],
-    );
+  List<Widget> _buildBankingDetailsSection() {
+    return [
+      _buildEditableInfoTile("Bank Account Number", _bankAccountNumberController, keyboardType: TextInputType.number),
+      _buildEditableInfoTile("IFSC Code", _ifscCodeController),
+      _buildEditableInfoTile("Bank Name", _bankNameController),
+      _buildEditableInfoTile("Branch", _branchController),
+    ];
   }
 
-  Widget _buildSectionTitle(BuildContext context, String title) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 12, top: 12),
-      child: Text(title, style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold)),
-    );
+  List<Widget> _buildEmergencyContactDetailsSection() {
+    return [
+      _buildEditableInfoTile("Emergency Contact Name", _emergencyContactNameController),
+      _buildEditableInfoTile("Emergency Contact Number", _emergencyContactNumberController, keyboardType: TextInputType.phone),
+    ];
   }
 }
 
-class CustomProfileBox extends StatelessWidget {
-  const CustomProfileBox({super.key});
+class _AddTeacherProfileBox extends StatelessWidget {
+  final File? image;
+  final VoidCallback onPickImage;
+
+  const _AddTeacherProfileBox({this.image, required this.onPickImage});
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final textTheme = theme.textTheme;
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(16.0),
-      decoration: BoxDecoration(
-        color: theme.primaryColor,
-        borderRadius: BorderRadius.circular(12),
-      ),
+    final screenSize = MediaQuery.of(context).size;
+    return Center(
       child: Column(
         children: [
-          Row(
-            children: [
-              Icon(Icons.person_add_alt_1, color: theme.colorScheme.onPrimary, size: 30),
-              const SizedBox(width: 8),
-              Text("New Teacher Profile",
-                  style: textTheme.titleLarge?.copyWith(
-                      color: theme.colorScheme.onPrimary,
-                      fontWeight: FontWeight.bold))
-            ],
+          CircleAvatar(
+            radius: screenSize.width * 0.15,
+            backgroundColor: theme.colorScheme.surface,
+            backgroundImage: image != null ? FileImage(image!) : null,
+            child: image == null
+                ? Icon(
+                    Icons.person_add_alt_1_rounded,
+                    size: screenSize.width * 0.15,
+                    color: theme.colorScheme.onSurface.withAlpha(128),
+                  )
+                : null,
           ),
-          const SizedBox(height: 16),
-          const CircleAvatar(
-            radius: 40,
-            child: Icon(Icons.person, size: 50),
-          ),
-          const SizedBox(height: 8),
-          Text("Profile Picture",
-              style: textTheme.titleMedium
-                  ?.copyWith(color: theme.colorScheme.onPrimary, fontWeight: FontWeight.bold)),
+          SizedBox(height: screenSize.height * 0.01),
+          TextButton.icon(
+            onPressed: onPickImage,
+            icon: Icon(Icons.camera_alt, color: theme.colorScheme.primary),
+            label: Text("Upload Photo", style: TextStyle(color: theme.colorScheme.primary)),
+          )
         ],
       ),
     );
   }
-}
-
-void showDeleteDialog(BuildContext context) {
-  final theme = Theme.of(context);
-  final textTheme = theme.textTheme;
-  showGeneralDialog(
-    context: context,
-    barrierDismissible: true,
-    barrierLabel: "Delete",
-    barrierColor: Colors.black.withOpacity(0.5),
-    transitionDuration: const Duration(milliseconds: 300),
-    pageBuilder: (context, anim1, anim2) {
-      return BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 5, sigmaY: 5),
-        child: AlertDialog(
-          backgroundColor: theme.scaffoldBackgroundColor,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-          title: Center(
-            child: Text("Delete Teacher",
-                style: textTheme.titleLarge
-                    ?.copyWith(fontWeight: FontWeight.bold)),
-          ),
-          content: Text("Are you sure you want to delete this teacher?",
-              textAlign: TextAlign.center,
-              style: textTheme.bodyMedium?.copyWith(color: theme.hintColor)),
-          actions: [
-            Row(
-              children: [
-                Expanded(
-                  child: TextButton(onPressed: () {}, child: const Text("Delete"))),
-                Expanded(
-                    child: ElevatedButton(
-                  onPressed: () => Navigator.of(context).pop(),
-                  child: const Text("Cancel"),
-                ))
-              ],
-            )
-          ],
-        ),
-      );
-    },
-  );
 }

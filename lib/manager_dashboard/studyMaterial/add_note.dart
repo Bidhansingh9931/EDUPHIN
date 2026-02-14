@@ -108,11 +108,12 @@ class _AddNotePageState extends State<AddNotePage> {
       var response = await request.send();
       final responseBody = await response.stream.bytesToString();
       final responseData = jsonDecode(responseBody);
+      final theme = Theme.of(context);
 
       if (response.statusCode == 201 && responseData['status'] == true) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(responseData['message'] ?? 'Note added successfully!'), backgroundColor: Colors.green),
+            SnackBar(content: Text(responseData['message'] ?? 'Note added successfully!'), backgroundColor: theme.colorScheme.primary),
           );
           success = true;
         }
@@ -121,8 +122,9 @@ class _AddNotePageState extends State<AddNotePage> {
       }
     } catch (e) {
       if (mounted) {
+        final theme = Theme.of(context);
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(e.toString().replaceFirst('Exception: ', '')), backgroundColor: Colors.red),
+          SnackBar(content: Text(e.toString().replaceFirst('Exception: ', '')), backgroundColor: theme.colorScheme.error),
         );
       }
     } finally {
@@ -137,6 +139,7 @@ class _AddNotePageState extends State<AddNotePage> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     return Scaffold(
       appBar: AppBar(title: const Text("Add New Note")),
       body: _isLoading
@@ -153,7 +156,7 @@ class _AddNotePageState extends State<AddNotePage> {
                   ),
                   const SizedBox(height: 16),
                   DropdownButtonFormField<int>(
-                    initialValue: _selectedClassId,
+                    value: _selectedClassId,
                     items: _classes.map<DropdownMenuItem<int>>((c) => DropdownMenuItem(value: c['id'], child: Text(c['name']))).toList(),
                     onChanged: (value) {
                       setState(() {
@@ -167,7 +170,7 @@ class _AddNotePageState extends State<AddNotePage> {
                   ),
                   const SizedBox(height: 16),
                   DropdownButtonFormField<int>(
-                    initialValue: _selectedSectionId,
+                    value: _selectedSectionId,
                     items: _sections.map<DropdownMenuItem<int>>((s) => DropdownMenuItem(value: s['id'], child: Text(s['section_name']))).toList(),
                     onChanged: (value) => setState(() => _selectedSectionId = value),
                     decoration: const InputDecoration(labelText: 'Section'),
@@ -184,7 +187,7 @@ class _AddNotePageState extends State<AddNotePage> {
                   Container(
                     padding: const EdgeInsets.symmetric(vertical: 8.0),
                     decoration: BoxDecoration(
-                      border: Border.all(color: Colors.grey),
+                      border: Border.all(color: theme.dividerColor),
                       borderRadius: BorderRadius.circular(4.0),
                     ),
                     child: Row(
@@ -207,9 +210,11 @@ class _AddNotePageState extends State<AddNotePage> {
         onPressed: _isSaving ? null : _saveNote,
         style: ElevatedButton.styleFrom(
           padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+          backgroundColor: theme.colorScheme.primary,
+          foregroundColor: theme.colorScheme.onPrimary,
         ),
         child: _isSaving 
-            ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2, valueColor: AlwaysStoppedAnimation(Colors.white)))
+            ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2))
             : const Text('Save Note'),
       ),
     );

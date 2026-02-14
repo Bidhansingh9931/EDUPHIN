@@ -184,6 +184,7 @@ class _DailyClassSchedulePageState extends State<DailyClassSchedulePage>{
   }
 
   Widget _buildBody() {
+    final theme = Theme.of(context);
     if (_isLoading) {
       return const Center(child: CircularProgressIndicator());
     }
@@ -195,7 +196,7 @@ class _DailyClassSchedulePageState extends State<DailyClassSchedulePage>{
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Text('Error: $_error', style: const TextStyle(color: Colors.red), textAlign: TextAlign.center,),
+              Text('Error: $_error', style: TextStyle(color: theme.colorScheme.error), textAlign: TextAlign.center,),
               const SizedBox(height: 16),
               ElevatedButton(onPressed: _fetchSchedule, child: const Text("Retry"))
             ],
@@ -205,15 +206,17 @@ class _DailyClassSchedulePageState extends State<DailyClassSchedulePage>{
     }
     
     if (_schedule.isEmpty) {
-       return const Center(child: Text("No schedule found for this day."));
+       return Center(child: Text("No schedule found for this day.", style: TextStyle(color: theme.colorScheme.onSurfaceVariant)));
     }
+
+    final screenSize = MediaQuery.of(context).size;
 
     return LayoutBuilder(
       builder: (context, constraints) {
         // Use GridView for wider screens
         if (constraints.maxWidth > 600) {
           return GridView.builder(
-            padding: const EdgeInsets.fromLTRB(16, 16, 16, 50),
+            padding: EdgeInsets.all(screenSize.width * 0.04),
             itemCount: _schedule.length,
             gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
               maxCrossAxisExtent: 400, // Max width per item
@@ -235,7 +238,7 @@ class _DailyClassSchedulePageState extends State<DailyClassSchedulePage>{
         } else {
           // Use ListView for narrower screens
           return ListView.separated(
-            padding: const EdgeInsets.fromLTRB(16, 16, 16, 50),
+            padding: EdgeInsets.all(screenSize.width * 0.04),
             itemCount: _schedule.length,
             separatorBuilder: (context, index) => const SizedBox(height: 16),
             itemBuilder: (context, index) {
@@ -278,58 +281,58 @@ class ScheduleCard extends StatelessWidget{
     return Container(
       width: double.infinity,
       decoration: BoxDecoration(
-        color: theme.colorScheme.surface,
-        borderRadius: BorderRadius.circular(10),
+        color: theme.cardColor,
+        borderRadius: BorderRadius.circular(12),
       ),
       padding: const EdgeInsets.all(16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisAlignment: MainAxisAlignment.center, // For Grid layout
-        children:[
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Use flexible to prevent overflow on very small screens
-              Flexible(
-                child: Text(
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Flexible(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisAlignment: MainAxisAlignment.center, // For Grid layout
+              children:[
+                Text(
                   title,
-                  // Using theme for scalable and consistent fonts
                   style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
+                  overflow: TextOverflow.ellipsis,
                 ),
-              ),
-              ElevatedButton(onPressed: (){
-                // Passing data to the OverrideSchedulePage
-                Navigator.push(context, MaterialPageRoute(builder: (context)=>OverrideSchedulePage(
-                  scheduleId: scheduleId,
-                  scheduleDetails: OriginalScheduleDetails(
-                    className: className,
-                    subject: title,
-                    teacher: subtitle,
-                    time: time,
-                  ),
-                )));
-              },
-              style: ElevatedButton.styleFrom(
-                // Using theme colors for consistency
-                backgroundColor: theme.colorScheme.primary,
-                foregroundColor: theme.colorScheme.onPrimary,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(10),
+                const SizedBox(height: 8),
+                Text(
+                  subtitle,
+                  style: theme.textTheme.bodyMedium?.copyWith(color: theme.hintColor, fontWeight: FontWeight.bold)
                 ),
-              ),
-              child: const Text("Override")
-              ),
-            ],
+                Text(
+                  time,
+                  style: theme.textTheme.bodyMedium?.copyWith(color: theme.hintColor, fontWeight: FontWeight.bold)
+                ),
+              ],
+            ),
           ),
-          const SizedBox(height: 8),
-          Text(
-            subtitle,
-            style: theme.textTheme.bodyMedium?.copyWith(color: theme.hintColor, fontWeight: FontWeight.bold)
+          ElevatedButton(onPressed: (){
+            // Passing data to the OverrideSchedulePage
+            Navigator.push(context, MaterialPageRoute(builder: (context)=>OverrideSchedulePage(
+              scheduleId: scheduleId,
+              scheduleDetails: OriginalScheduleDetails(
+                className: className,
+                subject: title,
+                teacher: subtitle,
+                time: time,
+              ),
+            )));
+          },
+          style: ElevatedButton.styleFrom(
+            backgroundColor: theme.colorScheme.primary,
+            foregroundColor: theme.colorScheme.onPrimary,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(10),
+            ),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
           ),
-          Text(
-            time,
-            style: theme.textTheme.bodyMedium?.copyWith(color: theme.hintColor, fontWeight: FontWeight.bold)
+          child: const FittedBox(
+            child: Text("Override"),
+          )
           ),
         ],
       ),

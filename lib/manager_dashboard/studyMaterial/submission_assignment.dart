@@ -76,10 +76,6 @@ class _AssignmentSubmissionsScreenState
 
     try {
       final response = await ApiService.get('manager/study/assignment/${widget.assignmentId}/submissions');
-      // Log the status code and response body
-      print('API Status Code: ${response.statusCode}');
-      print('API Response Body: ${response.body}');
-
       if (response.statusCode == 200) {
         final responseData = jsonDecode(response.body)['data'];
 
@@ -98,19 +94,15 @@ class _AssignmentSubmissionsScreenState
           });
         }
       } else {
-        // Log the error for non-200 responses
-        print('Failed to load submissions. Status code: ${response.statusCode}');
         throw Exception('Failed to load submissions');
       }
     } catch (e) {
-      // Log any other exceptions
-      print('Error fetching submissions: $e');
       if (mounted) {
         setState(() {
           isLoading = false;
         });
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: $e')),
+          SnackBar(content: Text('Error: $e'), backgroundColor: Theme.of(context).colorScheme.error),
         );
       }
     }
@@ -122,13 +114,8 @@ class _AssignmentSubmissionsScreenState
     return Scaffold(
       backgroundColor: theme.scaffoldBackgroundColor,
       appBar: AppBar(
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        leading: BackButton(color: theme.colorScheme.onSurface),
-        title: Text(
-          assignmentTitle,
-          style: TextStyle(color: theme.colorScheme.onSurface),
-        ),
+        title: Text(assignmentTitle),
+        centerTitle: true,
       ),
       body: isLoading
           ? const Center(child: CircularProgressIndicator())
@@ -179,139 +166,142 @@ class _SubmissionCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: theme.cardColor,
-        borderRadius: BorderRadius.circular(18),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Student Name
-          Text(
-            submission.name,
-            style: theme.textTheme.titleLarge?.copyWith(
-              color: theme.colorScheme.onSurface,
-              fontWeight: FontWeight.w700,
+    return Card(
+      elevation: 2,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Student Name
+            Text(
+              submission.name,
+              style: theme.textTheme.titleLarge?.copyWith(
+                color: theme.colorScheme.onSurface,
+                fontWeight: FontWeight.w700,
+              ),
             ),
-          ),
 
-          const SizedBox(height: 14),
+            const SizedBox(height: 14),
 
-          // FILE TILE
-          Container(
-            padding: const EdgeInsets.all(14),
-            decoration: BoxDecoration(
-              color: theme.scaffoldBackgroundColor,
-              borderRadius: BorderRadius.circular(14),
+            // FILE TILE
+            Container(
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: theme.scaffoldBackgroundColor,
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: theme.dividerColor),
+              ),
+              child: Row(
+                children: [
+                  Icon(
+                    submission.hasFile ? Icons.insert_drive_file : Icons.close,
+                    color: submission.hasFile
+                        ? theme.colorScheme.primary
+                        : theme.hintColor,
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      submission.fileName,
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        color: submission.hasFile
+                            ? theme.colorScheme.onSurface
+                            : theme.hintColor,
+                      ),
+                    ),
+                  ),
+                  Icon(
+                    Icons.download_outlined,
+                    color: submission.hasFile
+                        ? theme.colorScheme.onSurface
+                        : Colors.transparent,
+                  )
+                ],
+              ),
             ),
-            child: Row(
-              children: [
-                Icon(
-                  submission.hasFile ? Icons.insert_drive_file : Icons.close,
-                  color: submission.hasFile
-                      ? theme.colorScheme.primary
-                      : theme.hintColor,
-                ),
-                const SizedBox(width: 12),
-                Expanded(
+
+            const SizedBox(height: 14),
+
+            Text("Typed Answer",
+                style: theme.textTheme.labelMedium?.copyWith(color: theme.hintColor)),
+
+            const SizedBox(height: 6),
+
+            Text(
+              submission.typedAnswer,
+              style: theme.textTheme.bodyMedium,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+            ),
+
+            if (submission.typedAnswer.length > 50)
+              Padding(
+                padding: const EdgeInsets.only(top: 4.0),
+                child: InkWell(
+                  onTap: () {
+                    showDialog(
+                      context: context,
+                      builder: (BuildContext dialogContext) {
+                        final dialogTheme = Theme.of(dialogContext);
+                        return AlertDialog(
+                          backgroundColor: dialogTheme.cardColor,
+                          title: Text("Full Typed Answer", style: dialogTheme.textTheme.titleLarge),
+                          content: SingleChildScrollView(
+                            child: Text(submission.typedAnswer, style: dialogTheme.textTheme.bodyMedium),
+                          ),
+                          actions: [
+                            TextButton(
+                              onPressed: () {
+                                Navigator.of(dialogContext).pop();
+                              },
+                              child: Text("Close", style: TextStyle(color: dialogTheme.colorScheme.primary)),
+                            ),
+                          ],
+                        );
+                      },
+                    );
+                  },
                   child: Text(
-                    submission.fileName,
-                    style: theme.textTheme.bodyMedium?.copyWith(
-                      color: submission.hasFile
-                          ? theme.colorScheme.onSurface
-                          : theme.hintColor,
+                    "Read more",
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: theme.colorScheme.secondary,
                     ),
                   ),
                 ),
-                Icon(
-                  Icons.download_outlined,
-                  color: submission.hasFile
-                      ? theme.colorScheme.onSurface
-                      : Colors.transparent,
-                )
-              ],
-            ),
-          ),
+              ),
 
-          const SizedBox(height: 14),
+            const SizedBox(height: 14),
 
-          Text("Typed Answer",
-              style: theme.textTheme.labelMedium?.copyWith(color: theme.hintColor)),
-
-          const SizedBox(height: 6),
-
-          Text(
-            submission.typedAnswer,
-            style: theme.textTheme.bodyMedium,
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
-          ),
-
-          if (submission.typedAnswer.length > 50)
-            Padding(
-              padding: const EdgeInsets.only(top: 4.0),
-              child: InkWell(
-                onTap: () {
-                  showDialog(
-                    context: context,
-                    builder: (BuildContext dialogContext) {
-                      return AlertDialog(
-                        title: const Text("Full Typed Answer"),
-                        content: SingleChildScrollView(
-                          child: Text(submission.typedAnswer),
-                        ),
-                        actions: [
-                          TextButton(
-                            onPressed: () {
-                              Navigator.of(dialogContext).pop();
-                            },
-                            child: const Text("Close"),
-                          ),
-                        ],
-                      );
-                    },
-                  );
-                },
-                child: Text(
-                  "Read more",
-                  style: theme.textTheme.bodySmall?.copyWith(
-                    color: theme.colorScheme.secondary,
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(
+                  child: _buildInfoField(
+                    theme,
+                    label: "Submitted On",
+                    value: submission.submittedOn,
                   ),
                 ),
-              ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: _buildInfoField(
+                    theme,
+                    label: "Grade",
+                    value: submission.grade,
+                    isGraded: submission.graded,
+                    didFail: submission.fail,
+                  ),
+                ),
+              ],
             ),
 
-          const SizedBox(height: 14),
+            const SizedBox(height: 6),
 
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Expanded(
-                child: _buildInfoField(
-                  theme,
-                  label: "Submitted On",
-                  value: submission.submittedOn,
-                ),
-              ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: _buildInfoField(
-                  theme,
-                  label: "Grade",
-                  value: submission.grade,
-                  isGraded: submission.graded,
-                  didFail: submission.fail,
-                ),
-              ),
-            ],
-          ),
-
-          const SizedBox(height: 6),
-
-          _buildInfoField(theme, label: "Remarks", value: submission.remarks),
-        ],
+            _buildInfoField(theme, label: "Remarks", value: submission.remarks),
+          ],
+        ),
       ),
     );
   }
@@ -321,7 +311,7 @@ class _SubmissionCard extends StatelessWidget {
         
     Color valueColor;
     if (isGraded) {
-      valueColor = didFail ? theme.colorScheme.error : Colors.green.shade400;
+      valueColor = didFail ? theme.colorScheme.error : theme.colorScheme.primary;
     } else {
       valueColor = theme.hintColor;
     }
@@ -340,6 +330,7 @@ class _SubmissionCard extends StatelessWidget {
             value,
             style: theme.textTheme.bodyMedium?.copyWith(
               color: valueColor,
+              fontWeight: isGraded ? FontWeight.bold : FontWeight.normal,
             ),
           ),
         ],

@@ -308,7 +308,7 @@ class CustomExamResultContainerBox extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text("Date", style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onPrimary.withAlpha(150))),
-                      Text(date, style: theme.textTheme.bodyMedium?.copyWith(color: Colors.blue)),
+                      Text(date, style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onPrimary)),
                     ],
                   ),
                 ),
@@ -318,7 +318,7 @@ class CustomExamResultContainerBox extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text("Time", style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onPrimary.withAlpha(150))),
-                      Text(time, style: theme.textTheme.bodyMedium?.copyWith(color: Colors.blue)),
+                      Text(time, style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onPrimary)),
                     ],
                   ),
                 ),
@@ -334,12 +334,13 @@ class CustomExamResultContainerBox extends StatelessWidget {
                   child: ElevatedButton.icon(
                     onPressed: onEnterMarks,
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.blue.withAlpha(55),
+                      backgroundColor: theme.colorScheme.secondary,
+                      foregroundColor: theme.colorScheme.onSecondary,
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                       padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
                     ),
-                    icon: const Icon(Icons.edit, color: Colors.white, size: 16),
-                    label: Text("Enter Marks", style: theme.textTheme.labelLarge?.copyWith(color: Colors.white)),
+                    icon: const Icon(Icons.edit, size: 16),
+                    label: const Text("Enter Marks"),
                   ),
                 ),
                 const SizedBox(width: 10),
@@ -347,12 +348,13 @@ class CustomExamResultContainerBox extends StatelessWidget {
                   child: ElevatedButton.icon(
                     onPressed: onDelete,
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.red.withAlpha(55),
+                      backgroundColor: theme.colorScheme.errorContainer,
+                      foregroundColor: theme.colorScheme.onErrorContainer,
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                       padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
                     ),
-                    icon: const Icon(Icons.delete, color: Colors.white, size: 16),
-                    label: Text("Delete", style: theme.textTheme.labelLarge?.copyWith(color: Colors.white)),
+                    icon: const Icon(Icons.delete, size: 16),
+                    label: const Text("Delete"),
                   ),
                 ),
               ],

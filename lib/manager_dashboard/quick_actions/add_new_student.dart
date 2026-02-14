@@ -66,9 +66,10 @@ class _AddNewStudentPageState extends State<AddNewStudentPage> {
   }
 
   Future<void> _submitForm() async {
+    final theme = Theme.of(context);
     if (!_formKey.currentState!.validate()) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please fill all required fields.'), backgroundColor: Colors.red),
+        SnackBar(content: const Text('Please fill all required fields.'), backgroundColor: theme.colorScheme.error),
       );
       return;
     }
@@ -81,7 +82,7 @@ class _AddNewStudentPageState extends State<AddNewStudentPage> {
         return;
       }
       final message = responseData['message'] ?? 'Student added successfully!';
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message), backgroundColor: Colors.green));
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message), backgroundColor: theme.colorScheme.primary));
       Navigator.of(context).pop(true);
     } catch (e) {
       if (!mounted) {
@@ -89,7 +90,7 @@ class _AddNewStudentPageState extends State<AddNewStudentPage> {
       }
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(e.toString().replaceFirst("Exception: ", "")),
-            backgroundColor: Colors.red),
+            backgroundColor: theme.colorScheme.error),
       );
     } finally {
       if (mounted) {
@@ -253,18 +254,18 @@ class _AddNewStudentPageState extends State<AddNewStudentPage> {
 
   Widget _buildSectionContainer(
       ThemeData theme, String title, List<Widget> children) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(16.0),
-      decoration: BoxDecoration(
-          color: theme.primaryColor, borderRadius: BorderRadius.circular(12)),
-      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Text(title,
-            style: theme.textTheme.titleLarge
-                ?.copyWith(color: theme.colorScheme.onPrimary)),
-        const Divider(height: 24),
-        ...children,
-      ]),
+    return Card(
+      elevation: 2,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(16.0),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text(title, style: theme.textTheme.titleLarge),
+          Divider(height: 24, color: theme.dividerColor),
+          ...children,
+        ]),
+      ),
     );
   }
 
@@ -443,9 +444,7 @@ class _AddNewStudentPageState extends State<AddNewStudentPage> {
     return Padding(
         padding: const EdgeInsets.only(bottom: 16.0),
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Text(label,
-              style: theme.textTheme.labelLarge
-                  ?.copyWith(color: theme.colorScheme.onPrimary)),
+          Text(label, style: theme.textTheme.labelLarge),
           const SizedBox(height: 8),
           TextFormField(
               onChanged: onChanged,
@@ -453,12 +452,17 @@ class _AddNewStudentPageState extends State<AddNewStudentPage> {
               keyboardType: keyboardType,
               obscureText: isPassword,
               decoration: InputDecoration(
-                  hintText: "Enter $label",
-                  filled: true,
-                  fillColor: theme.scaffoldBackgroundColor,
-                  border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(10),
-                      borderSide: BorderSide.none)),
+                hintText: "Enter $label",
+                filled: true,
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(10),
+                  borderSide: BorderSide(color: theme.dividerColor),
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(10),
+                  borderSide: BorderSide(color: theme.dividerColor),
+                ),
+              ),
               validator: isOptional
                   ? null
                   : (validator ?? (val) => val!.isEmpty ? '$label is required' : null)),
@@ -470,21 +474,23 @@ class _AddNewStudentPageState extends State<AddNewStudentPage> {
     return Padding(
         padding: const EdgeInsets.only(bottom: 16.0),
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Text(label,
-              style: theme.textTheme.labelLarge
-                  ?.copyWith(color: theme.colorScheme.onPrimary)),
+          Text(label, style: theme.textTheme.labelLarge),
           const SizedBox(height: 8),
           DropdownButtonFormField<T>(
-              initialValue: value,
+              value: value,
               items: items,
               onChanged: onChanged,
               decoration: InputDecoration(
                   hintText: "--Select $label--",
                   filled: true,
-                  fillColor: theme.scaffoldBackgroundColor,
                   border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(10),
-                      borderSide: BorderSide.none)),
+                    borderRadius: BorderRadius.circular(10),
+                    borderSide: BorderSide(color: theme.dividerColor),
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(10),
+                    borderSide: BorderSide(color: theme.dividerColor),
+                  )),
               validator: (val) => val == null ? 'Please select a $label' : null),
         ]));
   }
@@ -516,9 +522,7 @@ class _AddNewStudentPageState extends State<AddNewStudentPage> {
     return Padding(
         padding: const EdgeInsets.only(bottom: 16.0),
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Text(label,
-              style: theme.textTheme.labelLarge
-                  ?.copyWith(color: theme.colorScheme.onPrimary)),
+          Text(label, style: theme.textTheme.labelLarge),
           const SizedBox(height: 8),
           FormField<DateTime>(
               initialValue: date,
@@ -540,11 +544,9 @@ class _AddNewStudentPageState extends State<AddNewStudentPage> {
                         padding: const EdgeInsets.symmetric(
                             vertical: 14, horizontal: 12),
                         decoration: BoxDecoration(
-                            color: theme.scaffoldBackgroundColor,
+                            color: theme.inputDecorationTheme.fillColor,
                             borderRadius: BorderRadius.circular(10),
-                            border: field.hasError
-                                ? Border.all(color: theme.colorScheme.error)
-                                : null),
+                            border: Border.all(color: field.hasError ? theme.colorScheme.error : theme.dividerColor)),
                         child: Row(
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
@@ -553,7 +555,7 @@ class _AddNewStudentPageState extends State<AddNewStudentPage> {
                                       ? DateFormat('yyyy-MM-dd').format(date)
                                       : "Select Date",
                                   style: theme.textTheme.bodyLarge),
-                              const Icon(Icons.calendar_month),
+                              Icon(Icons.calendar_month, color: theme.colorScheme.primary),
                             ])));
               }),
         ]));
@@ -568,22 +570,24 @@ class _AddNewStudentPageState extends State<AddNewStudentPage> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(label,
-              style: theme.textTheme.labelLarge
-                  ?.copyWith(color: theme.colorScheme.onPrimary)),
+          Text(label, style: theme.textTheme.labelLarge),
           const SizedBox(height: 8),
           TextFormField(
             readOnly: true,
             controller: controller,
             decoration: InputDecoration(
               filled: true,
-              fillColor: theme.scaffoldBackgroundColor,
               suffixIcon: IconButton(
-                  icon: const Icon(Icons.upload_file),
+                  icon: Icon(Icons.upload_file, color: theme.colorScheme.primary),
                   onPressed: () => _pickFile(onFilePicked)),
               border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(10),
-                  borderSide: BorderSide.none),
+                borderRadius: BorderRadius.circular(10),
+                borderSide: BorderSide(color: theme.dividerColor),
+              ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(10),
+                borderSide: BorderSide(color: theme.dividerColor),
+              ),
             ),
             validator:
                 isOptional ? null : (val) => file == null ? 'Please choose a file' : null,
@@ -594,44 +598,89 @@ class _AddNewStudentPageState extends State<AddNewStudentPage> {
   }
 
   Widget _buildActionButtons(ThemeData theme) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16.0),
-      child: Row(children: [
-        Expanded(
-            child: OutlinedButton(
-          onPressed: () => Navigator.of(context).pop(),
-          style: OutlinedButton.styleFrom(
-              padding: const EdgeInsets.symmetric(vertical: 16),
-              side: BorderSide(color: theme.dividerColor),
-              shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12.0))),
-          child: Text("Cancel",
-              style: theme.textTheme.labelLarge
-                  ?.copyWith(color: theme.colorScheme.onSurface)),
-        )),
-        const SizedBox(width: 16),
-        Expanded(
-            child: ElevatedButton.icon(
-          onPressed: _isSubmitting ? null : _submitForm,
-          style: ElevatedButton.styleFrom(
-              padding: const EdgeInsets.symmetric(vertical: 16),
-              backgroundColor: theme.colorScheme.primary,
-              foregroundColor: theme.colorScheme.onPrimary,
-              shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12.0))),
-          icon: _isSubmitting ? Container() : const Icon(Icons.add),
-          label: _isSubmitting
-              ? const SizedBox(
-                  height: 24,
-                  width: 24,
-                  child: CircularProgressIndicator(
-                      strokeWidth: 3,
-                      valueColor: AlwaysStoppedAnimation(Colors.white)))
-              : Text("Add Student",
-                  style: theme.textTheme.labelLarge
-                      ?.copyWith(color: theme.colorScheme.onPrimary)),
-        )),
-      ]),
-    );
+    return LayoutBuilder(builder: (context, constraints) {
+      final bool isWide = constraints.maxWidth > 300;
+      return Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16.0),
+        child: isWide
+            ? Row(children: [
+                Expanded(
+                  child: OutlinedButton(
+                    onPressed: () => Navigator.of(context).pop(),
+                    style: OutlinedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                        side: BorderSide(color: theme.dividerColor),
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12.0))),
+                    child: Text("Cancel",
+                        style: theme.textTheme.labelLarge
+                            ?.copyWith(color: theme.colorScheme.onSurface)),
+                  ),
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                    child: ElevatedButton.icon(
+                  onPressed: _isSubmitting ? null : _submitForm,
+                  style: ElevatedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                      backgroundColor: theme.colorScheme.primary,
+                      foregroundColor: theme.colorScheme.onPrimary,
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12.0))),
+                  icon: _isSubmitting ? Container() : const Icon(Icons.add),
+                  label: _isSubmitting
+                      ? SizedBox(
+                          height: 24,
+                          width: 24,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 3,
+                            color: theme.colorScheme.onPrimary,
+                          ))
+                      : Text("Add Student",
+                          style: theme.textTheme.labelLarge
+                              ?.copyWith(color: theme.colorScheme.onPrimary)),
+                )),
+              ])
+            : Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  ElevatedButton.icon(
+                    onPressed: _isSubmitting ? null : _submitForm,
+                    style: ElevatedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                        backgroundColor: theme.colorScheme.primary,
+                        foregroundColor: theme.colorScheme.onPrimary,
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12.0))),
+                    icon: _isSubmitting ? Container() : const Icon(Icons.add),
+                    label: _isSubmitting
+                        ? SizedBox(
+                            height: 24,
+                            width: 24,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 3,
+                              color: theme.colorScheme.onPrimary,
+                            ))
+                        : Text("Add Student",
+                            style: theme.textTheme.labelLarge
+                                ?.copyWith(color: theme.colorScheme.onPrimary)),
+                  ),
+                  const SizedBox(height: 8),
+                  OutlinedButton(
+                    onPressed: () => Navigator.of(context).pop(),
+                    style: OutlinedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                        side: BorderSide(color: theme.dividerColor),
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12.0))),
+                    child: Text("Cancel",
+                        style: theme.textTheme.labelLarge
+                            ?.copyWith(color: theme.colorScheme.onSurface)),
+                  ),
+                ],
+              ),
+      );
+    });
   }
 }

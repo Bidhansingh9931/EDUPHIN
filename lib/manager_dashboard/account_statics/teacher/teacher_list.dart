@@ -84,7 +84,7 @@ class _TeacherListPageState extends State<TeacherListPage> {
             await _fetchTeachersForRole(_selectedRoleId!); // Fetch teachers for the default role
           }
         } else {
-          setState(() => _isLoading = false); // No teacher roles found
+          if(mounted) setState(() => _isLoading = false); // No teacher roles found
         }
       } else {
         throw Exception('Failed to load roles');
@@ -125,70 +125,59 @@ class _TeacherListPageState extends State<TeacherListPage> {
     }
   }
 
-  @override
+ @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final screenSize = MediaQuery.of(context).size;
+
     return Scaffold(
-        floatingActionButton: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16.0),
-          child: SizedBox(
-              width: double.infinity,
-              height: 50,
-              child: FloatingActionButton.extended(
-                heroTag: 'addTeacherBtn',
-                onPressed: () async {
-                  final result = await Navigator.push(context, MaterialPageRoute(builder: (context)=>const AddTeacherPage()));
-                  if (result == true && mounted) {
-                    _fetchTeachersForRole(_selectedRoleId!); // Refresh list on return
-                  }
-                },
-                label: Text(
-                  "Add Teacher",
-                  style: theme.textTheme.labelLarge?.copyWith(
-                    color: theme.colorScheme.onSurface,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                icon: Icon(Icons.add, color: theme.colorScheme.onSurface),
-              ),
+      floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: () async {
+          final result = await Navigator.push(
+            context,
+            MaterialPageRoute(builder: (context) => const AddTeacherPage()),
+          );
+          if (result == true && mounted) {
+            _fetchTeachersForRole(_selectedRoleId!); // Refresh list on return
+          }
+        },
+        label: Text("Add Teacher", style: TextStyle(color: theme.colorScheme.onPrimary)),
+        icon: Icon(Icons.add, color: theme.colorScheme.onPrimary),
+        backgroundColor: theme.colorScheme.primary,
+      ),
+      backgroundColor: theme.scaffoldBackgroundColor,
+      appBar: AppBar(
+        title: const Text("Teacher List"),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.download),
+            onPressed: () {
+              // TODO: Implement download functionality
+            },
+          ),
+        ],
+      ),
+      body: SingleChildScrollView(
+        child: Padding(
+          padding: EdgeInsets.fromLTRB(screenSize.width * 0.04, screenSize.width * 0.04, screenSize.width * 0.04, 80),
+          child: CustomTeacherListBox(
+            isLoading: _isLoading,
+            teachers: _teachers,
+            roles: _roles,
+            selectedRoleId: _selectedRoleId,
+            onRoleChanged: (int? newRoleId) {
+              if (newRoleId != null) {
+                setState(() {
+                  _selectedRoleId = newRoleId;
+                });
+                _fetchTeachersForRole(newRoleId);
+              }
+            },
           ),
         ),
-        backgroundColor: theme.scaffoldBackgroundColor,
-        appBar: AppBar(
-          title: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                "Teacher List",
-                style: theme.textTheme.titleLarge?.copyWith(
-                    color: theme.colorScheme.onSurface,
-                    fontWeight: FontWeight.bold),
-              ),
-              const Icon(
-                Icons.download,
-              ),
-            ],
-          ),
-        ),
-        body: SingleChildScrollView(
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(16, 16, 16, 50),
-            child: CustomTeacherListBox(
-              isLoading: _isLoading,
-              teachers: _teachers,
-              roles: _roles,
-              selectedRoleId: _selectedRoleId,
-              onRoleChanged: (int? newRoleId) {
-                if (newRoleId != null) {
-                  setState(() {
-                    _selectedRoleId = newRoleId;
-                  });
-                  _fetchTeachersForRole(newRoleId);
-                }
-              },
-            ),
-          ),
-        ));
+      ),
+    );
   }
 }
 
@@ -215,11 +204,14 @@ class CustomTeacherListBox extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final screenSize = MediaQuery.of(context).size;
+    final isDarkMode = theme.brightness == Brightness.dark;
+
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(16.0),
+      padding: EdgeInsets.all(screenSize.width * 0.04),
       decoration: BoxDecoration(
-        color: theme.primaryColor,
+        color: theme.cardColor,
         borderRadius: BorderRadius.circular(12),
       ),
       child: Column(
@@ -228,14 +220,14 @@ class CustomTeacherListBox extends StatelessWidget {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 12),
             decoration: BoxDecoration(
-              color: theme.colorScheme.onPrimary.withAlpha(25),
+              color: isDarkMode ? theme.scaffoldBackgroundColor : const Color(0xFFF3F3F3),
               borderRadius: BorderRadius.circular(12),
             ),
             child: DropdownButton<int>(
               value: selectedRoleId,
               underline: const SizedBox(),
               isExpanded: true,
-              icon: Icon(Icons.arrow_drop_down, color: theme.colorScheme.onPrimary),
+              icon: Icon(Icons.arrow_drop_down, color: theme.colorScheme.onSurface),
               onChanged: onRoleChanged,
               items: roles.map<DropdownMenuItem<int>>((Role role) {
                 return DropdownMenuItem<int>(
@@ -260,7 +252,7 @@ class CustomTeacherListBox extends StatelessWidget {
               : LayoutBuilder(
                   builder: (context, constraints) {
                     if (teachers.isEmpty) {
-                      return const Center(child: Text("No teachers found for this role.", style: TextStyle(color: Colors.white),));
+                      return Center(child: Text("No teachers found for this role.", style: TextStyle(color: theme.colorScheme.onSurfaceVariant),));
                     }
 
                     final isLargeScreen = constraints.maxWidth > 600;
@@ -276,7 +268,7 @@ class CustomTeacherListBox extends StatelessWidget {
                           childAspectRatio: 3.5,
                         ),
                         itemBuilder: (context, index) {
-                          return _buildTeacherTile(context, teachers[index]);
+                          return _buildTeacherItem(context, teachers[index]);
                         },
                       );
                     } else {
@@ -286,7 +278,7 @@ class CustomTeacherListBox extends StatelessWidget {
                         itemCount: teachers.length,
                         separatorBuilder: (context, index) => const SizedBox(height: 16),
                         itemBuilder: (context, index) {
-                          return _buildTeacherTile(context, teachers[index]);
+                          return _buildTeacherItem(context, teachers[index]);
                         },
                       );
                     }
@@ -297,13 +289,15 @@ class CustomTeacherListBox extends StatelessWidget {
     );
   }
 
-  Widget _buildTeacherTile(BuildContext context, Teacher teacher) {
+  Widget _buildTeacherItem(BuildContext context, Teacher teacher) {
     final theme = Theme.of(context);
     final textTheme = theme.textTheme;
+    final isDarkMode = theme.brightness == Brightness.dark;
+
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: theme.colorScheme.onPrimary.withAlpha(25),
+        color: isDarkMode ? theme.scaffoldBackgroundColor : const Color(0xFFF3F3F3),
         borderRadius: BorderRadius.circular(12),
       ),
       child: Row(
@@ -321,7 +315,7 @@ class CustomTeacherListBox extends StatelessWidget {
                 Text(
                   teacher.name,
                   style: textTheme.titleMedium?.copyWith(
-                    color: theme.colorScheme.onPrimary,
+                    color: theme.colorScheme.onSurface,
                     fontWeight: FontWeight.bold,
                   ),
                 ),
@@ -329,7 +323,7 @@ class CustomTeacherListBox extends StatelessWidget {
                 Text(
                   teacher.designation,
                   style: textTheme.bodyMedium?.copyWith(
-                    color: theme.colorScheme.onPrimary.withAlpha(180),
+                    color: theme.hintColor,
                   ),
                 )
               ],

@@ -63,9 +63,9 @@ class _GenerateNewEventState extends State<GenerateNewEvent> {
       if (imageSize > 5 * 1024 * 1024) {
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Image size cannot exceed 5MB.'),
-            backgroundColor: Colors.red,
+          SnackBar(
+            content: const Text('Image size cannot exceed 5MB.'),
+            backgroundColor: Theme.of(context).colorScheme.error,
           ),
         );
         return;
@@ -85,9 +85,9 @@ class _GenerateNewEventState extends State<GenerateNewEvent> {
 
     if (_eventPosterFile == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Please select an event poster.'),
-          backgroundColor: Colors.red,
+        SnackBar(
+          content: const Text('Please select an event poster.'),
+          backgroundColor: Theme.of(context).colorScheme.error,
         ),
       );
       return;
@@ -155,13 +155,14 @@ class _GenerateNewEventState extends State<GenerateNewEvent> {
       final responseData = jsonDecode(response.body);
 
       if (!mounted) return;
+      final theme = Theme.of(context);
 
       if (response.statusCode == 201 && responseData['status'] == true) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
                 responseData['message'] ?? 'Event generated successfully!'),
-            backgroundColor: Colors.green,
+            backgroundColor: theme.colorScheme.primary,
           ),
         );
         Navigator.pop(context, true);
@@ -184,7 +185,7 @@ class _GenerateNewEventState extends State<GenerateNewEvent> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(e.toString().replaceFirst('Exception: ', '')),
-          backgroundColor: Colors.red,
+          backgroundColor: Theme.of(context).colorScheme.error,
         ),
       );
     } finally {
@@ -302,7 +303,7 @@ class _GenerateNewEventState extends State<GenerateNewEvent> {
               borderRadius: BorderRadius.circular(12),
             ),
             filled: true,
-            fillColor: theme.primaryColor,
+            fillColor: theme.colorScheme.surface,
           ),
         ),
         const SizedBox(height: 16),
@@ -320,7 +321,7 @@ class _GenerateNewEventState extends State<GenerateNewEvent> {
               height: 200,
               width: double.infinity,
               decoration: BoxDecoration(
-                color: theme.primaryColor,
+                color: theme.colorScheme.surface,
                 borderRadius: BorderRadius.circular(12),
               ),
               child: _eventPosterBytes != null
@@ -372,7 +373,7 @@ class _GenerateNewEventState extends State<GenerateNewEvent> {
               borderRadius: BorderRadius.circular(12),
             ),
             filled: true,
-            fillColor: theme.primaryColor,
+            fillColor: theme.colorScheme.surface,
           ),
         ),
         const SizedBox(height: 16),
@@ -384,9 +385,9 @@ class _GenerateNewEventState extends State<GenerateNewEvent> {
               value == null || value.isEmpty ? 'Please enter a venue' : null,
           decoration: InputDecoration(
             prefixIcon:
-                Icon(Icons.location_on, color: theme.colorScheme.onPrimary),
+                Icon(Icons.location_on, color: theme.colorScheme.onSurface),
             filled: true,
-            fillColor: theme.primaryColor,
+            fillColor: theme.colorScheme.surface,
             hintText: "Enter the Venue",
             hintStyle:
                 theme.textTheme.bodyMedium?.copyWith(color: theme.hintColor),
@@ -406,9 +407,9 @@ class _GenerateNewEventState extends State<GenerateNewEvent> {
               value == null || value.isEmpty ? 'Please select a date' : null,
           decoration: InputDecoration(
             prefixIcon: Icon(Icons.calendar_month,
-                color: theme.colorScheme.onPrimary),
+                color: theme.colorScheme.onSurface),
             filled: true,
-            fillColor: theme.primaryColor,
+            fillColor: theme.colorScheme.surface,
             hintText: "Select Event Date",
             hintStyle:
                 theme.textTheme.bodyMedium?.copyWith(color: theme.hintColor),
@@ -431,9 +432,9 @@ class _GenerateNewEventState extends State<GenerateNewEvent> {
               : null,
           decoration: InputDecoration(
             prefixIcon: Icon(Icons.access_time_rounded,
-                color: theme.colorScheme.onPrimary),
+                color: theme.colorScheme.onSurface),
             filled: true,
-            fillColor: theme.primaryColor,
+            fillColor: theme.colorScheme.surface,
             hintText: "Select Start Time",
             hintStyle:
                 theme.textTheme.bodyMedium?.copyWith(color: theme.hintColor),
@@ -468,9 +469,9 @@ class _GenerateNewEventState extends State<GenerateNewEvent> {
           },
           decoration: InputDecoration(
             prefixIcon: Icon(Icons.access_time_rounded,
-                color: theme.colorScheme.onPrimary),
+                color: theme.colorScheme.onSurface),
             filled: true,
-            fillColor: theme.primaryColor,
+            fillColor: theme.colorScheme.surface,
             hintText: "Select End Time",
             hintStyle:
                 theme.textTheme.bodyMedium?.copyWith(color: theme.hintColor),
@@ -525,7 +526,7 @@ class _GenerateNewEventState extends State<GenerateNewEvent> {
           controller: _maxParticipantsController,
           keyboardType: TextInputType.number,
           decoration: InputDecoration(
-            prefixIcon: Icon(Icons.group, color: theme.colorScheme.onPrimary),
+            prefixIcon: Icon(Icons.group, color: theme.colorScheme.onSurface),
             hintText: "Enter max participants",
             hintStyle: theme.textTheme.bodyMedium?.copyWith(
               color: theme.hintColor,
@@ -534,7 +535,7 @@ class _GenerateNewEventState extends State<GenerateNewEvent> {
               borderRadius: BorderRadius.circular(12),
             ),
             filled: true,
-            fillColor: theme.primaryColor,
+            fillColor: theme.colorScheme.surface,
           ),
         ),
         const SizedBox(height: 16),
@@ -564,7 +565,7 @@ class _GenerateNewEventState extends State<GenerateNewEvent> {
                 : null,
             decoration: InputDecoration(
               prefixIcon:
-                  Icon(Icons.currency_rupee, color: theme.colorScheme.onPrimary),
+                  Icon(Icons.currency_rupee, color: theme.colorScheme.onSurface),
               hintText: "Enter Ticket Price",
               hintStyle:
                   theme.textTheme.bodyMedium?.copyWith(color: theme.hintColor),
@@ -572,7 +573,7 @@ class _GenerateNewEventState extends State<GenerateNewEvent> {
                 borderRadius: BorderRadius.circular(12),
               ),
               filled: true,
-              fillColor: theme.primaryColor,
+              fillColor: theme.colorScheme.surface,
             ),
           ),
         ],
@@ -622,7 +623,7 @@ class CustomCheckbox extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
         decoration: BoxDecoration(
-          color: value ? theme.colorScheme.primaryContainer : theme.primaryColor,
+          color: value ? theme.colorScheme.primaryContainer : theme.colorScheme.surface,
           borderRadius: BorderRadius.circular(8),
           border: Border.all(
             color: value

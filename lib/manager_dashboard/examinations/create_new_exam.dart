@@ -73,10 +73,11 @@ class _CreateExamScreenState extends State<CreateExamScreen> {
       if (!mounted) return;
 
       final responseData = jsonDecode(response.body);
+      final theme = Theme.of(context);
 
       if (response.statusCode == 201 && responseData['status'] == true) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(responseData['message'] ?? 'Exam created successfully!'), backgroundColor: Colors.green),
+          SnackBar(content: Text(responseData['message'] ?? 'Exam created successfully!'), backgroundColor: theme.colorScheme.primary),
         );
         Navigator.pop(context, true);
       } else {
@@ -162,7 +163,7 @@ class _CreateExamScreenState extends State<CreateExamScreen> {
       ),
       floatingActionButton: ElevatedButton(
         onPressed: _isSaving ? null : _saveExam,
-        child: _isSaving ? const CircularProgressIndicator(valueColor: AlwaysStoppedAnimation(Colors.white)) : const Text('Save Exam'),
+        child: _isSaving ? const CircularProgressIndicator() : const Text('Save Exam'),
       ),
     );
   }
