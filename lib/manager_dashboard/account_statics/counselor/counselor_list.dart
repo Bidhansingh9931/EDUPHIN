@@ -1,8 +1,12 @@
 import 'dart:convert';
+import 'dart:io';
 
+import 'package:csv/csv.dart';
 import 'package:eduphin/manager_dashboard/account_statics/counselor/add_counselor.dart';
 import 'package:eduphin/services/api_service.dart';
 import 'package:flutter/material.dart';
+import 'package:open_file/open_file.dart';
+import 'package:path_provider/path_provider.dart';
 
 // ───────────────────────────────────────────────────────────
 //                          DATA MODELS
@@ -125,6 +129,45 @@ class _CounselorListPageState extends State<CounselorListPage> {
     }
   }
 
+  Future<void> _downloadCounselorList() async {
+    if (_counselors.isEmpty) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("No counselor data to download.")),
+      );
+      return;
+    }
+
+    // Convert counselor list to CSV
+    List<List<dynamic>> rows = [];
+    // Add header row
+    rows.add(['ID', 'Name', 'Designation']);
+    // Add data rows
+    for (var counselor in _counselors) {
+      rows.add([counselor.id, counselor.name, counselor.designation]);
+    }
+
+    String csv = const ListToCsvConverter().convert(rows);
+
+    try {
+      // Get storage directory
+      final directory = await getApplicationDocumentsDirectory();
+      final path = '${directory.path}/counselor_list.csv';
+      final file = File(path);
+
+      // Write to file
+      await file.writeAsString(csv);
+
+      // Open file
+      await OpenFile.open(path);
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("Failed to download counselor list: $e")),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -151,9 +194,7 @@ class _CounselorListPageState extends State<CounselorListPage> {
           actions: [
             IconButton(
               icon: const Icon(Icons.download),
-              onPressed: () {
-                // TODO: Implement download functionality
-              },
+              onPressed: _downloadCounselorList,
             ),
           ],
         ),

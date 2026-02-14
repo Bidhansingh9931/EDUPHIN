@@ -1,7 +1,11 @@
 import 'dart:convert';
+import 'dart:io';
 
+import 'package:csv/csv.dart';
 import 'package:eduphin/services/api_service.dart';
 import 'package:flutter/material.dart';
+import 'package:open_file/open_file.dart';
+import 'package:path_provider/path_provider.dart';
 
 import 'add_librarian.dart';
 
@@ -53,7 +57,8 @@ class _LibrarianListPageState extends State<LibrarianListPage> {
           final data = jsonDecode(response.body);
           final List<dynamic> usersData = data['data'] ?? data;
           setState(() {
-            _librarians = usersData.map((json) => Librarian.fromJson(json)).toList();
+            _librarians =
+                usersData.map((json) => Librarian.fromJson(json)).toList();
             _isLoading = false;
           });
         } else {
@@ -67,6 +72,45 @@ class _LibrarianListPageState extends State<LibrarianListPage> {
           _isLoading = false;
         });
       }
+    }
+  }
+
+  Future<void> _downloadLibrarianList() async {
+    if (_librarians.isEmpty) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("No librarian data to download.")),
+      );
+      return;
+    }
+
+    // Convert librarian list to CSV
+    List<List<dynamic>> rows = [];
+    // Add header row
+    rows.add(['ID', 'Name', 'Designation']);
+    // Add data rows
+    for (var librarian in _librarians) {
+      rows.add([librarian.id, librarian.name, librarian.designation]);
+    }
+
+    String csv = const ListToCsvConverter().convert(rows);
+
+    try {
+      // Get storage directory
+      final directory = await getApplicationDocumentsDirectory();
+      final path = '${directory.path}/librarian_list.csv';
+      final file = File(path);
+
+      // Write to file
+      await file.writeAsString(csv);
+
+      // Open file
+      await OpenFile.open(path);
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("Failed to download librarian list: $e")),
+      );
     }
   }
 
@@ -89,7 +133,8 @@ class _LibrarianListPageState extends State<LibrarianListPage> {
             _fetchLibrarians();
           }
         },
-        label: Text("Add Librarian", style: TextStyle(color: theme.colorScheme.onPrimary)),
+        label: Text("Add Librarian",
+            style: TextStyle(color: theme.colorScheme.onPrimary)),
         icon: Icon(Icons.add, color: theme.colorScheme.onPrimary),
         backgroundColor: theme.colorScheme.primary,
       ),
@@ -99,20 +144,27 @@ class _LibrarianListPageState extends State<LibrarianListPage> {
         actions: [
           IconButton(
             icon: const Icon(Icons.download),
-            onPressed: () {
-              // TODO: Implement download functionality
-            },
+            onPressed: _downloadLibrarianList,
           ),
         ],
       ),
       body: Padding(
-        padding: EdgeInsets.fromLTRB(screenSize.width * 0.04, screenSize.width * 0.04, screenSize.width * 0.04, 50),
+        padding: EdgeInsets.fromLTRB(
+            screenSize.width * 0.04,
+            screenSize.width * 0.04,
+            screenSize.width * 0.04,
+            50),
         child: _isLoading
             ? const Center(child: CircularProgressIndicator())
             : _error.isNotEmpty
-                ? Center(child: Text(_error, style: TextStyle(color: theme.colorScheme.error)))
+                ? Center(
+                    child: Text(_error,
+                        style: TextStyle(color: theme.colorScheme.error)))
                 : _librarians.isEmpty
-                    ? Center(child: Text("No librarians found.", style: TextStyle(color: theme.colorScheme.onSurfaceVariant)))
+                    ? Center(
+                        child: Text("No librarians found.",
+                            style: TextStyle(
+                                color: theme.colorScheme.onSurfaceVariant)))
                     : RefreshIndicator(
                         onRefresh: _fetchLibrarians,
                         child: CustomLibrarianListBox(librarians: _librarians),
@@ -166,7 +218,8 @@ class CustomLibrarianListBox extends StatelessWidget {
                   shrinkWrap: true,
                   physics: const NeverScrollableScrollPhysics(),
                   itemCount: librarians.length,
-                  separatorBuilder: (context, index) => const SizedBox(height: 16),
+                  separatorBuilder: (context, index) =>
+                      const SizedBox(height: 16),
                   itemBuilder: (context, index) {
                     return _buildLibrarianItem(context, librarians[index]);
                   },
@@ -187,14 +240,16 @@ class CustomLibrarianListBox extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: isDarkMode ? theme.scaffoldBackgroundColor : const Color(0xFFF3F3F3),
+        color:
+            isDarkMode ? theme.scaffoldBackgroundColor : const Color(0xFFF3F3F3),
         borderRadius: BorderRadius.circular(12),
       ),
       child: Row(
         children: [
           CircleAvatar(
             backgroundColor: theme.colorScheme.primaryContainer,
-            child: Icon(Icons.person, color: theme.colorScheme.onPrimaryContainer),
+            child:
+                Icon(Icons.person, color: theme.colorScheme.onPrimaryContainer),
           ),
           const SizedBox(width: 16),
           Expanded(
@@ -204,7 +259,8 @@ class CustomLibrarianListBox extends StatelessWidget {
               children: [
                 Text(
                   librarian.name,
-                  style: textTheme.titleMedium?.copyWith(color: theme.colorScheme.onSurface),
+                  style: textTheme.titleMedium
+                      ?.copyWith(color: theme.colorScheme.onSurface),
                 ),
                 const SizedBox(height: 4),
                 Text(

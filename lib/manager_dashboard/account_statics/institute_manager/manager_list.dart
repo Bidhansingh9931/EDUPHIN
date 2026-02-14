@@ -1,8 +1,12 @@
 import 'dart:convert';
+import 'dart:io';
 
+import 'package:csv/csv.dart';
 import 'package:eduphin/manager_dashboard/account_statics/institute_manager/add_manager.dart';
 import 'package:eduphin/services/api_service.dart';
 import 'package:flutter/material.dart';
+import 'package:open_file/open_file.dart';
+import 'package:path_provider/path_provider.dart';
 
 // ───────────────────────────────────────────────────────────
 //                          DATA MODELS
@@ -126,6 +130,45 @@ class _ManagerListPageState extends State<ManagerListPage> {
     }
   }
 
+  Future<void> _downloadManagerList() async {
+    if (_managers.isEmpty) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("No manager data to download.")),
+      );
+      return;
+    }
+
+    // Convert manager list to CSV
+    List<List<dynamic>> rows = [];
+    // Add header row
+    rows.add(['ID', 'Name', 'Designation']);
+    // Add data rows
+    for (var manager in _managers) {
+      rows.add([manager.id, manager.name, manager.designation]);
+    }
+
+    String csv = const ListToCsvConverter().convert(rows);
+
+    try {
+      // Get storage directory
+      final directory = await getApplicationDocumentsDirectory();
+      final path = '${directory.path}/manager_list.csv';
+      final file = File(path);
+
+      // Write to file
+      await file.writeAsString(csv);
+
+      // Open file
+      await OpenFile.open(path);
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("Failed to download manager list: $e")),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -152,9 +195,7 @@ class _ManagerListPageState extends State<ManagerListPage> {
         actions: [
             IconButton(
               icon: const Icon(Icons.download),
-              onPressed: () {
-                // TODO: Implement download functionality
-              },
+              onPressed: _downloadManagerList,
             ),
           ],
       ),
