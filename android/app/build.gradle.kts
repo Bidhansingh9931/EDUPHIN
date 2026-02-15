@@ -4,27 +4,54 @@ import java.io.FileInputStream
 plugins {
     id("com.android.application")
     id("kotlin-android")
-    // The Flutter Gradle Plugin must be applied after the Android and Kotlin Gradle plugins.
     id("dev.flutter.flutter-gradle-plugin")
 }
 
-val keystorePropertiesFile = rootProject.file("app/keystore.properties")
 val keystoreProperties = Properties()
+val keystorePropertiesFile = rootProject.file("keystore.properties")
 if (keystorePropertiesFile.exists()) {
     keystoreProperties.load(FileInputStream(keystorePropertiesFile))
+} else {
+    throw GradleException("keystore.properties not found in android/")
 }
 
 android {
-    namespace = "com.example.eduphin"
+    namespace = "com.bidha.eduphin"
     compileSdk = 36
     ndkVersion = flutter.ndkVersion
 
+    defaultConfig {
+        applicationId = "com.bidha.eduphin"
+        minSdk = flutter.minSdkVersion
+        targetSdk = flutter.targetSdkVersion
+        versionCode = flutter.versionCode
+        versionName = flutter.versionName
+}
+
+
     signingConfigs {
         create("release") {
-            keyAlias = keystoreProperties["keyAlias"] as String?
-            keyPassword = keystoreProperties["keyPassword"] as String?
-            storeFile = if (keystoreProperties["storeFile"] != null) file(keystoreProperties["storeFile"] as String) else null
-            storePassword = keystoreProperties["storePassword"] as String?
+            val storeFilePath = keystoreProperties["storeFile"]?.toString()
+                ?: throw GradleException("storeFile missing in keystore.properties")
+
+            keyAlias = keystoreProperties["keyAlias"]?.toString()
+                ?: throw GradleException("keyAlias missing in keystore.properties")
+
+            keyPassword = keystoreProperties["keyPassword"]?.toString()
+                ?: throw GradleException("keyPassword missing in keystore.properties")
+
+            storePassword = keystoreProperties["storePassword"]?.toString()
+                ?: throw GradleException("storePassword missing in keystore.properties")
+
+            storeFile = rootProject.file("app/$storeFilePath")
+        }
+    }
+
+    buildTypes {
+        getByName("release") {
+            signingConfig = signingConfigs.getByName("release")
+            isMinifyEnabled = false
+            isShrinkResources = false
         }
     }
 
@@ -35,22 +62,6 @@ android {
 
     kotlinOptions {
         jvmTarget = JavaVersion.VERSION_11.toString()
-    }
-
-    defaultConfig {
-        applicationId = "com.bidha.eduphin"
-        // You can update the following values to match your application needs.
-        // For more information, see: https://flutter.dev/to/review-gradle-config.
-        minSdk = flutter.minSdkVersion
-        targetSdk = flutter.targetSdkVersion
-        versionCode = flutter.versionCode
-        versionName = flutter.versionName
-    }
-
-    buildTypes {
-        release {
-            signingConfig = signingConfigs.getByName("release")
-        }
     }
 }
 
