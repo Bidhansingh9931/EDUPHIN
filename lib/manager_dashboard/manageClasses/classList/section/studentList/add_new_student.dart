@@ -102,7 +102,8 @@ class _AddNewStudentPageState extends State<AddNewStudentPage> {
         'gender': _selectedGender!,
       };
 
-      final response = await ApiService.postWithFile('manager/students', studentData, _imageFile!, 'image');
+      final files = <String, File>{'image': _imageFile!};
+      final response = await ApiService.postMultipart('manager/students', studentData, files: files);
       final responseBody = await response.stream.bytesToString();
       final responseData = jsonDecode(responseBody);
 
@@ -306,7 +307,7 @@ class _AddNewStudentPageState extends State<AddNewStudentPage> {
     return Padding(
       padding: const EdgeInsets.only(bottom: 16.0),
       child: DropdownButtonFormField<String>(
-        value: _selectedGender,
+        initialValue: _selectedGender,
         hint: const Text('Select Gender'),
         decoration: InputDecoration(
           labelText: 'Gender',

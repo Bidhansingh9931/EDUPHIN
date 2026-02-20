@@ -323,6 +323,12 @@ class _ManagerDashboardPageState extends State<ManagerDashboardPage> {
     _dashboardDataFuture = _apiService.fetchDashboardData(context);
   }
 
+  void _retry() {
+    setState(() {
+      _dashboardDataFuture = _apiService.fetchDashboardData(context);
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -347,7 +353,19 @@ class _ManagerDashboardPageState extends State<ManagerDashboardPage> {
           if (snapshot.connectionState == ConnectionState.waiting) {
             return const Center(child: CircularProgressIndicator());
           } else if (snapshot.hasError) {
-            return Center(child: Text("Error: ${snapshot.error.toString().replaceFirst('Exception: ', '')}"));
+            return Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text("Error: ${snapshot.error.toString().replaceFirst('Exception: ', '')}"),
+                  const SizedBox(height: 20),
+                  ElevatedButton(
+                    onPressed: _retry,
+                    child: const Text('Retry'),
+                  ),
+                ],
+              ),
+            );
           } else if (snapshot.hasData) {
             final data = snapshot.data!;
             return SingleChildScrollView(

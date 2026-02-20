@@ -11,7 +11,7 @@ import 'package:permission_handler/permission_handler.dart';
 import 'profile_model.dart';
 
 class ProfileProvider {
-  final String _profileApiUrl = "${ApiService.baseUrl}/moderator/profile";
+  final String _profileApiUrl = "${ApiService.baseUrl}/api/moderator/profile";
 
   Future<ProfileData> fetchProfileData() async {
     final String? token = await ApiService.getToken();

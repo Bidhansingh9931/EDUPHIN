@@ -22,6 +22,8 @@ class _SplashScreenState extends State<SplashScreen>
   late Animation<double> textFade;
   late Animation<Offset> textSlide;
 
+  bool _navigated = false; // ✅ ADDED: prevents double navigation
+
   @override
   void initState() {
     super.initState();
@@ -31,7 +33,6 @@ class _SplashScreenState extends State<SplashScreen>
       duration: const Duration(seconds: 4),
     );
 
-    // Move from bottom → center
     moveUp = Tween<double>(begin: 250, end: 0).animate(
       CurvedAnimation(
         parent: _controller,
@@ -39,7 +40,6 @@ class _SplashScreenState extends State<SplashScreen>
       ),
     );
 
-    // Rotate 45 degrees
     rotate = Tween<double>(begin: 0, end: pi / 4).animate(
       CurvedAnimation(
         parent: _controller,
@@ -47,7 +47,6 @@ class _SplashScreenState extends State<SplashScreen>
       ),
     );
 
-    // Scale explosion (fills entire screen)
     scale = Tween<double>(begin: 1.0, end: 30.0).animate(
       CurvedAnimation(
         parent: _controller,
@@ -55,46 +54,79 @@ class _SplashScreenState extends State<SplashScreen>
       ),
     );
 
-    // Text animations (fade and slide in)
     final textCurve = CurvedAnimation(
       parent: _controller,
       curve: const Interval(0.6, 0.9, curve: Curves.easeOut),
     );
     textFade = Tween<double>(begin: 0.0, end: 1.0).animate(textCurve);
-    textSlide = Tween<Offset>(begin: const Offset(0, 1), end: Offset.zero)
-        .animate(textCurve);
+    textSlide =
+        Tween<Offset>(begin: const Offset(0, 1), end: Offset.zero)
+            .animate(textCurve);
 
     _controller.forward();
 
-    // After animation finished, check auth status and navigate
+    // ✅ SAFE listener
     _controller.addStatusListener((status) {
-      if (status == AnimationStatus.completed) {
+      if (status == AnimationStatus.completed && !_navigated) {
         _checkAuthStatusAndNavigate();
       }
     });
   }
 
+  /// ✅ FULLY SAFE AUTH CHECK (NO CRASH)
   Future<void> _checkAuthStatusAndNavigate() async {
-    final token = await ApiService.getToken();
+    try {
+      _navigated = true;
 
-    if (mounted) {
+      final token = await ApiService.getToken()
+          .timeout(const Duration(seconds: 10));
+
+      if (!mounted) return;
+
       if (token != null) {
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(
-              builder: (context) => const ManagerDashboardPage()),
+            builder: (context) => const ManagerDashboardPage(),
+          ),
         );
       } else {
         Navigator.pushReplacement(
           context,
-          MaterialPageRoute(builder: (context) => const LoginPage()),
+          MaterialPageRoute(
+            builder: (context) => const LoginPage(),
+          ),
         );
       }
+    } catch (e) {
+      // ✅ FAIL-SAFE: never crash on splash
+      debugPrint('Splash auth error: $e');
+
+      if (!mounted) return;
+
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(
+          builder: (context) => const LoginPage(),
+        ),
+      );
     }
   }
 
   @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+
+    // ✅ ADDED: Preload image to avoid asset crash
+    precacheImage(
+      const AssetImage("assets/images/eduphin_logo_bg.png"),
+      context,
+    );
+  }
+
+  @override
   void dispose() {
+    _controller.removeStatusListener((_) {}); // ✅ extra safety
     _controller.dispose();
     super.dispose();
   }
@@ -102,6 +134,7 @@ class _SplashScreenState extends State<SplashScreen>
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+
     return Scaffold(
       backgroundColor: theme.scaffoldBackgroundColor,
       body: AnimatedBuilder(
@@ -109,7 +142,6 @@ class _SplashScreenState extends State<SplashScreen>
         builder: (context, child) {
           return Stack(
             children: [
-              // Explosion animation
               Center(
                 child: Transform.translate(
                   offset: Offset(0, moveUp.value),
@@ -130,7 +162,6 @@ class _SplashScreenState extends State<SplashScreen>
                 ),
               ),
 
-              // Logo and Text reveal
               Center(
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
@@ -142,11 +173,12 @@ class _SplashScreenState extends State<SplashScreen>
                         child: Image.asset(
                           "assets/images/eduphin_logo_bg.png",
                           height: 150,
+                          errorBuilder: (_, __, ___) =>
+                          const SizedBox(height: 150), // ✅ NO CRASH
                         ),
                       ),
                     ),
                     const SizedBox(height: 20),
-                    // Text slide and fade-in
                     FadeTransition(
                       opacity: textFade,
                       child: SlideTransition(

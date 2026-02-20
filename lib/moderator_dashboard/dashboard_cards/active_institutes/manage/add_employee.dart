@@ -1,20 +1,23 @@
+import 'dart:async';
+import 'dart:io';
+
+import 'package:eduphin/services/api_service.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_datetime_picker_plus/flutter_datetime_picker_plus.dart' as picker;
+import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
 
 import 'new_employee_model.dart';
-import 'add_employee_provider.dart';
 
 class AddEmployeePage extends StatefulWidget {
   final String instituteId;
-  const AddEmployeePage({Key? key, required this.instituteId}) : super(key: key);
+  const AddEmployeePage({super.key, required this.instituteId});
 
   @override
   State<AddEmployeePage> createState() => _AddEmployeePageState();
 }
 
 class _AddEmployeePageState extends State<AddEmployeePage> {
-  final AddEmployeeProvider _provider = AddEmployeeProvider();
   bool _isLoading = false;
 
   // Controllers for text fields
@@ -47,6 +50,7 @@ class _AddEmployeePageState extends State<AddEmployeePage> {
   String? selectedRelationshipStatus;
   String? selectedEmploymentType;
   DateTime? selectedJoiningDate;
+  File? _profileImage;
 
   @override
   void dispose() {
@@ -72,6 +76,16 @@ class _AddEmployeePageState extends State<AddEmployeePage> {
     emergencyContactNameController.dispose();
     emergencyContactNumberController.dispose();
     super.dispose();
+  }
+
+  Future<void> _pickImage() async {
+    final ImagePicker picker = ImagePicker();
+    final XFile? image = await picker.pickImage(source: ImageSource.gallery);
+    if (image != null) {
+      setState(() {
+        _profileImage = File(image.path);
+      });
+    }
   }
 
   Future<void> _submitEmployeeData() async {
@@ -118,10 +132,11 @@ class _AddEmployeePageState extends State<AddEmployeePage> {
       branch: branchController.text,
       emergencyContactName: emergencyContactNameController.text,
       emergencyContactNumber: emergencyContactNumberController.text,
+      profileImage: _profileImage,
     );
 
     try {
-      await _provider.addEmployee(newEmployee);
+      await ApiService.addEmployee(newEmployee);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
@@ -180,7 +195,7 @@ class _AddEmployeePageState extends State<AddEmployeePage> {
               children: [
                 _buildTextField(context: context, controller: fullNameController, label: "Full Name", icon: Icons.person_outline_sharp),
                 _buildTextField(context: context, controller: emailController, label: "Email", icon: Icons.email_outlined),
-                _buildDropdown(context: context, title: "Select Role", value: selectedRole, hint: "Assign a Role", items: ["Teacher", "Student", "Staff", "Accountant"], onChanged: (value) => setState(() => selectedRole = value)),
+                _buildDropdown(context: context, title: "Select Role", value: selectedRole, hint: "Assign a Role", items: ["Institute Manager", "Teacher", "Student", "Staff", "Accountant"], onChanged: (value) => setState(() => selectedRole = value)),
                 _buildDropdown(context: context, title: "Select Gender", value: selectedGender, hint: "Select Gender", items: ["Male", "Female", "Other"], onChanged: (value) => setState(() => selectedGender = value ?? "Male")),
                 _buildDatePickerField(context: context, hint: 'Select birth date', title: "Date of Birth", currentValue: selectedBirthDate, onConfirm: (date) => setState(() => selectedBirthDate = date)),
                 _buildDropdown(context: context, title: "Relationship Status", value: selectedRelationshipStatus, hint: "Select Relationship Status", items: ["Single", "Married", "Couple"], onChanged: (value) => setState(() => selectedRelationshipStatus = value)),
@@ -257,8 +272,7 @@ class _AddEmployeePageState extends State<AddEmployeePage> {
                 child: _isLoading
                     ? const CircularProgressIndicator(valueColor: AlwaysStoppedAnimation<Color>(Colors.white))
                     : Text('Add Employee', style: TextStyle(color: Colors.white, fontSize: responsiveFontSize(16), fontWeight: FontWeight.bold)),
-              ),
-            )
+              ),            )
           ],
         ),
       ),
@@ -272,13 +286,13 @@ class _AddEmployeePageState extends State<AddEmployeePage> {
         children: [
           CircleAvatar(
             radius: screenWidth * 0.15,
-            backgroundImage: const AssetImage("assets/images/girl_image.webp"),
+            backgroundImage: _profileImage != null ? FileImage(_profileImage!) : const AssetImage("assets/images/girl_image.webp") as ImageProvider,
           ),
           Positioned(
             bottom: 4,
             right: 4,
             child: InkWell(
-              onTap: () {},
+              onTap: _pickImage,
               child: Container(
                 padding: const EdgeInsets.all(6),
                 decoration: const BoxDecoration(
@@ -394,8 +408,11 @@ class _AddEmployeePageState extends State<AddEmployeePage> {
               dropdownColor: const Color(0xFF1B263B),
               style: TextStyle(color: Colors.white, fontSize: responsiveFontSize(14)),
               onChanged: onChanged,
-              items: items.map<DropdownMenuItem<String>>((String value) {
-                return DropdownMenuItem<String>(value: value, child: Text(value));
+              items: items.map((String value) {
+                return DropdownMenuItem<String>(
+                  value: value,
+                  child: Text(value),
+                );
               }).toList(),
             ),
           ),
@@ -404,34 +421,44 @@ class _AddEmployeePageState extends State<AddEmployeePage> {
     );
   }
 
-  Widget _buildDatePickerField({required BuildContext context, required String hint, required String title, DateTime? currentValue, required Function(DateTime) onConfirm}) {
+  Widget _buildDatePickerField({required BuildContext context, required String title, required String hint, DateTime? currentValue, required Function(DateTime) onConfirm}) {
     final screenWidth = MediaQuery.of(context).size.width;
     double responsiveFontSize(double baseSize) {
       if (screenWidth > 1200) return baseSize * 1.2;
       if (screenWidth > 600) return baseSize * 1.1;
       return baseSize;
     }
-
+    
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(title, style: TextStyle(color: Colors.white54, fontSize: responsiveFontSize(13))),
         const SizedBox(height: 8),
-        GestureDetector(
+        InkWell(
           onTap: () {
-            picker.DatePicker.showDatePicker(context, showTitleActions: true, onConfirm: onConfirm, currentTime: currentValue ?? DateTime.now());
+            picker.DatePicker.showDatePicker(context,
+                showTitleActions: true,
+                minTime: DateTime(1950, 1, 1),
+                maxTime: DateTime.now(),
+                onConfirm: onConfirm, 
+                currentTime: currentValue ?? DateTime.now());
           },
           child: Container(
-            height: 55,
-            padding: const EdgeInsets.symmetric(horizontal: 12.0),
-            decoration: BoxDecoration(color: const Color(0xFF0D1B2A), borderRadius: BorderRadius.circular(8)),
+            padding: const EdgeInsets.symmetric(vertical: 16.0, horizontal: 12.0),
+            decoration: BoxDecoration(
+              color: const Color(0xFF0D1B2A),
+              borderRadius: BorderRadius.circular(8),
+            ),
             child: Row(
               children: [
-                const Icon(Icons.calendar_month_outlined, color: Colors.white54),
+                const Icon(Icons.calendar_today_outlined, color: Colors.white54),
                 const SizedBox(width: 12),
                 Text(
-                  currentValue != null ? DateFormat('yyyy-MM-dd').format(currentValue) : hint,
-                  style: TextStyle(color: currentValue != null ? Colors.white : Colors.white54, fontSize: responsiveFontSize(14)),
+                  currentValue != null ? DateFormat.yMMMd().format(currentValue) : hint,
+                  style: TextStyle(
+                    color: currentValue != null ? Colors.white : Colors.white54,
+                    fontSize: responsiveFontSize(14),
+                  ),
                 ),
               ],
             ),

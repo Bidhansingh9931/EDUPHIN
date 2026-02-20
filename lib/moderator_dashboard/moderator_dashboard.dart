@@ -28,7 +28,6 @@ class _ModeratorDashboardPageState extends State<ModeratorDashboardPage> {
     _dashboardDataFuture = _dataProvider.fetchDashboardData();
   }
 
-  // Function to handle the refresh action
   Future<void> _refreshData() async {
     setState(() {
       _dashboardDataFuture = _dataProvider.fetchDashboardData();
@@ -37,29 +36,15 @@ class _ModeratorDashboardPageState extends State<ModeratorDashboardPage> {
 
   @override
   Widget build(BuildContext context) {
-    final screenWidth = MediaQuery.of(context).size.width;
-    final screenHeight = MediaQuery.of(context).size.height;
-
-    double responsiveFontSize(double baseFontSize) {
-      if (screenWidth > 1200) {
-        return baseFontSize * 1.2;
-      } else if (screenWidth > 600) {
-        return baseFontSize * 1.1;
-      } else {
-        return baseFontSize;
-      }
-    }
-
     return Scaffold(
       backgroundColor: const Color(0xFF0D1820),
       appBar: AppBar(
         backgroundColor: const Color(0xFF0D1820),
         elevation: 0,
         automaticallyImplyLeading: false,
-        title: Text(
+        title: const Text(
           "Dashboard Overview",
-          style: TextStyle(
-              color: Colors.white, fontSize: responsiveFontSize(18)),
+          style: TextStyle(color: Colors.white, fontSize: 18),
         ),
         centerTitle: true,
         actions: [
@@ -86,17 +71,18 @@ class _ModeratorDashboardPageState extends State<ModeratorDashboardPage> {
         child: FutureBuilder<DashboardData>(
           future: _dashboardDataFuture,
           builder: (context, snapshot) {
-            if (snapshot.connectionState == ConnectionState.waiting &&
-                !snapshot.hasData) { // Show indicator only on initial load
+            if (snapshot.connectionState == ConnectionState.waiting) {
               return const Center(child: CircularProgressIndicator());
             } else if (snapshot.hasError) {
-              // Provide a way to retry on error
               return Center(
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Text('Error: ${snapshot.error}',
-                        style: const TextStyle(color: Colors.white)),
+                    Text(
+                      'Error: An error occurred: ${snapshot.error}',
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(color: Colors.white70),
+                    ),
                     const SizedBox(height: 20),
                     ElevatedButton(
                       onPressed: _refreshData,
@@ -106,395 +92,386 @@ class _ModeratorDashboardPageState extends State<ModeratorDashboardPage> {
                 ),
               );
             } else if (snapshot.hasData) {
-              final data = snapshot.data!;
-              final total = data.accountants + data.staff + data.others;
-              const pieChartColors = [
-                Color(0xFF2E6CFF),
-                Color(0xFF2ECF7E),
-                Color(0xFF8A63FF),
-              ];
+              return _buildDashboardBody(snapshot.data!);
+            } else {
+              return const Center(
+                child: Text(
+                  'No data available.',
+                  style: TextStyle(color: Colors.white70),
+                ),
+              );
+            }
+          },
+        ),
+      ),
+    );
+  }
 
-              return SingleChildScrollView(
-                physics: const AlwaysScrollableScrollPhysics(), // Ensure scrolling is always enabled for RefreshIndicator
-                padding: EdgeInsets.symmetric(
-                    horizontal: screenWidth * 0.04, vertical: 8),
+  Widget _buildDashboardBody(DashboardData data) {
+    final screenWidth = MediaQuery.of(context).size.width;
+    final screenHeight = MediaQuery.of(context).size.height;
+
+    double responsiveFontSize(double baseFontSize) {
+      if (screenWidth > 1200) {
+        return baseFontSize * 1.2;
+      } else if (screenWidth > 600) {
+        return baseFontSize * 1.1;
+      } else {
+        return baseFontSize;
+      }
+    }
+
+    final total = data.accountants + data.staff + data.others;
+    const pieChartColors = [
+      Color(0xFF2E6CFF),
+      Color(0xFF2ECF7E),
+      Color(0xFF8A63FF),
+    ];
+
+    return SingleChildScrollView(
+      physics: const AlwaysScrollableScrollPhysics(),
+      padding: EdgeInsets.symmetric(
+          horizontal: screenWidth * 0.04, vertical: 8),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              InkWell(
+                onTap: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                        builder: (context) =>
+                            const ModeratorProfilePage())),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(40),
+                  child: Image.asset(
+                    'assets/images/girl_image.webp',
+                    width: 45,
+                    height: 45,
+                    fit: BoxFit.cover,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        InkWell(
-                          onTap: () => Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                  builder: (context) =>
-                                      const ModeratorProfilePage())),
-                          child: ClipRRect(
-                            borderRadius: BorderRadius.circular(40),
-                            child: Image.asset(
-                              'assets/images/girl_image.webp',
-                              width: 45,
-                              height: 45,
-                              fit: BoxFit.cover,
+                    Text("Welcome back, Sarah!",
+                        style: TextStyle(
+                            color: Colors.white,
+                            fontSize: responsiveFontSize(18),
+                            fontWeight: FontWeight.bold)),
+                    const SizedBox(height: 3),
+                    Text(
+                      "Here is the information about your moderator dashboard.",
+                      maxLines: 2,
+                      style: TextStyle(
+                          color: Colors.white54,
+                          fontSize: responsiveFontSize(12)),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          SizedBox(height: screenHeight * 0.02),
+          Container(
+            height: 45,
+            padding: const EdgeInsets.symmetric(horizontal: 14),
+            decoration: BoxDecoration(
+              color: const Color(0xFF13232E),
+              borderRadius: BorderRadius.circular(30),
+            ),
+            child: const Row(
+              children: [
+                Icon(Icons.search, color: Colors.white54),
+                SizedBox(width: 10),
+                Expanded(
+                  child: TextField(
+                    style: TextStyle(color: Colors.white),
+                    decoration: InputDecoration(
+                      hintText: "Search accounts, institutes...",
+                      hintStyle: TextStyle(color: Colors.white38),
+                      border: InputBorder.none,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          SizedBox(height: screenHeight * 0.02),
+          LayoutBuilder(builder: (context, constraints) {
+            if (constraints.maxWidth < 480) {
+              return Column(
+                children: [
+                  _buildDropdown(selectedValue, (newValue) {
+                    setState(() {
+                      selectedValue = newValue;
+                    });
+                  }, ['Last 7 Days', 'Last 30 Days', 'Last 60 Days']),
+                  const SizedBox(height: 10),
+                  _buildDropdown(selectedValue2, (newValue) {
+                    setState(() {
+                      selectedValue2 = newValue;
+                    });
+                  }, [
+                    'All Institutes',
+                    'Active Institutes',
+                    'Inactive Institutes'
+                  ]),
+                ],
+              );
+            } else {
+              return Row(
+                children: [
+                  Expanded(
+                      child: _buildDropdown(selectedValue, (newValue) {
+                    setState(() {
+                      selectedValue = newValue;
+                    });
+                  }, ['Last 7 Days', 'Last 30 Days', 'Last 60 Days'])),
+                  const SizedBox(width: 10),
+                  Expanded(
+                      child: _buildDropdown(selectedValue2, (newValue) {
+                    setState(() {
+                      selectedValue2 = newValue;
+                    });
+                  }, [
+                    'All Institutes',
+                    'Active Institutes',
+                    'Inactive Institutes'
+                  ])),
+                ],
+              );
+            }
+          }),
+          SizedBox(height: screenHeight * 0.02),
+          Text("Dashboard Overview",
+              style: TextStyle(
+                  color: Colors.white, fontSize: responsiveFontSize(18))),
+          const SizedBox(height: 12),
+          LayoutBuilder(builder: (context, constraints) {
+            int crossAxisCount;
+            double childAspectRatio;
+
+            if (constraints.maxWidth > 1200) {
+              crossAxisCount = 5;
+              childAspectRatio = 1.2;
+            } else if (constraints.maxWidth > 800) {
+              crossAxisCount = 4;
+              childAspectRatio = 1.1;
+            } else if (constraints.maxWidth > 600) {
+              crossAxisCount = 3;
+              childAspectRatio = 1.0;
+            } else {
+              crossAxisCount = 2;
+              childAspectRatio = 0.95;
+            }
+
+            return GridView.builder(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              itemCount: data.gridItems.length,
+              gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: crossAxisCount,
+                crossAxisSpacing: 12,
+                mainAxisSpacing: 12,
+                childAspectRatio: childAspectRatio,
+              ),
+              itemBuilder: (context, index) {
+                final item = data.gridItems[index];
+                return DashboardCard(
+                  icon: item.icon,
+                  title: item.title,
+                  value: item.value,
+                  percentage: item.percentage,
+                  isPositive: item.isPositive,
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (_) => item.page),
+                    );
+                  },
+                );
+              },
+            );
+          }),
+          const SizedBox(height: 18),
+          Text("User Role Distribution",
+              style: TextStyle(
+                  color: Colors.white, fontSize: responsiveFontSize(18))),
+          const SizedBox(height: 10),
+          Card(
+            color: const Color(0xFF10202A),
+            shape:
+                RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+            clipBehavior: Clip.antiAlias,
+            child: InkWell(
+              onTap: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                      builder: (_) => const RoleDistributionPage())),
+              child: Padding(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 14, vertical: 16),
+                child: Column(
+                  children: [
+                    SizedBox(
+                      height: 160,
+                      child: Stack(
+                        alignment: Alignment.center,
+                        children: [
+                          PieChart(
+                            PieChartData(
+                              sectionsSpace: 3,
+                              centerSpaceRadius: 42,
+                              startDegreeOffset: -90,
+                              sections: [
+                                PieChartSectionData(
+                                    value: data.accountants.toDouble(),
+                                    color: pieChartColors[0],
+                                    radius: 40,
+                                    title: ''),
+                                PieChartSectionData(
+                                    value: data.staff.toDouble(),
+                                    color: pieChartColors[1],
+                                    radius: 40,
+                                    title: ''),
+                                PieChartSectionData(
+                                    value: data.others.toDouble(),
+                                    color: pieChartColors[2],
+                                    radius: 40,
+                                    title: ''),
+                              ],
                             ),
                           ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
+                          Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
                             children: [
-                              Text("Welcome back, Sarah!",
+                              Text(total.toString(),
                                   style: TextStyle(
                                       color: Colors.white,
-                                      fontSize: responsiveFontSize(18),
+                                      fontSize: responsiveFontSize(22),
                                       fontWeight: FontWeight.bold)),
-                              const SizedBox(height: 3),
-                              Text(
-                                "Here is the information about your moderator dashboard.",
-                                maxLines: 2,
-                                style: TextStyle(
-                                    color: Colors.white54,
-                                    fontSize: responsiveFontSize(12)),
-                              ),
+                              const SizedBox(height: 4),
+                              const Text("Total Users",
+                                  style: TextStyle(color: Colors.white60)),
                             ],
-                          ),
-                        ),
-                      ],
-                    ),
-                    SizedBox(height: screenHeight * 0.02),
-                    Container(
-                      height: 45,
-                      padding: const EdgeInsets.symmetric(horizontal: 14),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF13232E),
-                        borderRadius: BorderRadius.circular(30),
-                      ),
-                      child: Row(
-                        children: const [
-                          Icon(Icons.search, color: Colors.white54),
-                          SizedBox(width: 10),
-                          Expanded(
-                            child: TextField(
-                              style: TextStyle(color: Colors.white),
-                              decoration: InputDecoration(
-                                hintText: "Search accounts, institutes...",
-                                hintStyle: TextStyle(color: Colors.white38),
-                                border: InputBorder.none,
-                              ),
-                            ),
                           ),
                         ],
                       ),
                     ),
-                    SizedBox(height: screenHeight * 0.02),
-                    LayoutBuilder(builder: (context, constraints) {
-                      if (constraints.maxWidth < 480) {
-                        return Column(
-                          children: [
-                            _buildDropdown(selectedValue, (newValue) {
-                              setState(() {
-                                selectedValue = newValue;
-                              });
-                            }, [
-                              'Last 7 Days',
-                              'Last 30 Days',
-                              'Last 60 Days'
-                            ]),
-                            const SizedBox(height: 10),
-                            _buildDropdown(selectedValue2, (newValue) {
-                              setState(() {
-                                selectedValue2 = newValue;
-                              });
-                            }, [
-                              'All Institutes',
-                              'Active Institutes',
-                              'Inactive Institutes'
-                            ]),
-                          ],
-                        );
-                      } else {
-                        return Row(
-                          children: [
-                            Expanded(
-                                child: _buildDropdown(selectedValue,
-                                    (newValue) {
-                              setState(() {
-                                selectedValue = newValue;
-                              });
-                            }, [
-                              'Last 7 Days',
-                              'Last 30 Days',
-                              'Last 60 Days'
-                            ])),
-                            const SizedBox(width: 10),
-                            Expanded(
-                                child: _buildDropdown(selectedValue2,
-                                    (newValue) {
-                              setState(() {
-                                selectedValue2 = newValue;
-                              });
-                            }, [
-                              'All Institutes',
-                              'Active Institutes',
-                              'Inactive Institutes'
-                            ])),
-                          ],
-                        );
-                      }
-                    }),
-                    SizedBox(height: screenHeight * 0.02),
-                    Text("Dashboard Overview",
-                        style: TextStyle(
-                            color: Colors.white,
-                            fontSize: responsiveFontSize(18))),
                     const SizedBox(height: 12),
-                    LayoutBuilder(builder: (context, constraints) {
-                      int crossAxisCount;
-                      double childAspectRatio;
-
-                      if (constraints.maxWidth > 1200) {
-                        crossAxisCount = 5;
-                        childAspectRatio = 1.2;
-                      } else if (constraints.maxWidth > 800) {
-                        crossAxisCount = 4;
-                        childAspectRatio = 1.1;
-                      } else if (constraints.maxWidth > 600) {
-                        crossAxisCount = 3;
-                        childAspectRatio = 1.0;
-                      } else {
-                        crossAxisCount = 2;
-                        childAspectRatio = 0.95;
-                      }
-
-                      return GridView.builder(
-                        shrinkWrap: true,
-                        physics: const NeverScrollableScrollPhysics(),
-                        itemCount: data.gridItems.length,
-                        gridDelegate:
-                            SliverGridDelegateWithFixedCrossAxisCount(
-                          crossAxisCount: crossAxisCount,
-                          crossAxisSpacing: 12,
-                          mainAxisSpacing: 12,
-                          childAspectRatio: childAspectRatio,
-                        ),
-                        itemBuilder: (context, index) {
-                          final item = data.gridItems[index];
-                          return DashboardCard(
-                            icon: item.icon,
-                            title: item.title,
-                            value: item.value,
-                            percentage: item.percentage,
-                            isPositive: item.isPositive,
-                            onTap: () {
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                    builder: (_) => item.page),
-                              );
-                            },
-                          );
-                        },
-                      );
-                    }),
-                    const SizedBox(height: 18),
-                    Text("User Role Distribution",
-                        style: TextStyle(
-                            color: Colors.white,
-                            fontSize: responsiveFontSize(18))),
-                    const SizedBox(height: 10),
-                    Card(
-                      color: const Color(0xFF10202A),
-                      shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(14)),
-                      clipBehavior: Clip.antiAlias,
-                      child: InkWell(
-                        onTap: () => Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                                builder: (_) =>
-                                    const RoleDistributionPage())),
-                        child: Padding(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 14, vertical: 16),
-                          child: Column(
-                            children: [
-                              SizedBox(
-                                height: 160,
-                                child: Stack(
-                                  alignment: Alignment.center,
-                                  children: [
-                                    PieChart(
-                                      PieChartData(
-                                        sectionsSpace: 3,
-                                        centerSpaceRadius: 42,
-                                        startDegreeOffset: -90,
-                                        sections: [
-                                          PieChartSectionData(
-                                              value: data.accountants
-                                                  .toDouble(),
-                                              color: pieChartColors[0],
-                                              radius: 40,
-                                              title: ''),
-                                          PieChartSectionData(
-                                              value: data.staff.toDouble(),
-                                              color: pieChartColors[1],
-                                              radius: 40,
-                                              title: ''),
-                                          PieChartSectionData(
-                                              value: data.others.toDouble(),
-                                              color: pieChartColors[2],
-                                              radius: 40,
-                                              title: ''),
-                                        ],
-                                      ),
-                                    ),
-                                    Column(
-                                      mainAxisAlignment: MainAxisAlignment.center,
-                                      children: [
-                                        Text(total.toString(),
-                                            style: TextStyle(
-                                                color: Colors.white,
-                                                fontSize:
-                                                    responsiveFontSize(22),
-                                                fontWeight:
-                                                    FontWeight.bold)),
-                                        const SizedBox(height: 4),
-                                        const Text("Total Users",
-                                            style: TextStyle(
-                                                color: Colors.white60)),
-                                      ],
-                                    ),
-                                  ],
-                                ),
-                              ),
-                              const SizedBox(height: 12),
-                              LegendRow(
-                                  title: "Accountants",
-                                  value: data.accountants,
-                                  color: pieChartColors[0]),
-                              LegendRow(
-                                  title: "Staff",
-                                  value: data.staff,
-                                  color: pieChartColors[1]),
-                              LegendRow(
-                                  title: "Others",
-                                  value: data.others,
-                                  color: pieChartColors[2]),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ),
-                    SizedBox(height: screenHeight * 0.02),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text("Recent Reviews",
-                            style: TextStyle(
-                                color: Colors.white,
-                                fontSize: responsiveFontSize(18))),
-                        GestureDetector(
-                          onTap: () => Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                  builder: (_) => const AllReviewsPage())),
-                          child: const Text("View All",
-                              style: TextStyle(color: Color(0xFF2E6CFF))),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 10),
-                    ListView.builder(
-                      shrinkWrap: true,
-                      physics: const NeverScrollableScrollPhysics(),
-                      itemCount: data.reviews.length,
-                      itemBuilder: (context, index) {
-                        final review = data.reviews[index];
-                        return ReviewCard(
-                          name: review.name,
-                          school: review.school,
-                          rating: review.rating,
-                          review: review.review,
-                          avatarAsset: review.avatarAsset,
-                        );
-                      },
-                    ),
-                    SizedBox(height: screenHeight * 0.02),
-                    Text("Database Status",
-                        style: TextStyle(
-                            color: Colors.white,
-                            fontSize: responsiveFontSize(18))),
-                    const SizedBox(height: 10),
-                    Row(
-                      children: [
-                        Expanded(
-                            child: StatCard(
-                                title: "Databases",
-                                value: data.databaseCount)),
-                        const SizedBox(width: 12),
-                        Expanded(
-                            child: StatCard(
-                                title: "Data Usage",
-                                value: data.dataUsage)),
-                      ],
-                    ),
-                    const SizedBox(height: 12),
-                    Card(
-                      color: const Color(0xFF10202A),
-                      shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12)),
-                      child: Padding(
-                        padding: const EdgeInsets.all(14),
-                        child: Row(
-                          children: [
-                            const Icon(Icons.cloud_done,
-                                color: Color(0xFF2ECF7E)),
-                            const SizedBox(width: 12),
-                            const Expanded(
-                                child: Text("System Uptime",
-                                    style: TextStyle(color: Colors.white))),
-                            Text(data.systemUptime,
-                                style: const TextStyle(
-                                    color: Color(0xFF2ECF7E),
-                                    fontWeight: FontWeight.bold)),
-                          ],
-                        ),
-                      ),
-                    ),
-                    SizedBox(height: screenHeight * 0.02),
-                    Text("Recent Activities",
-                        style: TextStyle(
-                            color: Colors.white,
-                            fontSize: responsiveFontSize(18))),
-                    const SizedBox(height: 10),
-                    ListView.builder(
-                      shrinkWrap: true,
-                      physics: const NeverScrollableScrollPhysics(),
-                      itemCount: data.recentActivities.length,
-                      itemBuilder: (context, index) {
-                        final activity = data.recentActivities[index];
-                        return ActivityTile(
-                          icon: activity.icon,
-                          color: activity.color,
-                          text: activity.text,
-                          time: activity.time,
-                        );
-                      },
-                    ),
-                    SizedBox(height: screenHeight * 0.05),
+                    LegendRow(
+                        title: "Accountants",
+                        value: data.accountants,
+                        color: pieChartColors[0]),
+                    LegendRow(
+                        title: "Staff",
+                        value: data.staff,
+                        color: pieChartColors[1]),
+                    LegendRow(
+                        title: "Others",
+                        value: data.others,
+                        color: pieChartColors[2]),
                   ],
                 ),
+              ),
+            ),
+          ),
+          SizedBox(height: screenHeight * 0.02),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text("Recent Reviews",
+                  style: TextStyle(
+                      color: Colors.white, fontSize: responsiveFontSize(18))),
+              GestureDetector(
+                onTap: () => Navigator.push(context,
+                    MaterialPageRoute(builder: (_) => const AllReviewsPage())),
+                child: const Text("View All",
+                    style: TextStyle(color: Color(0xFF2E6CFF))),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          ListView.builder(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            itemCount: data.reviews.length,
+            itemBuilder: (context, index) {
+              final review = data.reviews[index];
+              return ReviewCard(
+                name: review.name,
+                school: review.school,
+                rating: review.rating,
+                review: review.review,
+                avatarAsset: review.avatarAsset,
               );
-            } else {
-              // Fallback for any other unhandled state
-              return const Center(
-                  child: Text('No data available',
-                      style: TextStyle(color: Colors.white)));
-            }
-          },
-        ),
+            },
+          ),
+          SizedBox(height: screenHeight * 0.02),
+          Text("Database Status",
+              style: TextStyle(
+                  color: Colors.white, fontSize: responsiveFontSize(18))),
+          const SizedBox(height: 10),
+          Row(
+            children: [
+              Expanded(
+                  child: StatCard(
+                      title: "Databases", value: data.databaseCount)),
+              const SizedBox(width: 12),
+              Expanded(
+                  child:
+                      StatCard(title: "Data Usage", value: data.dataUsage)),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Card(
+            color: const Color(0xFF10202A),
+            shape:
+                RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            child: Padding(
+              padding: const EdgeInsets.all(14),
+              child: Row(
+                children: [
+                  const Icon(Icons.cloud_done, color: Color(0xFF2ECF7E)),
+                  const SizedBox(width: 12),
+                  const Expanded(
+                      child: Text("System Uptime",
+                          style: TextStyle(color: Colors.white))),
+                  Text(data.systemUptime,
+                      style: const TextStyle(
+                          color: Color(0xFF2ECF7E),
+                          fontWeight: FontWeight.bold)),
+                ],
+              ),
+            ),
+          ),
+          SizedBox(height: screenHeight * 0.02),
+          Text("Recent Activities",
+              style: TextStyle(
+                  color: Colors.white, fontSize: responsiveFontSize(18))),
+          const SizedBox(height: 10),
+          ListView.builder(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            itemCount: data.recentActivities.length,
+            itemBuilder: (context, index) {
+              final activity = data.recentActivities[index];
+              return ActivityTile(
+                icon: activity.icon,
+                color: activity.color,
+                text: activity.text,
+                time: activity.time,
+              );
+            },
+          ),
+          SizedBox(height: screenHeight * 0.05),
+        ],
       ),
     );
   }
@@ -686,10 +663,11 @@ class ReviewCard extends StatelessWidget {
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            ClipRRect(
-                borderRadius: BorderRadius.circular(30),
-                child: Image.asset(avatarAsset,
-                    width: 48, height: 48, fit: BoxFit.cover)),
+            if (avatarAsset.isNotEmpty)
+              ClipRRect(
+                  borderRadius: BorderRadius.circular(30),
+                  child: Image.asset(avatarAsset,
+                      width: 48, height: 48, fit: BoxFit.cover)),
             const SizedBox(width: 14),
             Expanded(
               child: Column(

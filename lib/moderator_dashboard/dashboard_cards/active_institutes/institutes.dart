@@ -1,40 +1,16 @@
 import 'dart:async';
-import 'dart:convert';
 import 'package:eduphin/services/api_service.dart';
-import 'package:http/http.dart' as http;
 import 'package:eduphin/moderator_dashboard/dashboard_cards/active_institutes/add_institute.dart';
 import 'package:eduphin/moderator_dashboard/dashboard_cards/active_institutes/view_institute_page.dart';
 import 'package:flutter/material.dart';
 
+import '../../institute/institute_model.dart';
 import 'manage/manage_institute.dart';
 
 // 1. Data Provider to fetch institute data
 class InstituteProvider {
   Future<List<Institute>> fetchInstitutes() async {
-    final token = await ApiService.getToken();
-    if (token == null) {
-      throw Exception('Authentication token not found. Please log in again.');
-    }
-
-    final response = await http.get(
-      Uri.parse('${ApiService.baseUrl}/moderator/institutes'),
-      headers: {
-        'Authorization': 'Bearer $token',
-        'Accept': 'application/json',
-      },
-    );
-
-    if (response.statusCode == 200) {
-      final responseBody = jsonDecode(response.body);
-      if (responseBody['success'] == true && responseBody['data'] != null) {
-        final List<dynamic> data = responseBody['data'];
-        return data.map((json) => Institute.fromJson(json)).toList();
-      } else {
-        throw Exception('Failed to parse institutes from API response.');
-      }
-    } else {
-      throw Exception('Failed to load institutes. Status code: ${response.statusCode}');
-    }
+    return ApiService.getInstitutes();
   }
 }
 
@@ -193,7 +169,7 @@ class _InstitutesPageState extends State<InstitutesPage> {
                       width: 50,
                       height: 50,
                       decoration: const BoxDecoration(
-                        color: Color(0xFF1B263B),
+                        color: const Color(0xFF1B263B),
                         shape: BoxShape.circle,
                       ),
                       child: const Icon(Icons.add, color: Colors.white),
@@ -266,68 +242,6 @@ class _InstitutesPageState extends State<InstitutesPage> {
           ],
         ),
       ),
-    );
-  }
-}
-
-class Institute {
-  final int id;
-  final String name;
-  final String code;
-  final String? logo;
-  final int establishedYear;
-  final String address;
-  final String city;
-  final String state;
-  final String pincode;
-  final String contactEmail;
-  final String contactPhone;
-  final String chairmanName;
-  final String? website;
-  final String? affiliationDetails;
-  final String status;
-
-  Institute({
-    required this.id,
-    required this.name,
-    required this.code,
-    this.logo,
-    required this.establishedYear,
-    required this.address,
-    required this.city,
-    required this.state,
-    required this.pincode,
-    required this.contactEmail,
-    required this.contactPhone,
-    required this.chairmanName,
-    this.website,
-    this.affiliationDetails,
-    required this.status,
-  });
-
-  factory Institute.fromJson(Map<String, dynamic> json) {
-    int parseYear(dynamic year) {
-      if (year is int) return year;
-      if (year is String) return int.tryParse(year) ?? 0;
-      return 0;
-    }
-    
-    return Institute(
-      id: json['id'] ?? 0,
-      name: json['name'] ?? 'N/A',
-      code: json['code'] ?? 'N/A',
-      logo: json['logo'],
-      establishedYear: parseYear(json['established_year']),
-      address: json['address'] ?? 'N/A',
-      city: json['city'] ?? 'N/A',
-      state: json['state'] ?? 'N/A',
-      pincode: json['pincode'] ?? 'N/A',
-      contactEmail: json['contact_email'] ?? 'N/A',
-      contactPhone: json['contact_phone'] ?? 'N/A',
-      chairmanName: json['chairman_name'] ?? 'N/A',
-      website: json['website'],
-      affiliationDetails: json['affiliation_details'],
-      status: json['status'] ?? 'pending',
     );
   }
 }
@@ -510,11 +424,16 @@ class ActionButton extends StatelessWidget {
         child: Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(icon, color: Colors.white, size: responsiveFontSize(18)),
-            const SizedBox(width: 6),
-            Text(label,
-                style: TextStyle(
-                    color: Colors.white, fontSize: responsiveFontSize(14))),
+            Icon(icon, color: Colors.white, size: responsiveFontSize(16)),
+            const SizedBox(width: 8),
+            Text(
+              label,
+              style: TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.w600,
+                fontSize: responsiveFontSize(13),
+              ),
+            ),
           ],
         ),
       ),

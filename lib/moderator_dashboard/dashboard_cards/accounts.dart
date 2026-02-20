@@ -31,6 +31,9 @@ class AccountProvider {
   Future<List<Account>> fetchAccounts(String instituteId) async {
     try {
       final response = await ApiService.get('moderator/institutes/$instituteId/accounts');
+      
+      // Print the raw response body for debugging
+      print('API Response: ${response.body}');
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);

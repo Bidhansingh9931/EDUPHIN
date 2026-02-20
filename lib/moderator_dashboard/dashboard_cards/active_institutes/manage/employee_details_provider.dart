@@ -3,13 +3,18 @@ import 'package:eduphin/services/api_service.dart';
 import 'employee_details.dart';
 
 class EmployeeDetailsProvider {
-  Future<EmployeeDetails> fetchEmployeeDetails(String employeeId) async {
+  Future<EmployeeDetails?> fetchEmployeeDetails(String employeeId) async {
     try {
       final response = await ApiService.get('moderator/accounts/$employeeId');
 
       if (response.statusCode == 200) {
         final responseData = json.decode(response.body);
-        return EmployeeDetails.fromJson(responseData['data']);
+        final data = responseData['data'];
+        if (data != null && data is Map<String, dynamic>) {
+          return EmployeeDetails.fromJson(data);
+        } else {
+          return null; // Return null if data is not found
+        }
       } else {
         throw Exception('Failed to load employee details. Status: ${response.statusCode}');
       }

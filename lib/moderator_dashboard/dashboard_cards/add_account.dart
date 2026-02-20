@@ -204,7 +204,7 @@ class _AddAccountPageState extends State<AddAccountPage> {
           borderRadius: BorderRadius.circular(8),
         ),
         filled: true,
-        fillColor: const Color(0xFF0D1B2A).withOpacity(0.5),
+        fillColor: const Color(0x800D1B2A),
       ),
       validator: (value) => value!.isEmpty ? 'Please enter $label' : null,
     );
@@ -238,7 +238,7 @@ class _AddAccountPageState extends State<AddAccountPage> {
             icon: const Icon(Icons.upload_file),
             label: Text('Upload $title'),
             style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF4A90E2).withOpacity(0.8),
+              backgroundColor: const Color(0xCC4A90E2),
               foregroundColor: Colors.white,
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(8),

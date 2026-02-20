@@ -90,36 +90,36 @@ class _EmployeeDetailsPageState extends State<EmployeeDetailsPage> {
   Future<void> _fetchData() async {
     try {
       final data = await _provider.fetchEmployeeDetails(widget.employeeId);
-      _employeeDetails = data; // Store fetched data
+      _employeeDetails = data ?? EmployeeDetails(); // If data is null, create an empty EmployeeDetails object
 
       // Populate controllers with fetched data
-      _fullNameController.text = data.fullName;
-      _emailController.text = data.email;
-      _roleController.text = data.role;
-      _genderController.text = data.gender;
-      _dateOfBirthController.text = data.dateOfBirth;
-      _relationshipStatusController.text = data.relationshipStatus;
-      _phoneNumberController.text = data.phoneNumber;
-      _alternateNumberController.text = data.alternateNumber;
-      _addressController.text = data.address;
-      _cityController.text = data.city;
-      _stateController.text = data.state;
-      _pinCodeController.text = data.pinCode;
-      _positionController.text = data.position;
-      _employmentTypeController.text = data.employmentType;
-      _joiningDateController.text = data.joiningDate;
-      _experienceController.text = data.experience;
-      _statusController.text = data.status;
-      _referenceController.text = data.reference;
-      _qualificationController.text = data.qualification;
-      _matriculationMarksController.text = data.matriculationMarks;
-      _intermediateMarksController.text = data.intermediateMarks;
-      _bankAccountNumberController.text = data.bankAccountNumber;
-      _ifscCodeController.text = data.ifscCode;
-      _bankNameController.text = data.bankName;
-      _branchController.text = data.branch;
-      _emergencyContactNameController.text = data.emergencyContactName;
-      _emergencyContactNumberController.text = data.emergencyContactNumber;
+      _fullNameController.text = _employeeDetails.fullName ?? '';
+      _emailController.text = _employeeDetails.email ?? '';
+      _roleController.text = _employeeDetails.role ?? '';
+      _genderController.text = _employeeDetails.gender ?? '';
+      _dateOfBirthController.text = _employeeDetails.dateOfBirth ?? '';
+      _relationshipStatusController.text = _employeeDetails.relationshipStatus ?? '';
+      _phoneNumberController.text = _employeeDetails.phoneNumber ?? '';
+      _alternateNumberController.text = _employeeDetails.alternateNumber ?? '';
+      _addressController.text = _employeeDetails.address ?? '';
+      _cityController.text = _employeeDetails.city ?? '';
+      _stateController.text = _employeeDetails.state ?? '';
+      _pinCodeController.text = _employeeDetails.pinCode ?? '';
+      _positionController.text = _employeeDetails.position ?? '';
+      _employmentTypeController.text = _employeeDetails.employmentType ?? '';
+      _joiningDateController.text = _employeeDetails.joiningDate ?? '';
+      _experienceController.text = _employeeDetails.experience ?? '';
+      _statusController.text = _employeeDetails.status ?? '';
+      _referenceController.text = _employeeDetails.reference ?? '';
+      _qualificationController.text = _employeeDetails.qualification ?? '';
+      _matriculationMarksController.text = _employeeDetails.matriculationMarks ?? '';
+      _intermediateMarksController.text = _employeeDetails.intermediateMarks ?? '';
+      _bankAccountNumberController.text = _employeeDetails.bankAccountNumber ?? '';
+      _ifscCodeController.text = _employeeDetails.ifscCode ?? '';
+      _bankNameController.text = _employeeDetails.bankName ?? '';
+      _branchController.text = _employeeDetails.branch ?? '';
+      _emergencyContactNameController.text = _employeeDetails.emergencyContactName ?? '';
+      _emergencyContactNumberController.text = _employeeDetails.emergencyContactNumber ?? '';
 
     } catch (e) {
       if (mounted) {
@@ -226,79 +226,79 @@ class _EmployeeDetailsPageState extends State<EmployeeDetailsPage> {
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
           : SingleChildScrollView(
-              padding: const EdgeInsets.all(16.0),
-              child: Column(
-                children: [
-                  _buildSection(
-                    title: 'Personal Details',
-                    children: [
-                      _buildTextField(controller: _fullNameController, label: 'Full Name'),
-                      _buildTextField(controller: _emailController, label: 'Email'),
-                      _buildTextField(controller: _roleController, label: 'Role'),
-                      _buildTextField(controller: _genderController, label: 'Gender'),
-                      _buildTextField(controller: _dateOfBirthController, label: 'Date of Birth'),
-                      _buildTextField(controller: _relationshipStatusController, label: 'Relationship Status'),
-                    ],
-                  ),
-                  _buildSection(
-                    title: 'Contact Information',
-                    children: [
-                      _buildTextField(controller: _phoneNumberController, label: 'Phone Number'),
-                      _buildTextField(controller: _alternateNumberController, label: 'Alternate Number'),
-                      _buildTextField(controller: _addressController, label: 'Address'),
-                      _buildTextField(controller: _cityController, label: 'City'),
-                      _buildTextField(controller: _stateController, label: 'State'),
-                      _buildTextField(controller: _pinCodeController, label: 'Pincode'),
-                    ],
-                  ),
-                  _buildSection(
-                    title: 'Employment Details',
-                    children: [
-                      _buildTextField(controller: _positionController, label: 'Position'),
-                      _buildTextField(controller: _employmentTypeController, label: 'Employment Type'),
-                      _buildTextField(controller: _joiningDateController, label: 'Joining Date', readOnly: true),
-                      _buildTextField(controller: _experienceController, label: 'Experience (Years)'),
-                      _buildTextField(controller: _statusController, label: 'Status'),
-                      _buildTextField(controller: _referenceController, label: 'Reference'),
-                    ],
-                  ),
-                  _buildSection(
-                    title: 'Educational Qualification',
-                    children: [
-                      _buildTextField(controller: _qualificationController, label: 'Qualification'),
-                      _buildTextField(controller: _matriculationMarksController, label: 'Matriculation Marks'),
-                      _buildTextField(controller: _intermediateMarksController, label: 'Intermediate Marks'),
-                    ],
-                  ),
-                  _buildSection(
-                    title: 'Bank Details',
-                    children: [
-                      _buildTextField(controller: _bankAccountNumberController, label: 'Bank Account Number'),
-                      _buildTextField(controller: _ifscCodeController, label: 'IFSC Code'),
-                      _buildTextField(controller: _bankNameController, label: 'Bank Name'),
-                      _buildTextField(controller: _branchController, label: 'Branch'),
-                    ],
-                  ),
-                  _buildSection(
-                    title: 'Emergency Contact',
-                    children: [
-                      _buildTextField(controller: _emergencyContactNameController, label: 'Emergency Contact Name'),
-                      _buildTextField(controller: _emergencyContactNumberController, label: 'Emergency Contact Number'),
-                    ],
-                  ),
-                  const SizedBox(height: 20),
-                  ElevatedButton(
-                    onPressed: _isSaving ? null : _saveChanges,
-                    style: ElevatedButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 15),
-                    ),
-                    child: _isSaving
-                        ? const CircularProgressIndicator(valueColor: AlwaysStoppedAnimation<Color>(Colors.white))
-                        : const Text('Save Changes'),
-                  ),
-                ],
-              ),
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          children: [
+            _buildSection(
+              title: 'Personal Details',
+              children: [
+                _buildTextField(controller: _fullNameController, label: 'Full Name'),
+                _buildTextField(controller: _emailController, label: 'Email'),
+                _buildTextField(controller: _roleController, label: 'Role'),
+                _buildTextField(controller: _genderController, label: 'Gender'),
+                _buildTextField(controller: _dateOfBirthController, label: 'Date of Birth'),
+                _buildTextField(controller: _relationshipStatusController, label: 'Relationship Status'),
+              ],
             ),
+            _buildSection(
+              title: 'Contact Information',
+              children: [
+                _buildTextField(controller: _phoneNumberController, label: 'Phone Number'),
+                _buildTextField(controller: _alternateNumberController, label: 'Alternate Number'),
+                _buildTextField(controller: _addressController, label: 'Address'),
+                _buildTextField(controller: _cityController, label: 'City'),
+                _buildTextField(controller: _stateController, label: 'State'),
+                _buildTextField(controller: _pinCodeController, label: 'Pincode'),
+              ],
+            ),
+            _buildSection(
+              title: 'Employment Details',
+              children: [
+                _buildTextField(controller: _positionController, label: 'Position'),
+                _buildTextField(controller: _employmentTypeController, label: 'Employment Type'),
+                _buildTextField(controller: _joiningDateController, label: 'Joining Date', readOnly: true),
+                _buildTextField(controller: _experienceController, label: 'Experience (Years)'),
+                _buildTextField(controller: _statusController, label: 'Status'),
+                _buildTextField(controller: _referenceController, label: 'Reference'),
+              ],
+            ),
+            _buildSection(
+              title: 'Educational Qualification',
+              children: [
+                _buildTextField(controller: _qualificationController, label: 'Qualification'),
+                _buildTextField(controller: _matriculationMarksController, label: 'Matriculation Marks'),
+                _buildTextField(controller: _intermediateMarksController, label: 'Intermediate Marks'),
+              ],
+            ),
+            _buildSection(
+              title: 'Bank Details',
+              children: [
+                _buildTextField(controller: _bankAccountNumberController, label: 'Bank Account Number'),
+                _buildTextField(controller: _ifscCodeController, label: 'IFSC Code'),
+                _buildTextField(controller: _bankNameController, label: 'Bank Name'),
+                _buildTextField(controller: _branchController, label: 'Branch'),
+              ],
+            ),
+            _buildSection(
+              title: 'Emergency Contact',
+              children: [
+                _buildTextField(controller: _emergencyContactNameController, label: 'Emergency Contact Name'),
+                _buildTextField(controller: _emergencyContactNumberController, label: 'Emergency Contact Number'),
+              ],
+            ),
+            const SizedBox(height: 20),
+            ElevatedButton(
+              onPressed: _isSaving ? null : _saveChanges,
+              style: ElevatedButton.styleFrom(
+                padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 15),
+              ),
+              child: _isSaving
+                  ? const CircularProgressIndicator(valueColor: AlwaysStoppedAnimation<Color>(Colors.white))
+                  : const Text('Save Changes'),
+            ),
+          ],
+        ),
+      ),
     );
   }
 

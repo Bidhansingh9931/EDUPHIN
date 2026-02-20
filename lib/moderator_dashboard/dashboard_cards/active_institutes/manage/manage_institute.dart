@@ -1,71 +1,12 @@
-import 'dart:convert';
+import 'dart:async';
 
 import 'package:eduphin/moderator_dashboard/moderator_dashboard.dart';
 import 'package:eduphin/moderator_dashboard/dashboard_cards/active_institutes/manage/add_employee.dart';
 import 'package:eduphin/services/api_service.dart';
 import 'package:flutter/material.dart';
-import 'dart:async';
-import 'package:http/http.dart' as http;
 
+import 'employee_model.dart';
 import 'employ_details.dart';
-
-// --- Data Models and Providers (for API integration) ---
-
-// 1. Data Model for an Employee
-class Employee {
-  final String id;
-  final String name;
-  final String role;
-
-  Employee({required this.id, required this.name, required this.role});
-
-  factory Employee.fromJson(Map<String, dynamic> json) {
-    String roleName = 'Unassigned';
-    if (json['roles'] != null && (json['roles'] as List).isNotEmpty) {
-      roleName = json['roles'][0]['name'] ?? 'Unassigned';
-    }
-
-    return Employee(
-      id: json['id'].toString(),
-      name: json['name'] ?? 'N/A',
-      role: roleName,
-    );
-  }
-}
-
-// 2. Data Provider to fetch employee data from the live API
-class EmployeeProvider {
-  Future<List<Employee>> fetchEmployees(String instituteId) async {
-    final token = await ApiService.getToken();
-    if (token == null) {
-      throw Exception('Authentication token not found.');
-    }
-
-    // CORRECTED: Using the URL structure from the accounts.dart file you provided.
-    final uri = Uri.parse('${ApiService.baseUrl}/moderator/institutes/$instituteId/accounts');
-
-    final response = await http.get(
-      uri,
-      headers: {
-        'Authorization': 'Bearer $token',
-        'Accept': 'application/json',
-      },
-    );
-
-    if (response.statusCode == 200) {
-      final data = jsonDecode(response.body);
-      // CORRECTED: Parsing the JSON based on the structure from accounts.dart { "success": true, "accounts": [...] }
-      if (data['success'] == true && data['accounts'] != null) {
-        final List<dynamic> accountsJson = data['accounts'];
-        return accountsJson.map((json) => Employee.fromJson(json)).toList();
-      } else {
-        throw Exception(data['message'] ?? 'Failed to load accounts.');
-      }
-    } else {
-      throw Exception('Failed to load employees. Status Code: ${response.statusCode}');
-    }
-  }
-}
 
 // 3. Dynamic list of roles
 const List<String> employeeRoles = [
@@ -97,7 +38,6 @@ class ManageInstitute extends StatefulWidget {
 }
 
 class _ManageInstitutePageState extends State<ManageInstitute> {
-  final EmployeeProvider _provider = EmployeeProvider();
   final _searchController = TextEditingController();
 
   bool _isLoading = true;
@@ -125,7 +65,7 @@ class _ManageInstitutePageState extends State<ManageInstitute> {
       _error = null;
     });
     try {
-      final employees = await _provider.fetchEmployees(widget.instituteId);
+      final employees = await ApiService.getEmployees(widget.instituteId);
       if (mounted) {
         setState(() {
           _allEmployees = employees;

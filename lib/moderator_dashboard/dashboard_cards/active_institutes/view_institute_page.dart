@@ -1,38 +1,14 @@
 import 'dart:async';
-import 'dart:convert';
 import 'package:eduphin/services/api_service.dart';
-import 'package:http/http.dart' as http;
 import 'package:eduphin/moderator_dashboard/moderator_dashboard.dart';
-import 'package:eduphin/moderator_dashboard/dashboard_cards/active_institutes/institutes.dart';
 import 'package:flutter/material.dart';
+
+import '../../institute/institute_model.dart';
 
 // 1. Data Provider to fetch live institute details
 class InstituteDetailProvider {
   Future<Institute> fetchInstituteDetails(String instituteId) async {
-    final token = await ApiService.getToken();
-    if (token == null) {
-      throw Exception('Authentication token not found.');
-    }
-
-    final response = await http.get(
-      Uri.parse('${ApiService.baseUrl}/moderator/institutes/$instituteId'),
-      headers: {
-        'Authorization': 'Bearer $token',
-        'Accept': 'application/json',
-      },
-    );
-
-    if (response.statusCode == 200) {
-      final responseBody = jsonDecode(response.body);
-      if (responseBody['success'] == true && responseBody['data'] != null) {
-        // Uses the same Institute model from institutes.dart
-        return Institute.fromJson(responseBody['data']);
-      } else {
-        throw Exception('Failed to parse institute data from API.');
-      }
-    } else {
-      throw Exception('Failed to load institute details. Status code: ${response.statusCode}');
-    }
+    return ApiService.getInstituteDetails(instituteId);
   }
 }
 
@@ -95,7 +71,7 @@ class _ViewInstitutePageState extends State<ViewInstitutePage> {
         // Helper to construct the full image URL
         String? getLogoUrl(String? path) {
           if (path == null || path.isEmpty) return null;
-          final baseUrl = ApiService.baseUrl.replaceAll('/api', ''); // Get the root URL
+          final baseUrl = ApiService.baseImageUrl; // Use the correct base URL from ApiService
           return '$baseUrl/storage/$path';
         }
 
@@ -142,8 +118,7 @@ class _ViewInstitutePageState extends State<ViewInstitutePage> {
                 ),
                 InkWell(
                   onTap: () => Navigator.pushReplacement(
-                      context, MaterialPageRoute(builder: (context) => const ModeratorDashboardPage())),
-                  child: const Icon(Icons.home_sharp, size: 30, color: Colors.white),
+                      context, MaterialPageRoute(builder: (context) => const ModeratorDashboardPage())),                  child: const Icon(Icons.home_sharp, size: 30, color: Colors.white),
                 ),
               ],
             ),

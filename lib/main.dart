@@ -1,8 +1,23 @@
+import 'dart:async'; // ✅ KEPT (error guarding)
 import 'package:eduphin/login_logout/splash_screen.dart';
 import 'package:flutter/material.dart';
 
 void main() {
-  runApp(const MyApp());
+  // ✅ Catch async / background errors (SAFE for web & mobile)
+  runZonedGuarded(() {
+    // ✅ MUST be inside the SAME zone
+    WidgetsFlutterBinding.ensureInitialized();
+
+    // ✅ Catch Flutter framework errors
+    FlutterError.onError = (FlutterErrorDetails details) {
+      FlutterError.presentError(details);
+    };
+
+    runApp(const MyApp());
+  }, (error, stackTrace) {
+    debugPrint('Uncaught error: $error');
+    debugPrint('$stackTrace');
+  });
 }
 
 class MyApp extends StatelessWidget {
@@ -18,8 +33,8 @@ class MyApp extends StatelessWidget {
       primary: primaryColor,
       onPrimary: Colors.white,
       surface: Colors.white,
-      onSurface: const Color(0xFF333333), // Main text color
-      onSurfaceVariant: Colors.grey.shade600, // Secondary text color
+      onSurface: const Color(0xFF333333),
+      onSurfaceVariant: Colors.grey,
       error: Colors.redAccent,
       onError: Colors.white,
     );
@@ -27,23 +42,38 @@ class MyApp extends StatelessWidget {
     final darkScheme = ColorScheme.fromSeed(
       seedColor: primaryColor,
       brightness: Brightness.dark,
-      primary: primaryColor, // Ensure primary color is consistent
+      primary: primaryColor,
       onPrimary: const Color(0xFFEBEDEF),
-      surface: const Color(0xFF112033), // Card color
-      onSurface: const Color(0xFFEBEDEF), // Main text color
-      onSurfaceVariant: Colors.grey.shade400, // Secondary text color
+      surface: const Color(0xFF112033),
+      onSurface: const Color(0xFFEBEDEF),
+      onSurfaceVariant: Colors.grey,
       error: Colors.redAccent,
       onError: Colors.white,
     );
 
     TextTheme buildTextTheme(ColorScheme colorScheme) {
       return TextTheme(
-        headlineSmall: TextStyle(color: colorScheme.onSurface, fontWeight: FontWeight.bold),
-        headlineMedium: TextStyle(color: colorScheme.onSurface, fontWeight: FontWeight.bold),
-        titleLarge: TextStyle(color: colorScheme.onSurface, fontWeight: FontWeight.bold),
-        titleMedium: TextStyle(color: colorScheme.onSurface),
-        bodyLarge: TextStyle(color: colorScheme.onSurface),
-        bodyMedium: TextStyle(color: colorScheme.onSurfaceVariant), // Use for secondary text
+        headlineSmall: TextStyle(
+          color: colorScheme.onSurface,
+          fontWeight: FontWeight.bold,
+        ),
+        headlineMedium: TextStyle(
+          color: colorScheme.onSurface,
+          fontWeight: FontWeight.bold,
+        ),
+        titleLarge: TextStyle(
+          color: colorScheme.onSurface,
+          fontWeight: FontWeight.bold,
+        ),
+        titleMedium: TextStyle(
+          color: colorScheme.onSurface,
+        ),
+        bodyLarge: TextStyle(
+          color: colorScheme.onSurface,
+        ),
+        bodyMedium: TextStyle(
+          color: colorScheme.onSurfaceVariant,
+        ),
       );
     }
 
@@ -51,10 +81,11 @@ class MyApp extends StatelessWidget {
       debugShowCheckedModeBanner: false,
       title: 'Eduphin',
       themeMode: ThemeMode.system,
+
       theme: ThemeData(
         brightness: Brightness.light,
         colorScheme: lightScheme,
-        scaffoldBackgroundColor: const Color(0xFFF0F4FF), // Light blue background
+        scaffoldBackgroundColor: const Color(0xFFF0F4FF),
         cardColor: lightScheme.surface,
         hintColor: Colors.grey.shade500,
         disabledColor: Colors.grey.shade400,
@@ -70,6 +101,7 @@ class MyApp extends StatelessWidget {
         ),
         textTheme: buildTextTheme(lightScheme),
       ),
+
       darkTheme: ThemeData(
         brightness: Brightness.dark,
         colorScheme: darkScheme,
@@ -89,6 +121,8 @@ class MyApp extends StatelessWidget {
         ),
         textTheme: buildTextTheme(darkScheme),
       ),
+
+      // ✅ Kept exactly as-is
       home: const SplashScreen(),
     );
   }
