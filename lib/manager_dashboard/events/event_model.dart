@@ -26,4 +26,19 @@ class Event {
     required this.audience,
     this.image,
   });
+
+  factory Event.fromJson(Map<String, dynamic> json) {
+    return Event(
+      title: json['title'] ?? '',
+      description: json['description'] ?? '',
+      venue: json['venue'] ?? '',
+      eventDate: DateTime.parse(json['event_date'] ?? '1970-01-01'),
+      startTime: json['start_time'] ?? '',
+      endTime: json['end_time'] ?? '',
+      isTicketed: json['is_ticketed'] == 1,
+      ticketPrice: json['ticket_price'],
+      maxParticipants: json['max_participants'].toString(),
+      audience: List<String>.from(json['audience'] ?? []),
+    );
+  }
 }

@@ -1,6 +1,7 @@
 import 'dart:async'; // ✅ KEPT (error guarding)
 import 'package:eduphin/login_logout/splash_screen.dart';
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 
 void main() {
   // ✅ Catch async / background errors (SAFE for web & mobile)
@@ -99,7 +100,7 @@ class MyApp extends StatelessWidget {
             fontWeight: FontWeight.bold,
           ),
         ),
-        textTheme: buildTextTheme(lightScheme),
+        textTheme: GoogleFonts.robotoTextTheme(buildTextTheme(lightScheme)),
       ),
 
       darkTheme: ThemeData(
@@ -119,7 +120,7 @@ class MyApp extends StatelessWidget {
             fontWeight: FontWeight.bold,
           ),
         ),
-        textTheme: buildTextTheme(darkScheme),
+        textTheme: GoogleFonts.robotoTextTheme(buildTextTheme(darkScheme)),
       ),
 
       // ✅ Kept exactly as-is

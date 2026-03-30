@@ -40,6 +40,9 @@ dependencies:
   # iOS icons support
   cupertino_icons: ^1.0.6
 
+  # Font handling
+  google_fonts: ^6.2.1
+
 dev_dependencies:
   flutter_test:
     sdk: flutter

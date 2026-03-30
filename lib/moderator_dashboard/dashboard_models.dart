@@ -1,6 +1,10 @@
 
+// import 'package:eduphin/moderator_dashboard/all_review.dart';
+// import 'package:eduphin/moderator_dashboard/all_testimonials.dart';
 import 'package:eduphin/moderator_dashboard/dashboard_cards/active_institutes/institutes.dart';
 import 'package:flutter/material.dart';
+
+import 'dashboard_cards/testimonials_page.dart';
 
 class GridItem {
   final String tag;
@@ -48,7 +52,28 @@ class Review {
     );
   }
 }
+class Testimonial {
+  final String name;
+  final String school;
+  final String review;
+  final String avatarAsset;
 
+  Testimonial({
+    required this.name,
+    required this.school,
+    required this.review,
+    required this.avatarAsset,
+  });
+
+  factory Testimonial.fromJson(Map<String, dynamic> json) {
+    return Testimonial(
+      name: json['name'] ?? 'N/A',
+      school: json['school'] ?? 'N/A',
+      review: json['review'] ?? '',
+      avatarAsset: json['avatarAsset'] ?? '',
+    );
+  }
+}
 class RecentActivity {
   final IconData icon;
   final Color color;
@@ -64,7 +89,7 @@ class RecentActivity {
 
   factory RecentActivity.fromJson(Map<String, dynamic> json) {
     String event = json['event'] ?? 'unknown';
-    // The model path can be long, like 'App\\Models\\User'. Get the last part.
+    // The model path can be long, like 'App\Models\User'. Get the last part.
     String model = json['model']?.toString().split('\\').last ?? 'item';
     String description = "User #${json['user_id']} triggered '$event' on $model #${json['model_id']}";
 
@@ -123,6 +148,7 @@ class DashboardData {
   final String dataUsage;
   final String systemUptime;
   final List<RecentActivity> recentActivities;
+   final List<Testimonial> testimonials;
 
   DashboardData({
     required this.gridItems,
@@ -131,6 +157,7 @@ class DashboardData {
     required this.dataUsage,
     required this.systemUptime,
     required this.recentActivities,
+    required this.testimonials,
   });
 
   factory DashboardData.fromJson(Map<String, dynamic> json) {
@@ -140,6 +167,9 @@ class DashboardData {
     // Manually add institutes to the grid items
     final int institutesCount = (json['counts'] as Map<String, dynamic>?)?['institutes'] ?? 0;
     gridItems.add(GridItem(tag: 'institutes', icon: Icons.school, value: institutesCount.toString(), title: 'Institutes', percentage: 0, isPositive: true, page: const InstitutesPage()));
+      final int testimonialCount = (json['counts'] as Map<String, dynamic>?)?['testimonials'] ?? 0;
+    gridItems.add(GridItem(tag: 'testimonials', icon: Icons.comment, value: testimonialCount.toString(), title: 'Testimonials', percentage: 0, isPositive: true, page: const TestimonialsPage()));
+
 
     for (var role in roles) {
       final roleName = role['name'] as String? ?? 'Unnamed Role';
@@ -160,7 +190,6 @@ class DashboardData {
     final activitiesList = (json['recent_activities'] as List<dynamic>? ?? []).cast<Map<String, dynamic>>();
     final recentActivities = activitiesList.map((i) => RecentActivity.fromJson(i)).toList();
 
-    final int testimonialCount = (json['counts'] as Map<String, dynamic>?)?['testimonials'] ?? 0;
     final List<Review> reviews = List.generate(testimonialCount, (index) => Review(
       name: 'User ${index + 1}',
       school: 'Eduphin Institute',
@@ -168,7 +197,8 @@ class DashboardData {
       review: 'This is a great platform!',
       avatarAsset: '',
     ));
-
+ final testimonialsList = (json['testimonials'] as List<dynamic>? ?? []).cast<Map<String, dynamic>>();
+    final testimonials = testimonialsList.map((i) => Testimonial.fromJson(i)).toList();
     return DashboardData(
       gridItems: gridItems,
       reviews: reviews,
@@ -176,6 +206,7 @@ class DashboardData {
       dataUsage: json['total_data_usage']?.toString() ?? 'N/A',
       systemUptime: json['uptime']?.toString() ?? 'N/A',
       recentActivities: recentActivities,
+      testimonials: testimonials,
     );
   }
 

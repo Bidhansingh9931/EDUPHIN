@@ -1,15 +1,18 @@
+import 'package:eduphin/accountant/dashboard/accountant_dashbard.dart';
 import 'package:eduphin/login_logout/ui_helper.dart';
 import 'package:eduphin/manager_dashboard/manager_dashboard.dart';
 import 'package:eduphin/moderator_dashboard/moderator_dashboard.dart';
+import 'package:eduphin/student/student_dashboard.dart';
+import 'package:eduphin/teacher/dashboard/teacher_dashboard.dart';
 import 'package:flutter/material.dart';
 import 'package:eduphin/services/api_service.dart';
 
-// import 'forgot_password.dart';
-
-// Add a class for role constants
 class Roles {
   static const int moderator = 2;
   static const int manager = 3;
+  static const int teacher = 5;
+  static const int student = 6;
+  static const int accountant = 8;
 }
 
 class LoginPage extends StatefulWidget {
@@ -68,6 +71,12 @@ class _LoginPageState extends State<LoginPage> {
       destinationPage = const ModeratorDashboardPage();
     } else if (roleId == Roles.manager) {
       destinationPage = const ManagerDashboardPage();
+    } else if (roleId == Roles.teacher) {
+      destinationPage = const TeacherDashboardPage();
+    } else if (roleId == Roles.student) {
+      destinationPage = const StudentDashboard();
+    } else if (roleId == Roles.accountant) {
+      destinationPage = const AccountantDashboard();
     }
 
     if (destinationPage != null) {

@@ -56,6 +56,7 @@ class DashboardDataProvider {
       dataUsage: 'N/A',
       systemUptime: 'N/A',
       recentActivities: [],
+      testimonials: [],
     );
   }
 }
