@@ -1,4 +1,5 @@
 import 'package:eduphin/accountant/dashboard/accountant_dashbard.dart';
+import 'package:eduphin/counselor/counselor_dashboard.dart';
 import 'package:eduphin/login_logout/ui_helper.dart';
 import 'package:eduphin/manager_dashboard/manager_dashboard.dart';
 import 'package:eduphin/moderator_dashboard/moderator_dashboard.dart';
@@ -11,6 +12,7 @@ import 'package:eduphin/services/api_service.dart';
 class Roles {
   static const int moderator = 2;
   static const int manager = 3;
+  static const int counselor = 4;
   static const int teacher = 5;
   static const int student = 6;
   static const int accountant = 8;
@@ -73,6 +75,8 @@ class _LoginPageState extends State<LoginPage> {
       destinationPage = const ModeratorDashboardPage();
     } else if (roleId == Roles.manager) {
       destinationPage = const ManagerDashboardPage();
+    } else if (roleId == Roles.counselor) {
+      destinationPage = const CounslorDeshboardPage();
     } else if (roleId == Roles.teacher) {
       destinationPage = const TeacherDashboardPage();
     } else if (roleId == Roles.student) {
