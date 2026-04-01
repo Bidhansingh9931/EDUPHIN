@@ -22,6 +22,7 @@ import 'package:eduphin/student/student_profile_model.dart' as student_profile;
 import 'package:eduphin/student/student_virtual_id_model.dart' as student_id;
 import 'package:eduphin/student/student_fee_model.dart' as student_fee;
 import 'package:eduphin/accountant/dashboard/accountant_dashboard_model.dart' as accountant_model;
+import 'package:eduphin/staff/staff_dashboard/staff_models.dart' as staff_model;
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
@@ -963,7 +964,7 @@ class ApiService {
     if (response.statusCode != 200) throw Exception(jsonDecode(response.body)['message'] ?? 'Failed to create ticket');
   }
 
-  static Future<TicketDetails> getAccountantTicketDetails(String id) async {
+  static Future<TicketDetails> getTicketDetailsAccountant(String id) async {
     final response = await get('accountants/tickets/$id');
     if (response.statusCode == 200) {
       final data = jsonDecode(response.body);
@@ -1045,5 +1046,195 @@ class ApiService {
       if (data['success'] == true) return VirtualIdCardData.fromJson(data['data']);
     }
     throw Exception('Failed to load virtual ID card');
+  }
+
+  // Staff APIs
+  static Future<staff_model.StaffDashboardData> getStaffDashboard() async {
+    final response = await get('staff/dashboard');
+    if (response.statusCode == 200) {
+      final data = jsonDecode(response.body);
+      if (data['success'] == true) return staff_model.StaffDashboardData.fromJson(data['data']);
+    }
+    throw Exception('Failed to load staff dashboard');
+  }
+
+  static Future<staff_model.UserDetail> getStaffProfile() async {
+    final response = await get('staff/profile');
+    if (response.statusCode == 200) {
+      final data = jsonDecode(response.body);
+      if (data['success'] == true) return staff_model.UserDetail.fromJson(data['data']);
+    }
+    throw Exception('Failed to load staff profile');
+  }
+
+  static Future<void> updateStaffProfile(Map<String, String> data, {File? photo}) async {
+    final files = photo != null ? {'photo': photo} : null;
+    final response = await postMultipart('staff/profile/update', data, files: files);
+    if (response.statusCode != 200) {
+      final responseBody = await response.stream.bytesToString();
+      throw Exception(jsonDecode(responseBody)['message'] ?? 'Failed to update profile');
+    }
+  }
+
+  static Future<staff_model.StaffVirtualIdCardData> getStaffVirtualIdCard() async {
+    final response = await get('staff/virtual-id-card');
+    if (response.statusCode == 200) {
+      final data = jsonDecode(response.body);
+      if (data['success'] == true) return staff_model.StaffVirtualIdCardData.fromJson(data['data']);
+    }
+    throw Exception('Failed to load virtual ID card');
+  }
+
+  static Future<List<staff_model.Event>> getStaffEvents({String? status, String? type}) async {
+    final Map<String, String> query = {};
+    if (status != null && status != 'All Events') query['status'] = status.toLowerCase();
+    if (type != null && type != 'All types') query['type'] = type.toLowerCase();
+    final response = await get('staff/events', query);
+    if (response.statusCode == 200) {
+      final data = jsonDecode(response.body);
+      if (data['success'] == true) return (data['data'] as List).map((e) => staff_model.Event.fromJson(e)).toList();
+    }
+    throw Exception('Failed to load events');
+  }
+
+  static Future<List<staff_model.EventRegistration>> getStaffRegisteredEvents({String? status, String? type}) async {
+    final Map<String, String> query = {};
+    if (status != null && status != 'All Events') query['status'] = status.toLowerCase();
+    if (type != null && type != 'All types') query['type'] = type.toLowerCase();
+    final response = await get('staff/events/registered', query);
+    if (response.statusCode == 200) {
+      final data = jsonDecode(response.body);
+      if (data['success'] == true) return (data['data'] as List).map((e) => staff_model.EventRegistration.fromJson(e)).toList();
+    }
+    throw Exception('Failed to load registered events');
+  }
+
+  static Future<void> staffRegisterForEvent(String id) async {
+    final response = await post('staff/events/register/$id', {});
+    if (response.statusCode != 200) throw Exception(jsonDecode(response.body)['message'] ?? 'Failed to register');
+  }
+
+  static Future<void> cancelStaffEventRegistration(String id) async {
+    final response = await post('staff/events/cancel/$id', {});
+    if (response.statusCode != 200) throw Exception(jsonDecode(response.body)['message'] ?? 'Failed to cancel');
+  }
+
+  static Future<List<staff_model.Exam>> getStaffExams() async {
+    final response = await get('staff/exams');
+    if (response.statusCode == 200) {
+      final data = jsonDecode(response.body);
+      if (data['success'] == true) return (data['data'] as List).map((e) => staff_model.Exam.fromJson(e)).toList();
+    }
+    throw Exception('Failed to load exams');
+  }
+
+  static Future<Map<String, dynamic>> getStaffExamSchedule(String id) async {
+    final response = await get('staff/exams/schedule/$id');
+    if (response.statusCode == 200) {
+      final data = jsonDecode(response.body);
+      if (data['success'] == true) return data['data'];
+    }
+    throw Exception('Failed to load exam schedule');
+  }
+
+  static Future<BookPagination> getStaffLibraryBooks(Map<String, String> filters, int page) async {
+    final query = Map<String, String>.from(filters)..['page'] = page.toString();
+    final response = await get('staff/library/books', query);
+    if (response.statusCode == 200) {
+      final body = jsonDecode(response.body);
+      return BookPagination.fromJson(body['data'] ?? body);
+    }
+    throw Exception('Failed to load books');
+  }
+
+  static Future<LendingPagination> getStaffLendingBooks(Map<String, String> filters, int page) async {
+    final query = Map<String, String>.from(filters)..['page'] = page.toString();
+    final response = await get('staff/library/lending', query);
+    if (response.statusCode == 200) {
+      final body = jsonDecode(response.body);
+      return LendingPagination.fromJson(body['data'] ?? body);
+    }
+    throw Exception('Failed to load lending data');
+  }
+
+  static Future<staff_model.SalaryPageData> getStaffSalaries() async {
+    final response = await get('staff/salary');
+    if (response.statusCode == 200) {
+      final data = jsonDecode(response.body);
+      if (data['success'] == true) return staff_model.SalaryPageData.fromJson(data['data']);
+    }
+    throw Exception('Failed to load salaries');
+  }
+
+  static Future<staff_model.SalaryDetailData> getStaffSalaryDetails(String id) async {
+    final response = await get('staff/salary/$id');
+    if (response.statusCode == 200) {
+      final data = jsonDecode(response.body);
+      if (data['success'] == true) return staff_model.SalaryDetailData.fromJson(data['data']);
+    }
+    throw Exception('Failed to load salary details');
+  }
+
+  static Future<List<staff_model.Ticket>> getStaffTickets(Map<String, String> filters) async {
+    final query = Map<String, String>.from(filters)..removeWhere((k, v) => v.isEmpty || v == 'all');
+    final response = await get('staff/tickets', query);
+    if (response.statusCode == 200) {
+      final data = jsonDecode(response.body);
+      if (data['success'] == true) return (data['data'] as List).map((j) => staff_model.Ticket.fromJson(j)).toList();
+    }
+    throw Exception('Failed to load tickets');
+  }
+
+  static Future<List<staff_model.Ticket>> getStaffAssignedTickets(Map<String, String> filters) async {
+    final query = Map<String, String>.from(filters)..removeWhere((k, v) => v.isEmpty || v == 'all');
+    final response = await get('staff/tickets/assigned', query);
+    if (response.statusCode == 200) {
+      final data = jsonDecode(response.body);
+      if (data['success'] == true) return (data['data'] as List).map((j) => staff_model.Ticket.fromJson(j)).toList();
+    }
+    throw Exception('Failed to load assigned tickets');
+  }
+
+  static Future<void> createStaffTicket(Map<String, dynamic> data) async {
+    final response = await post('staff/tickets', data);
+    if (response.statusCode != 200) throw Exception(jsonDecode(response.body)['message'] ?? 'Failed to create ticket');
+  }
+
+  static Future<void> updateStaffTicketStatus(String id, String status) async {
+    final response = await post('staff/tickets/status/$id', {'status': status});
+    if (response.statusCode != 200) throw Exception(jsonDecode(response.body)['message'] ?? 'Failed to update status');
+  }
+
+  static Future<TicketDetails> getStaffTicketDetails(String id) async {
+    final response = await get('staff/tickets/$id/replies');
+    if (response.statusCode == 200) {
+      final data = jsonDecode(response.body);
+      if (data['success'] == true) return TicketDetails.fromJson(data['data']);
+    }
+    throw Exception('Failed to load ticket details');
+  }
+
+  static Future<void> replyStaffTicket(String id, Map<String, String> fields, {File? attachment}) async {
+    final files = attachment != null ? {'attachment': attachment} : null;
+    final response = await postMultipart('staff/tickets/$id/reply', fields, files: files);
+    if (response.statusCode != 200) throw Exception(jsonDecode(await response.stream.bytesToString())['message'] ?? 'Failed to reply');
+  }
+
+  static Future<List<staff_model.Fee>> getStaffFees() async {
+    final response = await get('staff/fees'); // Assumption: staff/fees endpoint
+    if (response.statusCode == 200) {
+      final data = jsonDecode(response.body);
+      if (data['success'] == true) return (data['data'] as List).map((f) => staff_model.Fee.fromJson(f)).toList();
+    }
+    throw Exception('Failed to load fees');
+  }
+
+  static Future<staff_model.StudentFeeDetail> getStaffStudentFeeDetail(String studentId) async {
+    final response = await get('staff/student-fee/$studentId'); // Assumption: staff/student-fee/{id} endpoint
+    if (response.statusCode == 200) {
+      final data = jsonDecode(response.body);
+      if (data['success'] == true) return staff_model.StudentFeeDetail.fromJson(data['data']);
+    }
+    throw Exception('Failed to load student fee detail');
   }
 }

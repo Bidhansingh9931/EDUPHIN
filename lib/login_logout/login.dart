@@ -4,6 +4,7 @@ import 'package:eduphin/manager_dashboard/manager_dashboard.dart';
 import 'package:eduphin/moderator_dashboard/moderator_dashboard.dart';
 import 'package:eduphin/student/student_dashboard.dart';
 import 'package:eduphin/teacher/dashboard/teacher_dashboard.dart';
+import 'package:eduphin/staff/staff_dashboard/staff_dashboard.dart';
 import 'package:flutter/material.dart';
 import 'package:eduphin/services/api_service.dart';
 
@@ -13,6 +14,7 @@ class Roles {
   static const int teacher = 5;
   static const int student = 6;
   static const int accountant = 8;
+  static const int staff = 9;
 }
 
 class LoginPage extends StatefulWidget {
@@ -77,6 +79,8 @@ class _LoginPageState extends State<LoginPage> {
       destinationPage = const StudentDashboard();
     } else if (roleId == Roles.accountant) {
       destinationPage = const AccountantDashboard();
+    } else if (roleId == Roles.staff) {
+      destinationPage = const StaffDashboard();
     }
 
     if (destinationPage != null) {
