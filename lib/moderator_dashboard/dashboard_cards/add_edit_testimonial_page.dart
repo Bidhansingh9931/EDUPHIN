@@ -80,9 +80,10 @@ class _AddEditTestimonialPageState extends State<AddEditTestimonialPage> {
       return;
     }
 
+    // CORRECTED: Added '/api' prefix to the URLs
     final url = _isEditMode
-        ? '${ApiService.baseUrl}/moderator/testimonials/${widget.testimonial!.id}/update'
-        : '${ApiService.baseUrl}/moderator/testimonials';
+        ? '${ApiService.baseUrl}/api/moderator/testimonials/${widget.testimonial!.id}/update'
+        : '${ApiService.baseUrl}/api/moderator/testimonials';
 
     var request = http.MultipartRequest('POST', Uri.parse(url));
     request.headers['Authorization'] = 'Bearer $token';
@@ -109,9 +110,11 @@ class _AddEditTestimonialPageState extends State<AddEditTestimonialPage> {
       responseBody = await response.stream.bytesToString();
       final decodedBody = jsonDecode(responseBody);
 
+      // The PHP API returns 201 for creation and 200 for update.
       if (response.statusCode == 200 || response.statusCode == 201) {
         debugPrint("Submission successful: $responseBody");
         if (mounted) {
+          // Use the message from the backend for the snackbar
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(content: Text(decodedBody['message'] ?? 'Success!'), backgroundColor: Colors.green),
           );
@@ -119,7 +122,14 @@ class _AddEditTestimonialPageState extends State<AddEditTestimonialPage> {
         }
       } else {
         debugPrint("Submission failed with status ${response.statusCode}: $responseBody");
-        throw Exception(decodedBody['message'] ?? 'An unknown error occurred.');
+        // The backend validation errors might be in an 'errors' field.
+        String errorMessage = decodedBody['message'] ?? 'An unknown error occurred.';
+        if (decodedBody['errors'] != null && decodedBody['errors'] is Map) {
+            Map<String, dynamic> errors = decodedBody['errors'];
+            // Take the first error message to show.
+            errorMessage = errors.values.first[0] ?? errorMessage;
+        }
+        throw Exception(errorMessage);
       }
     } catch (e) {
       debugPrint("An exception occurred: $e");

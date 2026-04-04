@@ -1,3 +1,5 @@
+import 'dart:convert';
+import 'package:eduphin/services/api_service.dart';
 import 'package:flutter/material.dart';
 import 'dart:async';
 
@@ -18,69 +20,93 @@ class UserRole {
   });
 }
 
-// 2. Data Provider to fetch data (can be replaced with a real API call later)
+// 2. Data Provider updated to fetch data from the API
 class RoleDistributionProvider {
   Future<List<UserRole>> fetchUserRoles() async {
-    // Simulate a network delay to mimic an API call.
-    await Future.delayed(const Duration(seconds: 2));
+    final response = await ApiService.get('moderator/dashboard');
 
-    // When your API is ready, you will replace this mock data with a network request.
-    return [
-      UserRole(
-          icon: Icons.shield,
-          title: "Super Admin",
-          count: 2,
-          percent: 0.01,
-          color: Colors.blue),
-      UserRole(
-          icon: Icons.gavel,
-          title: "Moderator",
-          count: 5,
-          percent: 0.02,
-          color: Colors.purple),
-      UserRole(
-          icon: Icons.home_work,
-          title: "Institute Manager",
-          count: 25,
-          percent: 0.10,
-          color: Colors.orange),
-      UserRole(
-          icon: Icons.people,
-          title: "Counselors",
-          count: 50,
-          percent: 0.20,
-          color: Colors.amber),
-      UserRole(
-          icon: Icons.account_balance_wallet,
-          title: "Accountants",
-          count: 20,
-          percent: 0.08,
-          color: Colors.teal),
-      UserRole(
-          icon: Icons.badge,
-          title: "Staffs",
-          count: 182,
-          percent: 0.73,
-          color: Colors.pink),
-      UserRole(
-          icon: Icons.school,
-          title: "Teachers",
-          count: 498,
-          percent: 2.01,
-          color: Colors.green),
-      UserRole(
-          icon: Icons.person,
-          title: "Students",
-          count: 24000,
-          percent: 96.84,
-          color: Colors.lightBlue),
-      UserRole(
-          icon: Icons.menu_book,
-          title: "Librarians",
-          count: 2,
-          percent: 0.01,
-          color: Colors.deepPurpleAccent),
-    ];
+    if (response.statusCode == 200) {
+      final responseBody = json.decode(response.body);
+      if (responseBody['success'] == true && responseBody['data'] != null) {
+        final rolesData = (responseBody['data']['roles'] as List<dynamic>? ?? []).cast<Map<String, dynamic>>();
+
+        if (rolesData.isEmpty) {
+          return [];
+        }
+
+        final totalUsers = rolesData.fold<int>(0, (sum, role) => sum + ((role['users_count'] as num?)?.toInt() ?? 0));
+
+        if (totalUsers == 0) {
+          return rolesData.map((role) {
+            final roleName = role['name'] as String? ?? 'Unnamed Role';
+            final count = (role['users_count'] as num?)?.toInt() ?? 0;
+            return UserRole(
+              icon: _getIconForRole(roleName),
+              title: roleName,
+              count: count,
+              percent: 0.0,
+              color: _getColorForRole(roleName),
+            );
+          }).toList();
+        }
+
+        return rolesData.map((role) {
+          final roleName = role['name'] as String? ?? 'Unnamed Role';
+          final count = (role['users_count'] as num?)?.toInt() ?? 0;
+          return UserRole(
+            icon: _getIconForRole(roleName),
+            title: roleName,
+            count: count,
+            percent: (count / totalUsers) * 100,
+            color: _getColorForRole(roleName),
+          );
+        }).toList();
+      } else {
+        throw Exception('API call successful but returned no data or indicated failure.');
+      }
+    } else {
+      throw Exception('Failed to load user roles from API.');
+    }
+  }
+
+  IconData _getIconForRole(String roleName) {
+    switch (roleName) {
+      case 'Super Admin':
+        return Icons.shield;
+      case 'Moderator':
+        return Icons.gavel;
+      case 'Institute Manager':
+        return Icons.home_work;
+      case 'Counselors':
+        return Icons.people;
+      case 'Accountants':
+        return Icons.account_balance_wallet;
+      case 'Staffs':
+        return Icons.badge;
+      case 'Teachers':
+        return Icons.school;
+      case 'Students':
+        return Icons.person;
+      case 'Librarians':
+        return Icons.menu_book;
+      default:
+        return Icons.person_outline;
+    }
+  }
+
+  Color _getColorForRole(String roleName) {
+    const colors = {
+      'Super Admin': Colors.blue,
+      'Moderator': Colors.purple,
+      'Institute Manager': Colors.orange,
+      'Counselors': Colors.amber,
+      'Accountants': Colors.teal,
+      'Staffs': Colors.pink,
+      'Teachers': Colors.green,
+      'Students': Colors.lightBlue,
+      'Librarians': Colors.deepPurpleAccent,
+    };
+    return colors[roleName] ?? Colors.grey;
   }
 }
 

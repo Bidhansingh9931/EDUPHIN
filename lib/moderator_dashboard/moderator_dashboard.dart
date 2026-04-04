@@ -121,11 +121,13 @@ class _ModeratorDashboardPageState extends State<ModeratorDashboardPage> {
       }
     }
 
-    final total = data.accountants + data.staff + data.others;
-    const pieChartColors = [
-      Color(0xFF2E6CFF),
-      Color(0xFF2ECF7E),
-      Color(0xFF8A63FF),
+    final pieChartColors = [
+      const Color(0xFF2E6CFF),
+      const Color(0xFF2ECF7E),
+      const Color(0xFF8A63FF),
+      const Color(0xFFFFC107),
+      const Color(0xFFE91E63),
+      const Color(0xFF00BCD4),
     ];
 
     return SingleChildScrollView(
@@ -329,29 +331,21 @@ class _ModeratorDashboardPageState extends State<ModeratorDashboardPage> {
                               sectionsSpace: 3,
                               centerSpaceRadius: 42,
                               startDegreeOffset: -90,
-                              sections: [
-                                PieChartSectionData(
-                                    value: data.accountants.toDouble(),
-                                    color: pieChartColors[0],
-                                    radius: 40,
-                                    title: ''),
-                                PieChartSectionData(
-                                    value: data.staff.toDouble(),
-                                    color: pieChartColors[1],
-                                    radius: 40,
-                                    title: ''),
-                                PieChartSectionData(
-                                    value: data.others.toDouble(),
-                                    color: pieChartColors[2],
-                                    radius: 40,
-                                    title: ''),
-                              ],
+                              sections: List.generate(data.gridItems.length, (index) {
+                                final item = data.gridItems[index];
+                                return PieChartSectionData(
+                                  value: double.tryParse(item.value) ?? 0.0,
+                                  color: pieChartColors[index % pieChartColors.length],
+                                  radius: 40,
+                                  title: '',
+                                );
+                              }),
                             ),
                           ),
                           Column(
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
-                              Text(total.toString(),
+                              Text(data.gridItems.fold<int>(0, (sum, item) => sum + (int.tryParse(item.value) ?? 0)).toString(),
                                   style: TextStyle(
                                       color: Colors.white,
                                       fontSize: responsiveFontSize(22),
@@ -365,18 +359,14 @@ class _ModeratorDashboardPageState extends State<ModeratorDashboardPage> {
                       ),
                     ),
                     const SizedBox(height: 12),
-                    LegendRow(
-                        title: "Accountants",
-                        value: data.accountants,
-                        color: pieChartColors[0]),
-                    LegendRow(
-                        title: "Staff",
-                        value: data.staff,
-                        color: pieChartColors[1]),
-                    LegendRow(
-                        title: "Others",
-                        value: data.others,
-                        color: pieChartColors[2]),
+                    ...List.generate(data.gridItems.length, (index) {
+                      final item = data.gridItems[index];
+                      return LegendRow(
+                        title: item.title,
+                        value: int.tryParse(item.value) ?? 0,
+                        color: pieChartColors[index % pieChartColors.length],
+                      );
+                    }),
                   ],
                 ),
               ),
@@ -722,8 +712,7 @@ class LegendRow extends StatelessWidget {
           Container(
               width: 14,
               height: 14,
-              decoration:
-                  BoxDecoration(color: color, shape: BoxShape.circle)),
+              decoration: BoxDecoration(color: color, shape: BoxShape.circle)),
           const SizedBox(width: 10),
           Text(title, style: const TextStyle(color: Colors.white)),
           const Spacer(),

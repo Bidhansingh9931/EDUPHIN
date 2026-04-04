@@ -50,21 +50,13 @@ class DashboardDataProvider {
 
   DashboardData _emptyDashboardData() {
     return DashboardData(
-      gridItems: [
-        GridItem(tag: 'institutes', icon: Icons.school, value: '0', title: 'Institutes', percentage: 0, isPositive: true, page: Container()),
-        GridItem(tag: 'accountants', icon: Icons.person, value: '0', title: 'Accountants', percentage: 0, isPositive: true, page: Container()),
-        GridItem(tag: 'staff', icon: Icons.group, value: '0', title: 'Staff', percentage: 0, isPositive: true, page: Container()),
-        GridItem(tag: 'others', icon: Icons.person_outline, value: '0', title: 'Others', percentage: 0, isPositive: true, page: Container()),
-      ],
-      accountants: 0,
-      staff: 0,
-      others: 0,
-      institutes: 0,
+      gridItems: [],
       reviews: [],
       databaseCount: 'N/A',
       dataUsage: 'N/A',
       systemUptime: 'N/A',
       recentActivities: [],
+      testimonials: [],
     );
   }
 }
