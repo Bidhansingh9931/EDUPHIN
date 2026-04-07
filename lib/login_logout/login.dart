@@ -1,20 +1,24 @@
 import 'package:eduphin/accountant/dashboard/accountant_dashbard.dart';
 import 'package:eduphin/counselor/counselor_dashboard.dart';
+import 'package:eduphin/librarian/librarian_dashboard.dart';
 import 'package:eduphin/login_logout/ui_helper.dart';
 import 'package:eduphin/manager_dashboard/manager_dashboard.dart';
 import 'package:eduphin/moderator_dashboard/moderator_dashboard.dart';
 import 'package:eduphin/student/student_dashboard.dart';
 import 'package:eduphin/teacher/dashboard/teacher_dashboard.dart';
 import 'package:eduphin/staff/staff_dashboard/staff_dashboard.dart';
+import 'package:eduphin/superAdmin/super_admin_dashboard.dart';
 import 'package:flutter/material.dart';
 import 'package:eduphin/services/api_service.dart';
 
 class Roles {
+  static const int superAdmin = 1;
   static const int moderator = 2;
   static const int manager = 3;
   static const int counselor = 4;
   static const int teacher = 5;
   static const int student = 6;
+  static const int librarian = 7;
   static const int accountant = 8;
   static const int staff = 9;
 }
@@ -71,16 +75,20 @@ class _LoginPageState extends State<LoginPage> {
     if (!mounted) return;
 
     Widget? destinationPage;
-    if (roleId == Roles.moderator) {
+    if (roleId == Roles.superAdmin) {
+      destinationPage = const SuperAdminDashboard();
+    } else if (roleId == Roles.moderator) {
       destinationPage = const ModeratorDashboardPage();
     } else if (roleId == Roles.manager) {
       destinationPage = const ManagerDashboardPage();
     } else if (roleId == Roles.counselor) {
-      destinationPage = const CounslorDeshboardPage();
+      destinationPage = const CounselorDashboardPage();
     } else if (roleId == Roles.teacher) {
       destinationPage = const TeacherDashboardPage();
     } else if (roleId == Roles.student) {
       destinationPage = const StudentDashboard();
+    } else if (roleId == Roles.librarian) {
+      destinationPage = const LibrarianDashboard();
     } else if (roleId == Roles.accountant) {
       destinationPage = const AccountantDashboard();
     } else if (roleId == Roles.staff) {
@@ -127,8 +135,7 @@ class _LoginPageState extends State<LoginPage> {
                       color: theme.cardColor,
                       borderRadius: BorderRadius.circular(20),
                     ),
-                    child: Padding(
-                      padding: const EdgeInsets.all(25.0),
+                    child: Padding(padding: const EdgeInsets.all(25.0),
                       child: Column(
                         mainAxisAlignment: MainAxisAlignment.center,
                         crossAxisAlignment: CrossAxisAlignment.center,
@@ -204,21 +211,6 @@ class _LoginPageState extends State<LoginPage> {
                                   ),
                                 ],
                               ),
-                              // TextButton(
-                              //   onPressed: () {
-                              //     Navigator.push(
-                              //       context,
-                              //       MaterialPageRoute(
-                              //           builder: (context) =>
-                              //               const ForgotPasswordPage()),
-                              //     );
-                              //   },
-                              //   child: Text(
-                              //     "Forgot password?",
-                              //     style: TextStyle(
-                              //         color: theme.colorScheme.primary),
-                              //   ),
-                              // ),
                             ],
                           ),
                           const SizedBox(height: 20),

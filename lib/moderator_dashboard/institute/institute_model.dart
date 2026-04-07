@@ -3,6 +3,8 @@ import 'dart:convert';
 class Institute {
   final int id;
   final String name;
+  final String? gstNumber;
+  final String? panNumber;
   final String code;
   final String? logo;
   final int establishedYear;
@@ -16,12 +18,14 @@ class Institute {
   final String? website;
   final String? affiliationDetails;
   final String status;
-  final DateTime createdAt;
-  final DateTime updatedAt;
+  final DateTime? createdAt;
+  final DateTime? updatedAt;
 
   Institute({
     required this.id,
     required this.name,
+    this.gstNumber,
+    this.panNumber,
     required this.code,
     this.logo,
     required this.establishedYear,
@@ -35,8 +39,8 @@ class Institute {
     this.website,
     this.affiliationDetails,
     required this.status,
-    required this.createdAt,
-    required this.updatedAt,
+    this.createdAt,
+    this.updatedAt,
   });
 
   factory Institute.fromRawJson(String str) =>
@@ -47,9 +51,11 @@ class Institute {
   factory Institute.fromJson(Map<String, dynamic> json) => Institute(
         id: json["id"],
         name: json["name"],
+        gstNumber: json["gst_number"],
+        panNumber: json["pan_number"],
         code: json["code"],
         logo: json["logo"],
-        establishedYear: int.parse(json["established_year"].toString()),
+        establishedYear: int.tryParse(json["established_year"].toString()) ?? 0,
         address: json["address"],
         city: json["city"],
         state: json["state"],
@@ -59,13 +65,16 @@ class Institute {
         chairmanName: json["chairman_name"],
         website: json["website"],
         affiliationDetails: json["affiliation_details"],
-        status: json["status"],        createdAt: DateTime.parse(json["created_at"]),
-        updatedAt: DateTime.parse(json["updated_at"]),
+        status: json["status"] ?? 'Active',
+        createdAt: json["created_at"] != null ? DateTime.parse(json["created_at"]) : null,
+        updatedAt: json["updated_at"] != null ? DateTime.parse(json["updated_at"]) : null,
       );
 
   Map<String, dynamic> toJson() => {
         "id": id,
         "name": name,
+        "gst_number": gstNumber,
+        "pan_number": panNumber,
         "code": code,
         "logo": logo,
         "established_year": establishedYear,
@@ -79,7 +88,7 @@ class Institute {
         "website": website,
         "affiliation_details": affiliationDetails,
         "status": status,
-        "created_at": createdAt.toIso8601String(),
-        "updated_at": updatedAt.toIso8601String(),
+        "created_at": createdAt?.toIso8601String(),
+        "updated_at": updatedAt?.toIso8601String(),
       };
 }
