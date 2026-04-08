@@ -1,3 +1,5 @@
+import 'package:eduphin/login_logout/login.dart';
+import 'package:eduphin/services/api_service.dart';
 import 'package:flutter/material.dart';
 import 'teacher_dashboard.dart';
 import 'profile.dart';
@@ -191,8 +193,23 @@ class _AppDrawerState extends State<AppDrawer> {
                 ),
 
                 const Divider(),
-                _drawerItem(context, Icons.logout, "Logout", () {
-                  // Implement logout logic
+                _drawerItem(context, Icons.logout, "Logout", () async {
+                  try {
+                    await ApiService.logout();
+                    if (context.mounted) {
+                      Navigator.pushAndRemoveUntil(
+                        context,
+                        MaterialPageRoute(builder: (_) => const LoginPage()),
+                        (route) => false,
+                      );
+                    }
+                  } catch (e) {
+                    if (context.mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text("Logout failed: $e")),
+                      );
+                    }
+                  }
                 }, iconColor: colorScheme.error),
                 const SizedBox(height: 20),
               ],
