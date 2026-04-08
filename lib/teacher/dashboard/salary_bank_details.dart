@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:eduphin/services/api_service.dart';
 import 'package:eduphin/teacher/dashboard/salary_models.dart';
+import 'package:eduphin/staff/staff_dashboard/staff_models.dart' as staff_model;
 import 'package:intl/intl.dart';
 import 'common_widgets.dart';
 
@@ -43,7 +44,7 @@ class _SalaryBankDetailsPageState extends State<SalaryBankDetailsPage> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                _buildBankDetailsCard(data.account),
+                _buildBankDetailsCard(data, data.account),
                 const SizedBox(height: 24),
                 _buildPastRecordsTable(data.salaries),
               ],
@@ -54,7 +55,7 @@ class _SalaryBankDetailsPageState extends State<SalaryBankDetailsPage> {
     );
   }
 
-  Widget _buildBankDetailsCard(BankAccount account) {
+  Widget _buildBankDetailsCard(SalaryPageData data, BankAccount account) {
     final theme = Theme.of(context);
     return Card(
       child: Column(
@@ -84,10 +85,74 @@ class _SalaryBankDetailsPageState extends State<SalaryBankDetailsPage> {
                 _detailRow(Icons.location_on_outlined, "Branch:", account.branch ?? "N/A"),
                 _detailRow(Icons.payments_outlined, "Basic Salary:", "₹50,000.00"),
                 const SizedBox(height: 16),
-                buildActionButton(context, "GENERATE NEW SALARY SLIP", () {}, isPrimary: true),
+                buildActionButton(context, "GENERATE NEW SALARY SLIP", () {
+                  if (data.salaries.isNotEmpty) {
+                    _showSalaryDetail(data.salaries.first.id);
+                  } else {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text("No salary records found to generate slip.")),
+                    );
+                  }
+                }, isPrimary: true),
               ],
             ),
           ),
+        ],
+      ),
+    );
+  }
+
+  void _showSalaryDetail(dynamic salaryId) async {
+    try {
+      final data = await ApiService.getStaffSalarySlip(salaryId.toString());
+      final detail = staff_model.SalaryDetailData.fromJson(data);
+      if (!mounted) return;
+      
+      showModalBottomSheet(
+        context: context,
+        backgroundColor: const Color(0xFF1D2645),
+        shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
+        builder: (context) => Container(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text("Salary Slip Detail", style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold)),
+              const SizedBox(height: 20),
+              _buildDetailItem("Net Salary", "₹ ${detail.salary.netSalary ?? detail.salary.amount}"),
+              _buildDetailItem("Amount in words", detail.amountInWords),
+              _buildDetailItem("Basic Salary", "₹ ${detail.salary.basicSalary ?? 'N/A'}"),
+              _buildDetailItem("Month/Year", "${detail.salary.month} / ${detail.salary.year}"),
+              const SizedBox(height: 20),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  onPressed: () => Navigator.pop(context),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF6C63FF),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
+                  child: const Text("CLOSE", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    } catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
+    }
+  }
+
+  Widget _buildDetailItem(String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(label, style: const TextStyle(color: Colors.white38, fontSize: 12)),
+          Text(value, style: const TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.bold)),
         ],
       ),
     );

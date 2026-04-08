@@ -725,6 +725,14 @@ class ApiService {
     if (response.statusCode != 200) throw Exception('Failed to update profile');
   }
 
+  static Future<void> updateTeacherProfileFromBytes(teacher_profile.TeacherProfile profile, Uint8List? photoBytes, String? fileName) async {
+    final fields = profile.toApiData();
+    final files = photoBytes != null ? {'photo': photoBytes} : null;
+    final fileNames = fileName != null ? {'photo': fileName} : null;
+    final response = await postMultipartFromBytes('teacher/profile/update', fields, files: files, fileNames: fileNames);
+    if (response.statusCode != 200) throw Exception('Failed to update profile');
+  }
+
   static Future<teacher_my_class.MyClassData> getMyClassData() async {
     final response = await get('teacher/my-class');
     if (response.statusCode == 200) {
@@ -794,7 +802,7 @@ class ApiService {
     final response = await get('teacher/salary');
     if (response.statusCode == 200) {
       final data = jsonDecode(response.body);
-      if (data['status'] == true) return teacher_salary.SalaryPageData.fromJson(data['data']);
+      if (data['status'] == true) return teacher_salary.SalaryPageData.fromJson(data);
     }
     throw Exception('Failed to load salary');
   }
@@ -1004,7 +1012,31 @@ class ApiService {
   }
 
   static Future<List<staff_model.Fee>> getStaffFees() async {
-    final response = await get('staff/fees');
+    // Teachers and Staff use the same UI, but different endpoints.
+    // Try teacher/fees first as this is currently being called from the Teacher Dashboard.
+    final response = await get('teacher/fees');
+    
+    if (response.statusCode == 200) {
+      final data = jsonDecode(response.body);
+      if (data['success'] == true || data['status'] == true) {
+        return (data['data'] as List).map((f) => staff_model.Fee.fromJson(f)).toList();
+      }
+    }
+    
+    // Fallback to staff/fees if teacher/fees fails (for actual staff members)
+    final staffResponse = await get('staff/fees');
+    if (staffResponse.statusCode == 200) {
+      final data = jsonDecode(staffResponse.body);
+      if (data['success'] == true || data['status'] == true) {
+        return (data['data'] as List).map((f) => staff_model.Fee.fromJson(f)).toList();
+      }
+    }
+
+    throw Exception('Failed to load fees');
+  }
+
+  static Future<List<staff_model.Fee>> getTeacherFees() async {
+    final response = await get('teacher/fees');
     if (response.statusCode == 200) {
       final data = jsonDecode(response.body);
       if (data['success'] == true || data['status'] == true) return (data['data'] as List).map((f) => staff_model.Fee.fromJson(f)).toList();
@@ -1014,6 +1046,15 @@ class ApiService {
 
   static Future<staff_model.StudentFeeDetail> getStaffStudentFeeDetail(String studentId) async {
     final response = await get('staff/student-fee/$studentId');
+    if (response.statusCode == 200) {
+      final data = jsonDecode(response.body);
+      if (data['success'] == true || data['status'] == true) return staff_model.StudentFeeDetail.fromJson(data['data']);
+    }
+    throw Exception('Failed to load student fee detail');
+  }
+
+  static Future<staff_model.StudentFeeDetail> getTeacherStudentFeeDetail(String studentId) async {
+    final response = await get('teacher/student-fee/$studentId');
     if (response.statusCode == 200) {
       final data = jsonDecode(response.body);
       if (data['success'] == true || data['status'] == true) return staff_model.StudentFeeDetail.fromJson(data['data']);
@@ -1073,7 +1114,15 @@ class ApiService {
   }
 
   static Future<Map<String, dynamic>> getStaffSalarySlip(String salaryId) async {
-    final response = await get('staff/salary/slip/$salaryId');
+    // Try teacher endpoint first
+    var response = await get('teacher/salary/slip/$salaryId');
+    if (response.statusCode == 200) {
+      final data = jsonDecode(response.body);
+      if (data['success'] == true || data['status'] == true) return data['data'];
+    }
+
+    // Fallback to staff endpoint
+    response = await get('staff/salary/slip/$salaryId');
     if (response.statusCode == 200) {
       final data = jsonDecode(response.body);
       if (data['success'] == true || data['status'] == true) return data['data'];

@@ -16,11 +16,12 @@ Widget buildLabel(BuildContext context, String text) {
   );
 }
 
-Widget buildTextField(BuildContext context, TextEditingController controller, String hint, {bool isPassword = false, IconData? prefixIcon}) {
+Widget buildTextField(BuildContext context, TextEditingController controller, String hint, {bool isPassword = false, IconData? prefixIcon, bool readOnly = false}) {
   final theme = Theme.of(context);
   return TextFormField(
     controller: controller,
     obscureText: isPassword,
+    readOnly: readOnly,
     style: theme.textTheme.bodyMedium,
     decoration: InputDecoration(
       hintText: hint,

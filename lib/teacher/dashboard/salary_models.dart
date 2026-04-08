@@ -32,12 +32,11 @@ class BankAccount {
 
   factory BankAccount.fromJson(Map<String, dynamic> json) {
     return BankAccount(
-      accountHolderName: (json['user'] is Map ? json['user']['name'] : null) ?? 
-                         json['account_holder_name'] ?? 'N/A',
+      accountHolderName: json['name'] ?? 'N/A', 
       accountNumber: json['bank_account_number']?.toString(),
       ifscCode: json['ifsc_code']?.toString(),
       bankName: json['bank_name']?.toString(),
-      branch: json['bank_branch']?.toString(),
+      branch: json['branch_name']?.toString(), 
     );
   }
 }
@@ -64,9 +63,9 @@ class SalaryRecord {
       id: json['id'] ?? 0,
       paymentDate: json['payment_date'],
       baseSalary: json['basic_salary']?.toString() ?? '0',
-      deduction: json['total_deductions']?.toString() ?? '0',
+      deduction: json['deductions']?.toString() ?? '0', 
       netSalary: json['net_salary']?.toString() ?? '0',
-      status: json['status'] ?? 'pending',
+      status: json['status'] ?? 'Paid',
     );
   }
 }

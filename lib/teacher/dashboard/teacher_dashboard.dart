@@ -158,6 +158,9 @@ class _TeacherDashboardPageState extends State<TeacherDashboardPage> {
 
   Widget _buildProfileOverview(UserDetail user) {
     final theme = Theme.of(context);
+    final baseUrl = ApiService.baseUrl.replaceFirst('api/', '');
+    final photoUrl = user.photo != null ? '$baseUrl${user.photo}' : null;
+
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(20.0),
@@ -169,7 +172,8 @@ class _TeacherDashboardPageState extends State<TeacherDashboardPage> {
                 CircleAvatar(
                   radius: 40,
                   backgroundColor: theme.colorScheme.primary.withValues(alpha: 0.1),
-                  child: Icon(Icons.person, size: 50, color: theme.colorScheme.primary),
+                  backgroundImage: photoUrl != null ? NetworkImage(photoUrl) : null,
+                  child: photoUrl == null ? Icon(Icons.person, size: 50, color: theme.colorScheme.primary) : null,
                 ),
                 Container(
                   padding: const EdgeInsets.all(4),
@@ -180,7 +184,7 @@ class _TeacherDashboardPageState extends State<TeacherDashboardPage> {
             ),
             const SizedBox(height: 16),
             Text(user.name, style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold)),
-            Text(user.roleName ?? "Senior Teacher", style: theme.textTheme.bodyMedium?.copyWith(color: theme.hintColor)),
+            Text(user.roleName ?? "Teacher", style: theme.textTheme.bodyMedium?.copyWith(color: theme.hintColor)),
             const SizedBox(height: 20),
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceAround,
@@ -272,6 +276,23 @@ class _TeacherDashboardPageState extends State<TeacherDashboardPage> {
 
   Widget _buildSalaryCard(TeacherDashboardData data) {
     final theme = Theme.of(context);
+    final salary = data.lastSalary;
+
+    if (salary == null) {
+      return Card(
+        child: Padding(
+          padding: const EdgeInsets.all(20.0),
+          child: Column(
+            children: [
+              Text("No Salary Data", style: theme.textTheme.titleMedium?.copyWith(color: theme.hintColor)),
+              const SizedBox(height: 8),
+              const Text("Your salary details will appear here once processed."),
+            ],
+          ),
+        ),
+      );
+    }
+
     return Card(
       child: InkWell(
         onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const SalaryBankDetailsPage())),
@@ -279,14 +300,14 @@ class _TeacherDashboardPageState extends State<TeacherDashboardPage> {
           padding: const EdgeInsets.all(20.0),
           child: Column(
             children: [
-              Text("₹64,800.00", style: theme.textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold, color: theme.colorScheme.primary)),
-              Text("Last paid: October 2025", style: theme.textTheme.bodySmall?.copyWith(color: theme.hintColor)),
+              Text("₹${salary.amount.toStringAsFixed(2)}", style: theme.textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold, color: theme.colorScheme.primary)),
+              Text("Last processed payment", style: theme.textTheme.bodySmall?.copyWith(color: theme.hintColor)),
               const Divider(height: 32),
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  _buildSalaryInfoRow("Status", "Paid", Colors.green),
-                  _buildSalaryInfoRow("Payment Date", "13 Nov 2025", theme.colorScheme.onSurface),
+                  _buildSalaryInfoRow("Status", salary.status, salary.status.toLowerCase() == 'paid' ? Colors.green : Colors.orange),
+                  _buildSalaryInfoRow("Payment Date", salary.paymentDate ?? "Pending", theme.colorScheme.onSurface),
                 ],
               )
             ],

@@ -47,6 +47,7 @@ class _AssignmentPageState extends State<AssignmentPage> {
       return;
     }
     
+    // Use ApiService.baseUrl which handles 10.0.2.2 for Android
     final url = "${ApiService.baseUrl}/storage/$attachment";
     
     ScaffoldMessenger.of(context).showSnackBar(
@@ -54,7 +55,14 @@ class _AssignmentPageState extends State<AssignmentPage> {
     );
     
     try {
-      final response = await http.get(Uri.parse(url));
+      final token = await ApiService.getToken();
+      final response = await http.get(
+        Uri.parse(url),
+        headers: {
+          if (token != null) 'Authorization': 'Bearer $token',
+        },
+      );
+
       if (response.statusCode == 200) {
         final bytes = response.bodyBytes;
         final dir = await getTemporaryDirectory();

@@ -1,5 +1,8 @@
+import 'dart:io';
 import 'package:eduphin/services/api_service.dart';
 import 'package:eduphin/teacher/dashboard/teacher_profile_model.dart';
+import 'package:file_picker/file_picker.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'common_widgets.dart';
 
@@ -12,6 +15,7 @@ class ProfilePage extends StatefulWidget {
 
 class _ProfilePageState extends State<ProfilePage> {
   late Future<TeacherProfile> _profileFuture;
+  TeacherProfile? _profile;
 
   final _nameController = TextEditingController();
   final _emailController = TextEditingController();
@@ -30,6 +34,11 @@ class _ProfilePageState extends State<ProfilePage> {
   final _branchController = TextEditingController();
   final _passwordController = TextEditingController();
 
+  File? _selectedPhoto;
+  Uint8List? _webPhotoBytes;
+  String? _photoName;
+  bool _isSaving = false;
+
   @override
   void initState() {
     super.initState();
@@ -41,6 +50,7 @@ class _ProfilePageState extends State<ProfilePage> {
     _profileFuture.then((profile) {
       if (mounted) {
         setState(() {
+          _profile = profile;
           _nameController.text = profile.name;
           _emailController.text = profile.email;
           _genderController.text = profile.gender ?? '';
@@ -59,6 +69,56 @@ class _ProfilePageState extends State<ProfilePage> {
         });
       }
     });
+  }
+
+  Future<void> _pickPhoto() async {
+    final result = await FilePicker.platform.pickFiles(type: FileType.image, withData: true);
+    if (result != null) {
+      setState(() {
+        _photoName = result.files.single.name;
+        if (kIsWeb) {
+          _webPhotoBytes = result.files.single.bytes;
+        } else {
+          _selectedPhoto = File(result.files.single.path!);
+        }
+      });
+    }
+  }
+
+  Future<void> _saveChanges() async {
+    if (_profile == null) return;
+
+    setState(() => _isSaving = true);
+    try {
+      // Update profile object with form values
+      _profile!.gender = _genderController.text;
+      _profile!.dateOfBirth = _dobController.text;
+      _profile!.phone = _phoneController.text;
+      _profile!.alternatePhone = _altPhoneController.text;
+      _profile!.relationshipStatus = _relationshipStatusController.text;
+      _profile!.address = _addressController.text;
+      _profile!.city = _cityController.text;
+      _profile!.state = _stateController.text;
+      _profile!.pincode = _pincodeController.text;
+      _profile!.bankAccountNumber = _accountNumberController.text;
+      _profile!.password = _passwordController.text;
+
+      if (kIsWeb) {
+        await ApiService.updateTeacherProfileFromBytes(_profile!, _webPhotoBytes, _photoName);
+      } else {
+        _profile!.photo = _selectedPhoto;
+        await ApiService.updateTeacherProfile(_profile!);
+      }
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Profile updated successfully!")));
+        _loadProfile(); // Reload to refresh data
+      }
+    } catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Error: $e")));
+    } finally {
+      if (mounted) setState(() => _isSaving = false);
+    }
   }
 
   @override
@@ -87,10 +147,6 @@ class _ProfilePageState extends State<ProfilePage> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('My Profile'),
-        leading: IconButton(
-          icon: const Icon(Icons.person_outline),
-          onPressed: () => Navigator.pop(context),
-        ),
       ),
       body: FutureBuilder<TeacherProfile>(
         future: _profileFuture,
@@ -114,15 +170,15 @@ class _ProfilePageState extends State<ProfilePage> {
                       _rowLabel("GENDER *"),
                       buildDropdown(context, ['Male', 'Female', 'Other'], _genderController.text, (v) => setState(() => _genderController.text = v!)),
                       _rowLabel("Date of Birth *"),
-                      buildDateField(context, _dobController, "12-08-1985"),
+                      buildDateField(context, _dobController, "DD-MM-YYYY"),
                       _rowLabel("Phone *"),
                       buildTextField(context, _phoneController, "Enter Phone"),
                       _rowLabel("Alternate Phone"),
                       buildTextField(context, _altPhoneController, "Enter Alt Phone"),
                       _rowLabel("Relationship Status"),
-                      buildTextField(context, _relationshipStatusController, "Married"),
+                      buildTextField(context, _relationshipStatusController, "Married/Single"),
                       _rowLabel("Update Photo"),
-                      _buildFilePicker("Choose File", "No File Chosen"),
+                      _buildFilePicker("Choose Photo", _photoName ?? "No Photo Chosen", onTap: _pickPhoto),
                     ],
                   ),
                   _buildProfileSection(
@@ -132,11 +188,11 @@ class _ProfilePageState extends State<ProfilePage> {
                       _rowLabel("Address *"),
                       buildTextField(context, _addressController, "Enter Address"),
                       _rowLabel("City *"),
-                      buildTextField(context, _cityController, "Lucknow"),
+                      buildTextField(context, _cityController, "Enter City"),
                       _rowLabel("State *"),
-                      buildTextField(context, _stateController, "Uttar Pradesh"),
+                      buildTextField(context, _stateController, "Enter State"),
                       _rowLabel("Pincode *"),
-                      buildTextField(context, _pincodeController, "226017"),
+                      buildTextField(context, _pincodeController, "Enter Pincode"),
                     ],
                   ),
                   _buildProfileSection(
@@ -146,11 +202,11 @@ class _ProfilePageState extends State<ProfilePage> {
                       _rowLabel("Bank Account Number"),
                       buildTextField(context, _accountNumberController, "Enter Account Number"),
                       _rowLabel("IFSC Code"),
-                      buildTextField(context, _ifscController, "Enter IFSC"),
+                      _readOnlyField(_ifscController.text.isEmpty ? "N/A" : _ifscController.text),
                       _rowLabel("Bank Name"),
-                      buildTextField(context, _bankNameController, "Enter Bank Name"),
+                      _readOnlyField(_bankNameController.text.isEmpty ? "N/A" : _bankNameController.text),
                       _rowLabel("Branch Name"),
-                      buildTextField(context, _branchController, "Enter Branch"),
+                      _readOnlyField(_branchController.text.isEmpty ? "N/A" : _branchController.text),
                     ],
                   ),
                   _buildProfileSection(
@@ -158,7 +214,7 @@ class _ProfilePageState extends State<ProfilePage> {
                     status: "Editable",
                     children: [
                       _rowLabel("New Password"),
-                      buildTextField(context, _passwordController, "Enter new password", isPassword: true),
+                      buildTextField(context, _passwordController, "Enter new password to change", isPassword: true),
                     ],
                   ),
                   _buildProfileSection(
@@ -170,11 +226,19 @@ class _ProfilePageState extends State<ProfilePage> {
                       _readOnlyRow("EMPLOYMENT TYPE", profile.employmentType),
                       _readOnlyRow("JOINING DATE", profile.joiningDate),
                       _readOnlyRow("EXPERIENCE", profile.experience),
-                      _readOnlyRow("STATUS", "LIVE", isBadge: true),
+                      _readOnlyRow("STATUS", profile.status?.toUpperCase() ?? "LIVE", isBadge: true),
                     ],
                   ),
                   const SizedBox(height: 24),
-                  buildActionButton(context, "SAVE CHANGES", () {}),
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton(
+                      onPressed: _isSaving ? null : _saveChanges,
+                      child: _isSaving 
+                        ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                        : const Text("SAVE CHANGES"),
+                    ),
+                  ),
                   const SizedBox(height: 40),
                 ],
               ),
@@ -188,12 +252,16 @@ class _ProfilePageState extends State<ProfilePage> {
 
   Widget _buildProfileHeader(TeacherProfile profile) {
     final theme = Theme.of(context);
+    final baseUrl = ApiService.baseUrl.replaceFirst('api/', '');
+    final photoUrl = profile.photoUrl != null ? '$baseUrl${profile.photoUrl}' : null;
+
     return Column(
       children: [
         CircleAvatar(
           radius: 45,
           backgroundColor: theme.colorScheme.surfaceContainerHighest,
-          child: Icon(Icons.person, size: 50, color: theme.colorScheme.primary.withValues(alpha: 0.5)),
+          backgroundImage: photoUrl != null ? NetworkImage(photoUrl) : null,
+          child: photoUrl == null ? Icon(Icons.person, size: 50, color: theme.colorScheme.primary.withValues(alpha: 0.5)) : null,
         ),
         const SizedBox(height: 12),
         Text(profile.name, style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold)),
@@ -247,6 +315,10 @@ class _ProfilePageState extends State<ProfilePage> {
     );
   }
 
+  Widget _readOnlyField(String value) {
+    return buildTextField(context, TextEditingController(text: value), "", readOnly: true);
+  }
+
   Widget _readOnlyRow(String label, String? value, {bool isBadge = false}) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 12.0),
@@ -262,25 +334,28 @@ class _ProfilePageState extends State<ProfilePage> {
               child: Text(value ?? '', style: const TextStyle(color: Colors.blue, fontSize: 10, fontWeight: FontWeight.bold)),
             )
           else
-            buildTextField(context, TextEditingController(text: value), "", prefixIcon: null), // Simulated read-only field style
+            _readOnlyField(value ?? 'N/A'),
         ],
       ),
     );
   }
 
-  Widget _buildFilePicker(String btnText, String fileName) {
+  Widget _buildFilePicker(String btnText, String fileName, {VoidCallback? onTap}) {
     final theme = Theme.of(context);
-    return Container(
-      decoration: BoxDecoration(border: Border.all(color: theme.colorScheme.outline), borderRadius: BorderRadius.circular(8)),
-      child: Row(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(color: theme.colorScheme.surfaceContainerHighest, borderRadius: const BorderRadius.horizontal(left: Radius.circular(7))),
-            child: Text(btnText, style: const TextStyle(fontSize: 12)),
-          ),
-          Expanded(child: Padding(padding: const EdgeInsets.only(left: 12), child: Text(fileName, style: const TextStyle(fontSize: 12, color: Colors.grey)))),
-        ],
+    return InkWell(
+      onTap: onTap,
+      child: Container(
+        decoration: BoxDecoration(border: Border.all(color: theme.colorScheme.outline), borderRadius: BorderRadius.circular(8)),
+        child: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(color: theme.colorScheme.surfaceContainerHighest, borderRadius: const BorderRadius.horizontal(left: Radius.circular(7))),
+              child: Text(btnText, style: const TextStyle(fontSize: 12)),
+            ),
+            Expanded(child: Padding(padding: const EdgeInsets.only(left: 12), child: Text(fileName, style: const TextStyle(fontSize: 12, color: Colors.grey)))),
+          ],
+        ),
       ),
     );
   }

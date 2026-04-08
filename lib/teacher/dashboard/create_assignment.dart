@@ -2,8 +2,8 @@ import 'dart:io';
 import 'package:eduphin/services/api_service.dart';
 import 'package:eduphin/teacher/dashboard/teacher_dashboard_model.dart';
 import 'package:file_picker/file_picker.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:intl/intl.dart';
 import 'common_widgets.dart';
 
 class CreateAssignmentPage extends StatefulWidget {
@@ -21,7 +21,12 @@ class _CreateAssignmentPageState extends State<CreateAssignmentPage> {
   
   late Future<AssignmentPageData> _dataFuture;
   AssignmentSchedule? _selectedSchedule;
-  File? _selectedFile;
+  
+  // New state variables for cross-platform support
+  File? _selectedFile; // For Mobile
+  Uint8List? _webFileBytes; // For Web
+  String? _fileName;
+  
   bool _isSubmitting = false;
 
   @override
@@ -39,17 +44,22 @@ class _CreateAssignmentPageState extends State<CreateAssignmentPage> {
   }
 
   Future<void> _pickFile() async {
-    final result = await FilePicker.platform.pickFiles();
+    final result = await FilePicker.platform.pickFiles(withData: true);
     if (result != null) {
       setState(() {
-        _selectedFile = File(result.files.single.path!);
+        _fileName = result.files.single.name;
+        if (kIsWeb) {
+          _webFileBytes = result.files.single.bytes;
+        } else {
+          _selectedFile = File(result.files.single.path!);
+        }
       });
     }
   }
 
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
-    if (_selectedFile == null) {
+    if (_selectedFile == null && _webFileBytes == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text("Please select an attachment")),
       );
@@ -58,17 +68,27 @@ class _CreateAssignmentPageState extends State<CreateAssignmentPage> {
 
     setState(() => _isSubmitting = true);
     try {
-      // Format date to YYYY-MM-DD for backend
       final dateParts = _dateController.text.split('-');
       final formattedDate = "${dateParts[2]}-${dateParts[1]}-${dateParts[0]}";
 
-      await ApiService.createAssignment(
-        _selectedSchedule!.id,
-        _titleController.text,
-        _descriptionController.text,
-        formattedDate,
-        _selectedFile!,
-      );
+      if (kIsWeb) {
+        await ApiService.createAssignmentFromBytes(
+          _selectedSchedule!.id,
+          _titleController.text,
+          _descriptionController.text,
+          formattedDate,
+          _webFileBytes!,
+          _fileName!,
+        );
+      } else {
+        await ApiService.createAssignment(
+          _selectedSchedule!.id,
+          _titleController.text,
+          _descriptionController.text,
+          formattedDate,
+          _selectedFile!,
+        );
+      }
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -89,21 +109,17 @@ class _CreateAssignmentPageState extends State<CreateAssignmentPage> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
     return Scaffold(
-      appBar: AppBar(
-        title: const Text("Create Assignment"),
-      ),
+      appBar: AppBar(title: const Text("Create Assignment")),
       body: FutureBuilder<AssignmentPageData>(
         future: _dataFuture,
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
             return const Center(child: CircularProgressIndicator());
           } else if (snapshot.hasError) {
-            return Center(child: Text("Error loading data: ${snapshot.error}"));
+            return Center(child: Text("Error: ${snapshot.error}"));
           } else if (!snapshot.hasData) {
-            return const Center(child: Text("No schedules found"));
+            return const Center(child: Text("No data found"));
           }
 
           final schedules = snapshot.data!.schedules;
@@ -149,7 +165,7 @@ class _CreateAssignmentPageState extends State<CreateAssignmentPage> {
                     child: ElevatedButton(
                       onPressed: _isSubmitting ? null : _submit,
                       child: _isSubmitting 
-                        ? const CircularProgressIndicator(color: Colors.white)
+                        ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
                         : const Text("CREATE ASSIGNMENT"),
                     ),
                   ),
@@ -185,8 +201,8 @@ class _CreateAssignmentPageState extends State<CreateAssignmentPage> {
             const SizedBox(width: 12),
             Expanded(
               child: Text(
-                _selectedFile == null ? "Choose File (PDF, Images, etc.)" : _selectedFile!.path.split('/').last,
-                style: TextStyle(color: _selectedFile == null ? theme.hintColor : theme.colorScheme.onSurface),
+                _fileName ?? "Choose File (PDF, Images, etc.)",
+                style: TextStyle(color: _fileName == null ? theme.hintColor : theme.colorScheme.onSurface),
               ),
             ),
           ],

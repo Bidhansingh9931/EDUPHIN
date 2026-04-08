@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'package:eduphin/services/responsive_helper.dart';
 import 'package:file_picker/file_picker.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:eduphin/services/api_service.dart';
 import 'package:eduphin/teacher/dashboard/view_schedule_model.dart';
@@ -20,7 +21,11 @@ class _UploadAssignmentPageState extends State<UploadAssignmentPage> {
   ScheduleEntry? _selectedSchedule;
   final titleController = TextEditingController();
   final descController = TextEditingController();
-  File? _selectedFile;
+  
+  File? _selectedFile; // For Mobile
+  Uint8List? _webFileBytes; // For Web
+  String? _fileName;
+  
   bool _isUploading = false;
 
   @override
@@ -37,17 +42,22 @@ class _UploadAssignmentPageState extends State<UploadAssignmentPage> {
   }
 
   Future<void> _pickFile() async {
-    final result = await FilePicker.platform.pickFiles();
+    final result = await FilePicker.platform.pickFiles(withData: true);
     if (result != null) {
       setState(() {
-        _selectedFile = File(result.files.single.path!);
+        _fileName = result.files.single.name;
+        if (kIsWeb) {
+          _webFileBytes = result.files.single.bytes;
+        } else {
+          _selectedFile = File(result.files.single.path!);
+        }
       });
     }
   }
 
   Future<void> _handleUpload() async {
     if (!_formKey.currentState!.validate()) return;
-    if (_selectedFile == null) {
+    if (_selectedFile == null && _webFileBytes == null) {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Please select a file")));
       return;
     }
@@ -58,12 +68,23 @@ class _UploadAssignmentPageState extends State<UploadAssignmentPage> {
 
     setState(() => _isUploading = true);
     try {
-      await ApiService.uploadStudyMaterial(
-        _selectedSchedule!.id,
-        titleController.text,
-        descController.text,
-        _selectedFile!,
-      );
+      if (kIsWeb) {
+        await ApiService.uploadStudyMaterialFromBytes(
+          _selectedSchedule!.id,
+          titleController.text,
+          descController.text,
+          _webFileBytes!,
+          _fileName!,
+        );
+      } else {
+        await ApiService.uploadStudyMaterial(
+          _selectedSchedule!.id,
+          titleController.text,
+          descController.text,
+          _selectedFile!,
+        );
+      }
+      
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Material Uploaded Successfully")));
         Navigator.pop(context);
@@ -185,7 +206,7 @@ class _UploadAssignmentPageState extends State<UploadAssignmentPage> {
                                     child: Padding(
                                       padding: const EdgeInsets.only(left: 12, right: 12),
                                       child: Text(
-                                        _selectedFile == null ? "No file chosen" : _selectedFile!.path.split('/').last,
+                                        _fileName ?? "No file chosen",
                                         style: const TextStyle(color: Colors.grey, fontSize: 13),
                                         overflow: TextOverflow.ellipsis,
                                       ),
