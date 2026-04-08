@@ -4,18 +4,14 @@ import 'dart:io';
 import 'package:csv/csv.dart';
 import 'package:eduphin/manager_dashboard/account_statics/staff/add_staff.dart';
 import 'package:eduphin/services/api_service.dart';
+import 'package:eduphin/services/responsive_helper.dart';
 import 'package:flutter/material.dart';
 import 'package:open_file/open_file.dart';
 import 'package:path_provider/path_provider.dart';
 
-// ───────────────────────────────────────────────────────────
-//                          DATA MODELS
-// ───────────────────────────────────────────────────────────
-
 class Role {
   final int id;
   final String name;
-
   Role({required this.id, required this.name});
 }
 
@@ -30,15 +26,10 @@ class Staff {
     return Staff(
       id: json['id'] ?? 0,
       name: json['name'] ?? 'N/A',
-      designation:
-          json['designation'] ?? 'Staff', // API doesn't provide a specific designation
+      designation: json['designation'] ?? 'Staff',
     );
   }
 }
-
-// ───────────────────────────────────────────────────────────
-//                       STAFF LIST PAGE
-// ───────────────────────────────────────────────────────────
 
 class StaffListPage extends StatefulWidget {
   const StaffListPage({super.key});
@@ -49,7 +40,7 @@ class StaffListPage extends StatefulWidget {
 
 class _StaffListPageState extends State<StaffListPage> {
   bool _isLoading = true;
-  int? _selectedRoleId = 0; // 0 for "All Staff"
+  int? _selectedRoleId = 0;
   List<Role> _roles = [];
   List<Staff> _staff = [];
 
@@ -61,9 +52,7 @@ class _StaffListPageState extends State<StaffListPage> {
 
   Future<void> _fetchInitialData() async {
     if (!mounted) return;
-    setState(() {
-      _isLoading = true;
-    });
+    setState(() => _isLoading = true);
 
     try {
       final response = await ApiService.get('manager/salary/accounts');
@@ -75,14 +64,7 @@ class _StaffListPageState extends State<StaffListPage> {
             .map((role) => Role(id: role['role_id'], name: role['name']))
             .toList();
 
-        // Filter for roles that are considered 'staff' (e.g., not students)
-        final staffRoles = allRoles
-            .where((role) =>
-                role.id != 6 // Assuming 6 is Student
-                )
-            .toList();
-
-        // Add "All Staff" option
+        final staffRoles = allRoles.where((role) => role.id != 6).toList();
         final displayRoles = [Role(id: 0, name: "All Staff"), ...staffRoles];
 
         if (mounted) {
@@ -90,16 +72,14 @@ class _StaffListPageState extends State<StaffListPage> {
             _roles = displayRoles;
             _selectedRoleId = displayRoles.first.id;
           });
-          await _fetchStaffForRole(
-              _selectedRoleId!); // Fetch staff for the default role
+          await _fetchStaffForRole(_selectedRoleId!);
         }
       } else {
         throw Exception('Failed to load roles');
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text(e.toString())));
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString())));
         setState(() => _isLoading = false);
       }
     }
@@ -115,16 +95,13 @@ class _StaffListPageState extends State<StaffListPage> {
     try {
       List<Staff> allFetchedStaff = [];
       if (roleId == 0) {
-        // "All Staff" selected
-        final staffRoleIds =
-            _roles.where((r) => r.id != 0).map((r) => r.id).toList();
+        final staffRoleIds = _roles.where((r) => r.id != 0).map((r) => r.id).toList();
         for (int id in staffRoleIds) {
           final response = await ApiService.get('manager/users/$id');
           if (response.statusCode == 200) {
             final data = jsonDecode(response.body);
             final List<dynamic> staffData = data['data'];
-            allFetchedStaff.addAll(
-                staffData.map((json) => Staff.fromJson(json)).toList());
+            allFetchedStaff.addAll(staffData.map((json) => Staff.fromJson(json)).toList());
           }
         }
       } else {
@@ -132,10 +109,9 @@ class _StaffListPageState extends State<StaffListPage> {
         if (response.statusCode == 200) {
           final data = jsonDecode(response.body);
           final List<dynamic> staffData = data['data'];
-          allFetchedStaff =
-              staffData.map((json) => Staff.fromJson(json)).toList();
+          allFetchedStaff = staffData.map((json) => Staff.fromJson(json)).toList();
         } else {
-          throw Exception('Failed to load staff for the selected role');
+          throw Exception('Failed to load staff');
         }
       }
 
@@ -147,8 +123,7 @@ class _StaffListPageState extends State<StaffListPage> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text(e.toString())));
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString())));
         setState(() => _isLoading = false);
       }
     }
@@ -157,17 +132,11 @@ class _StaffListPageState extends State<StaffListPage> {
   Future<void> _downloadStaffList() async {
     if (_staff.isEmpty) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("No staff data to download.")),
-      );
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("No data to download.")));
       return;
     }
 
-    // Convert staff list to CSV
-    List<List<dynamic>> rows = [];
-    // Add header row
-    rows.add(['ID', 'Name', 'Designation']);
-    // Add data rows
+    List<List<dynamic>> rows = [['ID', 'Name', 'Designation']];
     for (var staffMember in _staff) {
       rows.add([staffMember.id, staffMember.name, staffMember.designation]);
     }
@@ -175,73 +144,56 @@ class _StaffListPageState extends State<StaffListPage> {
     String csv = const ListToCsvConverter().convert(rows);
 
     try {
-      // Get storage directory
       final directory = await getApplicationDocumentsDirectory();
       final path = '${directory.path}/staff_list.csv';
       final file = File(path);
-
-      // Write to file
       await file.writeAsString(csv);
-
-      // Open file
       await OpenFile.open(path);
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("Failed to download staff list: $e")),
-      );
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Download failed: $e")));
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final screenSize = MediaQuery.of(context).size;
-
     return Scaffold(
-      floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () async {
           final result = await Navigator.push(
             context,
             MaterialPageRoute(builder: (context) => const AddStaffPage()),
           );
-          if (result == true && mounted) {
-            _fetchStaffForRole(_selectedRoleId!); // Refresh list on return
-          }
+          if (result == true && mounted) _fetchStaffForRole(_selectedRoleId!);
         },
-        label: Text("Add Staff",
-            style: TextStyle(color: theme.colorScheme.onPrimary)),
-        icon: Icon(Icons.add, color: theme.colorScheme.onPrimary),
-        backgroundColor: theme.colorScheme.primary,
+        label: const Text("Add Staff"),
+        icon: const Icon(Icons.add),
       ),
-      backgroundColor: theme.scaffoldBackgroundColor,
       appBar: AppBar(
         title: const Text("Staff List"),
         actions: [
-          IconButton(
-            icon: const Icon(Icons.download),
-            onPressed: _downloadStaffList,
-          ),
+          IconButton(icon: const Icon(Icons.download), onPressed: _downloadStaffList),
         ],
       ),
-      body: SingleChildScrollView(
-        child: Padding(
-          padding: EdgeInsets.fromLTRB(screenSize.width * 0.04,
-              screenSize.width * 0.04, screenSize.width * 0.04, 50),
-          child: CustomStaffListBox(
-            isLoading: _isLoading,
-            staff: _staff,
-            roles: _roles,
-            selectedRoleId: _selectedRoleId,
-            onRoleChanged: (int? newRoleId) {
-              if (newRoleId != null) {
-                setState(() {
-                  _selectedRoleId = newRoleId;
-                });
-                _fetchStaffForRole(newRoleId);
-              }
-            },
+      body: SafeArea(
+        child: SingleChildScrollView(
+          padding: context.pagePadding,
+          child: Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 1200),
+              child: CustomStaffListBox(
+                isLoading: _isLoading,
+                staff: _staff,
+                roles: _roles,
+                selectedRoleId: _selectedRoleId,
+                onRoleChanged: (int? newRoleId) {
+                  if (newRoleId != null) {
+                    setState(() => _selectedRoleId = newRoleId);
+                    _fetchStaffForRole(newRoleId);
+                  }
+                },
+              ),
+            ),
           ),
         ),
       ),
@@ -267,120 +219,79 @@ class CustomStaffListBox extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final screenSize = MediaQuery.of(context).size;
-    final isDarkMode = theme.brightness == Brightness.dark;
-
-    return Container(
-      width: double.infinity,
-      padding: EdgeInsets.all(screenSize.width * 0.04),
-      decoration: BoxDecoration(
-        color: theme.cardColor,
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12),
-            decoration: BoxDecoration(
-              color: isDarkMode
-                  ? theme.scaffoldBackgroundColor
-                  : const Color(0xFFF3F3F3),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: DropdownButton<int>(
+    return Card(
+      child: Padding(
+        padding: EdgeInsets.all(context.spacing),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            DropdownButtonFormField<int>(
               value: selectedRoleId,
-              underline: const SizedBox(),
+              decoration: const InputDecoration(prefixIcon: Icon(Icons.badge_outlined)),
               isExpanded: true,
-              icon: Icon(Icons.arrow_drop_down,
-                  color: theme.colorScheme.onSurface),
               onChanged: onRoleChanged,
-              items: roles.map<DropdownMenuItem<int>>((Role role) {
-                return DropdownMenuItem<int>(
-                  value: role.id,
-                  child: Row(
-                    children: [
-                      const Icon(Icons.person_outline), // Prefix icon
-                      const SizedBox(width: 8),
-                      Text(
-                        role.name,
-                        style: theme.textTheme.bodyLarge,
-                      ),
-                    ],
-                  ),
-                );
-              }).toList(),
+              items: roles.map((role) => DropdownMenuItem(value: role.id, child: Text(role.name))).toList(),
             ),
-          ),
-          const SizedBox(height: 16),
-          isLoading
-              ? const Center(child: CircularProgressIndicator())
-              : LayoutBuilder(
-                  builder: (context, constraints) {
-                    if (staff.isEmpty) {
-                      return Center(
-                          child: Text(
-                        "No staff found for this role.",
-                        style: TextStyle(color: theme.colorScheme.onSurfaceVariant),
-                      ));
-                    }
-
-                    final isLargeScreen = constraints.maxWidth > 600;
-                    if (isLargeScreen) {
-                      return GridView.builder(
-                        shrinkWrap: true,
-                        physics: const NeverScrollableScrollPhysics(),
-                        itemCount: staff.length,
-                        gridDelegate:
-                            const SliverGridDelegateWithFixedCrossAxisCount(
-                          crossAxisCount: 2,
-                          crossAxisSpacing: 16,
-                          mainAxisSpacing: 16,
-                          childAspectRatio: 3.5,
-                        ),
-                        itemBuilder: (context, index) {
-                          return _buildStaffItem(context, staff[index]);
-                        },
-                      );
-                    } else {
-                      return ListView.separated(
-                        shrinkWrap: true,
-                        physics: const NeverScrollableScrollPhysics(),
-                        itemCount: staff.length,
-                        separatorBuilder: (context, index) =>
-                            const SizedBox(height: 16),
-                        itemBuilder: (context, index) {
-                          return _buildStaffItem(context, staff[index]);
-                        },
-                      );
-                    }
-                  },
-                ),
-        ],
+            const SizedBox(height: 24),
+            isLoading
+                ? const Center(child: Padding(padding: EdgeInsets.all(40), child: CircularProgressIndicator()))
+                : _buildContent(context),
+          ],
+        ),
       ),
+    );
+  }
+
+  Widget _buildContent(BuildContext context) {
+    if (staff.isEmpty) {
+      return const Center(child: Padding(padding: EdgeInsets.all(40), child: Text("No staff found.")));
+    }
+
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final crossAxisCount = context.responsive(1, tablet: 2, desktop: 3);
+        
+        if (crossAxisCount > 1) {
+          return GridView.builder(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            itemCount: staff.length,
+            gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: crossAxisCount,
+              crossAxisSpacing: 16,
+              mainAxisSpacing: 16,
+              mainAxisExtent: 80,
+            ),
+            itemBuilder: (context, index) => _buildStaffItem(context, staff[index]),
+          );
+        } else {
+          return ListView.separated(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            itemCount: staff.length,
+            separatorBuilder: (context, index) => const SizedBox(height: 12),
+            itemBuilder: (context, index) => _buildStaffItem(context, staff[index]),
+          );
+        }
+      },
     );
   }
 
   Widget _buildStaffItem(BuildContext context, Staff staffMember) {
     final theme = Theme.of(context);
-    final textTheme = theme.textTheme;
-    final isDarkMode = theme.brightness == Brightness.dark;
-
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: isDarkMode
-            ? theme.scaffoldBackgroundColor
-            : const Color(0xFFF3F3F3),
+        color: theme.colorScheme.surfaceContainerLow,
         borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: theme.colorScheme.outline.withOpacity(0.05)),
       ),
       child: Row(
         children: [
           CircleAvatar(
-            backgroundColor: theme.colorScheme.primaryContainer,
-            child:
-                Icon(Icons.person, color: theme.colorScheme.onPrimaryContainer),
+            radius: 24,
+            backgroundColor: theme.colorScheme.primary.withOpacity(0.1),
+            child: Icon(Icons.person, color: theme.colorScheme.primary),
           ),
           const SizedBox(width: 16),
           Expanded(
@@ -388,19 +299,12 @@ class CustomStaffListBox extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Text(
-                  staffMember.name,
-                  style: textTheme.titleMedium
-                      ?.copyWith(color: theme.colorScheme.onSurface),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  staffMember.designation,
-                  style: textTheme.bodyMedium?.copyWith(color: theme.hintColor),
-                )
+                Text(staffMember.name, style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold), maxLines: 1, overflow: TextOverflow.ellipsis),
+                Text(staffMember.designation, style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
               ],
             ),
-          )
+          ),
+          Icon(Icons.chevron_right, color: theme.colorScheme.outline),
         ],
       ),
     );

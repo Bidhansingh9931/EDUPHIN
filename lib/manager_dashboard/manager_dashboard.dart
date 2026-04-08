@@ -465,37 +465,37 @@ class CustomProfileBox extends StatelessWidget {
               backgroundColor: theme.colorScheme.onPrimary.withAlpha(26), // 10% opacity
               child: profile.imageUrl.isNotEmpty
                   ? ClipOval(
-                      child: Image.network(
-                        profile.imageUrl,
-                        width: 80,
-                        height: 80,
-                        fit: BoxFit.cover,
-                        loadingBuilder: (context, child, loadingProgress) {
-                          if (loadingProgress == null) return child;
-                          return Center(
-                            child: CircularProgressIndicator(
-                              value: loadingProgress.expectedTotalBytes != null
-                                  ? loadingProgress.cumulativeBytesLoaded / (loadingProgress.expectedTotalBytes ?? 1)
-                                  : null,
-                              strokeWidth: 2,
-                              valueColor: AlwaysStoppedAnimation<Color>(theme.colorScheme.onPrimary),
-                            ),
-                          );
-                        },
-                        errorBuilder: (context, error, stackTrace) {
-                          return Icon(
-                            Icons.person,
-                            size: 40,
-                            color: theme.colorScheme.primary,
-                          );
-                        },
+                child: Image.network(
+                  profile.imageUrl,
+                  width: 80,
+                  height: 80,
+                  fit: BoxFit.cover,
+                  loadingBuilder: (context, child, loadingProgress) {
+                    if (loadingProgress == null) return child;
+                    return Center(
+                      child: CircularProgressIndicator(
+                        value: loadingProgress.expectedTotalBytes != null
+                            ? loadingProgress.cumulativeBytesLoaded / (loadingProgress.expectedTotalBytes ?? 1)
+                            : null,
+                        strokeWidth: 2,
+                        valueColor: AlwaysStoppedAnimation<Color>(theme.colorScheme.onPrimary),
                       ),
-                    )
-                  : Icon(
+                    );
+                  },
+                  errorBuilder: (context, error, stackTrace) {
+                    return Icon(
                       Icons.person,
                       size: 40,
                       color: theme.colorScheme.primary,
-                    ),
+                    );
+                  },
+                ),
+              )
+                  : Icon(
+                Icons.person,
+                size: 40,
+                color: theme.colorScheme.primary,
+              ),
             ),
             const SizedBox(height: 8),
             Text(profile.name, style: textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold, color: theme.colorScheme.onPrimary)),
@@ -644,9 +644,9 @@ class CustomUpcomingEventsBox extends StatelessWidget {
                   const SizedBox(width: 16),
                   Expanded(
                       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                    Text(event.title, style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold), maxLines: 2, overflow: TextOverflow.ellipsis),
-                    Text(event.fullDate, style: theme.textTheme.bodyMedium?.copyWith(color: theme.hintColor)),
-                  ]))
+                        Text(event.title, style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold), maxLines: 2, overflow: TextOverflow.ellipsis),
+                        Text(event.fullDate, style: theme.textTheme.bodyMedium?.copyWith(color: theme.hintColor)),
+                      ]))
                 ]),
               );
             },

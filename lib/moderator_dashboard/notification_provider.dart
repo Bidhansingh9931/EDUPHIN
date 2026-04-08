@@ -7,7 +7,8 @@ import 'package:http/http.dart' as http;
 import 'notification_model.dart';
 
 class NotificationProvider {
-  final String _notificationsApiUrl = "${ApiService.baseUrl}/notifications";
+  // Added /api/ prefix to match standard Laravel API routing
+  final String _notificationsApiUrl = "${ApiService.baseUrl}/api/notifications";
 
   Future<List<Message>> fetchMessages() async {
     final String? token = await ApiService.getToken();
@@ -45,14 +46,14 @@ class NotificationProvider {
       } else {
         debugPrint(
             "Failed to load notifications. Status: ${response.statusCode}, Body: ${response.body}");
-        throw Exception(
-            "Failed to load notifications. Status: ${response.statusCode}\nBody: ${response.body}");
+        return []; // Return empty list instead of throwing to avoid UI crash
       }
     } on TimeoutException {
-      throw Exception("Connection timed out. Please check your network.");
+      debugPrint("Notification fetch timed out.");
+      return [];
     } catch (e) {
       debugPrint("An error occurred fetching notifications: $e");
-      rethrow;
+      return [];
     }
   }
 }

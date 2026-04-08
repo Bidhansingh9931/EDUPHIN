@@ -240,6 +240,7 @@ class _AddAccountPageState extends State<AddAccountPage> {
             style: ElevatedButton.styleFrom(
               backgroundColor: const Color(0xCC4A90E2),
               foregroundColor: Colors.white,
+              minimumSize: const Size(0, 46),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(8),
               ),

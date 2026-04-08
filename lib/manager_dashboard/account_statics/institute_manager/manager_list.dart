@@ -4,18 +4,14 @@ import 'dart:io';
 import 'package:csv/csv.dart';
 import 'package:eduphin/manager_dashboard/account_statics/institute_manager/add_manager.dart';
 import 'package:eduphin/services/api_service.dart';
+import 'package:eduphin/services/responsive_helper.dart';
 import 'package:flutter/material.dart';
 import 'package:open_file/open_file.dart';
 import 'package:path_provider/path_provider.dart';
 
-// ───────────────────────────────────────────────────────────
-//                          DATA MODELS
-// ───────────────────────────────────────────────────────────
-
 class Role {
   final int id;
   final String name;
-
   Role({required this.id, required this.name});
 }
 
@@ -30,14 +26,10 @@ class Manager {
     return Manager(
       id: json['id'] ?? 0,
       name: json['name'] ?? 'N/A',
-      designation: json['designation'] ?? 'Manager', // API doesn't provide a specific designation
+      designation: json['designation'] ?? 'Manager',
     );
   }
 }
-
-// ───────────────────────────────────────────────────────────
-//                       MANAGER LIST PAGE
-// ───────────────────────────────────────────────────────────
 
 class ManagerListPage extends StatefulWidget {
   const ManagerListPage({super.key});
@@ -60,12 +52,9 @@ class _ManagerListPageState extends State<ManagerListPage> {
 
   Future<void> _fetchInitialData() async {
     if (!mounted) return;
-    setState(() {
-      _isLoading = true;
-    });
+    setState(() => _isLoading = true);
 
     try {
-      // Fetch roles first to populate the dropdown
       final response = await ApiService.get('manager/salary/accounts');
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
@@ -75,7 +64,6 @@ class _ManagerListPageState extends State<ManagerListPage> {
             .map((role) => Role(id: role['role_id'], name: role['name']))
             .toList();
 
-        // Filter for roles that are considered 'managers'
         final managerRoles = allRoles.where((role) => 
           role.name.toLowerCase().contains('manager')
         ).toList();
@@ -86,10 +74,10 @@ class _ManagerListPageState extends State<ManagerListPage> {
               _roles = managerRoles;
               _selectedRoleId = managerRoles.first.id;
             });
-            await _fetchManagersForRole(_selectedRoleId!); // Fetch managers for the default role
+            await _fetchManagersForRole(_selectedRoleId!);
           }
         } else {
-          if(mounted) setState(() => _isLoading = false); // No manager roles found
+          if(mounted) setState(() => _isLoading = false);
         }
       } else {
         throw Exception('Failed to load roles');
@@ -104,9 +92,7 @@ class _ManagerListPageState extends State<ManagerListPage> {
 
   Future<void> _fetchManagersForRole(int roleId) async {
     if (!mounted) return;
-    setState(() {
-      _isLoading = true;
-    });
+    setState(() => _isLoading = true);
 
     try {
       final response = await ApiService.get('manager/users/$roleId');
@@ -120,7 +106,7 @@ class _ManagerListPageState extends State<ManagerListPage> {
           });
         }
       } else {
-        throw Exception('Failed to load managers for the selected role');
+        throw Exception('Failed to load managers');
       }
     } catch (e) {
       if (mounted) {
@@ -133,17 +119,11 @@ class _ManagerListPageState extends State<ManagerListPage> {
   Future<void> _downloadManagerList() async {
     if (_managers.isEmpty) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("No manager data to download.")),
-      );
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("No data to download.")));
       return;
     }
 
-    // Convert manager list to CSV
-    List<List<dynamic>> rows = [];
-    // Add header row
-    rows.add(['ID', 'Name', 'Designation']);
-    // Add data rows
+    List<List<dynamic>> rows = [['ID', 'Name', 'Designation']];
     for (var manager in _managers) {
       rows.add([manager.id, manager.name, manager.designation]);
     }
@@ -151,29 +131,19 @@ class _ManagerListPageState extends State<ManagerListPage> {
     String csv = const ListToCsvConverter().convert(rows);
 
     try {
-      // Get storage directory
       final directory = await getApplicationDocumentsDirectory();
       final path = '${directory.path}/manager_list.csv';
       final file = File(path);
-
-      // Write to file
       await file.writeAsString(csv);
-
-      // Open file
       await OpenFile.open(path);
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("Failed to download manager list: $e")),
-      );
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Download failed: $e")));
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final screenSize = MediaQuery.of(context).size;
-
     return Scaffold(
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () async {
@@ -181,50 +151,42 @@ class _ManagerListPageState extends State<ManagerListPage> {
             context,
             MaterialPageRoute(builder: (context) => const AddManagerPage()),
           );
-          if (result == true && mounted) {
-            _fetchManagersForRole(_selectedRoleId!); // Refresh list on return
-          }
+          if (result == true && mounted) _fetchManagersForRole(_selectedRoleId!);
         },
-        label: Text("Add Manager", style: TextStyle(color: theme.colorScheme.onPrimary)),
-        icon: Icon(Icons.add, color: theme.colorScheme.onPrimary),
-        backgroundColor: theme.colorScheme.primary,
+        label: const Text("Add Manager"),
+        icon: const Icon(Icons.add),
       ),
-      backgroundColor: theme.scaffoldBackgroundColor,
       appBar: AppBar(
         title: const Text("Manager List"),
         actions: [
-            IconButton(
-              icon: const Icon(Icons.download),
-              onPressed: _downloadManagerList,
-            ),
+            IconButton(icon: const Icon(Icons.download), onPressed: _downloadManagerList),
           ],
       ),
-      body: SingleChildScrollView(
-        child: Padding(
-          padding: EdgeInsets.fromLTRB(screenSize.width * 0.04, screenSize.width * 0.04, screenSize.width * 0.04, 50),
-          child: CustomManagerListBox(
-            isLoading: _isLoading,
-            managers: _managers,
-            roles: _roles,
-            selectedRoleId: _selectedRoleId,
-            onRoleChanged: (int? newRoleId) {
-              if (newRoleId != null) {
-                setState(() {
-                  _selectedRoleId = newRoleId;
-                });
-                _fetchManagersForRole(newRoleId);
-              }
-            },
+      body: SafeArea(
+        child: SingleChildScrollView(
+          padding: context.pagePadding,
+          child: Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 1200),
+              child: CustomManagerListBox(
+                isLoading: _isLoading,
+                managers: _managers,
+                roles: _roles,
+                selectedRoleId: _selectedRoleId,
+                onRoleChanged: (int? newRoleId) {
+                  if (newRoleId != null) {
+                    setState(() => _selectedRoleId = newRoleId);
+                    _fetchManagersForRole(newRoleId);
+                  }
+                },
+              ),
+            ),
           ),
         ),
       ),
     );
   }
 }
-
-// ───────────────────────────────────────────────────────────
-//                      MANAGER LIST BOX
-// ───────────────────────────────────────────────────────────
 
 class CustomManagerListBox extends StatelessWidget {
   final bool isLoading;
@@ -245,107 +207,80 @@ class CustomManagerListBox extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final screenSize = MediaQuery.of(context).size;
-    final isDarkMode = theme.brightness == Brightness.dark;
 
-    return Container(
-      width: double.infinity,
-      padding: EdgeInsets.all(screenSize.width * 0.04),
-      decoration: BoxDecoration(
-        color: theme.cardColor,
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12),
-            decoration: BoxDecoration(
-              color: isDarkMode ? theme.scaffoldBackgroundColor : const Color(0xFFF3F3F3),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: DropdownButton<int>(
+    return Card(
+      child: Padding(
+        padding: EdgeInsets.all(context.spacing),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            DropdownButtonFormField<int>(
               value: selectedRoleId,
-              underline: const SizedBox(),
+              decoration: const InputDecoration(prefixIcon: Icon(Icons.badge_outlined)),
               isExpanded: true,
-              icon: Icon(Icons.arrow_drop_down, color: theme.colorScheme.onSurface),
               onChanged: onRoleChanged,
-              items: roles.map<DropdownMenuItem<int>>((Role role) {
-                return DropdownMenuItem<int>(
-                  value: role.id,
-                  child: Row(
-                    children: [
-                      const Icon(Icons.person_outline), // Prefix icon
-                      const SizedBox(width: 8),
-                      Text(
-                        role.name,
-                        style: theme.textTheme.bodyLarge,
-                      ),
-                    ],
-                  ),
-                );
-              }).toList(),
+              items: roles.map((role) => DropdownMenuItem(value: role.id, child: Text(role.name))).toList(),
             ),
-          ),
-          const SizedBox(height: 16),
-          isLoading
-              ? const Center(child: CircularProgressIndicator())
-              : LayoutBuilder(
-                  builder: (context, constraints) {
-                    if (managers.isEmpty) {
-                      return Center(child: Text("No managers found for this role.", style: TextStyle(color: theme.colorScheme.onSurfaceVariant),));
-                    }
-
-                    final isLargeScreen = constraints.maxWidth > 600;
-                    if (isLargeScreen) {
-                      return GridView.builder(
-                        shrinkWrap: true,
-                        physics: const NeverScrollableScrollPhysics(),
-                        itemCount: managers.length,
-                        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                          crossAxisCount: 2,
-                          crossAxisSpacing: 16,
-                          mainAxisSpacing: 16,
-                          childAspectRatio: 3.5,
-                        ),
-                        itemBuilder: (context, index) {
-                          return _buildManagerItem(context, managers[index]);
-                        },
-                      );
-                    } else {
-                      return ListView.separated(
-                        shrinkWrap: true,
-                        physics: const NeverScrollableScrollPhysics(),
-                        itemCount: managers.length,
-                        separatorBuilder: (context, index) => const SizedBox(height: 16),
-                        itemBuilder: (context, index) {
-                          return _buildManagerItem(context, managers[index]);
-                        },
-                      );
-                    }
-                  },
-                ),
-        ],
+            const SizedBox(height: 24),
+            isLoading
+                ? const Center(child: Padding(padding: EdgeInsets.all(40), child: CircularProgressIndicator()))
+                : _buildContent(context),
+          ],
+        ),
       ),
+    );
+  }
+
+  Widget _buildContent(BuildContext context) {
+    if (managers.isEmpty) {
+      return const Center(child: Padding(padding: EdgeInsets.all(40), child: Text("No managers found.")));
+    }
+
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final crossAxisCount = context.responsive(1, tablet: 2, desktop: 3);
+        
+        if (crossAxisCount > 1) {
+          return GridView.builder(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            itemCount: managers.length,
+            gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: crossAxisCount,
+              crossAxisSpacing: 16,
+              mainAxisSpacing: 16,
+              mainAxisExtent: 80,
+            ),
+            itemBuilder: (context, index) => _buildManagerItem(context, managers[index]),
+          );
+        } else {
+          return ListView.separated(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            itemCount: managers.length,
+            separatorBuilder: (context, index) => const SizedBox(height: 12),
+            itemBuilder: (context, index) => _buildManagerItem(context, managers[index]),
+          );
+        }
+      },
     );
   }
 
   Widget _buildManagerItem(BuildContext context, Manager manager) {
     final theme = Theme.of(context);
-    final textTheme = theme.textTheme;
-    final isDarkMode = theme.brightness == Brightness.dark;
-
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: isDarkMode ? theme.scaffoldBackgroundColor : const Color(0xFFF3F3F3),
+        color: theme.colorScheme.surfaceContainerLow,
         borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: theme.colorScheme.outline.withOpacity(0.05)),
       ),
       child: Row(
         children: [
           CircleAvatar(
-            backgroundColor: theme.colorScheme.primaryContainer,
-            child: Icon(Icons.person, color: theme.colorScheme.onPrimaryContainer),
+            radius: 24,
+            backgroundColor: theme.colorScheme.primary.withOpacity(0.1),
+            child: Icon(Icons.person, color: theme.colorScheme.primary),
           ),
           const SizedBox(width: 16),
           Expanded(
@@ -353,18 +288,12 @@ class CustomManagerListBox extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Text(
-                  manager.name,
-                  style: textTheme.titleMedium?.copyWith(color: theme.colorScheme.onSurface),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  manager.designation,
-                  style: textTheme.bodyMedium?.copyWith(color: theme.hintColor),
-                )
+                Text(manager.name, style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold), maxLines: 1, overflow: TextOverflow.ellipsis),
+                Text(manager.designation, style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
               ],
             ),
-          )
+          ),
+          Icon(Icons.chevron_right, color: theme.colorScheme.outline),
         ],
       ),
     );

@@ -1,4 +1,4 @@
-
+import 'package:eduphin/services/responsive_helper.dart';
 import 'package:flutter/material.dart';
 import 'add_review_model.dart';
 import 'add_review_provider.dart';
@@ -41,23 +41,24 @@ class _AddReviewsPageState extends State<AddReviewsPage> {
 
       try {
         await _addReviewProvider.submitReview(submission);
-
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Review submitted successfully!')),
-        );
-        _formKey.currentState!.reset();
-        _fullNameController.clear();
-        _designationController.clear();
-        _messageController.clear();
-
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Review submitted successfully!'), backgroundColor: Colors.green),
+          );
+          Navigator.pop(context, true);
+        }
       } catch (e) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to submit review: $e')),
-        );
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Failed to submit review: $e'), backgroundColor: Colors.red),
+          );
+        }
       } finally {
-        setState(() {
-          _isLoading = false;
-        });
+        if (mounted) {
+          setState(() {
+            _isLoading = false;
+          });
+        }
       }
     }
   }
@@ -65,136 +66,144 @@ class _AddReviewsPageState extends State<AddReviewsPage> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
     return Scaffold(
       appBar: AppBar(
-        title: const Text(
-          "Add Reviews",
-          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-        ),
+        title: const Text("Write a Review"),
       ),
-      body: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Form(
-          key: _formKey,
-          child: SingleChildScrollView(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Center(
-                  child: Stack(
-                    alignment: Alignment.bottomRight,
-                    children: [
-                      ClipRRect(
-                          borderRadius: BorderRadius.circular(50),
-                          child: Image.asset("assets/images/girl_image.webp",
-                              width: 100, height: 100, fit: BoxFit.cover)),
-                      Container(
-                          width: 30,
-                          height: 30,
-                          decoration: BoxDecoration(
-                            color: theme.primaryColor,
-                            borderRadius: BorderRadius.circular(15),
+      body: SingleChildScrollView(
+        padding: context.pagePadding,
+        child: Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 800),
+            child: Form(
+              key: _formKey,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _buildPhotoSection(theme),
+                  const SizedBox(height: 32),
+                  Card(
+                    child: Padding(
+                      padding: const EdgeInsets.all(24.0),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text("Reviewer Information", style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
+                          const SizedBox(height: 24),
+                          _buildFieldLabel(theme, "Full Name"),
+                          const SizedBox(height: 8),
+                          TextFormField(
+                            controller: _fullNameController,
+                            validator: (value) => value == null || value.isEmpty ? 'Required' : null,
+                            decoration: const InputDecoration(
+                              prefixIcon: Icon(Icons.person_outline_rounded),
+                              hintText: "e.g. Amelia Johnson",
+                            ),
                           ),
-                          child: Icon(
-                            Icons.camera_alt_rounded,
-                            color: theme.colorScheme.onPrimary,
-                            size: 20,
-                          )),
-                    ],
-                  ),
-                ),
-                const SizedBox(
-                  height: 30,
-                ),
-                Text("Full Name", style: theme.textTheme.titleMedium),
-                const SizedBox(height: 10),
-                TextFormField(
-                  controller: _fullNameController,
-                  validator: (value) {
-                    if (value == null || value.isEmpty) {
-                      return 'Please enter a full name';
-                    }
-                    return null;
-                  },
-                  decoration: InputDecoration(
-                    prefixIcon: const Icon(Icons.person),
-                    hintText: "Amelia Johnson",
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(
-                        10,
+                          const SizedBox(height: 24),
+                          _buildFieldLabel(theme, "Designation / Role"),
+                          const SizedBox(height: 8),
+                          TextFormField(
+                            controller: _designationController,
+                            validator: (value) => value == null || value.isEmpty ? 'Required' : null,
+                            decoration: const InputDecoration(
+                              prefixIcon: Icon(Icons.badge_outlined),
+                              hintText: "e.g. Parent, Grade 10",
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                   ),
-                ),
-                const SizedBox(
-                  height: 20,
-                ),
-                Text("Designation", style: theme.textTheme.titleMedium),
-                const SizedBox(height: 10),
-                TextFormField(
-                  controller: _designationController,
-                  validator: (value) {
-                    if (value == null || value.isEmpty) {
-                      return 'Please enter a designation';
-                    }
-                    return null;
-                  },
-                  decoration: InputDecoration(
-                    prefixIcon: const Icon(Icons.connect_without_contact),
-                    hintText: "Parent, Grade 10",
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(
-                        10,
+                  const SizedBox(height: 24),
+                  Card(
+                    child: Padding(
+                      padding: const EdgeInsets.all(24.0),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text("Your Feedback", style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
+                          const SizedBox(height: 24),
+                          TextFormField(
+                            controller: _messageController,
+                            validator: (value) => value == null || value.isEmpty ? 'Required' : null,
+                            maxLines: 5,
+                            decoration: const InputDecoration(
+                              hintText: "Share your thoughts about the institute...",
+                              alignLabelWithHint: true,
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                   ),
-                ),
-                const SizedBox(
-                  height: 20,
-                ),
-                Text("Message", style: theme.textTheme.titleMedium),
-                const SizedBox(height: 10),
-                TextFormField(
-                  controller: _messageController,
-                  validator: (value) {
-                    if (value == null || value.isEmpty) {
-                      return 'Please enter a message';
-                    }
-                    return null;
-                  },
-                  maxLines: 5,
-                  decoration: InputDecoration(
-                      alignLabelWithHint: true,
-                      prefixIcon: const Padding(
-                        padding: EdgeInsets.only(bottom: 90, left: 10),
-                        child: Icon(
-                          Icons.message,
-                          size: 30,
-                        ),
-                      ),
-                      hintText: "Enter review message here...",
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(10),
-                      )),
-                ),
-                const SizedBox(
-                  height: 20,
-                ),
-                SizedBox(
-                    height: 50,
+                  const SizedBox(height: 32),
+                  SizedBox(
                     width: double.infinity,
-                    child: ElevatedButton(
-                        onPressed: _isLoading ? null : _submitReview,
-                        child: _isLoading
-                            ? const CircularProgressIndicator()
-                            : const Text("Send Reviews",
-                                style: TextStyle(
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: 15)))),
-              ],
+                    child: ElevatedButton.icon(
+                      onPressed: _isLoading ? null : _submitReview,
+                      icon: _isLoading 
+                        ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                        : const Icon(Icons.send_rounded),
+                      label: Text(_isLoading ? "Submitting..." : "SUBMIT REVIEW"),
+                      style: ElevatedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 18),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 50),
+                ],
+              ),
             ),
           ),
         ),
+      ),
+    );
+  }
+
+  Widget _buildPhotoSection(ThemeData theme) {
+    return Center(
+      child: Stack(
+        alignment: Alignment.bottomRight,
+        children: [
+          Container(
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              border: Border.all(color: theme.colorScheme.primary.withOpacity(0.2), width: 4),
+            ),
+            child: CircleAvatar(
+              radius: 50,
+              backgroundColor: theme.colorScheme.surfaceVariant,
+              backgroundImage: const AssetImage("assets/images/girl_image.webp"),
+            ),
+          ),
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: theme.colorScheme.primary,
+              shape: BoxShape.circle,
+              border: Border.all(color: theme.scaffoldBackgroundColor, width: 2),
+            ),
+            child: const Icon(
+              Icons.camera_alt_rounded,
+              color: Colors.white,
+              size: 18,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildFieldLabel(ThemeData theme, String label) {
+    return Text(
+      label,
+      style: theme.textTheme.bodySmall?.copyWith(
+        fontWeight: FontWeight.bold,
+        color: theme.hintColor,
+        letterSpacing: 1.1,
       ),
     );
   }

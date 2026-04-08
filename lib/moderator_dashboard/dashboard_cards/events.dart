@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:eduphin/services/responsive_helper.dart';
 import 'package:flutter/material.dart';
 
 // 1. Data Model for an Event
@@ -15,12 +16,12 @@ class Event {
 // 2. Data Provider to fetch event data
 class EventProvider {
   Future<List<Event>> fetchEvents() async {
-    await Future.delayed(const Duration(seconds: 2));
+    await Future.delayed(const Duration(seconds: 1));
     return List.generate(
-      15, // Increased count for better grid view demonstration
+      15,
       (index) => Event(
-        title: 'Event ${index + 1}',
-        description: 'This is the detailed description for Event ${index + 1}. It can be a bit longer.',
+        title: 'Institute Event ${index + 1}',
+        description: 'Detailed description for event ${index + 1}. This event is scheduled for all students and faculty.',
       ),
     );
   }
@@ -44,80 +45,94 @@ class _EventsPageState extends State<EventsPage> {
     _eventsFuture = _provider.fetchEvents();
   }
 
+  Future<void> _refreshEvents() async {
+    setState(() {
+      _eventsFuture = _provider.fetchEvents();
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
-    final screenWidth = MediaQuery.of(context).size.width;
-
-    double responsiveFontSize(double baseSize) {
-      if (screenWidth > 1200) {
-        return baseSize * 1.2;
-      } else if (screenWidth > 600) {
-        return baseSize * 1.1;
-      }
-      return baseSize;
-    }
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
 
     return Scaffold(
-      backgroundColor: const Color(0xFF0D1B2A),
       appBar: AppBar(
-        title: Text(
-          'Events',
-          style: TextStyle(fontSize: responsiveFontSize(20), color: Colors.white),
-        ),
-        backgroundColor: const Color(0xFF0D1B2A),
-        elevation: 0,
-        iconTheme: const IconThemeData(color: Colors.white),
+        title: const Text('All Events'),
+        actions: [
+          IconButton(
+            onPressed: _refreshEvents,
+            icon: const Icon(Icons.refresh_rounded),
+          ),
+          const SizedBox(width: 8),
+        ],
       ),
-      body: FutureBuilder<List<Event>>(
-        future: _eventsFuture,
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
-          }
-          if (snapshot.hasError) {
-            return Center(child: Text('Error: ${snapshot.error}', style: const TextStyle(color: Colors.white70)));
-          }
-          if (!snapshot.hasData || snapshot.data!.isEmpty) {
-            return const Center(child: Text('No events found.', style: const TextStyle(color: Colors.white70)));
-          }
+      body: RefreshIndicator(
+        onRefresh: _refreshEvents,
+        child: FutureBuilder<List<Event>>(
+          future: _eventsFuture,
+          builder: (context, snapshot) {
+            if (snapshot.connectionState == ConnectionState.waiting) {
+              return const Center(child: CircularProgressIndicator());
+            }
+            if (snapshot.hasError) {
+              return Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(Icons.error_outline_rounded, size: 48, color: colorScheme.error),
+                    const SizedBox(height: 16),
+                    Text('Failed to load events', style: theme.textTheme.titleMedium),
+                    const SizedBox(height: 24),
+                    ElevatedButton(onPressed: _refreshEvents, child: const Text("Retry")),
+                  ],
+                ),
+              );
+            }
+            if (!snapshot.hasData || snapshot.data!.isEmpty) {
+              return _buildEmptyState(theme);
+            }
 
-          final events = snapshot.data!;
+            final events = snapshot.data!;
 
-          return LayoutBuilder(
-            builder: (context, constraints) {
-              if (constraints.maxWidth > 600) {
-                int crossAxisCount = constraints.maxWidth > 1200 ? 4 : (constraints.maxWidth > 900 ? 3 : 2);
-                return GridView.builder(
-                  padding: EdgeInsets.fromLTRB(screenWidth * 0.04, screenWidth * 0.04, screenWidth * 0.04, 50),
-                  itemCount: events.length,
-                  gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                    crossAxisCount: crossAxisCount,
-                    crossAxisSpacing: 16,
-                    mainAxisSpacing: 16,
-                    childAspectRatio: 1.0, // Adjusted for better content visibility
+            return SingleChildScrollView(
+              padding: context.pagePadding,
+              physics: const AlwaysScrollableScrollPhysics(),
+              child: Center(
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 1200),
+                  child: GridView.builder(
+                    shrinkWrap: true,
+                    physics: const NeverScrollableScrollPhysics(),
+                    itemCount: events.length,
+                    gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                      crossAxisCount: context.responsive(1, tablet: 2, desktop: 3),
+                      crossAxisSpacing: 16,
+                      mainAxisSpacing: 16,
+                      mainAxisExtent: 140,
+                    ),
+                    itemBuilder: (context, index) {
+                      return EventCard(event: events[index]);
+                    },
                   ),
-                  itemBuilder: (context, index) {
-                    return EventCard(
-                      event: events[index],
-                      isGridView: true,
-                    );
-                  },
-                );
-              } else {
-                return ListView.builder(
-                  padding: const EdgeInsets.fromLTRB(0, 8, 0, 50),
-                  itemCount: events.length,
-                  itemBuilder: (context, index) {
-                    return EventCard(
-                      event: events[index],
-                      isGridView: false,
-                    );
-                  },
-                );
-              }
-            },
-          );
-        },
+                ),
+              ),
+            );
+          },
+        ),
+      ),
+    );
+  }
+
+  Widget _buildEmptyState(ThemeData theme) {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(Icons.event_busy_outlined, size: 64, color: theme.hintColor.withOpacity(0.3)),
+          const SizedBox(height: 16),
+          const Text("No events found", style: TextStyle(fontWeight: FontWeight.bold)),
+        ],
       ),
     );
   }
@@ -125,90 +140,63 @@ class _EventsPageState extends State<EventsPage> {
 
 class EventCard extends StatelessWidget {
   final Event event;
-  final bool isGridView;
 
   const EventCard({
     super.key,
     required this.event,
-    this.isGridView = false,
   });
 
   @override
   Widget build(BuildContext context) {
-    final screenWidth = MediaQuery.of(context).size.width;
-    double responsiveFontSize(double baseSize) {
-      if (screenWidth > 1200) return baseSize * 1.2;
-      if (screenWidth > 600) return baseSize * 1.1;
-      return baseSize;
-    }
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
 
-    final cardContent = isGridView
-        ? Column(
+    return Card(
+      child: InkWell(
+        onTap: () {},
+        borderRadius: BorderRadius.circular(16),
+        child: Padding(
+          padding: const EdgeInsets.all(20),
+          child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              CircleAvatar(
-                radius: responsiveFontSize(22),
-                backgroundColor: const Color(0xFF0D1B2A),
-                child: Icon(Icons.event, color: Colors.white, size: responsiveFontSize(24)),
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: colorScheme.primary.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Icon(Icons.calendar_today_rounded, color: colorScheme.primary, size: 20),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      event.title,
+                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                ],
               ),
               const Spacer(),
               Text(
-                event.title,
-                style: TextStyle(
-                  color: Colors.white,
-                  fontWeight: FontWeight.bold,
-                  fontSize: responsiveFontSize(14),
-                ),
-                overflow: TextOverflow.ellipsis,
-              ),
-              const SizedBox(height: 4),
-              Text(
                 event.description,
-                style: TextStyle(
-                  color: Colors.white70,
-                  fontSize: responsiveFontSize(12),
-                ),
+                style: theme.textTheme.bodySmall?.copyWith(color: theme.hintColor, height: 1.4),
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
               ),
-              const Spacer(),
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  Text("Read More", style: TextStyle(color: colorScheme.primary, fontSize: 12, fontWeight: FontWeight.bold)),
+                  const SizedBox(width: 4),
+                  Icon(Icons.arrow_forward_rounded, color: colorScheme.primary, size: 14),
+                ],
+              ),
             ],
-          )
-        : ListTile(
-            leading: CircleAvatar(
-              backgroundColor: const Color(0xFF0D1B2A),
-              child: Icon(Icons.event, color: Colors.white, size: responsiveFontSize(22)),
-            ),
-            title: Text(
-              event.title,
-              style: TextStyle(
-                color: Colors.white,
-                fontWeight: FontWeight.bold,
-                fontSize: responsiveFontSize(16),
-              ),
-            ),
-            subtitle: Text(
-              event.description,
-              style: TextStyle(
-                color: Colors.white70,
-                fontSize: responsiveFontSize(14),
-              ),
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-            ),
-          );
-
-    return Card(
-      color: const Color(0xFF1B263B),
-      elevation: 2,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      margin: isGridView ? EdgeInsets.zero : EdgeInsets.symmetric(horizontal: screenWidth * 0.04, vertical: 8),
-      child: InkWell(
-        onTap: () {},
-        borderRadius: BorderRadius.circular(12),
-        child: Padding(
-          padding: EdgeInsets.all(isGridView ? 16 : 8),
-          child: cardContent,
+          ),
         ),
       ),
     );

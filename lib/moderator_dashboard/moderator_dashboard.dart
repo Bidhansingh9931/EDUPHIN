@@ -145,7 +145,7 @@ class _ModeratorDashboardPageState extends State<ModeratorDashboardPage> {
                     context,
                     MaterialPageRoute(
                         builder: (context) =>
-                            const ModeratorProfilePage())),
+                        const ModeratorProfilePage())),
                 child: ClipRRect(
                   borderRadius: BorderRadius.circular(40),
                   child: Image.asset(
@@ -231,21 +231,21 @@ class _ModeratorDashboardPageState extends State<ModeratorDashboardPage> {
                 children: [
                   Expanded(
                       child: _buildDropdown(selectedValue, (newValue) {
-                    setState(() {
-                      selectedValue = newValue;
-                    });
-                  }, ['Last 7 Days', 'Last 30 Days', 'Last 60 Days'])),
+                        setState(() {
+                          selectedValue = newValue;
+                        });
+                      }, ['Last 7 Days', 'Last 30 Days', 'Last 60 Days'])),
                   const SizedBox(width: 10),
                   Expanded(
                       child: _buildDropdown(selectedValue2, (newValue) {
-                    setState(() {
-                      selectedValue2 = newValue;
-                    });
-                  }, [
-                    'All Institutes',
-                    'Active Institutes',
-                    'Inactive Institutes'
-                  ])),
+                        setState(() {
+                          selectedValue2 = newValue;
+                        });
+                      }, [
+                        'All Institutes',
+                        'Active Institutes',
+                        'Inactive Institutes'
+                      ])),
                 ],
               );
             }
@@ -309,7 +309,7 @@ class _ModeratorDashboardPageState extends State<ModeratorDashboardPage> {
           Card(
             color: const Color(0xFF10202A),
             shape:
-                RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+            RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
             clipBehavior: Clip.antiAlias,
             child: InkWell(
               onTap: () => Navigator.push(
@@ -318,7 +318,7 @@ class _ModeratorDashboardPageState extends State<ModeratorDashboardPage> {
                       builder: (_) => const RoleDistributionPage())),
               child: Padding(
                 padding:
-                    const EdgeInsets.symmetric(horizontal: 14, vertical: 16),
+                const EdgeInsets.symmetric(horizontal: 14, vertical: 16),
                 child: Column(
                   children: [
                     SizedBox(
@@ -416,14 +416,14 @@ class _ModeratorDashboardPageState extends State<ModeratorDashboardPage> {
               const SizedBox(width: 12),
               Expanded(
                   child:
-                      StatCard(title: "Data Usage", value: data.dataUsage)),
+                  StatCard(title: "Data Usage", value: data.dataUsage)),
             ],
           ),
           const SizedBox(height: 12),
           Card(
             color: const Color(0xFF10202A),
             shape:
-                RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
             child: Padding(
               padding: const EdgeInsets.all(14),
               child: Row(
@@ -486,7 +486,7 @@ class _ModeratorDashboardPageState extends State<ModeratorDashboardPage> {
             return DropdownMenuItem<String>(
               value: value,
               child:
-                  Text(value, style: const TextStyle(color: Colors.white)),
+              Text(value, style: const TextStyle(color: Colors.white)),
             );
           }).toList(),
           onChanged: onChanged,
@@ -699,9 +699,9 @@ class LegendRow extends StatelessWidget {
 
   const LegendRow(
       {super.key,
-      required this.title,
-      required this.value,
-      required this.color});
+        required this.title,
+        required this.value,
+        required this.color});
 
   @override
   Widget build(BuildContext context) {

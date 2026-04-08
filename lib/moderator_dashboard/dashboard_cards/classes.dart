@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'package:eduphin/services/api_service.dart';
+import 'package:eduphin/services/responsive_helper.dart';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 
@@ -71,171 +72,125 @@ class _ClassesPageState extends State<ClassesPage> {
     _classesFuture = _provider.fetchClasses(widget.instituteId);
   }
 
+  Future<void> _refreshClasses() async {
+    setState(() {
+      _classesFuture = _provider.fetchClasses(widget.instituteId);
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
-    final screenWidth = MediaQuery.of(context).size.width;
-
-    double responsiveFontSize(double baseSize) {
-      if (screenWidth > 1200) {
-        return baseSize * 1.2;
-      } else if (screenWidth > 600) {
-        return baseSize * 1.1;
-      }
-      return baseSize;
-    }
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
 
     return Scaffold(
-      backgroundColor: const Color(0xFF0D1B2A),
       appBar: AppBar(
-        title: Text(
-          'Classes',
-          style: TextStyle(fontSize: responsiveFontSize(20), color: Colors.white),
-        ),
-        backgroundColor: const Color(0xFF0D1B2A),
-        elevation: 0,
-        iconTheme: const IconThemeData(color: Colors.white),
+        title: const Text('Institute Classes'),
+        actions: [
+          IconButton(
+            onPressed: _refreshClasses,
+            icon: const Icon(Icons.refresh_rounded),
+          ),
+          const SizedBox(width: 8),
+        ],
       ),
-      body: FutureBuilder<List<ClassInfo>>(
-        future: _classesFuture,
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
-          }
-          if (snapshot.hasError) {
-            return Center(child: Text('Error: ${snapshot.error}', style: const TextStyle(color: Colors.white70)));
-          }
-          if (!snapshot.hasData || snapshot.data!.isEmpty) {
-            return const Center(child: Text('No classes found.', style: const TextStyle(color: Colors.white70)));
-          }
+      body: RefreshIndicator(
+        onRefresh: _refreshClasses,
+        child: FutureBuilder<List<ClassInfo>>(
+          future: _classesFuture,
+          builder: (context, snapshot) {
+            if (snapshot.connectionState == ConnectionState.waiting) {
+              return const Center(child: CircularProgressIndicator());
+            }
+            if (snapshot.hasError) {
+              return Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(Icons.error_outline_rounded, size: 48, color: colorScheme.error),
+                    const SizedBox(height: 16),
+                    Text('Error: ${snapshot.error}', textAlign: TextAlign.center),
+                    const SizedBox(height: 24),
+                    ElevatedButton(onPressed: _refreshClasses, child: const Text("Retry")),
+                  ],
+                ),
+              );
+            }
+            if (!snapshot.hasData || snapshot.data!.isEmpty) {
+              return _buildEmptyState(theme);
+            }
 
-          final classes = snapshot.data!;
+            final classes = snapshot.data!;
 
-          return LayoutBuilder(
-            builder: (context, constraints) {
-              if (constraints.maxWidth > 600) {
-                int crossAxisCount = constraints.maxWidth > 1200 ? 4 : (constraints.maxWidth > 900 ? 3 : 2);
-                return GridView.builder(
-                  padding: EdgeInsets.fromLTRB(screenWidth * 0.04, screenWidth * 0.04, screenWidth * 0.04, 50),
-                  itemCount: classes.length,
-                  gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                    crossAxisCount: crossAxisCount,
-                    crossAxisSpacing: 16,
-                    mainAxisSpacing: 16,
-                    childAspectRatio: 2.5, // Aspect ratio for grid items
+            return SingleChildScrollView(
+              padding: context.pagePadding,
+              physics: const AlwaysScrollableScrollPhysics(),
+              child: Center(
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 1200),
+                  child: GridView.builder(
+                    shrinkWrap: true,
+                    physics: const NeverScrollableScrollPhysics(),
+                    itemCount: classes.length,
+                    gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                      crossAxisCount: context.responsive(1, tablet: 2, desktop: 3),
+                      crossAxisSpacing: 16,
+                      mainAxisSpacing: 16,
+                      mainAxisExtent: 100,
+                    ),
+                    itemBuilder: (context, index) {
+                      return _buildClassCard(context, classes[index]);
+                    },
                   ),
-                  itemBuilder: (context, index) {
-                    return ClassCard(
-                      classInfo: classes[index],
-                      isGridView: true,
-                    );
-                  },
-                );
-              } else {
-                return ListView.builder(
-                  padding: const EdgeInsets.fromLTRB(0, 8, 0, 50),
-                  itemCount: classes.length,
-                  itemBuilder: (context, index) {
-                    return ClassCard(
-                      classInfo: classes[index],
-                      isGridView: false,
-                    );
-                  },
-                );
-              }
-            },
-          );
-        },
+                ),
+              ),
+            );
+          },
+        ),
       ),
     );
   }
-}
 
-class ClassCard extends StatelessWidget {
-  final ClassInfo classInfo;
-  final bool isGridView;
-
-  const ClassCard({
-    super.key,
-    required this.classInfo,
-    this.isGridView = false,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final screenWidth = MediaQuery.of(context).size.width;
-    double responsiveFontSize(double baseSize) {
-      if (screenWidth > 1200) return baseSize * 1.2;
-      if (screenWidth > 600) return baseSize * 1.1;
-      return baseSize;
-    }
-
-    final cardContent = isGridView
-        ? Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              CircleAvatar(
-                radius: responsiveFontSize(22),
-                backgroundColor: const Color(0xFF0D1B2A),
-                child: Icon(Icons.book, color: Colors.white, size: responsiveFontSize(24)),
-              ),
-              const SizedBox(height: 12),
-              Text(
-                classInfo.name,
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  color: Colors.white,
-                  fontWeight: FontWeight.bold,
-                  fontSize: responsiveFontSize(14),
-                ),
-                overflow: TextOverflow.ellipsis,
-              ),
-              const SizedBox(height: 4),
-              Text(
-                classInfo.section,
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  color: Colors.white70,
-                  fontSize: responsiveFontSize(12),
-                ),
-                overflow: TextOverflow.ellipsis,
-              ),
-            ],
-          )
-        : ListTile(
-            leading: CircleAvatar(
-              backgroundColor: const Color(0xFF0D1B2A),
-              child: Icon(Icons.book, color: Colors.white, size: responsiveFontSize(22)),
-            ),
-            title: Text(
-              classInfo.name,
-              style: TextStyle(
-                color: Colors.white,
-                fontWeight: FontWeight.bold,
-                fontSize: responsiveFontSize(16),
-              ),
-            ),
-            subtitle: Text(
-              classInfo.section,
-              style: TextStyle(
-                color: Colors.white70,
-                fontSize: responsiveFontSize(14),
-              ),
-            ),
-            onTap: () {},
-          );
+  Widget _buildClassCard(BuildContext context, ClassInfo classInfo) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
 
     return Card(
-      color: const Color(0xFF1B263B),
-      elevation: 2,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      margin: isGridView ? EdgeInsets.zero : EdgeInsets.symmetric(horizontal: screenWidth * 0.04, vertical: 8),
-      child: InkWell(
-        onTap: () {},
-        borderRadius: BorderRadius.circular(12),
-        child: Padding(
-          padding: EdgeInsets.all(isGridView ? 16 : 8),
-          child: cardContent,
+      child: ListTile(
+        contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+        leading: Container(
+          padding: const EdgeInsets.all(10),
+          decoration: BoxDecoration(
+            color: colorScheme.primary.withOpacity(0.1),
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Icon(Icons.class_rounded, color: colorScheme.primary),
         ),
+        title: Text(
+          classInfo.name,
+          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+        ),
+        subtitle: Text(
+          "Section: ${classInfo.section}",
+          style: TextStyle(color: theme.hintColor),
+        ),
+        trailing: const Icon(Icons.arrow_forward_ios_rounded, size: 16),
+        onTap: () {},
+      ),
+    );
+  }
+
+  Widget _buildEmptyState(ThemeData theme) {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(Icons.class_outlined, size: 64, color: theme.hintColor.withOpacity(0.3)),
+          const SizedBox(height: 16),
+          const Text("No classes found", style: TextStyle(fontWeight: FontWeight.bold)),
+          const SizedBox(height: 8),
+          Text("There are no classes recorded for this institute.", style: TextStyle(color: theme.hintColor)),
+        ],
       ),
     );
   }

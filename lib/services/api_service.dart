@@ -145,6 +145,15 @@ class ApiService {
     }
   }
 
+  static Future<http.Response> patch(String endpoint, Map<String, dynamic> data) async {
+    try {
+      return await http.patch(_uri(endpoint), headers: await _getHeaders(), body: jsonEncode(data))
+          .timeout(const Duration(seconds: 15));
+    } catch (e) {
+      throw Exception('PATCH failed: $e');
+    }
+  }
+
   static Future<http.Response> delete(String endpoint) async {
     try {
       return await http.delete(_uri(endpoint), headers: await _getHeaders())
@@ -208,7 +217,7 @@ class ApiService {
     final response = await get('moderator/institutes');
     if (response.statusCode == 200) {
       final Map<String, dynamic> data = jsonDecode(response.body);
-      if (data['success'] == true) return (data['data'] as List).map((json) => moderator_institute.Institute.fromJson(json)).toList();
+      if (data['success'] == true || data['status'] == true) return (data['data'] as List).map((json) => moderator_institute.Institute.fromJson(json)).toList();
     }
     throw Exception('Failed to load institutes');
   }
@@ -217,7 +226,7 @@ class ApiService {
     final response = await get('moderator/institutes/$instituteId');
     if (response.statusCode == 200) {
       final Map<String, dynamic> data = jsonDecode(response.body);
-      if (data['success'] == true) return moderator_institute.Institute.fromJson(data['data']);
+      if (data['success'] == true || data['status'] == true) return moderator_institute.Institute.fromJson(data['data']);
     }
     throw Exception('Failed to load institute details');
   }
@@ -226,7 +235,7 @@ class ApiService {
     final response = await get('moderator/institutes/$instituteId/accounts');
     if (response.statusCode == 200) {
       final Map<String, dynamic> data = jsonDecode(response.body);
-      if (data['success'] == true && data['accounts'] != null) {
+      if ((data['success'] == true || data['status'] == true) && data['accounts'] != null) {
         return (data['accounts'] as List).map((json) => Employee.fromJson(json)).toList();
       }
     }
@@ -240,7 +249,7 @@ class ApiService {
     final responseBody = await response.stream.bytesToString();
     if (response.statusCode >= 200 && response.statusCode < 300) {
       final data = jsonDecode(responseBody);
-      if (data['success'] == true) return;
+      if (data['success'] == true || data['status'] == true) return;
     }
     throw Exception('Failed to add employee');
   }
@@ -376,7 +385,7 @@ class ApiService {
     final response = await get('librarian/dashboard');
     if (response.statusCode == 200) {
       final data = jsonDecode(response.body);
-      if (data['success'] == true) return librarian_model.LibrarianDashboardData.fromJson(data['data']);
+      if (data['success'] == true || data['status'] == true) return librarian_model.LibrarianDashboardData.fromJson(data['data']);
     }
     throw Exception('Failed to load librarian dashboard');
   }
@@ -385,7 +394,7 @@ class ApiService {
     final response = await get('librarian/exams');
     if (response.statusCode == 200) {
       final data = jsonDecode(response.body);
-      if (data['success'] == true) return (data['data'] as List).map((e) => librarian_model.ExamType.fromJson(e)).toList();
+      if (data['success'] == true || data['status'] == true) return (data['data'] as List).map((e) => librarian_model.ExamType.fromJson(e)).toList();
     }
     throw Exception('Failed to load exams');
   }
@@ -394,7 +403,7 @@ class ApiService {
     final response = await get('librarian/exams/schedule/$examId');
     if (response.statusCode == 200) {
       final data = jsonDecode(response.body);
-      if (data['success'] == true) return data['data'];
+      if (data['success'] == true || data['status'] == true) return data['data'];
     }
     throw Exception('Failed to load exam schedule');
   }
@@ -403,7 +412,7 @@ class ApiService {
     final response = await get('librarian/my-issued-books');
     if (response.statusCode == 200) {
       final data = jsonDecode(response.body);
-      if (data['success'] == true) return (data['data'] as List).map((e) => librarian_model.IssuedBook.fromJson(e)).toList();
+      if (data['success'] == true || data['status'] == true) return (data['data'] as List).map((e) => librarian_model.IssuedBook.fromJson(e)).toList();
     }
     throw Exception('Failed to load issued books');
   }
@@ -412,7 +421,7 @@ class ApiService {
     final response = await get('librarian/issued-books', filters);
     if (response.statusCode == 200) {
       final data = jsonDecode(response.body);
-      if (data['success'] == true) return (data['data'] as List).map((e) => librarian_model.IssuedBook.fromJson(e)).toList();
+      if (data['success'] == true || data['status'] == true) return (data['data'] as List).map((e) => librarian_model.IssuedBook.fromJson(e)).toList();
     }
     throw Exception('Failed to load issued books');
   }
@@ -431,7 +440,7 @@ class ApiService {
     final response = await get('librarian/issued-books/$issueId/logs');
     if (response.statusCode == 200) {
       final data = jsonDecode(response.body);
-      if (data['success'] == true) return data['data'];
+      if (data['success'] == true || data['status'] == true) return data['data'];
     }
     throw Exception('Failed to load logs');
   }
@@ -440,7 +449,7 @@ class ApiService {
     final response = await get('librarian/issued-books/create');
     if (response.statusCode == 200) {
       final data = jsonDecode(response.body);
-      if (data['success'] == true) return data['data'];
+      if (data['success'] == true || data['status'] == true) return data['data'];
     }
     throw Exception('Failed to load data');
   }
@@ -454,7 +463,7 @@ class ApiService {
     final response = await get('librarian/issued-books/$issueId/edit');
     if (response.statusCode == 200) {
       final data = jsonDecode(response.body);
-      if (data['success'] == true) return data['data'];
+      if (data['success'] == true || data['status'] == true) return data['data'];
     }
     throw Exception('Failed to load edit data');
   }
@@ -468,7 +477,7 @@ class ApiService {
     final response = await get('librarian/profile');
     if (response.statusCode == 200) {
       final data = jsonDecode(response.body);
-      if (data['success'] == true) return librarian_model.UserDetail.fromJson(data['data']);
+      if (data['success'] == true || data['status'] == true) return librarian_model.UserDetail.fromJson(data['data']);
     }
     throw Exception('Failed to load profile');
   }
@@ -483,7 +492,7 @@ class ApiService {
     final response = await get('librarian/salary');
     if (response.statusCode == 200) {
       final data = jsonDecode(response.body);
-      if (data['success'] == true) return data['data'];
+      if (data['success'] == true || data['status'] == true) return data['data'];
     }
     throw Exception('Failed to load salaries');
   }
@@ -492,7 +501,7 @@ class ApiService {
     final response = await get('librarian/salary/slip/$salaryId');
     if (response.statusCode == 200) {
       final data = jsonDecode(response.body);
-      if (data['success'] == true) return data['data'];
+      if (data['success'] == true || data['status'] == true) return data['data'];
     }
     throw Exception('Failed to load salary slip');
   }
@@ -526,7 +535,7 @@ class ApiService {
     final response = await get('librarian/events', query);
     if (response.statusCode == 200) {
       final data = jsonDecode(response.body);
-      if (data['success'] == true) return (data['data'] as List).map((e) => librarian_model.Event.fromJson(e)).toList();
+      if (data['success'] == true || data['status'] == true) return (data['data'] as List).map((e) => librarian_model.Event.fromJson(e)).toList();
     }
     throw Exception('Failed to load events');
   }
@@ -540,7 +549,7 @@ class ApiService {
     final response = await get('librarian/events/registered');
     if (response.statusCode == 200) {
       final data = jsonDecode(response.body);
-      if (data['success'] == true) return (data['data'] as List).map((e) => librarian_model.EventRegistration.fromJson(e)).toList();
+      if (data['success'] == true || data['status'] == true) return (data['data'] as List).map((e) => librarian_model.EventRegistration.fromJson(e)).toList();
     }
     throw Exception('Failed to load registered events');
   }
@@ -554,7 +563,7 @@ class ApiService {
     final response = await get('accountants/tickets/$id');
     if (response.statusCode == 200) {
       final data = jsonDecode(response.body);
-      if (data['success'] == true) return teacher_ticket_details.TicketDetails.fromJson(data['data']);
+      if (data['success'] == true || data['status'] == true) return teacher_ticket_details.TicketDetails.fromJson(data['data']);
     }
     throw Exception('Failed to load ticket details');
   }
@@ -575,7 +584,7 @@ class ApiService {
     final response = await get('accountants/tickets', query);
     if (response.statusCode == 200) {
       final data = jsonDecode(response.body);
-      if (data['success'] == true) return (data['data'] as List).map((j) => teacher_ticket.SupportTicket.fromJson(j)).toList();
+      if (data['success'] == true || data['status'] == true) return (data['data'] as List).map((j) => teacher_ticket.SupportTicket.fromJson(j)).toList();
     }
     throw Exception('Failed to load tickets');
   }
@@ -585,7 +594,7 @@ class ApiService {
     final response = await get('accountants/tickets/assigned', query);
     if (response.statusCode == 200) {
       final data = jsonDecode(response.body);
-      if (data['success'] == true) return (data['data'] as List).map((j) => teacher_ticket.SupportTicket.fromJson(j)).toList();
+      if (data['success'] == true || data['status'] == true) return (data['data'] as List).map((j) => teacher_ticket.SupportTicket.fromJson(j)).toList();
     }
     throw Exception('Failed to load assigned tickets');
   }
@@ -594,7 +603,7 @@ class ApiService {
     final response = await get('accountants/students/$studentId');
     if (response.statusCode == 200) {
       final data = jsonDecode(response.body);
-      if (data['success'] == true) return data['data'];
+      if (data['success'] == true || data['status'] == true) return data['data'];
     }
     throw Exception('Failed to load student fee details');
   }
@@ -623,7 +632,7 @@ class ApiService {
     final response = await get('accountants/my-salary');
     if (response.statusCode == 200) {
       final data = jsonDecode(response.body);
-      if (data['success'] == true) return data['data'];
+      if (data['success'] == true || data['status'] == true) return data['data'];
     }
     throw Exception('Failed to load salaries');
   }
@@ -632,7 +641,7 @@ class ApiService {
     final response = await get('accountants/account/$id');
     if (response.statusCode == 200) {
       final data = jsonDecode(response.body);
-      if (data['success'] == true) return data['data'];
+      if (data['success'] == true || data['status'] == true) return data['data'];
     }
     throw Exception('Failed to load employee salary');
   }
@@ -794,7 +803,7 @@ class ApiService {
     final response = await get('accountants/fees');
     if (response.statusCode == 200) {
       final data = jsonDecode(response.body);
-      if (data['success'] == true) return data['data'];
+      if (data['success'] == true || data['status'] == true) return data['data'];
     }
     throw Exception('Failed to load fees');
   }
@@ -808,7 +817,7 @@ class ApiService {
     final response = await get('accountants/fees/create');
     if (response.statusCode == 200) {
       final data = jsonDecode(response.body);
-      if (data['success'] == true) return data['data']['classes'];
+      if (data['success'] == true || data['status'] == true) return data['data']['classes'];
     }
     throw Exception('Failed to load classes');
   }
@@ -817,7 +826,7 @@ class ApiService {
     final response = await get('accountants/fees/edit/$feeId');
     if (response.statusCode == 200) {
       final data = jsonDecode(response.body);
-      if (data['success'] == true) return data['data'];
+      if (data['success'] == true || data['status'] == true) return data['data'];
     }
     throw Exception('Failed to load fee data');
   }
@@ -836,7 +845,7 @@ class ApiService {
     final response = await get('staff/dashboard');
     if (response.statusCode == 200) {
       final data = jsonDecode(response.body);
-      if (data['success'] == true) return staff_model.StaffDashboardData.fromJson(data['data']);
+      if (data['success'] == true || data['status'] == true) return staff_model.StaffDashboardData.fromJson(data['data']);
     }
     throw Exception('Failed to load staff dashboard');
   }
@@ -845,7 +854,7 @@ class ApiService {
     final response = await get('staff/profile');
     if (response.statusCode == 200) {
       final data = jsonDecode(response.body);
-      if (data['success'] == true) return staff_model.UserDetail.fromJson(data['data']);
+      if (data['success'] == true || data['status'] == true) return staff_model.UserDetail.fromJson(data['data']);
     }
     throw Exception('Failed to load staff profile');
   }
@@ -860,7 +869,7 @@ class ApiService {
     final response = await get('staff/virtual-id-card');
     if (response.statusCode == 200) {
       final data = jsonDecode(response.body);
-      if (data['success'] == true) return staff_model.StaffVirtualIdCardData.fromJson(data['data']);
+      if (data['success'] == true || data['status'] == true) return staff_model.StaffVirtualIdCardData.fromJson(data['data']);
     }
     throw Exception('Failed to load virtual ID card');
   }
@@ -869,7 +878,7 @@ class ApiService {
     final response = await get('staff/exams');
     if (response.statusCode == 200) {
       final data = jsonDecode(response.body);
-      if (data['success'] == true) return (data['data'] as List).map((e) => staff_model.Exam.fromJson(e)).toList();
+      if (data['success'] == true || data['status'] == true) return (data['data'] as List).map((e) => staff_model.Exam.fromJson(e)).toList();
     }
     throw Exception('Failed to load exams');
   }
@@ -878,7 +887,7 @@ class ApiService {
     final response = await get('staff/exams/schedule/$examId');
     if (response.statusCode == 200) {
       final data = jsonDecode(response.body);
-      if (data['success'] == true) return data['data'];
+      if (data['success'] == true || data['status'] == true) return data['data'];
     }
     throw Exception('Failed to load exam schedule');
   }
@@ -887,7 +896,7 @@ class ApiService {
     final response = await get('staff/salary');
     if (response.statusCode == 200) {
       final data = jsonDecode(response.body);
-      if (data['success'] == true) return staff_model.SalaryPageData.fromJson(data['data']);
+      if (data['success'] == true || data['status'] == true) return staff_model.SalaryPageData.fromJson(data['data']);
     }
     throw Exception('Failed to load salaries');
   }
@@ -896,7 +905,7 @@ class ApiService {
     final response = await get('staff/salary/$salaryId');
     if (response.statusCode == 200) {
       final data = jsonDecode(response.body);
-      if (data['success'] == true) return staff_model.StaffDashboardData.fromJson(data['data']);
+      if (data['success'] == true || data['status'] == true) return staff_model.StaffDashboardData.fromJson(data['data']);
     }
     throw Exception('Failed to load salary details');
   }
@@ -906,7 +915,7 @@ class ApiService {
     final response = await get('staff/tickets', query);
     if (response.statusCode == 200) {
       final data = jsonDecode(response.body);
-      if (data['success'] == true) return (data['data'] as List).map((j) => teacher_ticket.SupportTicket.fromJson(j)).toList();
+      if (data['success'] == true || data['status'] == true) return (data['data'] as List).map((j) => teacher_ticket.SupportTicket.fromJson(j)).toList();
     }
     throw Exception('Failed to load tickets');
   }
@@ -916,7 +925,7 @@ class ApiService {
     final response = await get('staff/tickets/assigned', query);
     if (response.statusCode == 200) {
       final data = jsonDecode(response.body);
-      if (data['success'] == true) return (data['data'] as List).map((j) => teacher_ticket.SupportTicket.fromJson(j)).toList();
+      if (data['success'] == true || data['status'] == true) return (data['data'] as List).map((j) => teacher_ticket.SupportTicket.fromJson(j)).toList();
     }
     throw Exception('Failed to load assigned tickets');
   }
@@ -935,7 +944,7 @@ class ApiService {
     final response = await get('staff/tickets/$ticketId/replies');
     if (response.statusCode == 200) {
       final data = jsonDecode(response.body);
-      if (data['success'] == true) return teacher_ticket_details.TicketDetails.fromJson(data['data']);
+      if (data['success'] == true || data['status'] == true) return teacher_ticket_details.TicketDetails.fromJson(data['data']);
     }
     throw Exception('Failed to load ticket details');
   }
@@ -943,7 +952,7 @@ class ApiService {
   static Future<void> replyStaffTicket(String ticketId, Map<String, String> fields, {File? attachment}) async {
     final files = attachment != null ? {'attachment': attachment} : null;
     final response = await postMultipart('staff/tickets/$ticketId/reply', fields, files: files);
-    if (response.statusCode != 200) throw Exception(jsonDecode(await response.stream.bytesToString())['message'] ?? 'Failed to reply');
+    if (response.statusCode != 200) throw Exception(jsonDecode(await response.stream.bytesToString())['message'] ?? 'Failed to update profile');
   }
 
   static Future<List<librarian_model.IssuedBook>> getStaffIssuedBooks(Map<String, String> filters) async {
@@ -951,7 +960,7 @@ class ApiService {
     final response = await get('staff/library/lending', query);
     if (response.statusCode == 200) {
       final data = jsonDecode(response.body);
-      if (data['success'] == true) return (data['data'] as List).map((e) => librarian_model.IssuedBook.fromJson(e)).toList();
+      if (data['success'] == true || data['status'] == true) return (data['data'] as List).map((e) => librarian_model.IssuedBook.fromJson(e)).toList();
     }
     throw Exception('Failed to load issued books');
   }
@@ -970,7 +979,7 @@ class ApiService {
     final response = await get('staff/events', query);
     if (response.statusCode == 200) {
       final data = jsonDecode(response.body);
-      if (data['success'] == true) return (data['data'] as List).map((e) => staff_model.Event.fromJson(e)).toList();
+      if (data['success'] == true || data['status'] == true) return (data['data'] as List).map((e) => staff_model.Event.fromJson(e)).toList();
     }
     throw Exception('Failed to load events');
   }
@@ -979,7 +988,7 @@ class ApiService {
     final response = await get('staff/events/registered');
     if (response.statusCode == 200) {
       final data = jsonDecode(response.body);
-      if (data['success'] == true) return (data['data'] as List).map((e) => staff_model.EventRegistration.fromJson(e)).toList();
+      if (data['success'] == true || data['status'] == true) return (data['data'] as List).map((e) => staff_model.EventRegistration.fromJson(e)).toList();
     }
     throw Exception('Failed to load registered events');
   }
@@ -998,7 +1007,7 @@ class ApiService {
     final response = await get('staff/fees');
     if (response.statusCode == 200) {
       final data = jsonDecode(response.body);
-      if (data['success'] == true) return (data['data'] as List).map((f) => staff_model.Fee.fromJson(f)).toList();
+      if (data['success'] == true || data['status'] == true) return (data['data'] as List).map((f) => staff_model.Fee.fromJson(f)).toList();
     }
     throw Exception('Failed to load fees');
   }
@@ -1007,7 +1016,7 @@ class ApiService {
     final response = await get('staff/student-fee/$studentId');
     if (response.statusCode == 200) {
       final data = jsonDecode(response.body);
-      if (data['success'] == true) return staff_model.StudentFeeDetail.fromJson(data['data']);
+      if (data['success'] == true || data['status'] == true) return staff_model.StudentFeeDetail.fromJson(data['data']);
     }
     throw Exception('Failed to load student fee detail');
   }
@@ -1067,7 +1076,7 @@ class ApiService {
     final response = await get('staff/salary/slip/$salaryId');
     if (response.statusCode == 200) {
       final data = jsonDecode(response.body);
-      if (data['success'] == true) return data['data'];
+      if (data['success'] == true || data['status'] == true) return data['data'];
     }
     throw Exception('Failed to load salary slip');
   }
@@ -1077,7 +1086,7 @@ class ApiService {
     final response = await get('accountants/dashboard');
     if (response.statusCode == 200) {
       final data = jsonDecode(response.body);
-      if (data['success'] == true) return accountant_model.AccountantDashboardData.fromJson(data['data']);
+      if (data['success'] == true || data['status'] == true) return accountant_model.AccountantDashboardData.fromJson(data['data']);
     }
     throw Exception('Failed to load accountant dashboard');
   }
@@ -1089,7 +1098,7 @@ class ApiService {
     final response = await get('accountants/events', query);
     if (response.statusCode == 200) {
       final data = jsonDecode(response.body);
-      if (data['success'] == true) return (data['data'] as List).map((e) => accountant_model.Event.fromJson(e)).toList();
+      if (data['success'] == true || data['status'] == true) return (data['data'] as List).map((e) => accountant_model.Event.fromJson(e)).toList();
     }
     throw Exception('Failed to load events');
   }
@@ -1101,7 +1110,7 @@ class ApiService {
     final response = await get('accountants/events/registered', query);
     if (response.statusCode == 200) {
       final data = jsonDecode(response.body);
-      if (data['success'] == true) return (data['data'] as List).map((e) => accountant_model.EventRegistration.fromJson(e)).toList();
+      if (data['success'] == true || data['status'] == true) return (data['data'] as List).map((e) => accountant_model.EventRegistration.fromJson(e)).toList();
     }
     throw Exception('Failed to load registered events');
   }
@@ -1120,7 +1129,7 @@ class ApiService {
     final response = await get('accountants/exams');
     if (response.statusCode == 200) {
       final data = jsonDecode(response.body);
-      if (data['success'] == true) return (data['data'] as List).map((e) => accountant_model.Exam.fromJson(e)).toList();
+      if (data['success'] == true || data['status'] == true) return (data['data'] as List).map((e) => accountant_model.Exam.fromJson(e)).toList();
     }
     throw Exception('Failed to load exams');
   }
@@ -1129,7 +1138,7 @@ class ApiService {
     final response = await get('accountants/profile');
     if (response.statusCode == 200) {
       final data = jsonDecode(response.body);
-      if (data['success'] == true) return accountant_model.UserDetail.fromJson(data['data']);
+      if (data['success'] == true || data['status'] == true) return accountant_model.UserDetail.fromJson(data['data']);
     }
     throw Exception('Failed to load profile');
   }
@@ -1144,7 +1153,7 @@ class ApiService {
     final response = await get('accountants/virtual-id-card');
     if (response.statusCode == 200) {
       final data = jsonDecode(response.body);
-      if (data['success'] == true) return accountant_model.UserDetail.fromJson(data['data']);
+      if (data['success'] == true || data['status'] == true) return accountant_model.UserDetail.fromJson(data['data']);
     }
     throw Exception('Failed to load virtual ID card');
   }
@@ -1371,7 +1380,7 @@ class ApiService {
     final response = await get('superadmin/institutes');
     if (response.statusCode == 200) {
       final Map<String, dynamic> data = jsonDecode(response.body);
-      if (data['success'] == true) return (data['data'] as List).map((json) => moderator_institute.Institute.fromJson(json)).toList();
+      if (data['status'] == true || data['success'] == true) return (data['data'] as List).map((json) => moderator_institute.Institute.fromJson(json)).toList();
     }
     throw Exception('Failed to load super admin institutes');
   }
@@ -1383,7 +1392,7 @@ class ApiService {
   }
 
   static Future<void> storeSuperAdminInstitute(Map<String, String> data, {File? logo}) async {
-    final response = await postMultipart('superadmin/institutes/store', data, files: logo != null ? {'logo': logo} : null);
+    final response = await postMultipart('superadmin/institutes', data, files: logo != null ? {'logo': logo} : null);
     if (response.statusCode != 200 && response.statusCode != 201) throw Exception('Failed to create institute');
   }
 
@@ -1393,23 +1402,23 @@ class ApiService {
   }
 
   static Future<List<dynamic>> getModerates() async {
-    final response = await get('superadmin/moderators');
+    final response = await get('superadmin/moderates');
     if (response.statusCode == 200) return jsonDecode(response.body)['data'];
     throw Exception('Failed to load super admin moderators');
   }
 
   static Future<void> storeModerate(Map<String, String> fields, {Map<String, File>? files}) async {
-    final response = await postMultipart('superadmin/moderators/store', fields, files: files);
+    final response = await postMultipart('superadmin/moderates', fields, files: files);
     if (response.statusCode != 200 && response.statusCode != 201) throw Exception('Failed to store moderator');
   }
 
   static Future<void> updateModerate(String id, Map<String, String> fields, {Map<String, File>? files}) async {
-    final response = await postMultipart('superadmin/moderators/update/$id', fields, files: files);
+    final response = await postMultipart('superadmin/moderates/$id', fields, files: files);
     if (response.statusCode != 200) throw Exception('Failed to update moderator');
   }
 
   static Future<void> deleteModerate(String id) async {
-    final response = await delete('superadmin/moderators/$id');
+    final response = await delete('superadmin/moderates/$id');
     if (response.statusCode != 200) throw Exception('Failed to delete moderator');
   }
 
@@ -1420,7 +1429,7 @@ class ApiService {
   }
 
   static Future<void> storeFaq(Map<String, dynamic> data) async {
-    final response = await post('superadmin/faqs/store', data);
+    final response = await post('superadmin/faqs', data);
     if (response.statusCode != 200) throw Exception('Failed to store FAQ');
   }
 
@@ -1430,7 +1439,7 @@ class ApiService {
   }
 
   static Future<void> deleteFaq(String id) async {
-    final response = await delete('superadmin/faqs/delete/$id');
+    final response = await delete('superadmin/faqs/$id');
     if (response.statusCode != 200) throw Exception('Failed to delete FAQ');
   }
 
@@ -1447,30 +1456,41 @@ class ApiService {
 
   static Future<void> storeOrUpdateTestimonial(Map<String, String> fields, {File? image}) async {
     final files = image != null ? {'image': image} : null;
-    final response = await postMultipart('superadmin/testimonials/store-update', fields, files: files);
+    final response = await postMultipart('superadmin/testimonials', fields, files: files);
     if (response.statusCode != 200) throw Exception('Failed to save testimonial');
   }
 
   static Future<Map<String, dynamic>> getPrivacyPolicy() async {
-    final response = await get('superadmin/policies/privacy-policy');
+    final response = await get('superadmin/privacy-policy');
     if (response.statusCode == 200) return jsonDecode(response.body)['data'];
     throw Exception('Failed to load privacy policy');
   }
 
   static Future<void> updatePrivacyPolicy(String content) async {
-    final response = await post('superadmin/policies/privacy-policy', {'content': content});
+    final response = await post('superadmin/privacy-policy', {'content': content});
     if (response.statusCode != 200) throw Exception('Failed to update privacy policy');
   }
 
   static Future<Map<String, dynamic>> getCancellationPolicy() async {
-    final response = await get('superadmin/policies/cancellation-policy');
+    final response = await get('superadmin/cancellation-policy');
     if (response.statusCode == 200) return jsonDecode(response.body)['data'];
     throw Exception('Failed to load cancellation policy');
   }
 
   static Future<void> updateCancellationPolicy(String content) async {
-    final response = await post('superadmin/policies/cancellation-policy', {'content': content});
+    final response = await post('superadmin/cancellation-policy', {'content': content});
     if (response.statusCode != 200) throw Exception('Failed to update cancellation policy');
+  }
+
+  static Future<Map<String, dynamic>> getTermsOfService() async {
+    final response = await get('superadmin/terms-of-service');
+    if (response.statusCode == 200) return jsonDecode(response.body)['data'];
+    throw Exception('Failed to load terms of service');
+  }
+
+  static Future<void> updateTermsOfService(String content) async {
+    final response = await post('superadmin/terms-of-service', {'content': content});
+    if (response.statusCode != 200) throw Exception('Failed to update terms of service');
   }
 
   static Future<List<dynamic>> getSuperAdminContacts() async {
@@ -1480,13 +1500,13 @@ class ApiService {
   }
 
   static Future<List<dynamic>> getAuditLogs() async {
-    final response = await get('superadmin/logs/audit');
+    final response = await get('superadmin/audit');
     if (response.statusCode == 200) return jsonDecode(response.body)['data'];
     throw Exception('Failed to load audit logs');
   }
 
   static Future<List<dynamic>> getDatabaseLogs() async {
-    final response = await get('superadmin/logs/database');
+    final response = await get('superadmin/audit/database');
     if (response.statusCode == 200) return jsonDecode(response.body)['data'];
     throw Exception('Failed to load database logs');
   }

@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:eduphin/services/api_service.dart';
 import 'package:eduphin/moderator_dashboard/dashboard_cards/active_institutes/add_institute.dart';
 import 'package:eduphin/moderator_dashboard/dashboard_cards/active_institutes/view_institute_page.dart';
+import 'package:eduphin/services/responsive_helper.dart';
 import 'package:flutter/material.dart';
 
 import '../../institute/institute_model.dart';
@@ -37,6 +38,7 @@ class _InstitutesPageState extends State<InstitutesPage> {
   }
 
   Future<void> _fetchData() async {
+    if (!mounted) return;
     setState(() {
       _isLoading = true;
       _error = null;
@@ -95,152 +97,112 @@ class _InstitutesPageState extends State<InstitutesPage> {
 
   @override
   Widget build(BuildContext context) {
-    final screenWidth = MediaQuery.of(context).size.width;
-
-    double responsiveFontSize(double baseSize) {
-      if (screenWidth > 1200) return baseSize * 1.2;
-      if (screenWidth > 600) return baseSize * 1.1;
-      return baseSize;
-    }
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
 
     return Scaffold(
-      backgroundColor: const Color(0xFF0D1B2A),
-      body: SafeArea(
+      appBar: AppBar(
+        title: const Text("Active Institutes"),
+        actions: [
+          IconButton(
+            onPressed: _fetchData,
+            icon: const Icon(Icons.refresh_rounded),
+          ),
+          const SizedBox(width: 8),
+        ],
+      ),
+      body: RefreshIndicator(
+        onRefresh: _fetchData,
         child: Column(
           children: [
             Padding(
-              padding: EdgeInsets.all(screenWidth * 0.04),
-              child: Row(
-                children: [
-                  GestureDetector(
-                    onTap: () => Navigator.pop(context),
-                    child: const Icon(Icons.arrow_back, color: Colors.white),
-                  ),
-                  const SizedBox(width: 12),
-                  Text(
-                    "Active Institutes",
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: responsiveFontSize(20),
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            Padding(
-              padding: EdgeInsets.symmetric(horizontal: screenWidth * 0.04),
+              padding: context.pagePadding.copyWith(bottom: 0),
               child: Row(
                 children: [
                   Expanded(
-                    child: Container(
-                      height: 50,
-                      padding: const EdgeInsets.symmetric(horizontal: 16),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF1B263B),
-                        borderRadius: BorderRadius.circular(30),
+                    child: TextField(
+                      controller: _searchController,
+                      decoration: const InputDecoration(
+                        hintText: "Search by name or code...",
+                        prefixIcon: Icon(Icons.search_rounded),
                       ),
-                      child: Row(
-                        children: [
-                          const Icon(Icons.search, color: Colors.white54),
-                          const SizedBox(width: 10),
-                          Expanded(
-                            child: TextField(
-                              controller: _searchController,
-                              style: TextStyle(
-                                  color: Colors.white,
-                                  fontSize: responsiveFontSize(14)),
-                              decoration: InputDecoration(
-                                border: InputBorder.none,
-                                hintText: "Search by name or code...",
-                                hintStyle: TextStyle(
-                                    color: Colors.white54,
-                                    fontSize: responsiveFontSize(14)),
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),                  ),
-                  const SizedBox(width: 10),
-                  GestureDetector(
-                    onTap: _navigateAndAdd,
-                    child: Container(
-                      width: 50,
-                      height: 50,
-                      decoration: const BoxDecoration(
-                        color: const Color(0xFF1B263B),
-                        shape: BoxShape.circle,
-                      ),
-                      child: const Icon(Icons.add, color: Colors.white),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  IconButton.filled(
+                    onPressed: _navigateAndAdd,
+                    icon: const Icon(Icons.add_rounded),
+                    style: IconButton.styleFrom(
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      padding: const EdgeInsets.all(12),
                     ),
                   ),
                 ],
               ),
             ),
-            const SizedBox(height: 15),
+            const SizedBox(height: 16),
             Expanded(
               child: _isLoading
                   ? const Center(child: CircularProgressIndicator())
                   : _error != null
-                      ? Center(
-                          child: Padding(
-                            padding: const EdgeInsets.all(16.0),
-                            child: Text(
-                              "Error: $_error",
-                              textAlign: TextAlign.center,
-                              style: TextStyle(
-                                  color: Colors.red.shade300,
-                                  fontSize: responsiveFontSize(14)),
-                            ),
-                          ),
-                        )
+                      ? _buildErrorState(theme)
                       : _filteredInstitutes.isEmpty
-                          ? Center(
-                              child: Text(
-                              "No institutes found.",
-                              style: TextStyle(
-                                  color: Colors.white54,
-                                  fontSize: responsiveFontSize(14)),
-                            ))
-                          : LayoutBuilder(builder: (context, constraints) {
-                              if (constraints.maxWidth > 600) {
-                                int crossAxisCount = constraints.maxWidth > 1200
-                                    ? 4
-                                    : (constraints.maxWidth > 900 ? 3 : 2);
-                                return GridView.builder(
-                                  padding: EdgeInsets.all(screenWidth * 0.04),
-                                  itemCount: _filteredInstitutes.length,
-                                  gridDelegate:
-                                      SliverGridDelegateWithFixedCrossAxisCount(
-                                    crossAxisCount: crossAxisCount,
-                                    crossAxisSpacing: 16,
-                                    mainAxisSpacing: 16,
-                                    childAspectRatio: 2.4,                                  ),
-                                  itemBuilder: (context, index) {
-                                    return InstituteCard(
-                                      _filteredInstitutes[index],
-                                      isGridView: true,
-                                    );
-                                  },
-                                );
-                              } else {
-                                return ListView.builder(
-                                  padding: EdgeInsets.symmetric(
-                                      horizontal: screenWidth * 0.04),
-                                  itemCount: _filteredInstitutes.length,
-                                  itemBuilder: (context, index) {
-                                    return InstituteCard(
-                                      _filteredInstitutes[index],
-                                      isGridView: false,
-                                    );
-                                  },
-                                );
-                              }
-                            }),
+                          ? _buildEmptyState(theme)
+                          : SingleChildScrollView(
+                              padding: context.pagePadding,
+                              physics: const AlwaysScrollableScrollPhysics(),
+                              child: Center(
+                                child: ConstrainedBox(
+                                  constraints: const BoxConstraints(maxWidth: 1200),
+                                  child: GridView.builder(
+                                    shrinkWrap: true,
+                                    physics: const NeverScrollableScrollPhysics(),
+                                    itemCount: _filteredInstitutes.length,
+                                    gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                                      crossAxisCount: context.responsive(1, tablet: 2, desktop: 3),
+                                      crossAxisSpacing: 16,
+                                      mainAxisSpacing: 16,
+                                      mainAxisExtent: 210,
+                                    ),
+                                    itemBuilder: (context, index) {
+                                      return InstituteCard(data: _filteredInstitutes[index]);
+                                    },
+                                  ),
+                                ),
+                              ),
+                            ),
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildErrorState(ThemeData theme) {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(Icons.cloud_off_rounded, size: 64, color: theme.colorScheme.error.withOpacity(0.5)),
+          const SizedBox(height: 16),
+          Text("Connection Error", style: theme.textTheme.titleMedium),
+          Text(_error ?? "Unknown error", style: TextStyle(color: theme.hintColor), textAlign: TextAlign.center),
+          const SizedBox(height: 24),
+          ElevatedButton(onPressed: _fetchData, child: const Text("Retry")),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildEmptyState(ThemeData theme) {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(Icons.business_rounded, size: 64, color: theme.hintColor.withOpacity(0.3)),
+          const SizedBox(height: 16),
+          const Text("No institutes found", style: TextStyle(fontWeight: FontWeight.bold)),
+        ],
       ),
     );
   }
@@ -248,191 +210,114 @@ class _InstitutesPageState extends State<InstitutesPage> {
 
 class InstituteCard extends StatelessWidget {
   final Institute data;
-  final bool isGridView;
 
-  const InstituteCard(this.data, {super.key, this.isGridView = false});
+  const InstituteCard({super.key, required this.data});
   
   Color _getStatusColor(String status) {
     switch (status.toLowerCase()) {
-      case 'active':
-        return Colors.green.shade600;
-      case 'inactive':
-        return Colors.red.shade600;
-      case 'pending':
-        return Colors.orange.shade600;
-      default:
-        return Colors.grey.shade600;
+      case 'active': return Colors.greenAccent[400]!;
+      case 'inactive': return Colors.redAccent[200]!;
+      case 'pending': return Colors.orangeAccent[200]!;
+      default: return Colors.blueGrey;
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    final screenWidth = MediaQuery.of(context).size.width;
-    double responsiveFontSize(double baseSize) {
-      if (screenWidth > 1200) return baseSize * 1.2;
-      if (screenWidth > 600) return baseSize * 1.1;
-      return baseSize;
-    }
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
 
-    return Container(
-      margin: isGridView ? EdgeInsets.zero : const EdgeInsets.only(bottom: 16),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: const Color(0xFF1B263B),
-        borderRadius: BorderRadius.circular(16),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisAlignment:
-            isGridView ? MainAxisAlignment.spaceBetween : MainAxisAlignment.start,
-        children: [
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: const Color(0xFF0E86D4),
-                  borderRadius: BorderRadius.circular(12),
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: colorScheme.primary.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Icon(Icons.school_rounded, color: colorScheme.primary, size: 24),
                 ),
-                child: Icon(Icons.school,
-                    color: Colors.white, size: responsiveFontSize(26)),
-              ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      data.name,
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: responsiveFontSize(16),
-                        fontWeight: FontWeight.bold,
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        data.name,
+                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                       ),
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      "Code: ${data.code}",
-                      style: TextStyle(
-                          color: Colors.white54,
-                          fontSize: responsiveFontSize(13)),
-                    ),
-                  ],
+                      Text(
+                        "Code: ${data.code}",
+                        style: TextStyle(color: theme.hintColor, fontSize: 12),
+                      ),
+                    ],
+                  ),
                 ),
-              ),
-            ],
-          ),
-          SizedBox(height: isGridView ? 12 : 16),
-          Row(
-            children: [
-              Text(
-                "Status: ",
-                style: TextStyle(
-                    color: Colors.white70, fontSize: responsiveFontSize(13)),
-              ),
-              Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                decoration: BoxDecoration(
-                  color: _getStatusColor(data.status),
-                  borderRadius: BorderRadius.circular(8),
+              ],
+            ),
+            const Spacer(),
+            Row(
+              children: [
+                Container(
+                  width: 8,
+                  height: 8,
+                  decoration: BoxDecoration(shape: BoxShape.circle, color: _getStatusColor(data.status)),
                 ),
-                child: Text(
+                const SizedBox(width: 8),
+                Text(
                   data.status.toUpperCase(),
-                  style: TextStyle(
-                      color: Colors.white,
-                      fontWeight: FontWeight.bold,
-                      fontSize: responsiveFontSize(11)),
+                  style: TextStyle(color: _getStatusColor(data.status), fontWeight: FontWeight.bold, fontSize: 11, letterSpacing: 1.1),
                 ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 16),
-          Row(
-            children: [
-              Expanded(
-                child: ActionButton(
-                  icon: Icons.visibility_outlined,
-                  label: "View",
-                  onTap: () {
-                    Navigator.push(
+              ],
+            ),
+            const SizedBox(height: 16),
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton(
+                    onPressed: () {
+                      Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                              builder: (_) => ViewInstitutePage(instituteId: data.id.toString())));
+                    },
+                    style: OutlinedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                    ),
+                    child: const Text("View Info", style: TextStyle(fontSize: 12)),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: ElevatedButton(
+                    onPressed: () {
+                      Navigator.push(
                         context,
                         MaterialPageRoute(
-                            builder: (_) =>
-                                ViewInstitutePage(instituteId: data.id.toString())));
-                  },
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: ActionButton(
-                  icon: Icons.settings_outlined,
-                  label: "Manage",
-                  onTap: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => ManageInstitute(
-                          instituteId: data.id.toString(),
-                          instituteName: data.name,
+                          builder: (_) => ManageInstitute(
+                            instituteId: data.id.toString(),
+                            instituteName: data.name,
+                          ),
                         ),
-                      ),
-                    );
-                  },
+                      );
+                    },
+                    style: ElevatedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                    ),
+                    child: const Text("Manage", style: TextStyle(fontSize: 12)),
+                  ),
                 ),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class ActionButton extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  final VoidCallback? onTap;
-
-  const ActionButton({
-    super.key,
-    required this.icon,
-    required this.label,
-    this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final screenWidth = MediaQuery.of(context).size.width;
-    double responsiveFontSize(double baseSize) {
-      if (screenWidth > 1200) return baseSize * 1.2;
-      if (screenWidth > 600) return baseSize * 1.1;
-      return baseSize;
-    }
-
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 10),
-        decoration: BoxDecoration(
-          color: const Color(0xFF0D1B2A),
-          borderRadius: BorderRadius.circular(10),
-        ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(icon, color: Colors.white, size: responsiveFontSize(16)),
-            const SizedBox(width: 8),
-            Text(
-              label,
-              style: TextStyle(
-                color: Colors.white,
-                fontWeight: FontWeight.w600,
-                fontSize: responsiveFontSize(13),
-              ),
+              ],
             ),
           ],
         ),

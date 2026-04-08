@@ -18,7 +18,7 @@ class AllReviewProvider {
         name: 'John Smith',
         designation: 'Parent, Grade 10',
         reviewText: 'Excellent platform, very easy to use and navigate. Highly recommended!',
-        avatarAsset: 'assets/images/men_image.png',
+        avatarAsset: 'assets/images/man_image.png',
       ),
        ReviewDetail(
         name: 'Jane Doe',
@@ -30,7 +30,7 @@ class AllReviewProvider {
         name: 'John Smith',
         designation: 'Parent, Grade 10',
         reviewText: 'Excellent platform, very easy to use and navigate. Highly recommended!',
-        avatarAsset: 'assets/images/men_image.png',
+        avatarAsset: 'assets/images/man_image.png',
       ),
        ReviewDetail(
         name: 'Jane Doe',
@@ -42,7 +42,7 @@ class AllReviewProvider {
         name: 'John Smith',
         designation: 'Parent, Grade 10',
         reviewText: 'Excellent platform, very easy to use and navigate. Highly recommended!',
-        avatarAsset: 'assets/images/men_image.png',
+        avatarAsset: 'assets/images/man_image.png',
       ),
     ];
   }

@@ -1,8 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
-import 'package:eduphin/manager_dashboard/manager_dashboard.dart';
 import 'package:eduphin/services/api_service.dart';
-import 'package:file_picker/file_picker.dart';
+import 'package:eduphin/services/responsive_helper.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
@@ -18,13 +17,12 @@ class _AddLibrarianPageState extends State<AddLibrarianPage> {
   final _formKey = GlobalKey<FormState>();
   bool _isLoading = false;
 
-  // Controllers
   final _fullNameController = TextEditingController();
   final _emailController = TextEditingController();
-  final _newPasswordController = TextEditingController();
+  final _passwordController = TextEditingController();
   final _aadharController = TextEditingController();
-  final _phoneNumberController = TextEditingController();
-  final _alternateNumberController = TextEditingController();
+  final _phoneController = TextEditingController();
+  final _altPhoneController = TextEditingController();
   final _addressController = TextEditingController();
   final _cityController = TextEditingController();
   final _stateController = TextEditingController();
@@ -33,104 +31,58 @@ class _AddLibrarianPageState extends State<AddLibrarianPage> {
   final _experienceController = TextEditingController();
   final _referenceController = TextEditingController();
   final _qualificationController = TextEditingController();
-  final _matriculationMarksController = TextEditingController();
-  final _intermediateMarksController = TextEditingController();
-  final _bankAccountNumberController = TextEditingController();
-  final _ifscCodeController = TextEditingController();
+  final _matricMarksController = TextEditingController();
+  final _interMarksController = TextEditingController();
+  final _bankAccController = TextEditingController();
+  final _ifscController = TextEditingController();
   final _bankNameController = TextEditingController();
   final _branchController = TextEditingController();
-  final _emergencyContactNameController = TextEditingController();
-  final _emergencyContactNumberController = TextEditingController();
+  final _emergencyNameController = TextEditingController();
+  final _emergencyPhoneController = TextEditingController();
 
-  // State variables
   String? _gender;
-  DateTime? _dateOfBirth;
-  String? _relationshipStatus;
+  DateTime? _dob;
+  String? _maritalStatus;
   String? _employmentType;
   DateTime? _joiningDate;
   String? _status;
   File? _profileImage;
-  PlatformFile? _matriculationMarksheet;
-  PlatformFile? _intermediateMarksheet;
-  PlatformFile? _resume;
 
   @override
   void dispose() {
-    // Dispose all controllers
-    _fullNameController.dispose();
-    _emailController.dispose();
-    _newPasswordController.dispose();
-    _aadharController.dispose();
-    _phoneNumberController.dispose();
-    _alternateNumberController.dispose();
-    _addressController.dispose();
-    _cityController.dispose();
-    _stateController.dispose();
-    _pinCodeController.dispose();
-    _positionController.dispose();
-    _experienceController.dispose();
-    _referenceController.dispose();
-    _qualificationController.dispose();
-    _matriculationMarksController.dispose();
-    _intermediateMarksController.dispose();
-    _bankAccountNumberController.dispose();
-    _ifscCodeController.dispose();
-    _bankNameController.dispose();
-    _branchController.dispose();
-    _emergencyContactNameController.dispose();
-    _emergencyContactNumberController.dispose();
+    final controllers = [
+      _fullNameController, _emailController, _passwordController, _aadharController,
+      _phoneController, _altPhoneController, _addressController, _cityController,
+      _stateController, _pinCodeController, _positionController, _experienceController,
+      _referenceController, _qualificationController, _matricMarksController,
+      _interMarksController, _bankAccController, _ifscController, _bankNameController,
+      _branchController, _emergencyNameController, _emergencyPhoneController
+    ];
+    for (var c in controllers) c.dispose();
     super.dispose();
   }
 
   Future<void> _pickImage() async {
     final picker = ImagePicker();
     final pickedFile = await picker.pickImage(source: ImageSource.gallery);
-    if (pickedFile != null) {
-      setState(() {
-        _profileImage = File(pickedFile.path);
-      });
-    }
+    if (pickedFile != null) setState(() => _profileImage = File(pickedFile.path));
   }
 
-  Future<void> _pickFile(Function(PlatformFile) onFilePicked) async {
+  void _submit() async {
+    if (!_formKey.currentState!.validate()) return;
+    setState(() => _isLoading = true);
     try {
-      FilePickerResult? result = await FilePicker.platform.pickFiles();
-      if (result != null) {
-        setState(() {
-          onFilePicked(result.files.single);
-        });
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error picking file: $e')),
-        );
-      }
-    }
-  }
-
-  void _addLibrarian() async {
-    if (!_formKey.currentState!.validate()) {
-      return;
-    }
-
-    setState(() {
-      _isLoading = true;
-    });
-
-    try {
-      final librarianData = {
+      final data = {
         'name': _fullNameController.text,
         'email': _emailController.text,
-        'password': _newPasswordController.text,
-        'role_id': '6', // Librarian Role ID
-        'institute_id': '1', // This should be dynamic
+        'password': _passwordController.text,
+        'role_id': '6', // Librarian
         'gender': _gender,
-        'date_of_birth': _dateOfBirth != null ? DateFormat('yyyy-MM-dd').format(_dateOfBirth!) : null,
-        'marital_status': _relationshipStatus,
+        'date_of_birth': _dob != null ? DateFormat('yyyy-MM-dd').format(_dob!) : null,
+        'marital_status': _maritalStatus,
         'aadhar_number': _aadharController.text,
-        'phone': _phoneNumberController.text,
-        'alternate_phone': _alternateNumberController.text,
+        'phone': _phoneController.text,
+        'alternate_phone': _altPhoneController.text,
         'address': _addressController.text,
         'city': _cityController.text,
         'state': _stateController.text,
@@ -142,411 +94,192 @@ class _AddLibrarianPageState extends State<AddLibrarianPage> {
         'status': _status,
         'reference': _referenceController.text,
         'qualification': _qualificationController.text,
-        'matric_marks': _matriculationMarksController.text,
-        'inter_marks': _intermediateMarksController.text,
-        'bank_account_number': _bankAccountNumberController.text,
-        'ifsc_code': _ifscCodeController.text,
+        'matric_marks': _matricMarksController.text,
+        'inter_marks': _interMarksController.text,
+        'bank_account_number': _bankAccController.text,
+        'ifsc_code': _ifscController.text,
         'bank_name': _bankNameController.text,
         'branch': _branchController.text,
-        'emergency_contact_name': _emergencyContactNameController.text,
-        'emergency_contact_phone': _emergencyContactNumberController.text,
+        'emergency_contact_name': _emergencyNameController.text,
+        'emergency_contact_phone': _emergencyPhoneController.text,
       };
 
-      if (_profileImage != null) {
-        final bytes = await _profileImage!.readAsBytes();
-        librarianData['photo'] = base64Encode(bytes);
-      }
-      if (_matriculationMarksheet != null) {
-        librarianData['matriculation_marksheet'] = base64Encode(_matriculationMarksheet!.bytes!);
-      }
-      if (_intermediateMarksheet != null) {
-        librarianData['intermediate_marksheet'] = base64Encode(_intermediateMarksheet!.bytes!);
-      }
-      if (_resume != null) {
-        librarianData['resume'] = base64Encode(_resume!.bytes!);
-      }
+      if (_profileImage != null) data['photo'] = base64Encode(await _profileImage!.readAsBytes());
 
-      final response = await ApiService.post('manager/users', librarianData);
+      final response = await ApiService.post('manager/users', data);
+      final resBody = jsonDecode(response.body);
 
-      if (!mounted) return;
-      final responseData = jsonDecode(response.body);
-
-      if (response.statusCode >= 200 && response.statusCode < 300 && responseData['status'] == true) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(responseData['message'] ?? 'Librarian added successfully!')),
-        );
+      if (response.statusCode == 200 && resBody['status'] == true) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Librarian added!')));
         Navigator.pop(context, true);
       } else {
-        throw Exception(responseData['message'] ?? 'Failed to add librarian.');
+        throw Exception(resBody['message'] ?? 'Failed to add librarian');
       }
     } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(e.toString().replaceFirst('Exception: ', '')), backgroundColor: Colors.red),
-        );
-      }
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString()), backgroundColor: Colors.red));
     } finally {
-      if (mounted) {
-        setState(() {
-          _isLoading = false;
-        });
-      }
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final screenSize = MediaQuery.of(context).size;
-
     return Scaffold(
-      floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
-      floatingActionButton: Padding(
-        padding: EdgeInsets.symmetric(horizontal: screenSize.width * 0.04),
-        child: SizedBox(
-          width: double.infinity,
-          child: FloatingActionButton.extended(
-            heroTag: 'addLibrarianBtn',
-            onPressed: _isLoading ? null : _addLibrarian,
-            label: _isLoading
-                ? const CircularProgressIndicator(valueColor: AlwaysStoppedAnimation<Color>(Colors.white))
-                : Text("Add Librarian", style: theme.textTheme.labelLarge?.copyWith(color: theme.colorScheme.onPrimary)),
-            icon: _isLoading ? null : Icon(Icons.add, color: theme.colorScheme.onPrimary),
+      appBar: AppBar(title: const Text("Add New Librarian")),
+      body: SafeArea(
+        child: SingleChildScrollView(
+          padding: context.pagePadding,
+          child: Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 1000),
+              child: Form(
+                key: _formKey,
+                child: Column(
+                  children: [
+                    _buildProfileHeader(),
+                    const SizedBox(height: 24),
+                    _buildFormGrid(),
+                    const SizedBox(height: 40),
+                    ElevatedButton(
+                      onPressed: _isLoading ? null : _submit,
+                      child: _isLoading ? const CircularProgressIndicator(color: Colors.white) : const Text("Save Librarian"),
+                    ),
+                    const SizedBox(height: 40),
+                  ],
+                ),
+              ),
+            ),
           ),
         ),
       ),
-      backgroundColor: theme.scaffoldBackgroundColor,
-      appBar: AppBar(
-        title: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+    );
+  }
+
+  Widget _buildProfileHeader() {
+    return Column(
+      children: [
+        GestureDetector(
+          onTap: _pickImage,
+          child: CircleAvatar(
+            radius: 50,
+            backgroundColor: Theme.of(context).colorScheme.primaryContainer,
+            backgroundImage: _profileImage != null ? FileImage(_profileImage!) : null,
+            child: _profileImage == null ? const Icon(Icons.add_a_photo, size: 30) : null,
+          ),
+        ),
+        const SizedBox(height: 8),
+        Text("Upload Profile Photo", style: Theme.of(context).textTheme.bodySmall),
+      ],
+    );
+  }
+
+  Widget _buildFormGrid() {
+    final crossAxisCount = context.responsive(1, tablet: 2);
+    return Column(
+      children: [
+        _SectionHeader(title: "Account Information"),
+        _ResponsiveGrid(
+          crossAxisCount: crossAxisCount,
           children: [
-            const Text('Add Librarian'),
-            InkWell(
-                onTap: () => Navigator.pushReplacement(
-                    context, MaterialPageRoute(builder: (context) => const ManagerDashboardPage())),
-                child: const Icon(Icons.home_sharp, size: 30)),
+            _buildTextField("Full Name", _fullNameController, Icons.person),
+            _buildTextField("Email Address", _emailController, Icons.email, keyboardType: TextInputType.emailAddress),
+            _buildTextField("Password", _passwordController, Icons.lock, isPassword: true),
+            _buildTextField("Aadhar Number", _aadharController, Icons.badge),
           ],
         ),
-      ),
-      body: Form(
-        key: _formKey,
-        child: Padding(
-          padding: EdgeInsets.fromLTRB(screenSize.width * 0.04, screenSize.width * 0.04, screenSize.width * 0.04, screenSize.height * 0.15),
-          child: LayoutBuilder(
-            builder: (context, constraints) {
-              return constraints.maxWidth > 800 ? _buildWideLayout() : _buildNarrowLayout();
-            },
-          ),
+        const SizedBox(height: 24),
+        _SectionHeader(title: "Personal Details"),
+        _ResponsiveGrid(
+          crossAxisCount: crossAxisCount,
+          children: [
+            _buildDropdown("Gender", _gender, ['Male', 'Female', 'Other'], (v) => setState(() => _gender = v)),
+            _buildDatePicker("Date of Birth", _dob, (d) => setState(() => _dob = d)),
+            _buildDropdown("Marital Status", _maritalStatus, ['Single', 'Married'], (v) => setState(() => _maritalStatus = v)),
+            _buildTextField("Phone Number", _phoneController, Icons.phone, keyboardType: TextInputType.phone),
+          ],
         ),
-      ),
-    );
-  }
-
-  Widget _buildNarrowLayout() {
-    final screenSize = MediaQuery.of(context).size;
-    return SingleChildScrollView(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          _AddLibrarianProfileBox(image: _profileImage, onPickImage: _pickImage),
-          SizedBox(height: screenSize.height * 0.02),
-          _buildSectionCard(title: "Account Details", children: _buildAccountDetailsSection()),
-          SizedBox(height: screenSize.height * 0.02),
-          _buildSectionCard(title: "Personal Details", children: _buildPersonalDetailsSection()),
-          SizedBox(height: screenSize.height * 0.02),
-          _buildSectionCard(title: "Contact Details", children: _buildContactDetailsSection()),
-          SizedBox(height: screenSize.height * 0.02),
-          _buildSectionCard(title: "Address Details", children: _buildAddressDetailsSection()),
-          SizedBox(height: screenSize.height * 0.02),
-          _buildSectionCard(title: "Professional Information", children: _buildProfessionalInformationSection()),
-          SizedBox(height: screenSize.height * 0.02),
-          _buildSectionCard(title: "Education & Documents", children: _buildEducationDetailsSection()),
-          SizedBox(height: screenSize.height * 0.02),
-          _buildSectionCard(title: "Banking Details", children: _buildBankingDetailsSection()),
-          SizedBox(height: screenSize.height * 0.02),
-          _buildSectionCard(title: "Emergency Contact Details", children: _buildEmergencyContactDetailsSection()),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildWideLayout() {
-    final screenSize = MediaQuery.of(context).size;
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Expanded(
-          child: SingleChildScrollView(
-            child: Padding(
-              padding: EdgeInsets.only(right: screenSize.width * 0.01),
-              child: _buildLeftColumn(),
-            ),
-          ),
-        ),
-        Expanded(
-          child: SingleChildScrollView(
-            child: Padding(
-              padding: EdgeInsets.only(left: screenSize.width * 0.01),
-              child: _buildRightColumn(),
-            ),
-          ),
+        const SizedBox(height: 24),
+        _SectionHeader(title: "Professional Details"),
+        _ResponsiveGrid(
+          crossAxisCount: crossAxisCount,
+          children: [
+            _buildTextField("Position", _positionController, Icons.work),
+            _buildDropdown("Employment Type", _employmentType, ['Full-time', 'Part-time', 'Contract'], (v) => setState(() => _employmentType = v)),
+            _buildDatePicker("Joining Date", _joiningDate, (d) => setState(() => _joiningDate = d)),
+            _buildTextField("Experience (Years)", _experienceController, Icons.history, keyboardType: TextInputType.number),
+          ],
         ),
       ],
     );
   }
 
-  Widget _buildLeftColumn() {
-    final screenSize = MediaQuery.of(context).size;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        _AddLibrarianProfileBox(image: _profileImage, onPickImage: _pickImage),
-        SizedBox(height: screenSize.height * 0.02),
-        _buildSectionCard(title: "Account Details", children: _buildAccountDetailsSection()),
-        SizedBox(height: screenSize.height * 0.02),
-        _buildSectionCard(title: "Personal Details", children: _buildPersonalDetailsSection()),
-        SizedBox(height: screenSize.height * 0.02),
-        _buildSectionCard(title: "Contact Details", children: _buildContactDetailsSection()),
-        SizedBox(height: screenSize.height * 0.02),
-        _buildSectionCard(title: "Address Details", children: _buildAddressDetailsSection()),
-      ],
+  Widget _buildTextField(String label, TextEditingController controller, IconData icon, {bool isPassword = false, TextInputType? keyboardType}) {
+    return TextFormField(
+      controller: controller,
+      obscureText: isPassword,
+      keyboardType: keyboardType,
+      decoration: InputDecoration(labelText: label, prefixIcon: Icon(icon, size: 20)),
+      validator: (v) => v!.isEmpty ? "Required" : null,
     );
   }
 
-  Widget _buildRightColumn() {
-    final screenSize = MediaQuery.of(context).size;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        _buildSectionCard(title: "Professional Information", children: _buildProfessionalInformationSection()),
-        SizedBox(height: screenSize.height * 0.02),
-        _buildSectionCard(title: "Education & Documents", children: _buildEducationDetailsSection()),
-        SizedBox(height: screenSize.height * 0.02),
-        _buildSectionCard(title: "Banking Details", children: _buildBankingDetailsSection()),
-        SizedBox(height: screenSize.height * 0.02),
-        _buildSectionCard(title: "Emergency Contact Details", children: _buildEmergencyContactDetailsSection()),
-      ],
+  Widget _buildDropdown(String label, String? value, List<String> items, ValueChanged<String?> onChanged) {
+    return DropdownButtonFormField<String>(
+      value: value,
+      decoration: InputDecoration(labelText: label, prefixIcon: const Icon(Icons.arrow_drop_down_circle_outlined, size: 20)),
+      items: items.map((i) => DropdownMenuItem(value: i, child: Text(i))).toList(),
+      onChanged: onChanged,
+      validator: (v) => v == null ? "Required" : null,
     );
   }
 
-  Widget _buildEditableInfoTile(String title, TextEditingController controller, {bool isPassword = false, TextInputType keyboardType = TextInputType.text}) {
-    final theme = Theme.of(context);
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8.0),
-      child: TextFormField(
-        controller: controller,
-        obscureText: isPassword,
-        keyboardType: keyboardType,
-        style: theme.textTheme.bodyLarge,
-        decoration: _inputDecoration(theme, title),
-        validator: (value) {
-          if (value == null || value.isEmpty) {
-            return '$title cannot be empty';
-          }
-          return null;
-        },
-      ),
-    );
-  }
-  
-  Widget _buildDropdownField<T>(String title, T? value, List<T> items, ValueChanged<T?> onChanged) {
-    final theme = Theme.of(context);
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8.0),
-      child: DropdownButtonFormField<T>(
-        value: value,
-        items: items.map((item) => DropdownMenuItem(value: item, child: Text(item.toString().split('.').last))).toList(),
-        onChanged: onChanged,
-        decoration: _inputDecoration(theme, title),
-        validator: (value) => value == null ? 'Please select a $title' : null,
-      ),
-    );
-  }
-
-  Widget _buildDatePickerField(String title, DateTime? selectedDate, ValueChanged<DateTime?> onDateChanged) {
-    final theme = Theme.of(context);
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8.0),
-      child: TextFormField(
-        readOnly: true,
-        controller: TextEditingController(
-          text: selectedDate == null ? '' : DateFormat('yyyy-MM-dd').format(selectedDate),
-        ),
-        decoration: _inputDecoration(theme, title).copyWith(suffixIcon: const Icon(Icons.calendar_today)),
-        onTap: () async {
-          DateTime? picked = await showDatePicker(
-            context: context,
-            initialDate: selectedDate ?? DateTime.now(),
-            firstDate: DateTime(1950),
-            lastDate: DateTime.now(),
-             builder: (context, child) {
-              return Theme(
-                data: theme.copyWith(
-                  colorScheme: theme.colorScheme.copyWith(
-                    primary: theme.primaryColor,
-                  ),
-                ),
-                child: child!,
-              );
-            },
-          );
-          if (picked != null) {
-            onDateChanged(picked);
-          }
-        },
-        validator: (value) => value == null || value.isEmpty ? 'Please select a date' : null,
-      ),
-    );
-  }
-
-  Widget _buildFilePickerTile(String title, PlatformFile? file, VoidCallback onPickFile) {
-    final theme = Theme.of(context);
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8.0),
-      child: TextFormField(
-        readOnly: true,
-        controller: TextEditingController(text: file?.name ?? 'No file selected'),
-        decoration: _inputDecoration(theme, title).copyWith(
-          suffixIcon: IconButton(
-            icon: const Icon(Icons.upload_file),
-            onPressed: onPickFile,
-          ),
-        ),
-        onTap: onPickFile,
-      ),
-    );
-  }
-
-  InputDecoration _inputDecoration(ThemeData theme, String label) {
-    final isDarkMode = theme.brightness == Brightness.dark;
-     return InputDecoration(
-          labelText: label,
-          labelStyle: theme.textTheme.bodyMedium?.copyWith(color: theme.hintColor),
-          filled: true,
-          fillColor: isDarkMode ? theme.scaffoldBackgroundColor : const Color(0xFFF3F3F3),
-          contentPadding: const EdgeInsets.symmetric(vertical: 16.0, horizontal: 12.0),
-          border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide.none),
-          enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide.none),
-          focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide(color: theme.primaryColor, width: 1.5)),
+  Widget _buildDatePicker(String label, DateTime? selectedDate, ValueChanged<DateTime?> onChanged) {
+    return TextFormField(
+      readOnly: true,
+      onTap: () async {
+        final date = await showDatePicker(
+          context: context,
+          initialDate: selectedDate ?? DateTime.now(),
+          firstDate: DateTime(1900),
+          lastDate: DateTime.now().add(const Duration(days: 365)),
         );
-  }
-
-  Widget _buildSectionCard({required String title, required List<Widget> children}) {
-    final theme = Theme.of(context);
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(color: theme.cardColor, borderRadius: BorderRadius.circular(12)),
-      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(title, style: theme.textTheme.titleLarge), const Divider(height: 24), ...children]),
+        onChanged(date);
+      },
+      decoration: InputDecoration(
+        labelText: label,
+        prefixIcon: const Icon(Icons.calendar_today, size: 20),
+        hintText: selectedDate == null ? "Select Date" : DateFormat('yyyy-MM-dd').format(selectedDate),
+      ),
     );
-  }
-
-  // --- SECTION BUILDERS ---
-
-   List<Widget> _buildAccountDetailsSection() {
-    return [
-      _buildEditableInfoTile("Full Name", _fullNameController),
-      _buildEditableInfoTile("Email", _emailController, keyboardType: TextInputType.emailAddress),
-      _buildEditableInfoTile("New Password", _newPasswordController, isPassword: true),
-    ];
-  }
-
-  List<Widget> _buildPersonalDetailsSection() {
-    return [
-      _buildEditableInfoTile("Aadhaar Number", _aadharController),
-      _buildDropdownField("Gender", _gender, ['Male', 'Female', 'Other'], (val) => setState(() => _gender = val)),
-      _buildDatePickerField("Date of Birth", _dateOfBirth, (val) => setState(() => _dateOfBirth = val)),
-      _buildDropdownField("Relationship Status", _relationshipStatus, ['Single', 'Married'], (val) => setState(() => _relationshipStatus = val)),
-    ];
-  }
-
-  List<Widget> _buildContactDetailsSection() {
-    return [
-      _buildEditableInfoTile("Phone Number", _phoneNumberController, keyboardType: TextInputType.phone),
-      _buildEditableInfoTile("Alternate Number", _alternateNumberController, keyboardType: TextInputType.phone),
-    ];
-  }
-
-  List<Widget> _buildAddressDetailsSection() {
-    return [
-      _buildEditableInfoTile("Address", _addressController),
-      _buildEditableInfoTile("City", _cityController),
-      _buildEditableInfoTile("State", _stateController),
-      _buildEditableInfoTile("Pin code", _pinCodeController, keyboardType: TextInputType.number),
-    ];
-  }
-
-  List<Widget> _buildProfessionalInformationSection() {
-    return [
-      _buildEditableInfoTile("Position", _positionController),
-      _buildDropdownField("Employment Type", _employmentType, ['full-time', 'part-time', 'internship', 'contract-based', 'other'], (val) => setState(() => _employmentType = val)),
-      _buildDatePickerField("Joining Date", _joiningDate, (val) => setState(() => _joiningDate = val)),
-      _buildEditableInfoTile("Experience (Years)", _experienceController, keyboardType: TextInputType.number),
-      _buildDropdownField("Status", _status, ['live', 'expired'], (val) => setState(() => _status = val)),
-      _buildEditableInfoTile("Reference", _referenceController),
-    ];
-  }
-
-  List<Widget> _buildEducationDetailsSection() {
-    return [
-      _buildEditableInfoTile("Qualification", _qualificationController),
-      _buildEditableInfoTile("Matriculation Marks (%)", _matriculationMarksController, keyboardType: TextInputType.number),
-      _buildEditableInfoTile("Intermediate Marks (%)", _intermediateMarksController, keyboardType: TextInputType.number),
-      _buildFilePickerTile("Matriculation Marksheet", _matriculationMarksheet, () => _pickFile((file) => _matriculationMarksheet = file)),
-      _buildFilePickerTile("Intermediate Marksheet", _intermediateMarksheet, () => _pickFile((file) => _intermediateMarksheet = file)),
-      _buildFilePickerTile("Resume", _resume, () => _pickFile((file) => _resume = file)),
-    ];
-  }
-
-  List<Widget> _buildBankingDetailsSection() {
-    return [
-      _buildEditableInfoTile("Bank Account Number", _bankAccountNumberController, keyboardType: TextInputType.number),
-      _buildEditableInfoTile("IFSC Code", _ifscCodeController),
-      _buildEditableInfoTile("Bank Name", _bankNameController),
-      _buildEditableInfoTile("Branch", _branchController),
-    ];
-  }
-
-  List<Widget> _buildEmergencyContactDetailsSection() {
-    return [
-      _buildEditableInfoTile("Emergency Contact Name", _emergencyContactNameController),
-      _buildEditableInfoTile("Emergency Contact Number", _emergencyContactNumberController, keyboardType: TextInputType.phone),
-    ];
   }
 }
 
-class _AddLibrarianProfileBox extends StatelessWidget {
-  final File? image;
-  final VoidCallback onPickImage;
-
-  const _AddLibrarianProfileBox({this.image, required this.onPickImage});
-
+class _SectionHeader extends StatelessWidget {
+  final String title;
+  const _SectionHeader({required this.title});
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final screenSize = MediaQuery.of(context).size;
-    return Center(
-      child: Column(
-        children: [
-          CircleAvatar(
-            radius: screenSize.width * 0.15,
-            backgroundColor: theme.colorScheme.surface,
-            backgroundImage: image != null ? FileImage(image!) : null,
-            child: image == null
-                ? Icon(
-                    Icons.person_add_alt_1_rounded,
-                    size: screenSize.width * 0.15,
-                    color: theme.colorScheme.onSurface.withAlpha(128),
-                  )
-                : null,
-          ),
-          SizedBox(height: screenSize.height * 0.01),
-          TextButton.icon(
-            onPressed: onPickImage,
-            icon: Icon(Icons.camera_alt, color: theme.colorScheme.primary),
-            label: Text("Upload Photo", style: TextStyle(color: theme.colorScheme.primary)),
-          )
-        ],
-      ),
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 16),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Text(title, style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold, color: Theme.of(context).colorScheme.primary)),
+        const Divider(),
+      ]),
+    );
+  }
+}
+
+class _ResponsiveGrid extends StatelessWidget {
+  final int crossAxisCount;
+  final List<Widget> children;
+  const _ResponsiveGrid({required this.crossAxisCount, required this.children});
+  @override
+  Widget build(BuildContext context) {
+    if (crossAxisCount == 1) return Column(children: children.map((c) => Padding(padding: const EdgeInsets.only(bottom: 16), child: c)).toList());
+    return Wrap(
+      spacing: 16, runSpacing: 16,
+      children: children.map((c) => SizedBox(width: (MediaQuery.of(context).size.width - context.spacing * 2 - 16) / crossAxisCount, child: c)).toList(),
     );
   }
 }

@@ -1,14 +1,13 @@
 import 'dart:async';
-
 import 'package:eduphin/moderator_dashboard/moderator_dashboard.dart';
 import 'package:eduphin/moderator_dashboard/dashboard_cards/active_institutes/manage/add_employee.dart';
 import 'package:eduphin/services/api_service.dart';
+import 'package:eduphin/services/responsive_helper.dart';
 import 'package:flutter/material.dart';
 
 import 'employee_model.dart';
 import 'employ_details.dart';
 
-// 3. Dynamic list of roles
 const List<String> employeeRoles = [
   'All',
   'Principal',
@@ -30,7 +29,7 @@ class ManageInstitute extends StatefulWidget {
   const ManageInstitute({
     super.key,
     this.instituteName = "Global Tech Academy",
-    required this.instituteId, // Made required to ensure it's passed
+    required this.instituteId,
   });
 
   @override
@@ -119,132 +118,138 @@ class _ManageInstitutePageState extends State<ManageInstitute> {
 
   @override
   Widget build(BuildContext context) {
-    final screenWidth = MediaQuery.of(context).size.width;
-    double responsiveFontSize(double baseSize) {
-      if (screenWidth > 1200) return baseSize * 1.2;
-      if (screenWidth > 600) return baseSize * 1.1;
-      return baseSize;
-    }
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
 
     return Scaffold(
-      backgroundColor: const Color(0xFF0D1B2A),
       appBar: AppBar(
-        backgroundColor: const Color(0xFF0D1B2A),
-        iconTheme: const IconThemeData(color: Colors.white),
-        title: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Expanded(
-              child: Text(
-                widget.instituteName,
-                style: TextStyle(color: Colors.white, fontSize: responsiveFontSize(18)),
-                overflow: TextOverflow.ellipsis,
-              ),
-            ),
-            InkWell(
-              onTap: () => Navigator.pushReplacement(
-                context,
-                MaterialPageRoute(builder: (context) => const ModeratorDashboardPage()),
-              ),
-              child: const Icon(Icons.home_sharp, size: 30, color: Colors.white),
-            ),
-          ],
-        ),
+        title: Text(widget.instituteName),
+        actions: [
+          IconButton(
+            onPressed: () => Navigator.pushAndRemoveUntil(context, MaterialPageRoute(builder: (context) => const ModeratorDashboardPage()), (route) => false),
+            icon: const Icon(Icons.dashboard_rounded),
+          ),
+          const SizedBox(width: 8),
+        ],
       ),
-      body: Padding(
-        padding: EdgeInsets.fromLTRB(screenWidth * 0.04, 12, screenWidth * 0.04, 0),
+      body: RefreshIndicator(
+        onRefresh: _fetchEmployees,
         child: Column(
           children: [
-            Row(
-              children: [
-                Expanded(
-                  child: TextField(
-                    controller: _searchController,
-                    style: TextStyle(color: Colors.white, fontSize: responsiveFontSize(14)),
-                    decoration: InputDecoration(
-                      hintText: "Search employees...",
-                      hintStyle: TextStyle(color: Colors.white54, fontSize: responsiveFontSize(14)),
-                      prefixIcon: const Icon(Icons.search, color: Colors.white54),
-                      filled: true,
-                      fillColor: const Color(0xFF1B263B),
-                      contentPadding: const EdgeInsets.symmetric(vertical: 0, horizontal: 20),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(30),
-                        borderSide: BorderSide.none,
+            Padding(
+              padding: context.pagePadding.copyWith(bottom: 0),
+              child: Column(
+                children: [
+                  Row(
+                    children: [
+                      Expanded(
+                        child: TextField(
+                          controller: _searchController,
+                          decoration: const InputDecoration(
+                            hintText: "Search employees...",
+                            prefixIcon: Icon(Icons.search_rounded),
+                          ),
+                        ),
                       ),
+                      const SizedBox(width: 12),
+                      IconButton.filled(
+                        onPressed: _navigateAndRefresh,
+                        icon: const Icon(Icons.person_add_rounded),
+                        style: IconButton.styleFrom(
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                          padding: const EdgeInsets.all(12),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                  SizedBox(
+                    height: 40,
+                    child: ListView.builder(
+                      scrollDirection: Axis.horizontal,
+                      itemCount: employeeRoles.length,
+                      itemBuilder: (context, index) {
+                        final role = employeeRoles[index];
+                        return Padding(
+                          padding: const EdgeInsets.only(right: 8.0),
+                          child: FilterChip(
+                            label: Text(role, style: TextStyle(fontSize: 12, fontWeight: _selectedRole == role ? FontWeight.bold : FontWeight.normal)),
+                            selected: _selectedRole == role,
+                            onSelected: (bool selected) => _onRoleSelected(role),
+                            backgroundColor: colorScheme.surface,
+                            selectedColor: colorScheme.primary.withOpacity(0.2),
+                            checkmarkColor: colorScheme.primary,
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20), side: BorderSide(color: _selectedRole == role ? colorScheme.primary : colorScheme.outline.withOpacity(0.2))),
+                          ),
+                        );
+                      },
                     ),
                   ),
-                ),
-                const SizedBox(width: 10),
-                GestureDetector(
-                  onTap: _navigateAndRefresh,
-                  child: Container(
-                    width: 50,
-                    height: 50,
-                    decoration: const BoxDecoration(
-                      color: Color(0xFF1B263B),
-                      shape: BoxShape.circle,
-                    ),
-                    child: const Icon(Icons.person_add_alt_1_outlined, color: Colors.white, size: 24),
-                  ),
-                ),
-              ],),
-            const SizedBox(height: 15),
-            SizedBox(
-              height: 40,
-              child: ListView.builder(
-                scrollDirection: Axis.horizontal,
-                itemCount: employeeRoles.length,
-                itemBuilder: (context, index) {
-                  final role = employeeRoles[index];
-                  return Padding(
-                    padding: const EdgeInsets.only(right: 8.0),
-                    child: RoleChip(
-                      label: role,
-                      isSelected: _selectedRole == role,
-                      onTap: () => _onRoleSelected(role),
-                    ),
-                  );
-                },
+                ],
               ),
             ),
-            const SizedBox(height: 15),
+            const SizedBox(height: 16),
             Expanded(
               child: _isLoading
                   ? const Center(child: CircularProgressIndicator())
                   : _error != null
-                      ? Center(child: Text("Error: $_error", style: TextStyle(color: Colors.red.shade300, fontSize: responsiveFontSize(14))))
+                      ? _buildErrorState(theme)
                       : _filteredEmployees.isEmpty
-                          ? Center(child: Text("No employees found.", style: TextStyle(color: Colors.white54, fontSize: responsiveFontSize(14))))
-                          : LayoutBuilder(builder: (context, constraints) {
-                              if (constraints.maxWidth > 600) {
-                                int crossAxisCount = constraints.maxWidth > 1200 ? 4 : (constraints.maxWidth > 900 ? 3 : 2);
-                                return GridView.builder(
-                                  padding: const EdgeInsets.only(bottom: 16),
-                                  itemCount: _filteredEmployees.length,
-                                  gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                                    crossAxisCount: crossAxisCount,
-                                    crossAxisSpacing: 16,
-                                    mainAxisSpacing: 16,
-                                    childAspectRatio: 3,
+                          ? _buildEmptyState(theme)
+                          : SingleChildScrollView(
+                              padding: context.pagePadding,
+                              physics: const AlwaysScrollableScrollPhysics(),
+                              child: Center(
+                                child: ConstrainedBox(
+                                  constraints: const BoxConstraints(maxWidth: 1200),
+                                  child: GridView.builder(
+                                    shrinkWrap: true,
+                                    physics: const NeverScrollableScrollPhysics(),
+                                    itemCount: _filteredEmployees.length,
+                                    gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                                      crossAxisCount: context.responsive(1, tablet: 2, desktop: 3),
+                                      crossAxisSpacing: 16,
+                                      mainAxisSpacing: 16,
+                                      mainAxisExtent: 80,
+                                    ),
+                                    itemBuilder: (context, index) {
+                                      return EmployeeCard(employee: _filteredEmployees[index]);
+                                    },
                                   ),
-                                  itemBuilder: (context, index) {
-                                    return EmployeeCard(_filteredEmployees[index]);
-                                  },
-                                );
-                              } else {
-                                return ListView.builder(
-                                  padding: const EdgeInsets.only(bottom: 50),
-                                  itemCount: _filteredEmployees.length,
-                                  itemBuilder: (context, index) {
-                                    return EmployeeCard(_filteredEmployees[index]);
-                                  },
-                                );
-                              }
-                            }),
+                                ),
+                              ),
+                            ),
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildErrorState(ThemeData theme) {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(Icons.error_outline_rounded, size: 64, color: theme.colorScheme.error.withOpacity(0.5)),
+          const SizedBox(height: 16),
+          const Text("Failed to load employees", style: TextStyle(fontWeight: FontWeight.bold)),
+          const SizedBox(height: 24),
+          ElevatedButton(onPressed: _fetchEmployees, child: const Text("Retry")),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildEmptyState(ThemeData theme) {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(Icons.people_outline_rounded, size: 64, color: theme.hintColor.withOpacity(0.3)),
+          const SizedBox(height: 16),
+          const Text("No employees found", style: TextStyle(fontWeight: FontWeight.bold)),
+        ],
       ),
     );
   }
@@ -253,97 +258,59 @@ class _ManageInstitutePageState extends State<ManageInstitute> {
 class EmployeeCard extends StatelessWidget {
   final Employee employee;
 
-  const EmployeeCard(this.employee, {super.key});
+  const EmployeeCard({super.key, required this.employee});
 
   @override
   Widget build(BuildContext context) {
-    final screenWidth = MediaQuery.of(context).size.width;
-    double responsiveFontSize(double baseSize) {
-      if (screenWidth > 1200) return baseSize * 1.2;
-      if (screenWidth > 600) return baseSize * 1.1;
-      return baseSize;
-    }
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
 
-    return InkWell(
-      onTap: () {
-        Navigator.push(
-          context,
-          MaterialPageRoute(builder: (context) => EmployeeDetailsPage(employeeId: employee.id)),
-        );
-      },
-      borderRadius: BorderRadius.circular(16),
-      child: Container(
-        margin: const EdgeInsets.only(bottom: 12),
-        padding: const EdgeInsets.all(12),
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(16),
-          color: const Color(0xFF1B263B),
-        ),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.center,
-          children: [
-            CircleAvatar(
-              radius: 25,
-              backgroundColor: const Color(0xFF0D1B2A),
-              child: Icon(Icons.person_outline_sharp, size: responsiveFontSize(28), color: Colors.white70),
-            ),
-            const SizedBox(width: 16),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Text(
-                    employee.name,
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: responsiveFontSize(16),
-                      fontWeight: FontWeight.bold,
-                    ),
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    employee.role,
-                    style: TextStyle(color: Colors.white70, fontSize: responsiveFontSize(13)),
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
+    return Card(
+      elevation: 0,
+      color: theme.colorScheme.surfaceContainerHighest.withOpacity(0.3),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+        side: BorderSide(color: colorScheme.outline.withOpacity(0.1)),
       ),
-    );
-  }
-}
-
-class RoleChip extends StatelessWidget {
-  final String label;
-  final bool isSelected;
-  final VoidCallback onTap;
-
-  const RoleChip({
-    super.key,
-    required this.label,
-    required this.isSelected,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(20),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-        decoration: BoxDecoration(
-          color: isSelected ? const Color(0xFF0E86D4) : const Color(0xFF1B263B),
-          borderRadius: BorderRadius.circular(20),
-        ),
-        child: Text(
-          label,
-          style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+      child: InkWell(
+        onTap: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(builder: (context) => EmployeeDetailsPage(employeeId: employee.id)),
+          );
+        },
+        borderRadius: BorderRadius.circular(16),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          child: Row(
+            children: [
+              CircleAvatar(
+                radius: 20,
+                backgroundColor: colorScheme.primary.withOpacity(0.1),
+                child: Text(employee.name[0].toUpperCase(), style: TextStyle(color: colorScheme.primary, fontWeight: FontWeight.bold)),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Text(
+                      employee.name,
+                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    Text(
+                      employee.role,
+                      style: TextStyle(color: theme.hintColor, fontSize: 12),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
+                ),
+              ),
+              const Icon(Icons.chevron_right_rounded, size: 20),
+            ],
+          ),
         ),
       ),
     );

@@ -4,6 +4,7 @@ import 'dart:io';
 
 import 'package:eduphin/moderator_dashboard/moderator_dashboard.dart';
 import 'package:eduphin/services/api_service.dart';
+import 'package:eduphin/services/responsive_helper.dart';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:image_picker/image_picker.dart';
@@ -18,7 +19,6 @@ class AddNewInstitutePage extends StatefulWidget {
 class _AddInstitutePageState extends State<AddNewInstitutePage> {
   final _formKey = GlobalKey<FormState>();
 
-  // Updated controllers to match the backend model
   final _nameController = TextEditingController();
   final _codeController = TextEditingController();
   final _establishedYearController = TextEditingController();
@@ -38,7 +38,6 @@ class _AddInstitutePageState extends State<AddNewInstitutePage> {
 
   @override
   void dispose() {
-    // Dispose all controllers
     _nameController.dispose();
     _codeController.dispose();
     _establishedYearController.dispose();
@@ -65,39 +64,24 @@ class _AddInstitutePageState extends State<AddNewInstitutePage> {
 
   Future<void> _addInstitute() async {
     if (!_formKey.currentState!.validate()) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Please fill all required fields.'),
-          backgroundColor: Colors.red,
-        ),
-      );
       return;
     }
 
-    setState(() {
-      _isLoading = true;
-    });
+    setState(() => _isLoading = true);
 
     final token = await ApiService.getToken();
     if (token == null) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Authentication token not found.')),
-        );
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Authentication token not found.')));
         setState(() => _isLoading = false);
       }
       return;
     }
 
-    var request = http.MultipartRequest(
-      'POST',
-      Uri.parse('${ApiService.baseUrl}/moderator/institutes'),
-    );
-
+    var request = http.MultipartRequest('POST', Uri.parse('${ApiService.baseUrl}/moderator/institutes'));
     request.headers['Authorization'] = 'Bearer $token';
     request.headers['Accept'] = 'application/json';
 
-    // Add all form fields
     request.fields.addAll({
       'name': _nameController.text,
       'code': _codeController.text,
@@ -111,10 +95,9 @@ class _AddInstitutePageState extends State<AddNewInstitutePage> {
       'chairman_name': _chairmanNameController.text,
       'website': _websiteController.text,
       'affiliation_details': _affiliationDetailsController.text,
-      'status': 'pending', // Default status
+      'status': 'pending',
     });
 
-    // Add logo file if selected
     if (_logo != null) {
       request.files.add(await http.MultipartFile.fromPath('logo', _logo!.path));
     }
@@ -125,245 +108,85 @@ class _AddInstitutePageState extends State<AddNewInstitutePage> {
 
       if (response.statusCode == 201) {
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Institute added successfully!'),
-              backgroundColor: Colors.green,
-            ),
-          );
-          Navigator.of(context).pop(true); // Pop with success result
+          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Institute added successfully!'), backgroundColor: Colors.green));
+          Navigator.of(context).pop(true);
         }
       } else {
         final error = jsonDecode(responseBody);
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Failed to add institute: ${error['message'] ?? 'Unknown error'}'),
-              backgroundColor: Colors.red,
-            ),
-          );
-        }
+        if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: ${error['message'] ?? 'Failed to add'}'), backgroundColor: Colors.red));
       }
     } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('An error occurred: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('An error occurred: $e'), backgroundColor: Colors.red));
     } finally {
-      if (mounted) {
-        setState(() {
-          _isLoading = false;
-        });
-      }
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    final screenWidth = MediaQuery.of(context).size.width;
-
-    double responsiveFontSize(double baseSize) {
-      if (screenWidth > 1200) return baseSize * 1.2;
-      if (screenWidth > 600) return baseSize * 1.1;
-      return baseSize;
-    }
-
-    final formFields = [
-      _buildTextField(
-        controller: _nameController,
-        labelText: 'Institute Name *',
-        icon: Icons.school_outlined,
-        validator: (value) => value!.isEmpty ? 'Name is required' : null,
-      ),
-      _buildTextField(
-        controller: _codeController,
-        labelText: 'Institute Code *',
-        icon: Icons.book_outlined,
-        validator: (value) => value!.isEmpty ? 'Code is required' : null,
-      ),
-      _buildTextField(
-        controller: _chairmanNameController,
-        labelText: 'Chairman Name *',
-        icon: Icons.person_outline_sharp,
-         validator: (value) => value!.isEmpty ? 'Chairman Name is required' : null,
-      ),
-      _buildTextField(
-        controller: _establishedYearController,
-        labelText: 'Established Year *',
-        icon: Icons.calendar_today_outlined,
-        keyboardType: TextInputType.number,
-         validator: (value) => value!.isEmpty ? 'Year is required' : null,
-      ),
-      _buildTextField(
-        controller: _addressController,
-        labelText: 'Address *',
-        icon: Icons.location_on_outlined,
-         validator: (value) => value!.isEmpty ? 'Address is required' : null,
-      ),
-        _buildTextField(
-        controller: _cityController,
-        labelText: 'City *',
-        icon: Icons.location_city_outlined,
-         validator: (value) => value!.isEmpty ? 'City is required' : null,
-      ),
-        _buildTextField(
-        controller: _stateController,
-        labelText: 'State *',
-        icon: Icons.map_outlined,
-         validator: (value) => value!.isEmpty ? 'State is required' : null,
-      ),
-        _buildTextField(
-        controller: _pincodeController,
-        labelText: 'Pincode *',
-        icon: Icons.pin_drop_outlined,
-        keyboardType: TextInputType.number,
-        validator: (value) => value!.isEmpty ? 'Pincode is required' : null,
-      ),
-      _buildTextField(
-        controller: _contactEmailController,
-        labelText: 'Contact Email *',
-        icon: Icons.email_outlined,
-        keyboardType: TextInputType.emailAddress,
-        validator: (value) {
-            if(value!.isEmpty) return 'Email is required';
-            if(!value.contains('@')) return 'Enter a valid email';
-            return null;
-        }
-      ),
-      _buildTextField(
-        controller: _contactPhoneController,
-        labelText: 'Contact Phone *',
-        icon: Icons.phone_outlined,
-        keyboardType: TextInputType.phone,
-         validator: (value) => value!.isEmpty ? 'Phone is required' : null,
-      ),
-      _buildTextField(
-        controller: _websiteController,
-        labelText: 'Website',
-        icon: Icons.web_outlined,
-        keyboardType: TextInputType.url,
-      ),
-      _buildTextField(
-        controller: _affiliationDetailsController,
-        labelText: 'Affiliation Details',
-        icon: Icons.corporate_fare_outlined,
-      ),
-    ];
+    final theme = Theme.of(context);
 
     return Scaffold(
-      backgroundColor: const Color(0xFF0D1B2A),
       appBar: AppBar(
-        backgroundColor: const Color(0xFF0D1B2A),
-        iconTheme: const IconThemeData(color: Colors.white),
-        title: Text(
-          'Add New Institute',
-          style: TextStyle(color: Colors.white, fontSize: responsiveFontSize(18)),
-        ),
-        actions: [
-          IconButton(
-            onPressed: () => Navigator.pushReplacement(
-              context,
-              MaterialPageRoute(
-                builder: (context) => const ModeratorDashboardPage(),
-              ),
-            ),
-            icon: const Icon(
-              Icons.home_sharp,
-              size: 30,
-              color: Colors.white,
-            ),
-          ),
-          const SizedBox(width: 10),
-        ],
+        title: const Text('Register New Institute'),
       ),
-      body: Form(
-        key: _formKey,
-        child: SingleChildScrollView(
-          child: Padding(
-            padding: EdgeInsets.fromLTRB(screenWidth * 0.04, 16, screenWidth * 0.04, 80),
-            child: Column(
-              children: [
-                GestureDetector(
-                  onTap: _pickLogo,
-                  child: Center(
-                    child: Container(
-                      height: screenWidth * 0.25,
-                      width: screenWidth * 0.25,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        color: const Color(0xFF1B263B),
-                        border: Border.all(color: Colors.white24),
-                        image: _logo != null ? DecorationImage(image: FileImage(_logo!), fit: BoxFit.cover) : null,
-                      ),
-                      child: _logo == null 
-                          ? Icon(
-                              Icons.add_a_photo_outlined,
-                              size: screenWidth * 0.12,
-                              color: Colors.white70,
-                            )
-                          : null,
+      body: SingleChildScrollView(
+        padding: context.pagePadding,
+        child: Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 900),
+            child: Form(
+              key: _formKey,
+              child: Column(
+                children: [
+                  _buildLogoPicker(theme),
+                  const SizedBox(height: 32),
+                  
+                  _buildFormSection(context, title: "General Information", icon: Icons.info_outline_rounded, fields: [
+                    _buildResponsiveRow(context, [
+                      _buildTextField(controller: _nameController, label: 'Institute Name *', icon: Icons.business_rounded, validator: (v) => v!.isEmpty ? 'Required' : null),
+                      _buildTextField(controller: _codeController, label: 'Institute Code *', icon: Icons.qr_code_rounded, validator: (v) => v!.isEmpty ? 'Required' : null),
+                    ]),
+                    _buildResponsiveRow(context, [
+                      _buildTextField(controller: _chairmanNameController, label: 'Chairman Name *', icon: Icons.person_rounded, validator: (v) => v!.isEmpty ? 'Required' : null),
+                      _buildTextField(controller: _establishedYearController, label: 'Established Year *', icon: Icons.calendar_today_rounded, keyboardType: TextInputType.number, validator: (v) => v!.isEmpty ? 'Required' : null),
+                    ]),
+                  ]),
+
+                  _buildFormSection(context, title: "Contact Details", icon: Icons.contact_mail_outlined, fields: [
+                    _buildResponsiveRow(context, [
+                      _buildTextField(controller: _contactEmailController, label: 'Email *', icon: Icons.email_rounded, keyboardType: TextInputType.emailAddress, validator: (v) => v!.isEmpty ? 'Required' : null),
+                      _buildTextField(controller: _contactPhoneController, label: 'Phone *', icon: Icons.phone_rounded, keyboardType: TextInputType.phone, validator: (v) => v!.isEmpty ? 'Required' : null),
+                    ]),
+                    _buildTextField(controller: _websiteController, label: 'Website', icon: Icons.language_rounded, keyboardType: TextInputType.url),
+                  ]),
+
+                  _buildFormSection(context, title: "Location Details", icon: Icons.map_outlined, fields: [
+                    _buildTextField(controller: _addressController, label: 'Address *', icon: Icons.location_on_rounded, validator: (v) => v!.isEmpty ? 'Required' : null),
+                    _buildResponsiveRow(context, [
+                      _buildTextField(controller: _cityController, label: 'City *', validator: (v) => v!.isEmpty ? 'Required' : null),
+                      _buildTextField(controller: _stateController, label: 'State *', validator: (v) => v!.isEmpty ? 'Required' : null),
+                      _buildTextField(controller: _pincodeController, label: 'Pincode *', keyboardType: TextInputType.number, validator: (v) => v!.isEmpty ? 'Required' : null),
+                    ]),
+                  ]),
+
+                  _buildFormSection(context, title: "Others", icon: Icons.more_horiz_rounded, fields: [
+                    _buildTextField(controller: _affiliationDetailsController, label: 'Affiliation Details', icon: Icons.verified_user_rounded, maxLines: 2),
+                  ]),
+
+                  const SizedBox(height: 40),
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton.icon(
+                      onPressed: _isLoading ? null : _addInstitute,
+                      icon: _isLoading ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white)) : const Icon(Icons.add_business_rounded),
+                      label: Text(_isLoading ? "REGISTERING..." : "REGISTER INSTITUTE"),
+                      style: ElevatedButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 18), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16))),
                     ),
                   ),
-                ),
-                const SizedBox(height: 8),
-                Text("Tap to upload logo", style: TextStyle(color: Colors.white54, fontSize: responsiveFontSize(12))),
-                const SizedBox(height: 30),
-                LayoutBuilder(builder: (context, constraints) {
-                  if (constraints.maxWidth > 700) {
-                    return GridView.builder(
-                      shrinkWrap: true,
-                      physics: const NeverScrollableScrollPhysics(),
-                      itemCount: formFields.length,
-                      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                        crossAxisCount: 2,
-                        crossAxisSpacing: 16,
-                        mainAxisSpacing: 16,
-                        childAspectRatio: 5.5, // Adjusted for validator text
-                      ),
-                      itemBuilder: (context, index) => formFields[index],
-                    );
-                  } else {
-                    return Column(
-                      children: formFields.map((widget) {
-                        return Padding(
-                          padding: const EdgeInsets.only(bottom: 12),
-                          child: widget,
-                        );
-                      }).toList(),
-                    );
-                  }
-                }),
-                const SizedBox(height: 30),
-                SizedBox(
-                  width: double.infinity,
-                  height: 50,
-                  child: ElevatedButton(
-                    onPressed: _isLoading ? null : _addInstitute,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF0E86D4),
-                      disabledBackgroundColor: const Color(0xFF0E86D4).withAlpha(128),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(15),
-                      ),
-                    ),
-                    child: _isLoading
-                        ? const CircularProgressIndicator(
-                            valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                          )
-                        : Text(
-                            'Add Institute',
-                            style: TextStyle(
-                                color: Colors.white,
-                                fontSize: responsiveFontSize(16),
-                                fontWeight: FontWeight.bold),
-                          ),
-                  ),
-                )
-              ],
+                  const SizedBox(height: 60),
+                ],
+              ),
             ),
           ),
         ),
@@ -371,53 +194,79 @@ class _AddInstitutePageState extends State<AddNewInstitutePage> {
     );
   }
 
-  Widget _buildTextField({
-    required TextEditingController controller,
-    required String labelText,
-    required IconData icon,
-    TextInputType? keyboardType,
-    String? Function(String?)? validator,
-  }) {
-    final screenWidth = MediaQuery.of(context).size.width;
-    double responsiveFontSize(double baseSize) {
-      if (screenWidth > 1200) return baseSize * 1.2;
-      if (screenWidth > 600) return baseSize * 1.1;
-      return baseSize;
-    }
-
-    return TextFormField(
-      controller: controller,
-      style: TextStyle(color: Colors.white, fontSize: responsiveFontSize(14)),
-      keyboardType: keyboardType,
-      decoration: InputDecoration(
-        prefixIcon: Icon(icon, color: Colors.white54),
-        labelText: labelText,
-        labelStyle: TextStyle(color: Colors.white54, fontSize: responsiveFontSize(14)),
-        filled: true,
-        fillColor: const Color(0xFF1B263B),
-        contentPadding: const EdgeInsets.symmetric(vertical: 16.0, horizontal: 12.0),
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(8),
-          borderSide: BorderSide.none,
-        ),
-        enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(8),
-          borderSide: BorderSide.none,
-        ),
-        focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(8),
-          borderSide: const BorderSide(color: Color(0xFF0E86D4), width: 1.5),
-        ),
-        errorBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(8),
-          borderSide: const BorderSide(color: Colors.redAccent, width: 1),
-        ),
-        focusedErrorBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(8),
-          borderSide: const BorderSide(color: Colors.redAccent, width: 1.5),
-        ),
+  Widget _buildLogoPicker(ThemeData theme) {
+    return Center(
+      child: Column(
+        children: [
+          Stack(
+            alignment: Alignment.bottomRight,
+            children: [
+              Container(
+                width: 120,
+                height: 120,
+                decoration: BoxDecoration(
+                  color: theme.colorScheme.surfaceContainerHighest,
+                  shape: BoxShape.circle,
+                  border: Border.all(color: theme.colorScheme.outline.withOpacity(0.2), width: 4),
+                  image: _logo != null ? DecorationImage(image: FileImage(_logo!), fit: BoxFit.cover) : null,
+                ),
+                child: _logo == null ? Icon(Icons.business_rounded, size: 50, color: theme.colorScheme.primary.withOpacity(0.5)) : null,
+              ),
+              InkWell(
+                onTap: _pickLogo,
+                child: Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(color: theme.colorScheme.primary, shape: BoxShape.circle, border: Border.all(color: theme.scaffoldBackgroundColor, width: 2)),
+                  child: const Icon(Icons.camera_alt_rounded, color: Colors.white, size: 20),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Text("Institutional Logo", style: theme.textTheme.labelLarge?.copyWith(fontWeight: FontWeight.bold)),
+        ],
       ),
-      validator: validator,
+    );
+  }
+
+  Widget _buildFormSection(BuildContext context, {required String title, required IconData icon, required List<Widget> fields}) {
+    final theme = Theme.of(context);
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 24),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: const EdgeInsets.only(left: 4, bottom: 12),
+            child: Row(
+              children: [
+                Icon(icon, size: 20, color: theme.colorScheme.primary),
+                const SizedBox(width: 8),
+                Text(title, style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
+              ],
+            ),
+          ),
+          Card(child: Padding(padding: const EdgeInsets.all(20), child: Column(children: fields))),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildResponsiveRow(BuildContext context, List<Widget> children) {
+    if (context.isMobile) return Column(children: children);
+    return Row(crossAxisAlignment: CrossAxisAlignment.start, children: children.map((c) => Expanded(child: Padding(padding: const EdgeInsets.only(right: 16), child: c))).toList());
+  }
+
+  Widget _buildTextField({required TextEditingController controller, required String label, IconData? icon, TextInputType? keyboardType, String? Function(String?)? validator, int maxLines = 1}) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 16),
+      child: TextFormField(
+        controller: controller,
+        keyboardType: keyboardType,
+        maxLines: maxLines,
+        decoration: InputDecoration(labelText: label, prefixIcon: icon != null ? Icon(icon, size: 20) : null),
+        validator: validator,
+      ),
     );
   }
 }

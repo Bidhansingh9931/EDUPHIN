@@ -2,6 +2,9 @@
 // import 'package:eduphin/moderator_dashboard/all_review.dart';
 // import 'package:eduphin/moderator_dashboard/all_testimonials.dart';
 import 'package:eduphin/moderator_dashboard/dashboard_cards/active_institutes/institutes.dart';
+import 'package:eduphin/moderator_dashboard/dashboard_cards/role_distribution.dart';
+import 'package:eduphin/moderator_dashboard/dashboard_cards/students.dart';
+import 'package:eduphin/moderator_dashboard/dashboard_cards/accounts.dart';
 import 'package:flutter/material.dart';
 
 import 'dashboard_cards/testimonials_page.dart';
@@ -148,7 +151,7 @@ class DashboardData {
   final String dataUsage;
   final String systemUptime;
   final List<RecentActivity> recentActivities;
-   final List<Testimonial> testimonials;
+  final List<Testimonial> testimonials;
 
   DashboardData({
     required this.gridItems,
@@ -167,7 +170,7 @@ class DashboardData {
     // Manually add institutes to the grid items
     final int institutesCount = (json['counts'] as Map<String, dynamic>?)?['institutes'] ?? 0;
     gridItems.add(GridItem(tag: 'institutes', icon: Icons.school, value: institutesCount.toString(), title: 'Institutes', percentage: 0, isPositive: true, page: const InstitutesPage()));
-      final int testimonialCount = (json['counts'] as Map<String, dynamic>?)?['testimonials'] ?? 0;
+    final int testimonialCount = (json['counts'] as Map<String, dynamic>?)?['testimonials'] ?? 0;
     gridItems.add(GridItem(tag: 'testimonials', icon: Icons.comment, value: testimonialCount.toString(), title: 'Testimonials', percentage: 0, isPositive: true, page: const TestimonialsPage()));
 
 
@@ -182,11 +185,11 @@ class DashboardData {
           title: roleName,
           percentage: 0,
           isPositive: true,
-          page: Container(), // Replace with actual page later
+          page: _getPageForRole(roleName), 
         ),
       );
     }
-    
+
     final activitiesList = (json['recent_activities'] as List<dynamic>? ?? []).cast<Map<String, dynamic>>();
     final recentActivities = activitiesList.map((i) => RecentActivity.fromJson(i)).toList();
 
@@ -197,7 +200,7 @@ class DashboardData {
       review: 'This is a great platform!',
       avatarAsset: '',
     ));
- final testimonialsList = (json['testimonials'] as List<dynamic>? ?? []).cast<Map<String, dynamic>>();
+    final testimonialsList = (json['testimonials'] as List<dynamic>? ?? []).cast<Map<String, dynamic>>();
     final testimonials = testimonialsList.map((i) => Testimonial.fromJson(i)).toList();
     return DashboardData(
       gridItems: gridItems,
@@ -208,6 +211,24 @@ class DashboardData {
       recentActivities: recentActivities,
       testimonials: testimonials,
     );
+  }
+
+  static Widget _getPageForRole(String roleName) {
+    switch (roleName) {
+      case 'Students':
+        return const StudentsPage(instituteId: '1'); 
+      case 'Teachers':
+      case 'Librarian':
+      case 'Accountants':
+      case 'Staff':
+      case 'Counselors':
+      case 'Institute Manager':
+      case 'Moderator':
+      case 'Super Admin':
+        return const AccountsPage(instituteId: '1');
+      default:
+        return const RoleDistributionPage();
+    }
   }
 
   static IconData _getIconForRole(String roleName) {
