@@ -141,28 +141,41 @@ class _ExamScheduleManagementPageState extends State<ExamScheduleManagementPage>
                                 SingleChildScrollView(
                                   scrollDirection: Axis.horizontal,
                                   child: DataTable(
-                                    headingRowColor: WidgetStateProperty.all(theme.colorScheme.primary.withOpacity(0.05)),
-                                    columnSpacing: 25,
-                                    columns: const [
-                                      DataColumn(label: Text("#", style: TextStyle(fontWeight: FontWeight.bold))),
-                                      DataColumn(label: Text("Subject", style: TextStyle(fontWeight: FontWeight.bold))),
-                                      DataColumn(label: Text("Date", style: TextStyle(fontWeight: FontWeight.bold))),
-                                      DataColumn(label: Text("Time", style: TextStyle(fontWeight: FontWeight.bold))),
-                                      DataColumn(label: Text("Room", style: TextStyle(fontWeight: FontWeight.bold))),
-                                    ],
-                                    rows: _schedules.asMap().entries.map((entry) {
-                                      int index = entry.key + 1;
-                                      var s = entry.value;
-                                      return DataRow(cells: [
-                                        DataCell(Text(index.toString())),
-                                        DataCell(Text(s['subject']?['name'] ?? 'N/A', 
-                                            style: const TextStyle(fontWeight: FontWeight.bold))),
-                                        DataCell(Text(s['date'] ?? 'N/A')),
-                                        DataCell(Text("${s['start_time']} - ${s['end_time']}")),
-                                        DataCell(Text(s['room']?['name'] ?? 'N/A')),
-                                      ]);
-                                    }).toList(),
-                                  ),
+                                  headingRowColor: WidgetStateProperty.all(theme.colorScheme.primary.withValues(alpha: 0.05)),
+                                  columnSpacing: 25,
+                                  columns: const [
+                                    DataColumn(label: Text("#", style: TextStyle(fontWeight: FontWeight.bold))),
+                                    DataColumn(label: Text("Subject", style: TextStyle(fontWeight: FontWeight.bold))),
+                                    DataColumn(label: Text("Date", style: TextStyle(fontWeight: FontWeight.bold))),
+                                    DataColumn(label: Text("Time", style: TextStyle(fontWeight: FontWeight.bold))),
+                                    DataColumn(label: Text("Room", style: TextStyle(fontWeight: FontWeight.bold))),
+                                  ],
+                                  rows: _schedules.asMap().entries.map((entry) {
+                                    int index = entry.key + 1;
+                                    var s = entry.value;
+                                    String subjectName = "N/A";
+                                    if (s['subject'] is Map) {
+                                      subjectName = s['subject']['name']?.toString() ?? "N/A";
+                                    } else if (s['subject_name'] != null) {
+                                      subjectName = s['subject_name'].toString();
+                                    }
+
+                                    String roomName = "N/A";
+                                    if (s['room'] is Map) {
+                                      roomName = s['room']['name']?.toString() ?? "N/A";
+                                    } else if (s['room_name'] != null) {
+                                      roomName = s['room_name'].toString();
+                                    }
+
+                                    return DataRow(cells: [
+                                      DataCell(Text(index.toString())),
+                                      DataCell(Text(subjectName, style: const TextStyle(fontWeight: FontWeight.bold))),
+                                      DataCell(Text(s['date']?.toString() ?? 'N/A')),
+                                      DataCell(Text("${s['start_time'] ?? ''} - ${s['end_time'] ?? ''}")),
+                                      DataCell(Text(roomName)),
+                                    ]);
+                                  }).toList(),
+                                ),
                                 ),
                               const SizedBox(height: 16),
                             ],
@@ -182,9 +195,9 @@ class _ExamScheduleManagementPageState extends State<ExamScheduleManagementPage>
       margin: const EdgeInsets.only(left: 8),
       padding: const EdgeInsets.all(8),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.1), 
+        color: color.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(8), 
-        border: Border.all(color: color.withOpacity(0.2))
+        border: Border.all(color: color.withValues(alpha: 0.2))
       ),
       child: Icon(icon, color: color, size: 18),
     );

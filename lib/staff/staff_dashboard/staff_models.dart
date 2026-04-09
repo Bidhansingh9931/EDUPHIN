@@ -428,8 +428,8 @@ class StaffVirtualIdCardData {
 
   factory StaffVirtualIdCardData.fromJson(Map<String, dynamic> json) {
     return StaffVirtualIdCardData(
-      user: User.fromJson(json['user']),
-      userDetail: UserDetail.fromJson(json['user_detail']),
+      user: User.fromJson(json['user'] ?? json['userDetail']?['user'] ?? {}),
+      userDetail: UserDetail.fromJson(json['user_detail'] ?? json['userDetail'] ?? {}),
     );
   }
 }

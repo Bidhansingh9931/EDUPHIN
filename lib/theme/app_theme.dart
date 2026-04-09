@@ -19,7 +19,7 @@ class AppTheme {
       surface: isDark ? const Color(0xFF0F172A) : Colors.white,
       onSurface: isDark ? const Color(0xFFF8FAFC) : const Color(0xFF1E293B),
       error: const Color(0xFFEF4444),
-      outline: isDark ? Colors.white.withOpacity(0.1) : Colors.black.withOpacity(0.1),
+      outline: isDark ? Colors.white.withValues(alpha: 0.1) : Colors.black.withValues(alpha: 0.1),
       surfaceContainerHighest: isDark ? const Color(0xFF1E293B) : const Color(0xFFF1F5F9),
     );
 
@@ -64,7 +64,7 @@ class AppTheme {
 
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
-        fillColor: isDark ? Colors.white.withOpacity(0.03) : Colors.black.withOpacity(0.02),
+        fillColor: isDark ? Colors.white.withValues(alpha: 0.03) : Colors.black.withValues(alpha: 0.02),
         contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../teacher/dashboard/app_drawer.dart';
 import '../../services/api_service.dart';
 import '../../services/responsive_helper.dart';
 import 'staff_models.dart';
@@ -49,6 +50,7 @@ class _StaffDashboardState extends State<StaffDashboard> {
           ),
         ],
       ),
+      drawer: const AppDrawer(),
       body: RefreshIndicator(
         onRefresh: _refreshData,
         child: FutureBuilder<StaffDashboardData>(
@@ -100,7 +102,7 @@ class _StaffDashboardState extends State<StaffDashboard> {
                 children: [
                   _buildWelcomeCard(context, user?.name ?? 'Staff Member', userDetail?.photo),
                   const SizedBox(height: 24),
-                  
+
                   // Responsive Grid for Main Sections
                   LayoutBuilder(
                     builder: (context, constraints) {
@@ -118,7 +120,7 @@ class _StaffDashboardState extends State<StaffDashboard> {
                       );
                     },
                   ),
-                  
+
                   const SizedBox(height: 16),
                   _buildLibraryCard(context),
                   const SizedBox(height: 16),
@@ -160,7 +162,7 @@ class _StaffDashboardState extends State<StaffDashboard> {
             Text(
               "Your personalized workspace awaits.",
               style: theme.textTheme.bodyMedium?.copyWith(
-                color: colorScheme.onPrimary.withOpacity(0.8),
+                color: colorScheme.onPrimary.withValues(alpha: 0.8),
               ),
               textAlign: TextAlign.center,
             ),
@@ -186,7 +188,7 @@ class _StaffDashboardState extends State<StaffDashboard> {
   Widget _buildProfileOverview(BuildContext context, UserDetail? userDetail) {
     final theme = Theme.of(context);
     final user = userDetail?.user;
-    
+
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(24),
@@ -200,11 +202,11 @@ class _StaffDashboardState extends State<StaffDashboard> {
             CircleAvatar(
               radius: 40,
               backgroundColor: theme.colorScheme.primaryContainer,
-              backgroundImage: userDetail?.photo != null 
-                  ? NetworkImage('${ApiService.baseUrl}/storage/${userDetail!.photo}') 
+              backgroundImage: userDetail?.photo != null
+                  ? NetworkImage('${ApiService.baseUrl}/storage/${userDetail!.photo}')
                   : null,
-              child: userDetail?.photo == null 
-                  ? Icon(Icons.person, color: theme.colorScheme.onPrimaryContainer, size: 40) 
+              child: userDetail?.photo == null
+                  ? Icon(Icons.person, color: theme.colorScheme.onPrimaryContainer, size: 40)
                   : null,
             ),
             const SizedBox(height: 16),
@@ -269,7 +271,7 @@ class _StaffDashboardState extends State<StaffDashboard> {
         leading: Container(
           padding: const EdgeInsets.all(8),
           decoration: BoxDecoration(
-            color: theme.colorScheme.primary.withOpacity(0.1),
+            color: theme.colorScheme.primary.withValues(alpha: 0.1),
             borderRadius: BorderRadius.circular(8),
           ),
           child: Icon(Icons.payments_rounded, color: theme.colorScheme.primary),

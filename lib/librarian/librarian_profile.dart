@@ -165,7 +165,7 @@ class _LibrarianProfilePageState extends State<LibrarianProfilePage> {
                               padding: const EdgeInsets.all(4),
                               decoration: BoxDecoration(
                                 shape: BoxShape.circle,
-                                border: Border.all(color: theme.colorScheme.primary.withOpacity(0.5), width: 2),
+                                border: Border.all(color: theme.colorScheme.primary.withValues(alpha: 0.5), width: 2),
                               ),
                               child: CircleAvatar(
                                 radius: 50,
@@ -310,7 +310,7 @@ class _LibrarianProfilePageState extends State<LibrarianProfilePage> {
             width: double.infinity,
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              color: theme.colorScheme.primary.withOpacity(0.05),
+              color: theme.colorScheme.primary.withValues(alpha: 0.05),
               borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
             ),
             child: Row(
@@ -386,7 +386,7 @@ class _LibrarianProfilePageState extends State<LibrarianProfilePage> {
               decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(12),
                 color: theme.inputDecorationTheme.fillColor,
-                border: Border.all(color: theme.colorScheme.outline.withOpacity(0.1)),
+                border: Border.all(color: theme.colorScheme.outline.withValues(alpha: 0.1)),
               ),
               child: Row(
                 children: [

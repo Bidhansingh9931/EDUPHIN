@@ -1,6 +1,10 @@
-import 'package:eduphin/services/responsive_helper.dart';
+import '../../services/responsive_helper.dart';
 import 'package:flutter/material.dart';
+import '../../services/api_service.dart';
+import '../librarian_models.dart';
 import 'create_ticket.dart';
+
+import 'ticket_details.dart';
 
 class MyTicketsPage extends StatefulWidget {
   const MyTicketsPage({super.key});
@@ -10,8 +14,26 @@ class MyTicketsPage extends StatefulWidget {
 }
 
 class _MyTicketsPageState extends State<MyTicketsPage> {
-  String selectedPriority = "All Priorities";
-  String selectedStatus = "All Statuses";
+  String selectedPriority = "all";
+  String selectedStatus = "all";
+  String searchQuery = "";
+  late Future<List<SupportTicket>> _ticketsFuture;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadTickets();
+  }
+
+  void _loadTickets() {
+    setState(() {
+      _ticketsFuture = ApiService.getLibrarianTickets({
+        'priority': selectedPriority,
+        'status': selectedStatus,
+        'search': searchQuery,
+      });
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -39,18 +61,34 @@ class _MyTicketsPageState extends State<MyTicketsPage> {
                             children: [
                               _buildResponsiveRow(context, [
                                 TextField(
+                                  onChanged: (val) {
+                                    setState(() => searchQuery = val);
+                                    _loadTickets();
+                                  },
                                   decoration: const InputDecoration(
                                     hintText: "Search by Title...",
                                     prefixIcon: Icon(Icons.search),
                                   ),
                                 ),
-                                _buildDropdown(selectedPriority, ["All Priorities", "Low", "Medium", "High"], (val) {
+                                _buildDropdown(selectedPriority, {
+                                  "all": "All Priorities",
+                                  "low": "Low",
+                                  "medium": "Medium",
+                                  "high": "High"
+                                }, (val) {
                                   setState(() => selectedPriority = val!);
+                                  _loadTickets();
                                 }),
                               ]),
                               const SizedBox(height: 12),
-                              _buildDropdown(selectedStatus, ["All Statuses", "Open", "Closed", "Pending"], (val) {
+                              _buildDropdown(selectedStatus, {
+                                "all": "All Statuses",
+                                "open": "Open",
+                                "closed": "Closed",
+                                "pending": "Pending"
+                              }, (val) {
                                 setState(() => selectedStatus = val!);
+                                _loadTickets();
                               }),
                             ],
                           ),
@@ -69,24 +107,43 @@ class _MyTicketsPageState extends State<MyTicketsPage> {
                               child: Text("Recent Tickets", style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
                             ),
                             const Divider(height: 1),
-                            SingleChildScrollView(
-                              scrollDirection: Axis.horizontal,
-                              child: DataTable(
-                                headingRowColor: WidgetStateProperty.all(theme.colorScheme.primary.withOpacity(0.05)),
-                                columnSpacing: 25,
-                                columns: const [
-                                  DataColumn(label: Text("#ID", style: TextStyle(fontWeight: FontWeight.bold))),
-                                  DataColumn(label: Text("Title", style: TextStyle(fontWeight: FontWeight.bold))),
-                                  DataColumn(label: Text("Priority", style: TextStyle(fontWeight: FontWeight.bold))),
-                                  DataColumn(label: Text("Status", style: TextStyle(fontWeight: FontWeight.bold))),
-                                  DataColumn(label: Text("Category", style: TextStyle(fontWeight: FontWeight.bold))),
-                                  DataColumn(label: Text("Action", style: TextStyle(fontWeight: FontWeight.bold))),
-                                ],
-                                rows: [
-                                  _buildDataRow(context, "10", "System Access", "Low", "Open", "Technical"),
-                                  _buildDataRow(context, "7", "Network Error", "High", "Closed", "Technical"),
-                                ],
-                              ),
+                            FutureBuilder<List<SupportTicket>>(
+                              future: _ticketsFuture,
+                              builder: (context, snapshot) {
+                                if (snapshot.connectionState == ConnectionState.waiting) {
+                                  return const Padding(
+                                    padding: EdgeInsets.all(20.0),
+                                    child: Center(child: CircularProgressIndicator()),
+                                  );
+                                } else if (snapshot.hasError) {
+                                  return Padding(
+                                    padding: const EdgeInsets.all(20.0),
+                                    child: Center(child: Text("Error: ${snapshot.error}")),
+                                  );
+                                } else if (!snapshot.hasData || snapshot.data!.isEmpty) {
+                                  return const Padding(
+                                    padding: EdgeInsets.all(20.0),
+                                    child: Center(child: Text("No tickets found")),
+                                  );
+                                }
+
+                                return SingleChildScrollView(
+                                  scrollDirection: Axis.horizontal,
+                                  child: DataTable(
+                                    headingRowColor: WidgetStateProperty.all(theme.colorScheme.primary.withValues(alpha: 0.05)),
+                                    columnSpacing: 25,
+                                    columns: const [
+                                      DataColumn(label: Text("#ID", style: TextStyle(fontWeight: FontWeight.bold))),
+                                      DataColumn(label: Text("Title", style: TextStyle(fontWeight: FontWeight.bold))),
+                                      DataColumn(label: Text("Priority", style: TextStyle(fontWeight: FontWeight.bold))),
+                                      DataColumn(label: Text("Status", style: TextStyle(fontWeight: FontWeight.bold))),
+                                      DataColumn(label: Text("Category", style: TextStyle(fontWeight: FontWeight.bold))),
+                                      DataColumn(label: Text("Action", style: TextStyle(fontWeight: FontWeight.bold))),
+                                    ],
+                                    rows: snapshot.data!.map((ticket) => _buildDataRow(context, ticket)).toList(),
+                                  ),
+                                );
+                              },
                             ),
                           ],
                         ),
@@ -100,11 +157,12 @@ class _MyTicketsPageState extends State<MyTicketsPage> {
               Padding(
                 padding: context.pagePadding,
                 child: ElevatedButton.icon(
-                  onPressed: () {
-                    Navigator.push(
+                  onPressed: () async {
+                    final result = await Navigator.push(
                       context,
                       MaterialPageRoute(builder: (context) => const CreateTicketPage()),
                     );
+                    if (result == true) _loadTickets();
                   },
                   icon: const Icon(Icons.add),
                   label: const Text("CREATE NEW TICKET"),
@@ -125,34 +183,44 @@ class _MyTicketsPageState extends State<MyTicketsPage> {
     );
   }
 
-  Widget _buildDropdown(String value, List<String> items, Function(String?) onChanged) {
+  Widget _buildDropdown(String value, Map<String, String> items, Function(String?) onChanged) {
     return DropdownButtonFormField<String>(
       value: value,
       isExpanded: true,
-      items: items.map((e) => DropdownMenuItem(value: e, child: Text(e, style: const TextStyle(fontSize: 14)))).toList(),
+      items: items.entries.map((e) => DropdownMenuItem(value: e.key, child: Text(e.value, style: const TextStyle(fontSize: 14)))).toList(),
       onChanged: onChanged,
     );
   }
 
-  DataRow _buildDataRow(BuildContext context, String id, String title, String priority, String status, String category) {
+  DataRow _buildDataRow(BuildContext context, SupportTicket ticket) {
     return DataRow(cells: [
-      DataCell(Text(id)),
-      DataCell(Text(title, style: const TextStyle(fontWeight: FontWeight.bold))),
-      DataCell(_buildBadge(priority)),
-      DataCell(_buildBadge(status)),
-      DataCell(Text(category)),
+      DataCell(Text(ticket.id.toString())),
+      DataCell(Text(ticket.title, style: const TextStyle(fontWeight: FontWeight.bold))),
+      DataCell(_buildBadge(ticket.priority)),
+      DataCell(_buildBadge(ticket.status)),
+      DataCell(Text(ticket.category ?? "N/A")),
       DataCell(IconButton(
         icon: const Icon(Icons.visibility_outlined, size: 20),
-        onPressed: () {},
+        onPressed: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(builder: (context) => LibrarianTicketDetailsPage(ticketId: ticket.id)),
+          ).then((_) => _loadTickets());
+        },
       )),
     ]);
   }
 
   Widget _buildBadge(String text) {
+    Color color = Colors.grey;
+    if (text.toLowerCase() == 'high' || text.toLowerCase() == 'closed') color = Colors.red;
+    if (text.toLowerCase() == 'medium' || text.toLowerCase() == 'pending') color = Colors.orange;
+    if (text.toLowerCase() == 'low' || text.toLowerCase() == 'open') color = Colors.green;
+
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-      decoration: BoxDecoration(color: Colors.white10, borderRadius: BorderRadius.circular(20)),
-      child: Text(text, style: const TextStyle(fontSize: 10)),
+      decoration: BoxDecoration(color: color.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(20), border: Border.all(color: color.withValues(alpha: 0.2))),
+      child: Text(text, style: TextStyle(fontSize: 10, color: color, fontWeight: FontWeight.bold)),
     );
   }
 }

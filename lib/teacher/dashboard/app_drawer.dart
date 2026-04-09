@@ -1,6 +1,7 @@
 import 'package:eduphin/login_logout/login.dart';
 import 'package:eduphin/services/api_service.dart';
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'teacher_dashboard.dart';
 import 'profile.dart';
 import 'virtual_id_page.dart';
@@ -23,6 +24,11 @@ import 'new_class_schedule.dart';
 import 'assignment.dart';
 import 'create_assignment.dart';
 
+// Import for other dashboards if needed for navigation
+import '../../librarian/librarian_dashboard.dart';
+import '../../accountant/dashboard/accountant_dashbard.dart';
+import '../../staff/staff_dashboard/staff_dashboard.dart';
+
 class AppDrawer extends StatefulWidget {
   const AppDrawer({super.key});
 
@@ -31,6 +37,47 @@ class AppDrawer extends StatefulWidget {
 }
 
 class _AppDrawerState extends State<AppDrawer> {
+  int _roleId = 0;
+  String _userName = "User Dashboard";
+
+  @override
+  void initState() {
+    super.initState();
+    _loadUserInfo();
+  }
+
+  Future<void> _loadUserInfo() async {
+    final prefs = await SharedPreferences.getInstance();
+    setState(() {
+      _roleId = prefs.getInt('role_id') ?? 0;
+      _userName = prefs.getString('user_name') ?? _getRoleName(_roleId);
+    });
+  }
+
+  String _getRoleName(int roleId) {
+    switch (roleId) {
+      case Roles.teacher: return "Teacher Dashboard";
+      case Roles.librarian: return "Librarian Dashboard";
+      case Roles.accountant: return "Accountant Dashboard";
+      case Roles.staff: return "Staff Dashboard";
+      case Roles.manager: return "Manager Dashboard";
+      case Roles.moderator: return "Moderator Dashboard";
+      case Roles.superAdmin: return "Super Admin Dashboard";
+      case Roles.student: return "Student Dashboard";
+      default: return "Dashboard";
+    }
+  }
+
+  Widget _getDashboardPage(int roleId) {
+    switch (roleId) {
+      case Roles.teacher: return const TeacherDashboardPage();
+      case Roles.librarian: return const LibrarianDashboard();
+      case Roles.accountant: return const AccountantDashboard();
+      case Roles.staff: return const StaffDashboard();
+      default: return const TeacherDashboardPage(); // Fallback
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -47,7 +94,7 @@ class _AppDrawerState extends State<AppDrawer> {
                 colors: [colorScheme.primary, colorScheme.primaryContainer],
               ),
             ),
-            accountName: const Text("Teacher Dashboard", style: TextStyle(fontWeight: FontWeight.bold)),
+            accountName: Text(_userName, style: const TextStyle(fontWeight: FontWeight.bold)),
             accountEmail: const Text("Eduphin Platform"),
             currentAccountPicture: CircleAvatar(
               backgroundColor: colorScheme.onPrimary.withValues(alpha: 0.2),
@@ -59,7 +106,7 @@ class _AppDrawerState extends State<AppDrawer> {
               padding: EdgeInsets.zero,
               children: [
                 _drawerItem(context, Icons.dashboard_outlined, "Dashboard", () {
-                  Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const TeacherDashboardPage()));
+                  Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => _getDashboardPage(_roleId)));
                 }),
                 
                 _expandableSection(
@@ -75,6 +122,7 @@ class _AppDrawerState extends State<AppDrawer> {
                   ],
                 ),
 
+                if (_roleId == Roles.teacher)
                 _expandableSection(
                   title: "Class Management",
                   icon: Icons.class_outlined,
@@ -88,6 +136,7 @@ class _AppDrawerState extends State<AppDrawer> {
                   ],
                 ),
 
+                if (_roleId == Roles.teacher)
                 _expandableSection(
                   title: "Assignments",
                   icon: Icons.assignment_outlined,
@@ -108,15 +157,18 @@ class _AppDrawerState extends State<AppDrawer> {
                     _drawerItem(context, Icons.info_outline, "Exam Information", () {
                       Navigator.push(context, MaterialPageRoute(builder: (_) => const ExamInformationPage()));
                     }),
-                    _drawerItem(context, Icons.schedule_outlined, "Exam Schedule", () {
-                      Navigator.push(context, MaterialPageRoute(builder: (_) => const ExamSchedulePage()));
-                    }),
-                    _drawerItem(context, Icons.edit_note_outlined, "Marks Entry", () {
-                      Navigator.push(context, MaterialPageRoute(builder: (_) => const MarksEntryPage()));
-                    }),
+                    if (_roleId == Roles.teacher) ...[
+                      _drawerItem(context, Icons.schedule_outlined, "Exam Schedule", () {
+                        Navigator.push(context, MaterialPageRoute(builder: (_) => const ExamSchedulePage()));
+                      }),
+                      _drawerItem(context, Icons.edit_note_outlined, "Marks Entry", () {
+                        Navigator.push(context, MaterialPageRoute(builder: (_) => const MarksEntryPage()));
+                      }),
+                    ],
                   ],
                 ),
 
+                if (_roleId == Roles.teacher)
                 _expandableSection(
                   title: "Study Materials",
                   icon: Icons.library_books_outlined,
@@ -143,6 +195,7 @@ class _AppDrawerState extends State<AppDrawer> {
                   ],
                 ),
 
+                if (_roleId == Roles.teacher)
                 _expandableSection(
                   title: "Schedule",
                   icon: Icons.calendar_today_outlined,

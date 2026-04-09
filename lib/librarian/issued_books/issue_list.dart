@@ -1,6 +1,6 @@
-import 'package:eduphin/services/responsive_helper.dart';
+import '../../services/responsive_helper.dart';
 import 'package:flutter/material.dart';
-import '../../services/api_service.dart';
+import '../../../services/api_service.dart';
 import '../librarian_models.dart';
 import 'edit_issue.dart';
 import 'issue_books.dart';
@@ -183,7 +183,7 @@ class _IssuedBooksListPageState extends State<IssuedBooksListPage> {
                                   scrollDirection: Axis.horizontal,
                                   child: DataTable(
                                     columnSpacing: 24,
-                                    headingRowColor: WidgetStateProperty.all(theme.colorScheme.primary.withOpacity(0.05)),
+                                    headingRowColor: WidgetStateProperty.all(theme.colorScheme.primary.withValues(alpha: 0.05)),
                                     columns: const [
                                       DataColumn(label: Text("#", style: TextStyle(fontWeight: FontWeight.bold))),
                                       DataColumn(label: Text("Title", style: TextStyle(fontWeight: FontWeight.bold))),
@@ -206,9 +206,9 @@ class _IssuedBooksListPageState extends State<IssuedBooksListPage> {
                                             Container(
                                               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                                               decoration: BoxDecoration(
-                                                color: (isReturned ? Colors.green : Colors.orange).withOpacity(0.1),
+                                                color: (isReturned ? Colors.green : Colors.orange).withValues(alpha: 0.1),
                                                 borderRadius: BorderRadius.circular(6),
-                                                border: Border.all(color: (isReturned ? Colors.green : Colors.orange).withOpacity(0.5)),
+                                                border: Border.all(color: (isReturned ? Colors.green : Colors.orange).withValues(alpha: 0.5)),
                                               ),
                                               child: Text(isReturned ? "Returned" : "Issued", 
                                                 style: TextStyle(color: isReturned ? Colors.green : Colors.orange, fontSize: 10, fontWeight: FontWeight.bold)),

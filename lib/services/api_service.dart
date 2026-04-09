@@ -103,9 +103,12 @@ class ApiService {
       if (response.statusCode == 200 && responseData['success'] == true) {
         final token = responseData['token'];
         final roleId = responseData['user']?['role_id'];
+        final userName = responseData['user']?['name'];
         if (token != null && roleId != null) {
           final prefs = await SharedPreferences.getInstance();
           await prefs.setString('auth_token', token);
+          await prefs.setInt('role_id', roleId);
+          if (userName != null) await prefs.setString('user_name', userName);
           return roleId;
         } else {
           throw Exception('Missing token or role.');
@@ -385,7 +388,9 @@ class ApiService {
     final response = await get('librarian/dashboard');
     if (response.statusCode == 200) {
       final data = jsonDecode(response.body);
-      if (data['success'] == true || data['status'] == true) return librarian_model.LibrarianDashboardData.fromJson(data['data']);
+      if (data['success'] == true || data['status'] == true) {
+        return librarian_model.LibrarianDashboardData.fromJson(data['data'] ?? {});
+      }
     }
     throw Exception('Failed to load librarian dashboard');
   }
@@ -394,25 +399,35 @@ class ApiService {
     final response = await get('librarian/exams');
     if (response.statusCode == 200) {
       final data = jsonDecode(response.body);
-      if (data['success'] == true || data['status'] == true) return (data['data'] as List).map((e) => librarian_model.ExamType.fromJson(e)).toList();
+      if (data['success'] == true || data['status'] == true) {
+        final list = (data['data'] is List) ? data['data'] : (data['data']?['data'] as List? ?? []);
+        return (list as List).map<librarian_model.ExamType>((e) => librarian_model.ExamType.fromJson(e)).toList();
+      }
     }
     throw Exception('Failed to load exams');
   }
 
   static Future<Map<String, dynamic>> getLibrarianExamSchedule(String examId) async {
-    final response = await get('librarian/exams/schedule/$examId');
+    final response = await get('librarian/exams/$examId/schedule');
     if (response.statusCode == 200) {
       final data = jsonDecode(response.body);
-      if (data['success'] == true || data['status'] == true) return data['data'];
+      if (data['success'] == true || data['status'] == true) {
+        if (data['data'] is Map<String, dynamic>) return data['data'];
+        if (data['data'] is List) return {'schedules': data['data']};
+        return {};
+      }
     }
     throw Exception('Failed to load exam schedule');
   }
 
-  static Future<List<librarian_model.IssuedBook>> getLibrarianMyIssuedBooks() async {
-    final response = await get('librarian/my-issued-books');
+  static Future<List<librarian_model.IssuedBook>> getLibrarianMyIssuedBooks([Map<String, String>? filters]) async {
+    final response = await get('librarian/my-issued-books', filters ?? {});
     if (response.statusCode == 200) {
       final data = jsonDecode(response.body);
-      if (data['success'] == true || data['status'] == true) return (data['data'] as List).map((e) => librarian_model.IssuedBook.fromJson(e)).toList();
+      if (data['success'] == true || data['status'] == true) {
+        final rawList = (data['data'] is List) ? data['data'] : (data['data']?['data'] as List? ?? []);
+        return (rawList as List).map<librarian_model.IssuedBook>((e) => librarian_model.IssuedBook.fromJson(e)).toList();
+      }
     }
     throw Exception('Failed to load issued books');
   }
@@ -421,7 +436,10 @@ class ApiService {
     final response = await get('librarian/issued-books', filters);
     if (response.statusCode == 200) {
       final data = jsonDecode(response.body);
-      if (data['success'] == true || data['status'] == true) return (data['data'] as List).map((e) => librarian_model.IssuedBook.fromJson(e)).toList();
+      if (data['success'] == true || data['status'] == true) {
+        final rawList = (data['data'] is List) ? data['data'] : (data['data']?['data'] as List? ?? []);
+        return (rawList as List).map<librarian_model.IssuedBook>((e) => librarian_model.IssuedBook.fromJson(e)).toList();
+      }
     }
     throw Exception('Failed to load issued books');
   }
@@ -492,39 +510,47 @@ class ApiService {
     final response = await get('librarian/salary');
     if (response.statusCode == 200) {
       final data = jsonDecode(response.body);
-      if (data['success'] == true || data['status'] == true) return data['data'];
+      // Backend returns view or json. If it's json, we return it.
+      if (data is Map<String, dynamic>) {
+        if (data['success'] == true || data['status'] == true) return data['data'] ?? data;
+        return data;
+      }
     }
+    // If it's a 200 but not valid JSON (maybe HTML), the jsonDecode will fail or we handle it here
     throw Exception('Failed to load salaries');
   }
 
   static Future<Map<String, dynamic>> getLibrarianSalarySlip(String salaryId) async {
-    final response = await get('librarian/salary/slip/$salaryId');
+    final response = await get('librarian/salary/$salaryId');
     if (response.statusCode == 200) {
       final data = jsonDecode(response.body);
-      if (data['success'] == true || data['status'] == true) return data['data'];
+      if (data is Map<String, dynamic>) {
+        if (data['success'] == true || data['status'] == true) return data['data'] ?? data;
+        return data;
+      }
     }
     throw Exception('Failed to load salary slip');
   }
 
   static Future<teacher_library.BookPagination> getLibrarianBooks(Map<String, String> filters, int page) async {
     final query = Map<String, String>.from(filters)..['page'] = page.toString();
-    final response = await get('librarian/library/books', query);
+    final response = await get('librarian/books', query);
     if (response.statusCode == 200) return teacher_library.BookPagination.fromJson(jsonDecode(response.body)['data'] ?? jsonDecode(response.body));
     throw Exception('Failed to load books');
   }
 
   static Future<void> createLibrarianBook(Map<String, dynamic> data) async {
-    final response = await post('librarian/library/books', data);
-    if (response.statusCode != 200) throw Exception('Failed to add book');
+    final response = await post('librarian/books', data);
+    if (response.statusCode != 200 && response.statusCode != 201) throw Exception('Failed to add book');
   }
 
   static Future<void> updateLibrarianBook(String bookId, Map<String, dynamic> data) async {
-    final response = await post('librarian/library/books/$bookId/update', data);
+    final response = await post('librarian/books/$bookId/update', data);
     if (response.statusCode != 200) throw Exception('Failed to update book');
   }
 
   static Future<void> deleteLibrarianBook(String bookId) async {
-    final response = await delete('librarian/library/books/$bookId');
+    final response = await delete('librarian/books/$bookId');
     if (response.statusCode != 200) throw Exception('Failed to delete book');
   }
 
@@ -535,7 +561,10 @@ class ApiService {
     final response = await get('librarian/events', query);
     if (response.statusCode == 200) {
       final data = jsonDecode(response.body);
-      if (data['success'] == true || data['status'] == true) return (data['data'] as List).map((e) => librarian_model.Event.fromJson(e)).toList();
+      if (data['success'] == true || data['status'] == true) {
+        final list = (data['data'] is List) ? data['data'] : (data['data']?['data'] as List? ?? []);
+        return (list as List).map<librarian_model.Event>((e) => librarian_model.Event.fromJson(e)).toList();
+      }
     }
     throw Exception('Failed to load events');
   }
@@ -549,7 +578,10 @@ class ApiService {
     final response = await get('librarian/events/registered');
     if (response.statusCode == 200) {
       final data = jsonDecode(response.body);
-      if (data['success'] == true || data['status'] == true) return (data['data'] as List).map((e) => librarian_model.EventRegistration.fromJson(e)).toList();
+      if (data['success'] == true || data['status'] == true) {
+        final list = (data['data'] is List) ? data['data'] : (data['data']?['data'] as List? ?? []);
+        return (list as List).map<librarian_model.EventRegistration>((e) => librarian_model.EventRegistration.fromJson(e)).toList();
+      }
     }
     throw Exception('Failed to load registered events');
   }
@@ -557,6 +589,68 @@ class ApiService {
   static Future<void> cancelLibrarianEventRegistration(String registrationId) async {
     final response = await post('librarian/events/cancel/$registrationId', {});
     if (response.statusCode != 200) throw Exception('Failed to cancel');
+  }
+
+  static Future<List<librarian_model.SupportTicket>> getLibrarianTickets(Map<String, String> filters) async {
+    final query = Map<String, String>.from(filters)..removeWhere((k, v) => v.isEmpty || v == 'all');
+    final response = await get('librarian/tickets', query);
+    if (response.statusCode == 200) {
+      final data = jsonDecode(response.body);
+      if (data['success'] == true || data['status'] == true) {
+        final list = (data['data'] is List) ? data['data'] : (data['data']?['data'] as List? ?? []);
+        return (list as List).map<librarian_model.SupportTicket>((j) => librarian_model.SupportTicket.fromJson(j)).toList();
+      }
+    }
+    throw Exception('Failed to load tickets');
+  }
+
+  static Future<List<librarian_model.SupportTicket>> getLibrarianAssignedTickets(Map<String, String> filters) async {
+    final query = Map<String, String>.from(filters)..removeWhere((k, v) => v.isEmpty || v == 'all');
+    final response = await get('librarian/tickets/assigned', query);
+    if (response.statusCode == 200) {
+      final data = jsonDecode(response.body);
+      if (data['success'] == true || data['status'] == true) {
+        final list = (data['data'] is List) ? data['data'] : (data['data']?['data'] as List? ?? []);
+        return (list as List).map<librarian_model.SupportTicket>((j) => librarian_model.SupportTicket.fromJson(j)).toList();
+      }
+    }
+    throw Exception('Failed to load assigned tickets');
+  }
+
+  static Future<void> createLibrarianTicket(Map<String, dynamic> data) async {
+    final response = await post('librarian/tickets', data);
+    if (response.statusCode != 200 && response.statusCode != 201) throw Exception(jsonDecode(response.body)['message'] ?? 'Failed to create ticket');
+  }
+
+  static Future<void> updateLibrarianTicketStatus(String ticketId, String status) async {
+    final response = await post('librarian/tickets/status/$ticketId', {'status': status});
+    if (response.statusCode != 200) throw Exception(jsonDecode(response.body)['message'] ?? 'Failed to update status');
+  }
+
+  static Future<teacher_ticket_details.TicketDetails> getLibrarianTicketDetails(String ticketId) async {
+    final response = await get('librarian/tickets/$ticketId/replies');
+    if (response.statusCode == 200) {
+      final data = jsonDecode(response.body);
+      if (data['success'] == true || data['status'] == true) return teacher_ticket_details.TicketDetails.fromJson(data['data']);
+    }
+    throw Exception('Failed to load ticket details');
+  }
+
+  static Future<void> replyLibrarianTicket(String ticketId, Map<String, String> fields, {File? attachment}) async {
+    final files = attachment != null ? {'attachment': attachment} : null;
+    final response = await postMultipart('librarian/tickets/$ticketId/reply', fields, files: files);
+    if (response.statusCode != 200) throw Exception(jsonDecode(await response.stream.bytesToString())['message'] ?? 'Failed to add reply');
+  }
+
+  static Future<staff_model.StaffVirtualIdCardData> getLibrarianVirtualIdCard() async {
+    final response = await get('librarian/virtual-id-card');
+    if (response.statusCode == 200) {
+      final data = jsonDecode(response.body);
+      if (data['success'] == true || data['status'] == true) {
+        return staff_model.StaffVirtualIdCardData.fromJson(data['data'] ?? {});
+      }
+    }
+    throw Exception('Failed to load virtual ID card');
   }
 
   static Future<teacher_ticket_details.TicketDetails> getTicketDetailsAccountant(String id) async {

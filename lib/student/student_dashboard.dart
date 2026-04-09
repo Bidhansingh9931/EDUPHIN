@@ -300,7 +300,7 @@ class _StudentDashboardState extends State<StudentDashboard> {
         const SizedBox(height: 12),
         _buildUpcomingEvents(),
         const SizedBox(height: 32),
-        
+
         _buildSectionHeader(context, Icons.assignment_turned_in_rounded, "Available Exams", onTap: () {
           Navigator.push(context, MaterialPageRoute(builder: (_) => const ExamSchedulePage()));
         }),
@@ -349,7 +349,7 @@ class _StudentDashboardState extends State<StudentDashboard> {
                 borderRadius: BorderRadius.circular(8),
                 border: Border.all(color: (isReg ? Colors.green : Colors.blue).withValues(alpha: 0.5)),
               ),
-              child: Text(isReg ? "REGISTERED" : "OPEN", 
+              child: Text(isReg ? "REGISTERED" : "OPEN",
                 style: TextStyle(color: isReg ? Colors.green : Colors.blue, fontWeight: FontWeight.bold, fontSize: 10)),
             ),
           ),

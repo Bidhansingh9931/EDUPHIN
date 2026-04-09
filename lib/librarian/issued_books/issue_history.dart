@@ -13,7 +13,7 @@ class IssueHistoryPage extends StatefulWidget {
 class _IssueHistoryPageState extends State<IssueHistoryPage> {
   final TextEditingController _fromController = TextEditingController();
   final TextEditingController _toController = TextEditingController();
-  
+
   bool _isLoading = true;
   List<dynamic> _logs = [];
 

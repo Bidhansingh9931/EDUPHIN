@@ -30,7 +30,12 @@ class _MyLendingBooksPageState extends State<MyLendingBooksPage> {
     if (!mounted) return;
     setState(() => _isLoading = true);
     try {
-      final books = await ApiService.getLibrarianMyIssuedBooks();
+      final filters = {
+        'book_title': _bookTitleController.text,
+        'date_from': _dateFromController.text,
+        'date_to': _dateToController.text,
+      };
+      final books = await ApiService.getLibrarianMyIssuedBooks(filters);
       if (!mounted) return;
       setState(() {
         _myIssuedBooks = books;
@@ -161,7 +166,7 @@ class _MyLendingBooksPageState extends State<MyLendingBooksPage> {
                                 SingleChildScrollView(
                                   scrollDirection: Axis.horizontal,
                                   child: DataTable(
-                                    headingRowColor: WidgetStateProperty.all(theme.colorScheme.primary.withOpacity(0.05)),
+                                    headingRowColor: WidgetStateProperty.all(theme.colorScheme.primary.withValues(alpha: 0.05)),
                                     columnSpacing: 25,
                                     columns: const [
                                       DataColumn(label: Text("#", style: TextStyle(fontWeight: FontWeight.bold))),
@@ -250,16 +255,22 @@ class _MyLendingBooksPageState extends State<MyLendingBooksPage> {
       margin: const EdgeInsets.only(left: 8),
       padding: const EdgeInsets.all(8),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.1),
+        color: color.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: color.withOpacity(0.2)),
+        border: Border.all(color: color.withValues(alpha: 0.2)),
       ),
       child: Icon(icon, color: color, size: 16),
     );
   }
 
   DataRow _buildDataRow(BuildContext context, String hash, IssuedBook ib) {
-    bool isOverdue = ib.returnedAt == null && ib.dueDate != null && DateTime.parse(ib.dueDate!).isBefore(DateTime.now());
+    bool isOverdue = false;
+    try {
+      if (ib.returnedAt == null && ib.dueDate != null && ib.dueDate!.isNotEmpty) {
+        isOverdue = DateTime.parse(ib.dueDate!).isBefore(DateTime.now());
+      }
+    } catch (_) {}
+
     final statusColor = ib.returnedAt != null ? Colors.green : (isOverdue ? Colors.red : Colors.orange);
     
     return DataRow(cells: [
@@ -271,9 +282,9 @@ class _MyLendingBooksPageState extends State<MyLendingBooksPage> {
       DataCell(Container(
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
         decoration: BoxDecoration(
-          color: statusColor.withOpacity(0.1),
+          color: statusColor.withValues(alpha: 0.1),
           borderRadius: BorderRadius.circular(6),
-          border: Border.all(color: statusColor.withOpacity(0.5)),
+          border: Border.all(color: statusColor.withValues(alpha: 0.5)),
         ),
         child: Text(
           ib.returnedAt != null ? "RETURNED" : (isOverdue ? "OVERDUE" : "PENDING"), 

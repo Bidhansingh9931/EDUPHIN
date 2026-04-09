@@ -159,7 +159,7 @@ class _TeacherDashboardPageState extends State<TeacherDashboardPage> {
   Widget _buildProfileOverview(UserDetail user) {
     final theme = Theme.of(context);
     final baseUrl = ApiService.baseUrl.replaceFirst('api/', '');
-    final photoUrl = user.photo != null ? '$baseUrl${user.photo}' : null;
+    final photoUrl = user.photo != null ? "${ApiService.baseImageUrl}/storage/${user.photo}" : null;
 
     return Card(
       child: Padding(

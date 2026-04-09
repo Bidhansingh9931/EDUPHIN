@@ -1,4 +1,4 @@
-import 'package:eduphin/services/responsive_helper.dart';
+import '../../services/responsive_helper.dart';
 import 'package:flutter/material.dart';
 import '../../services/api_service.dart';
 import 'package:eduphin/teacher/dashboard/library_models.dart';

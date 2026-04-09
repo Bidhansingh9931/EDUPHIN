@@ -27,16 +27,16 @@ class LibrarianDashboardData {
 
   factory LibrarianDashboardData.fromJson(Map<String, dynamic> json) {
     return LibrarianDashboardData(
-      userDetail: json['userDetail'] != null ? UserDetail.fromJson(json['userDetail']) : null,
-      lastSalary: json['lastSalary'] != null ? Salary.fromJson(json['lastSalary']) : null,
-      events: (json['events'] as List? ?? []).map((e) => Event.fromJson(e)).toList(),
-      instituteExams: (json['instituteexam'] as List? ?? []).map((e) => ExamType.fromJson(e)).toList(),
-      tickets: (json['tickets'] as List? ?? []).map((e) => SupportTicket.fromJson(e)).toList(),
-      assignedTickets: (json['assigntickets'] as List? ?? []).map((e) => SupportTicket.fromJson(e)).toList(),
-      books: (json['books'] as List? ?? []).map((e) => Book.fromJson(e)).toList(),
-      issuedBooks: (json['issuebook'] as List? ?? []).map((e) => IssuedBook.fromJson(e)).toList(),
-      overdueBooks: (json['overduebook'] as List? ?? []).map((e) => IssuedBook.fromJson(e)).toList(),
-      totalBooksQuantity: json['totalBooksQuantity'] ?? 0,
+      userDetail: (json['userDetail'] is Map<String, dynamic>) ? UserDetail.fromJson(json['userDetail']) : null,
+      lastSalary: (json['lastSalary'] is Map<String, dynamic>) ? Salary.fromJson(json['lastSalary']) : null,
+      events: (json['events'] as List? ?? []).map((e) => Event.fromJson(e is Map<String, dynamic> ? e : {})).toList(),
+      instituteExams: (json['instituteexam'] as List? ?? []).map((e) => ExamType.fromJson(e is Map<String, dynamic> ? e : {})).toList(),
+      tickets: (json['tickets'] as List? ?? []).map((e) => SupportTicket.fromJson(e is Map<String, dynamic> ? e : {})).toList(),
+      assignedTickets: (json['assigntickets'] as List? ?? []).map((e) => SupportTicket.fromJson(e is Map<String, dynamic> ? e : {})).toList(),
+      books: (json['books'] as List? ?? []).map((e) => Book.fromJson(e is Map<String, dynamic> ? e : {})).toList(),
+      issuedBooks: (json['issuebook'] as List? ?? []).map((e) => IssuedBook.fromJson(e is Map<String, dynamic> ? e : {})).toList(),
+      overdueBooks: (json['overduebook'] as List? ?? []).map((e) => IssuedBook.fromJson(e is Map<String, dynamic> ? e : {})).toList(),
+      totalBooksQuantity: int.tryParse(json['totalBooksQuantity']?.toString() ?? '0') ?? 0,
     );
   }
 }
@@ -92,8 +92,8 @@ class UserDetail {
 
   factory UserDetail.fromJson(Map<String, dynamic> json) {
     return UserDetail(
-      id: json['id'] ?? 0,
-      userId: json['user_id'] ?? 0,
+      id: int.tryParse(json['id']?.toString() ?? '0') ?? 0,
+      userId: int.tryParse(json['user_id']?.toString() ?? '0') ?? 0,
       firstName: json['first_name']?.toString(),
       lastName: json['last_name']?.toString(),
       photo: json['photo']?.toString(),
@@ -135,7 +135,7 @@ class Salary {
 
   factory Salary.fromJson(Map<String, dynamic> json) {
     return Salary(
-      id: json['id'] ?? 0,
+      id: int.tryParse(json['id']?.toString() ?? '0') ?? 0,
       amount: json['amount']?.toString() ?? '0',
       paymentDate: (json['payment_date'] ?? json['created_at'])?.toString(),
       status: json['status']?.toString(),
@@ -170,7 +170,7 @@ class Event {
 
   factory Event.fromJson(Map<String, dynamic> json) {
     return Event(
-      id: json['id'] ?? 0,
+      id: int.tryParse(json['id']?.toString() ?? '0') ?? 0,
       title: json['title']?.toString() ?? 'N/A',
       description: json['description']?.toString(),
       eventDate: json['event_date']?.toString(),
@@ -205,9 +205,9 @@ class EventRegistration {
 
   factory EventRegistration.fromJson(Map<String, dynamic> json) {
     return EventRegistration(
-      id: json['id'] ?? 0,
-      eventId: json['event_id'] ?? 0,
-      userId: json['user_id'] ?? 0,
+      id: int.tryParse(json['id']?.toString() ?? '0') ?? 0,
+      eventId: int.tryParse(json['event_id']?.toString() ?? '0') ?? 0,
+      userId: int.tryParse(json['user_id']?.toString() ?? '0') ?? 0,
       status: json['status']?.toString() ?? 'Unknown',
       registeredAt: json['registered_at']?.toString(),
       reasonForCancel: json['reason_for_cancel']?.toString(),
@@ -229,7 +229,7 @@ class ExamType {
 
   factory ExamType.fromJson(Map<String, dynamic> json) {
     return ExamType(
-      id: json['id'] ?? 0,
+      id: int.tryParse(json['id']?.toString() ?? '0') ?? 0,
       name: json['name']?.toString() ?? 'N/A',
       status: json['status']?.toString(),
     );
@@ -259,7 +259,7 @@ class SupportTicket {
 
   factory SupportTicket.fromJson(Map<String, dynamic> json) {
     return SupportTicket(
-      id: json['id'] ?? 0,
+      id: int.tryParse(json['id']?.toString() ?? '0') ?? 0,
       title: json['title']?.toString() ?? 'N/A',
       description: json['description']?.toString(),
       priority: json['priority']?.toString() ?? 'Low',
@@ -292,7 +292,7 @@ class Book {
 
   factory Book.fromJson(Map<String, dynamic> json) {
     return Book(
-      id: json['id'] ?? 0,
+      id: int.tryParse(json['id']?.toString() ?? '0') ?? 0,
       title: json['title']?.toString() ?? 'N/A',
       author: json['author']?.toString(),
       isbn: json['isbn']?.toString(),
@@ -325,14 +325,15 @@ class IssuedBook {
   });
 
   factory IssuedBook.fromJson(Map<String, dynamic> json) {
+    final lender = json['lender'] ?? json['issued_to_user'] ?? json['user'];
     return IssuedBook(
-      id: json['id'] ?? 0,
-      bookId: json['book_id'] ?? 0,
-      issuedToId: json['issued_to'] ?? json['lender']?['id'],
-      bookTitle: json['book']?['title']?.toString(),
-      lenderName: json['lender']?['name']?.toString(),
+      id: int.tryParse(json['id']?.toString() ?? '0') ?? 0,
+      bookId: int.tryParse(json['book_id']?.toString() ?? '0') ?? 0,
+      issuedToId: int.tryParse(json['issued_to']?.toString() ?? '') ?? int.tryParse(lender?['id']?.toString() ?? ''),
+      bookTitle: (json['book']?['title'] ?? json['book_title'])?.toString(),
+      lenderName: (lender?['name'] ?? lender?['full_name'])?.toString(),
       issuedAt: (json['issued_at'] ?? json['created_at'])?.toString(),
-      dueDate: json['due_date']?.toString(),
+      dueDate: (json['due_date'] ?? json['return_date'])?.toString(),
       returnedAt: json['returned_at']?.toString(),
     );
   }

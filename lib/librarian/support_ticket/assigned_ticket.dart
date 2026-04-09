@@ -1,4 +1,9 @@
 import 'package:flutter/material.dart';
+import '../../services/api_service.dart';
+import '../librarian_models.dart';
+import '../../services/responsive_helper.dart';
+
+import 'ticket_details.dart';
 
 class AssignedTicketsPage extends StatefulWidget {
   const AssignedTicketsPage({super.key});
@@ -8,170 +13,189 @@ class AssignedTicketsPage extends StatefulWidget {
 }
 
 class _AssignedTicketsPageState extends State<AssignedTicketsPage> {
-  static const Color bgColor = Color(0xFF0B0D18);
-  static const Color cardColor = Color(0xFF1B2238);
-  static const Color fieldColor = Color(0xFF323B5C);
-  static const Color blueBtn = Color(0xFF2563EB);
+  String selectedPriority = "all";
+  String selectedStatus = "all";
+  String searchQuery = "";
+  late Future<List<SupportTicket>> _ticketsFuture;
 
-  String selectedPriority = "All Priorities";
-  String selectedStatus = "All Statuses";
+  @override
+  void initState() {
+    super.initState();
+    _loadTickets();
+  }
+
+  void _loadTickets() {
+    setState(() {
+      _ticketsFuture = ApiService.getLibrarianAssignedTickets({
+        'priority': selectedPriority,
+        'status': selectedStatus,
+        'search': searchQuery,
+      });
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     return Scaffold(
-      backgroundColor: bgColor,
       appBar: AppBar(
-        backgroundColor: bgColor,
-        elevation: 0,
-        leading: const Icon(Icons.assignment_outlined, color: Colors.white, size: 24),
-        title: const Text("Assigned Tickets",
-            style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 18)),
+        title: const Text("Assigned Tickets"),
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          children: [
-            /// FILTER SECTION
-            Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: cardColor,
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Column(
-                children: [
-                  buildSearchField(),
-                  const SizedBox(height: 12),
-                  buildDropdown(selectedPriority, ["All Priorities", "Low", "Medium", "High"], (val) {
-                    setState(() => selectedPriority = val!);
-                  }),
-                  const SizedBox(height: 12),
-                  buildDropdown(selectedStatus, ["All Statuses", "Open", "Closed", "Pending"], (val) {
-                    setState(() => selectedStatus = val!);
-                  }),
-                ],
-              ),
-            ),
-
-            const SizedBox(height: 20),
-
-            /// DATA TABLE SECTION
-            Container(
-              width: double.infinity,
-              decoration: BoxDecoration(
-                color: cardColor,
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Column(
-                children: [
-                  SingleChildScrollView(
-                    scrollDirection: Axis.horizontal,
-                    child: DataTable(
-                      headingRowColor: MaterialStateProperty.all(const Color(0xFF2D3748)),
-                      columnSpacing: 25,
-                      columns: const [
-                        DataColumn(label: Text("#ID", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold))),
-                        DataColumn(label: Text("Issue By", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold))),
-                        DataColumn(label: Text("Title", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold))),
-                        DataColumn(label: Text("Priority", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold))),
-                        DataColumn(label: Text("Status", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold))),
-                        DataColumn(label: Text("Category", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold))),
-                        DataColumn(label: Text("Created At", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold))),
-                        DataColumn(label: Text("Action", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold))),
-                      ],
-                      rows: [
-                        buildDataRow("4", "Nisha\nRao", "Issue with\nFee\nPayment\nPortal", "Low", "Open", "Payment\nProblem", "09 Oct, 2025"),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  Align(
-                    alignment: Alignment.centerRight,
-                    child: Padding(
-                      padding: const EdgeInsets.only(right: 16.0, bottom: 16.0),
-                      child: ElevatedButton.icon(
-                        onPressed: () {},
-                        icon: const Icon(Icons.speaker_notes_outlined, color: Colors.white, size: 18),
-                        label: const Text("VIEW/REPLY", style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold)),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFF374151),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      body: RefreshIndicator(
+        onRefresh: () async => _loadTickets(),
+        child: SingleChildScrollView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          padding: context.pagePadding,
+          child: Column(
+            children: [
+              /// FILTER SECTION
+              Card(
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    children: [
+                      _buildResponsiveRow(context, [
+                        TextField(
+                          onChanged: (val) {
+                            setState(() => searchQuery = val);
+                            _loadTickets();
+                          },
+                          decoration: const InputDecoration(
+                            hintText: "Search by Title...",
+                            prefixIcon: Icon(Icons.search),
+                          ),
                         ),
-                      ),
-                    ),
+                        _buildDropdown(selectedPriority, {
+                          "all": "All Priorities",
+                          "low": "Low",
+                          "medium": "Medium",
+                          "high": "High"
+                        }, (val) {
+                          setState(() => selectedPriority = val!);
+                          _loadTickets();
+                        }),
+                      ]),
+                      const SizedBox(height: 12),
+                      _buildDropdown(selectedStatus, {
+                        "all": "All Statuses",
+                        "open": "Open",
+                        "closed": "Closed",
+                        "pending": "Pending"
+                      }, (val) {
+                        setState(() => selectedStatus = val!);
+                        _loadTickets();
+                      }),
+                    ],
                   ),
-                ],
+                ),
               ),
-            ),
-          ],
+
+              const SizedBox(height: 20),
+
+              /// DATA TABLE SECTION
+              Card(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: Text("Tickets Assigned to You", style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
+                    ),
+                    const Divider(height: 1),
+                    FutureBuilder<List<SupportTicket>>(
+                      future: _ticketsFuture,
+                      builder: (context, snapshot) {
+                        if (snapshot.connectionState == ConnectionState.waiting) {
+                          return const Padding(
+                            padding: EdgeInsets.all(20.0),
+                            child: Center(child: CircularProgressIndicator()),
+                          );
+                        } else if (snapshot.hasError) {
+                          return Padding(
+                            padding: const EdgeInsets.all(20.0),
+                            child: Center(child: Text("Error: ${snapshot.error}")),
+                          );
+                        } else if (!snapshot.hasData || snapshot.data!.isEmpty) {
+                          return const Padding(
+                            padding: EdgeInsets.all(20.0),
+                            child: Center(child: Text("No assigned tickets found")),
+                          );
+                        }
+
+                        return SingleChildScrollView(
+                          scrollDirection: Axis.horizontal,
+                          child: DataTable(
+                            headingRowColor: WidgetStateProperty.all(theme.colorScheme.primary.withValues(alpha: 0.05)),
+                            columnSpacing: 25,
+                            columns: const [
+                              DataColumn(label: Text("#ID", style: TextStyle(fontWeight: FontWeight.bold))),
+                              DataColumn(label: Text("Title", style: TextStyle(fontWeight: FontWeight.bold))),
+                              DataColumn(label: Text("Priority", style: TextStyle(fontWeight: FontWeight.bold))),
+                              DataColumn(label: Text("Status", style: TextStyle(fontWeight: FontWeight.bold))),
+                              DataColumn(label: Text("Category", style: TextStyle(fontWeight: FontWeight.bold))),
+                              DataColumn(label: Text("Action", style: TextStyle(fontWeight: FontWeight.bold))),
+                            ],
+                            rows: snapshot.data!.map((ticket) => _buildDataRow(context, ticket)).toList(),
+                          ),
+                        );
+                      },
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
   }
 
-  Widget buildSearchField() {
-    return Container(
-      height: 45,
-      decoration: BoxDecoration(color: fieldColor, borderRadius: BorderRadius.circular(8)),
-      child: const TextField(
-        style: TextStyle(color: Colors.white, fontSize: 14),
-        decoration: InputDecoration(
-          hintText: "Search by Title...",
-          hintStyle: TextStyle(color: Colors.white38, fontSize: 14),
-          border: InputBorder.none,
-          contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-        ),
-      ),
+  Widget _buildResponsiveRow(BuildContext context, List<Widget> children) {
+    if (!context.isTablet) return Column(children: children);
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: children.map((c) => Expanded(child: Padding(padding: const EdgeInsets.only(right: 12), child: c))).toList(),
     );
   }
 
-  Widget buildDropdown(String value, List<String> items, Function(String?) onChanged) {
-    return Container(
-      height: 45,
-      padding: const EdgeInsets.symmetric(horizontal: 16),
-      decoration: BoxDecoration(color: fieldColor, borderRadius: BorderRadius.circular(8)),
-      child: DropdownButtonHideUnderline(
-        child: DropdownButton<String>(
-          value: value,
-          isExpanded: true,
-          dropdownColor: fieldColor,
-          icon: const Icon(Icons.keyboard_arrow_down, color: Colors.white54),
-          style: const TextStyle(color: Colors.white, fontSize: 14),
-          items: items.map((e) => DropdownMenuItem(value: e, child: Text(e))).toList(),
-          onChanged: onChanged,
-        ),
-      ),
+  Widget _buildDropdown(String value, Map<String, String> items, Function(String?) onChanged) {
+    return DropdownButtonFormField<String>(
+      value: value,
+      isExpanded: true,
+      items: items.entries.map((e) => DropdownMenuItem(value: e.key, child: Text(e.value, style: const TextStyle(fontSize: 14)))).toList(),
+      onChanged: onChanged,
     );
   }
 
-  DataRow buildDataRow(String id, String by, String title, String priority, String status, String category, String date) {
+  DataRow _buildDataRow(BuildContext context, SupportTicket ticket) {
     return DataRow(cells: [
-      DataCell(Text(id, style: const TextStyle(color: Colors.white70))),
-      DataCell(Text(by, style: const TextStyle(color: Colors.white, fontSize: 13))),
-      DataCell(Text(title, style: const TextStyle(color: Colors.white, fontSize: 13))),
-      DataCell(Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-        decoration: BoxDecoration(color: Colors.white12, borderRadius: BorderRadius.circular(20)),
-        child: Text(priority, style: const TextStyle(color: Colors.white70, fontSize: 11)),
-      )),
-      DataCell(Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-        decoration: BoxDecoration(color: Colors.white12, borderRadius: BorderRadius.circular(20)),
-        child: Text(status, style: const TextStyle(color: Colors.white70, fontSize: 11)),
-      )),
-      DataCell(Text(category, style: const TextStyle(color: Colors.white70, fontSize: 12))),
-      DataCell(Text(date, style: const TextStyle(color: Colors.white70, fontSize: 12))),
-      DataCell(Container(
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-        decoration: BoxDecoration(color: Colors.white12, borderRadius: BorderRadius.circular(20)),
-        child: const Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text("Open", style: TextStyle(color: Colors.white70, fontSize: 11)),
-            Icon(Icons.keyboard_arrow_down, color: Colors.white54, size: 14),
-          ],
-        ),
+      DataCell(Text(ticket.id.toString())),
+      DataCell(Text(ticket.title, style: const TextStyle(fontWeight: FontWeight.bold))),
+      DataCell(_buildBadge(ticket.priority)),
+      DataCell(_buildBadge(ticket.status)),
+      DataCell(Text(ticket.category ?? "N/A")),
+      DataCell(IconButton(
+        icon: const Icon(Icons.visibility_outlined, size: 20),
+        onPressed: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(builder: (context) => LibrarianTicketDetailsPage(ticketId: ticket.id)),
+          ).then((_) => _loadTickets());
+        },
       )),
     ]);
+  }
+
+  Widget _buildBadge(String text) {
+    Color color = Colors.grey;
+    if (text.toLowerCase() == 'high' || text.toLowerCase() == 'closed') color = Colors.red;
+    if (text.toLowerCase() == 'medium' || text.toLowerCase() == 'pending') color = Colors.orange;
+    if (text.toLowerCase() == 'low' || text.toLowerCase() == 'open') color = Colors.green;
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      decoration: BoxDecoration(color: color.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(20), border: Border.all(color: color.withValues(alpha: 0.2))),
+      child: Text(text, style: TextStyle(fontSize: 10, color: color, fontWeight: FontWeight.bold)),
+    );
   }
 }

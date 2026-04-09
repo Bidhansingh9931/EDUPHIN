@@ -1,6 +1,6 @@
-import 'package:eduphin/services/responsive_helper.dart';
+import '../../services/responsive_helper.dart';
 import 'package:flutter/material.dart';
-import '../../services/api_service.dart';
+import '../../../services/api_service.dart';
 import 'issue_list.dart';
 import 'package:intl/intl.dart';
 

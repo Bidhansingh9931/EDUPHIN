@@ -120,7 +120,7 @@ class _ExaminationListPageState extends State<ExaminationListPage> {
       child: ExpansionTile(
         shape: const RoundedRectangleBorder(side: BorderSide.none),
         leading: CircleAvatar(
-          backgroundColor: theme.colorScheme.primary.withOpacity(0.1),
+          backgroundColor: theme.colorScheme.primary.withValues(alpha: 0.1),
           child: Icon(Icons.assignment_outlined, color: theme.colorScheme.primary),
         ),
         title: Text(exam.name, style: const TextStyle(fontWeight: FontWeight.bold)),

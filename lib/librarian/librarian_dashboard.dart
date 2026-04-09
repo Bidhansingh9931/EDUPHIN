@@ -2,6 +2,7 @@ import 'package:eduphin/services/responsive_helper.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../services/api_service.dart';
+import 'virtual_id_card.dart';
 import 'librarian_models.dart';
 import 'books/all_books.dart';
 import 'books/add_new_books.dart';
@@ -43,561 +44,328 @@ class _LibrarianDashboardState extends State<LibrarianDashboard> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
 
     return Scaffold(
-      body: SafeArea(
-        child: FutureBuilder<LibrarianDashboardData>(
-          future: _dashboardData,
-          builder: (context, snapshot) {
-            if (snapshot.connectionState == ConnectionState.waiting) {
-              return const Center(child: CircularProgressIndicator());
-            } else if (snapshot.hasError) {
-              return Center(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Text("Error: ${snapshot.error}"),
-                    const SizedBox(height: 16),
-                    ElevatedButton(
-                      onPressed: _refreshData,
-                      child: const Text("Retry"),
-                    )
-                  ],
-                ),
-              );
-            } else if (!snapshot.hasData) {
-              return const Center(child: Text("No data found"));
-            }
-
-            final data = snapshot.data!;
-            final user = data.userDetail;
-            final salary = data.lastSalary;
-
-            return RefreshIndicator(
-              onRefresh: _refreshData,
-              child: SingleChildScrollView(
-                padding: context.pagePadding,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    /// HEADER
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                "Welcome, ${user?.fullName ?? 'Librarian'}",
-                                style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
-                              ),
-                              Text(
-                                "Librarian / Resource Management",
-                                style: theme.textTheme.bodySmall?.copyWith(color: theme.hintColor),
-                              ),
-                              const SizedBox(height: 4),
-                              Text(
-                                DateFormat('EEEE, MMMM d, yyyy').format(DateTime.now()),
-                                style: theme.textTheme.labelSmall?.copyWith(color: theme.hintColor),
-                              ),
-                            ],
-                          ),
-                        ),
-                        Container(
-                          width: 50,
-                          height: 50,
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            border: Border.all(color: colorScheme.outline, width: 2),
-                            image: user?.photo != null
-                                ? DecorationImage(
-                                    image: NetworkImage("${ApiService.baseImageUrl}/storage/${user!.photo}"),
-                                    fit: BoxFit.cover,
-                                  )
-                                : null,
-                          ),
-                          child: user?.photo == null
-                              ? Center(
-                                  child: Text(
-                                    user?.firstName?.substring(0, 1).toUpperCase() ?? "L",
-                                    style: TextStyle(
-                                        color: colorScheme.primary,
-                                        fontWeight: FontWeight.bold,
-                                        fontSize: 16),
-                                  ),
-                                )
-                              : null,
-                        )
-                      ],
-                    ),
-
-                    const SizedBox(height: 24),
-
-                    /// PROFILE OVERVIEW
-                    SectionWrapper(
-                      title: "Profile overview",
-                      child: InkWell(
-                        onTap: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(builder: (context) => const LibrarianProfilePage()),
-                          );
-                        },
-                        child: Column(
-                          children: [
-                            CircleAvatar(
-                              radius: 35,
-                              backgroundColor: colorScheme.primary.withValues(alpha: 0.1),
-                              backgroundImage: user?.photo != null
-                                  ? NetworkImage("${ApiService.baseImageUrl}/storage/${user!.photo}")
-                                  : null,
-                              child: user?.photo == null
-                                  ? Text(user?.firstName?.substring(0, 1).toUpperCase() ?? "L",
-                                      style: TextStyle(
-                                          color: colorScheme.primary,
-                                          fontSize: 20,
-                                          fontWeight: FontWeight.bold))
-                                  : null,
-                            ),
-                            const SizedBox(height: 12),
-                            Text(
-                              user?.fullName ?? "N/A",
-                              style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
-                            ),
-                            Text(
-                              "(${user?.employeeId ?? 'N/A'})",
-                              style: theme.textTheme.bodySmall?.copyWith(color: theme.hintColor),
-                            ),
-                            const SizedBox(height: 20),
-                            profileInfo(context, Icons.email_outlined, user?.email ?? "N/A"),
-                            profileInfo(context, Icons.phone_outlined, user?.phone ?? "N/A"),
-                            profileInfo(context, Icons.location_on_outlined, user?.address ?? "N/A"),
-                          ],
-                        ),
-                      ),
-                    ),
-
-                    const SizedBox(height: 20),
-
-                    /// Responsive Grid for Stats/Actions
-                    LayoutBuilder(
-                      builder: (context, constraints) {
-                        return GridView.count(
-                          shrinkWrap: true,
-                          physics: const NeverScrollableScrollPhysics(),
-                          crossAxisCount: context.isTablet ? 2 : 1,
-                          mainAxisSpacing: 20,
-                          crossAxisSpacing: 20,
-                          childAspectRatio: context.isTablet ? 1.5 : 1.8,
-                          children: [
-                            /// MY SALARY
-                            SectionWrapper(
-                              title: "My Salary",
-                              icon: Icons.account_balance_wallet_outlined,
-                              child: Column(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  Text(
-                                    salary != null ? "₹${salary.amount}" : "₹0.00",
-                                    style: const TextStyle(
-                                        color: Colors.greenAccent,
-                                        fontSize: 24,
-                                        fontWeight: FontWeight.bold),
-                                  ),
-                                  Text(
-                                    "Last paid: ${salary?.paymentDate != null ? DateFormat('dd MMM yyyy').format(DateTime.parse(salary!.paymentDate!)) : 'N/A'}",
-                                    style: theme.textTheme.bodySmall?.copyWith(color: theme.hintColor),
-                                  ),
-                                  const SizedBox(height: 12),
-                                  Row(
-                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                    children: [
-                                      Text("Status:", style: theme.textTheme.bodySmall),
-                                      Container(
-                                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                                        decoration: BoxDecoration(
-                                          color: (salary?.status?.toLowerCase() == 'paid' ? Colors.green : Colors.orange).withValues(alpha: 0.1),
-                                          borderRadius: BorderRadius.circular(4),
-                                        ),
-                                        child: Text(salary?.status ?? "N/A",
-                                            style: TextStyle(
-                                                color: salary?.status?.toLowerCase() == 'paid' ? Colors.greenAccent : Colors.orangeAccent,
-                                                fontSize: 10,
-                                                fontWeight: FontWeight.bold)),
-                                      ),
-                                    ],
-                                  ),
-                                ],
-                              ),
-                            ),
-
-                            /// BOOKS
-                            SectionWrapper(
-                              title: "Books (${data.totalBooksQuantity} Total)",
-                              icon: Icons.menu_book_outlined,
-                              child: Column(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  navButton(context, "All Books", Icons.arrow_forward_ios, () {
-                                    Navigator.push(context, MaterialPageRoute(builder: (context) => const AllBooksPage()));
-                                  }),
-                                  const SizedBox(height: 8),
-                                  navButton(context, "Add New Books", Icons.arrow_forward_ios, () {
-                                    Navigator.push(context, MaterialPageRoute(builder: (context) => const AddNewBookPage()));
-                                  }),
-                                ],
-                              ),
-                            ),
-                          ],
-                        );
-                      }
-                    ),
-
-                    const SizedBox(height: 20),
-
-                    /// ISSUED BOOKS
-                    SectionWrapper(
-                      title: "Issued Books",
-                      icon: Icons.assignment_turned_in_outlined,
-                      child: Column(
-                        children: [
-                          navButton(context, "Issue List (${data.issuedBooks.length})", Icons.arrow_forward_ios, () {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(builder: (context) => const IssuedBooksListPage()),
-                            );
-                          }),
-                          const SizedBox(height: 10),
-                          navButton(context, "Issue Book", Icons.arrow_forward_ios, () {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(builder: (context) => const IssueBookPage()),
-                            );
-                          }),
-                        ],
-                      ),
-                    ),
-
-                    const SizedBox(height: 20),
-
-                    /// OVERDUE BOOKS
-                    SectionWrapper(
-                      title: "Overdue Books (${data.overdueBooks.length})",
-                      icon: Icons.info_outline,
-                      child: navButton(context, "Overdue List", Icons.arrow_forward_ios, () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(builder: (context) => const OverdueBooksPage()),
-                        );
-                      }),
-                    ),
-
-                    const SizedBox(height: 20),
-
-                    /// NAVIGATION GRID
-                    GridView.count(
-                      shrinkWrap: true,
-                      physics: const NeverScrollableScrollPhysics(),
-                      crossAxisCount: context.isTablet ? 3 : 1,
-                      mainAxisSpacing: 12,
-                      crossAxisSpacing: 12,
-                      childAspectRatio: 4,
-                      children: [
-                        fullWidthNavItem(context, "My Lending Books", Icons.people_outline, () {
-                          Navigator.push(context, MaterialPageRoute(builder: (context) => const MyLendingBooksPage()));
-                        }),
-                        fullWidthNavItem(context, "Examination", Icons.description_outlined, () {
-                          Navigator.push(context, MaterialPageRoute(builder: (context) => const ExaminationListPage()));
-                        }),
-                        fullWidthNavItem(context, "Salary Details", Icons.payments_outlined, () {
-                          Navigator.push(context, MaterialPageRoute(builder: (context) => const SalaryBankDetailsPage()));
-                        }),
-                      ],
-                    ),
-
-                    const SizedBox(height: 20),
-
-                    /// EVENT MANAGEMENT
-                    SectionWrapper(
-                      title: "Event Management",
-                      icon: Icons.event_note_outlined,
-                      child: Column(
-                        children: [
-                          navButton(context, "Event List", Icons.arrow_forward_ios, () {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(builder: (context) => const ExploreEventsPage()),
-                            );
-                          }),
-                          const SizedBox(height: 10),
-                          navButton(context, "Registered Events", Icons.arrow_forward_ios, () {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(builder: (context) => const MyRegisteredEventsPage()),
-                            );
-                          }),
-                        ],
-                      ),
-                    ),
-
-                    const SizedBox(height: 20),
-
-                    /// SUPPORT TICKETS
-                    SectionWrapper(
-                      title: "Support Tickets",
-                      icon: Icons.help_outline,
-                      child: Column(
-                        children: [
-                          navButton(context, "My Tickets (${data.tickets.length})", Icons.arrow_forward_ios, () {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(builder: (context) => const MyTicketsPage()),
-                            );
-                          }),
-                          const SizedBox(height: 10),
-                          navButton(context, "Create Ticket", Icons.arrow_forward_ios, () {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(builder: (context) => const CreateTicketPage()),
-                            );
-                          }),
-                          const SizedBox(height: 10),
-                          navButton(context, "Assigned Tickets (${data.assignedTickets.length})", Icons.arrow_forward_ios, () {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(builder: (context) => const AssignedTicketsPage()),
-                            );
-                          }),
-                        ],
-                      ),
-                    ),
-
-                    const SizedBox(height: 32),
-
-                    /// RECENTLY ADDED BOOKS
-                    SectionHeader(context, icon: Icons.library_books_outlined, title: "Recently Added Books"),
-                    const SizedBox(height: 12),
-                    if (data.books.isEmpty)
-                      const Center(child: Padding(
-                        padding: EdgeInsets.all(8.0),
-                        child: Text("No books added recently", style: TextStyle(color: Colors.grey)),
-                      ))
-                    else
-                      Column(
-                        children: data.books.take(4).map((book) => bookItem(
-                          context,
-                          book.title,
-                          "By ${book.author ?? 'Unknown'}",
-                          book.createdAt != null ? DateFormat('dd MMM yyyy').format(DateTime.parse(book.createdAt!)) : "N/A"
-                        )).toList(),
-                      ),
-
-                    const SizedBox(height: 32),
-
-                    /// RECENTLY ISSUED BOOKS
-                    SectionHeader(context, icon: Icons.history_outlined, title: "Recently Issued Books"),
-                    const SizedBox(height: 12),
-                    if (data.issuedBooks.isEmpty)
-                      const Center(child: Padding(
-                        padding: EdgeInsets.all(8.0),
-                        child: Text("No books issued recently", style: TextStyle(color: Colors.grey)),
-                      ))
-                    else
-                      Column(
-                        children: data.issuedBooks.take(4).map((ib) => issuedItem(
-                          context,
-                          ib.bookTitle ?? "Unknown Book",
-                          ib.lenderName ?? "Unknown Borrower",
-                          ib.issuedAt != null ? DateFormat('dd MMM yyyy').format(DateTime.parse(ib.issuedAt!)) : "N/A"
-                        )).toList(),
-                      ),
-
-                    const SizedBox(height: 32),
-
-                    /// OVERDUE BOOKS LIST
-                    SectionHeader(context, icon: Icons.warning_amber_outlined, title: "Overdue Books"),
-                    const SizedBox(height: 12),
-                    if (data.overdueBooks.isEmpty)
-                      const Center(child: Padding(
-                        padding: EdgeInsets.all(8.0),
-                        child: Text("No overdue books", style: TextStyle(color: Colors.grey)),
-                      ))
-                    else
-                      Column(
-                        children: [
-                          ...data.overdueBooks.take(3).map((ib) => overdueItem(
-                            context,
-                            ib.bookTitle ?? "Unknown Book",
-                            ib.lenderName ?? "Unknown Borrower",
-                            ib.dueDate != null ? DateFormat('dd MMM yyyy').format(DateTime.parse(ib.dueDate!)) : "N/A"
-                          )),
-                          Card(
-                            child: InkWell(
-                              onTap: () {
-                                Navigator.push(context, MaterialPageRoute(builder: (context) => const OverdueBooksPage()));
-                              },
-                              borderRadius: BorderRadius.circular(16),
-                              child: const SizedBox(
-                                height: 50,
-                                width: double.infinity,
-                                child: Center(child: Text("View All", style: TextStyle(fontWeight: FontWeight.bold))),
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                  ],
-                ),
-              ),
-            );
-          },
+      backgroundColor: theme.scaffoldBackgroundColor,
+      appBar: AppBar(
+        title: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text("Librarian Dashboard", style: theme.appBarTheme.titleTextStyle),
+            Text("Overview & Management", style: theme.textTheme.labelSmall?.copyWith(color: theme.hintColor)),
+          ],
         ),
+        actions: [
+          IconButton(
+            onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const LibrarianProfilePage())),
+            icon: CircleAvatar(
+              radius: 16,
+              backgroundColor: theme.colorScheme.primary.withValues(alpha: 0.1),
+              child: Icon(Icons.person_outline, size: 20, color: theme.colorScheme.primary),
+            ),
+          ),
+          const SizedBox(width: 8),
+        ],
+      ),
+      body: FutureBuilder<LibrarianDashboardData>(
+        future: _dashboardData,
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return const Center(child: CircularProgressIndicator());
+          } else if (snapshot.hasError) {
+            return _buildErrorWidget(snapshot.error.toString());
+          } else if (snapshot.hasData) {
+            return _buildDashboardContent(context, snapshot.data!);
+          }
+          return const Center(child: Text("No data available"));
+        },
       ),
     );
   }
 
-  /// HELPER WIDGETS
-
-  Widget profileInfo(BuildContext context, IconData icon, String text) {
-    final theme = Theme.of(context);
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 8.0),
-      child: Row(
+  Widget _buildErrorWidget(String error) {
+    return Center(
+      child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(icon, color: theme.hintColor, size: 16),
-          const SizedBox(width: 8),
-          Expanded(child: Text(text, style: theme.textTheme.bodySmall, overflow: TextOverflow.ellipsis)),
+          Icon(Icons.error_outline, size: 48, color: Theme.of(context).colorScheme.error),
+          const SizedBox(height: 16),
+          Text("Failed to load dashboard", style: Theme.of(context).textTheme.titleMedium),
+          Text(error, style: Theme.of(context).textTheme.bodySmall, textAlign: TextAlign.center),
+          const SizedBox(height: 24),
+          ElevatedButton(
+            onPressed: _refreshData,
+            child: const Text("Retry"),
+          )
         ],
       ),
     );
   }
 
-  Widget navButton(BuildContext context, String text, IconData icon, VoidCallback onTap) {
-    final theme = Theme.of(context);
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(12),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-        decoration: BoxDecoration(
-          color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
-          borderRadius: BorderRadius.circular(12),
-        ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Text(text, style: theme.textTheme.bodyMedium),
-            Icon(icon, color: theme.hintColor, size: 14),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget fullWidthNavItem(BuildContext context, String title, IconData icon, VoidCallback onTap) {
-    return Card(
-      child: ListTile(
-        onTap: onTap,
-        leading: Icon(icon, color: Theme.of(context).colorScheme.primary),
-        title: Text(title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
-        trailing: const Icon(Icons.chevron_right, size: 18),
-      ),
-    );
-  }
-
-  Widget bookItem(BuildContext context, String title, String author, String date) {
-    final theme = Theme.of(context);
-    return Card(
-      margin: const EdgeInsets.only(bottom: 12),
-      child: ListTile(
-        title: Text(title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
-        subtitle: Text(author, style: theme.textTheme.bodySmall?.copyWith(color: theme.hintColor)),
-        trailing: Text(date, style: theme.textTheme.labelSmall?.copyWith(color: theme.hintColor)),
-      ),
-    );
-  }
-
-  Widget issuedItem(BuildContext context, String title, String borrower, String date) {
-    final theme = Theme.of(context);
-    return Card(
-      margin: const EdgeInsets.only(bottom: 12),
-      child: ListTile(
-        title: Text(title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
-        subtitle: Text("Issued to: $borrower", style: theme.textTheme.bodySmall?.copyWith(color: theme.hintColor)),
-        trailing: Text(date, style: theme.textTheme.labelSmall?.copyWith(color: theme.hintColor)),
-      ),
-    );
-  }
-
-  Widget overdueItem(BuildContext context, String title, String borrower, String date) {
-    final theme = Theme.of(context);
-    return Card(
-      margin: const EdgeInsets.only(bottom: 12),
-      child: ListTile(
-        title: Text(title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
-        subtitle: Text("Borrower: $borrower", style: theme.textTheme.bodySmall?.copyWith(color: theme.hintColor)),
-        trailing: Text("Overdue:\n$date", textAlign: TextAlign.right, style: TextStyle(color: theme.colorScheme.error, fontSize: 10, fontWeight: FontWeight.bold)),
-      ),
-    );
-  }
-}
-
-class SectionWrapper extends StatelessWidget {
-  final String title;
-  final IconData? icon;
-  final Widget child;
-
-  const SectionWrapper({super.key, required this.title, this.icon, required this.child});
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return Card(
-      child: Padding(
+  Widget _buildDashboardContent(BuildContext context, LibrarianDashboardData data) {
+    final user = data.userDetail;
+    return RefreshIndicator(
+      onRefresh: _refreshData,
+      child: ListView(
         padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                if (icon != null) Icon(icon, color: theme.colorScheme.primary, size: 18),
-                if (icon != null) const SizedBox(width: 8),
-                Text(
-                  title,
-                  style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+        children: [
+          // Profile Overview Section
+          if (user != null) _buildProfileOverview(user),
+          const SizedBox(height: 20),
+
+          // Quick Actions
+          _buildSectionHeader("Quick Actions", Icons.bolt),
+          const SizedBox(height: 12),
+          _buildQuickActions(context),
+          const SizedBox(height: 24),
+
+          // Salary Section
+          _buildSectionHeader("My Salary", Icons.payments_outlined),
+          const SizedBox(height: 12),
+          _buildSalaryCard(data.lastSalary),
+          const SizedBox(height: 24),
+
+          // Library Management Section
+          _buildSectionHeader("Library Management", Icons.local_library_outlined),
+          const SizedBox(height: 12),
+          _buildMenuCard([
+            _buildMenuItem("All Books (${data.totalBooksQuantity})", Icons.book_outlined, () => Navigator.push(context, MaterialPageRoute(builder: (_) => const AllBooksPage()))),
+            _buildMenuItem("Issue New Book", Icons.add_box_outlined, () => Navigator.push(context, MaterialPageRoute(builder: (_) => const IssueBookPage()))),
+            _buildMenuItem("Issued List (${data.issuedBooks.length})", Icons.list_alt_outlined, () => Navigator.push(context, MaterialPageRoute(builder: (_) => const IssuedBooksListPage()))),
+            _buildMenuItem("Overdue Books (${data.overdueBooks.length})", Icons.warning_amber_rounded, () => Navigator.push(context, MaterialPageRoute(builder: (_) => const OverdueBooksPage())), isWarning: data.overdueBooks.isNotEmpty),
+            _buildMenuItem("Lending Books", Icons.assignment_return_outlined, () => Navigator.push(context, MaterialPageRoute(builder: (_) => const MyLendingBooksPage()))),
+          ]),
+          const SizedBox(height: 24),
+
+          // Examinations Section
+          _buildSectionHeader("Examinations", Icons.assignment_outlined),
+          const SizedBox(height: 12),
+          _buildMenuCard([
+            _buildMenuItem("Examination List", Icons.info_outline, () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ExaminationListPage()))),
+          ]),
+          const SizedBox(height: 24),
+
+          // Event Management Section
+          _buildSectionHeader("Event Management", Icons.event_note_outlined),
+          const SizedBox(height: 12),
+          _buildMenuCard([
+            _buildMenuItem("Explore Events", Icons.search, () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ExploreEventsPage()))),
+            _buildMenuItem("My Registered Events", Icons.how_to_reg_outlined, () => Navigator.push(context, MaterialPageRoute(builder: (_) => const MyRegisteredEventsPage()))),
+          ]),
+          const SizedBox(height: 24),
+
+          // Support Ticket Section
+          _buildSectionHeader("Support Helpdesk", Icons.support_agent_outlined),
+          const SizedBox(height: 12),
+          _buildMenuCard([
+            _buildMenuItem("My Tickets (${data.tickets.length})", Icons.confirmation_number_outlined, () => Navigator.push(context, MaterialPageRoute(builder: (_) => const MyTicketsPage()))),
+            _buildMenuItem("Assigned Tickets (${data.assignedTickets.length})", Icons.assignment_ind_outlined, () => Navigator.push(context, MaterialPageRoute(builder: (_) => const AssignedTicketsPage()))),
+            _buildMenuItem("Create New Ticket", Icons.add_comment_outlined, () => Navigator.push(context, MaterialPageRoute(builder: (_) => const CreateTicketPage()))),
+          ]),
+          const SizedBox(height: 40),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildProfileOverview(UserDetail user) {
+    final theme = Theme.of(context);
+    final photoUrl = user.photo != null ? "${ApiService.baseImageUrl}/storage/${user.photo}" : null;
+
+    return Card(
+      child: InkWell(
+        onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const LibrarianProfilePage())).then((_) => _refreshData()),
+        borderRadius: BorderRadius.circular(12),
+        child: Padding(
+          padding: const EdgeInsets.all(20.0),
+          child: Column(
+            children: [
+              Stack(
+                alignment: Alignment.bottomRight,
+                children: [
+                  CircleAvatar(
+                    radius: 40,
+                    backgroundColor: theme.colorScheme.primary.withValues(alpha: 0.1),
+                    backgroundImage: photoUrl != null ? NetworkImage(photoUrl) : null,
+                    child: photoUrl == null ? Icon(Icons.person, size: 50, color: theme.colorScheme.primary) : null,
+                  ),
+                  Container(
+                    padding: const EdgeInsets.all(4),
+                    decoration: BoxDecoration(color: Colors.green, shape: BoxShape.circle, border: Border.all(color: theme.colorScheme.surface, width: 2)),
+                    child: const Icon(Icons.check, size: 12, color: Colors.white),
+                  )
+                ],
+              ),
+              const SizedBox(height: 16),
+              Text(user.fullName ?? "Librarian", style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold)),
+              Text("Librarian", style: theme.textTheme.bodyMedium?.copyWith(color: theme.hintColor)),
+              const SizedBox(height: 20),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceAround,
+                children: [
+                  _buildProfileInfoItem(Icons.badge_outlined, user.employeeId ?? "N/A"),
+                  _buildProfileInfoItem(Icons.phone_outlined, user.phone ?? "N/A"),
+                  _buildProfileInfoItem(Icons.location_on_outlined, "Library Dept"),
+                ],
+              ),
+              const SizedBox(height: 20),
+              ElevatedButton.icon(
+                onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const LibrarianVirtualIdCardPage())),
+                icon: const Icon(Icons.vignette_outlined, size: 18),
+                label: const Text("GENERATE VIRTUAL ID CARD"),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: theme.colorScheme.surfaceContainerHighest,
+                  foregroundColor: theme.colorScheme.onSurface,
+                  minimumSize: const Size(double.infinity, 44),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                 ),
-              ],
-            ),
-            const SizedBox(height: 16),
-            child,
-          ],
+              )
+            ],
+          ),
         ),
       ),
     );
   }
-}
 
-class SectionHeader extends StatelessWidget {
-  final IconData icon;
-  final String title;
+  Widget _buildProfileInfoItem(IconData icon, String value) {
+    final theme = Theme.of(context);
+    return Column(
+      children: [
+        Icon(icon, size: 20, color: theme.colorScheme.primary.withValues(alpha: 0.7)),
+        const SizedBox(height: 4),
+        Text(value, style: theme.textTheme.labelSmall?.copyWith(fontWeight: FontWeight.w600)),
+      ],
+    );
+  }
 
-  const SectionHeader(BuildContext context, {super.key, required this.icon, required this.title});
-
-  @override
-  Widget build(BuildContext context) {
+  Widget _buildSectionHeader(String title, IconData icon) {
     final theme = Theme.of(context);
     return Row(
       children: [
-        Icon(icon, color: theme.colorScheme.primary, size: 20),
+        Icon(icon, size: 20, color: theme.colorScheme.primary),
         const SizedBox(width: 10),
-        Text(
-          title,
-          style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
-        ),
+        Text(title, style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
       ],
+    );
+  }
+
+  Widget _buildQuickActions(BuildContext context) {
+    return Row(
+      children: [
+        Expanded(child: _quickActionButton("ADD BOOK", Icons.library_add_outlined, () {
+          Navigator.push(context, MaterialPageRoute(builder: (_) => const AddNewBookPage()));
+        })),
+        const SizedBox(width: 12),
+        Expanded(child: _quickActionButton("ISSUE BOOK", Icons.assignment_turned_in_outlined, () {
+          Navigator.push(context, MaterialPageRoute(builder: (_) => const IssueBookPage()));
+        })),
+        const SizedBox(width: 12),
+        Expanded(child: _quickActionButton("CREATE TICKET", Icons.add_circle_outline, () {
+          Navigator.push(context, MaterialPageRoute(builder: (_) => const CreateTicketPage()));
+        })),
+      ],
+    );
+  }
+
+  Widget _quickActionButton(String label, IconData icon, VoidCallback onTap) {
+    final theme = Theme.of(context);
+    return InkWell(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 12),
+        decoration: BoxDecoration(
+          color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: theme.colorScheme.outline.withValues(alpha: 0.3)),
+        ),
+        child: Column(
+          children: [
+            Icon(icon, size: 20, color: theme.colorScheme.primary),
+            const SizedBox(height: 8),
+            Text(label, style: theme.textTheme.labelSmall?.copyWith(fontSize: 9, fontWeight: FontWeight.bold), textAlign: TextAlign.center),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSalaryCard(Salary? salary) {
+    final theme = Theme.of(context);
+
+    if (salary == null) {
+      return Card(
+        child: Padding(
+          padding: const EdgeInsets.all(20.0),
+          child: Column(
+            children: [
+              Text("No Salary Data", style: theme.textTheme.titleMedium?.copyWith(color: theme.hintColor)),
+              const SizedBox(height: 8),
+              const Text("Your salary details will appear here once processed."),
+            ],
+          ),
+        ),
+      );
+    }
+
+    return Card(
+      child: InkWell(
+        onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const SalaryBankDetailsPage())),
+        child: Padding(
+          padding: const EdgeInsets.all(20.0),
+          child: Column(
+            children: [
+              Text("₹${salary.amount}", style: theme.textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold, color: theme.colorScheme.primary)),
+              Text("Last processed payment", style: theme.textTheme.bodySmall?.copyWith(color: theme.hintColor)),
+              const Divider(height: 32),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  _buildSalaryInfoRow("Status", "Paid", Colors.green),
+                  _buildSalaryInfoRow("Payment Date", salary.paymentDate != null ? DateFormat('dd MMM yyyy').format(DateTime.parse(salary.paymentDate!)) : "N/A", theme.colorScheme.onSurface),
+                ],
+              )
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSalaryInfoRow(String label, String value, Color valueColor) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(label, style: Theme.of(context).textTheme.labelSmall?.copyWith(color: Theme.of(context).hintColor)),
+        const SizedBox(height: 4),
+        Text(value, style: Theme.of(context).textTheme.bodySmall?.copyWith(fontWeight: FontWeight.bold, color: valueColor)),
+      ],
+    );
+  }
+
+  Widget _buildMenuCard(List<Widget> children) {
+    return Card(
+      child: Column(
+        children: children.asMap().entries.map((entry) {
+          int idx = entry.key;
+          Widget child = entry.value;
+          return Column(
+            children: [
+              child,
+              if (idx != children.length - 1) const Divider(height: 1, indent: 16, endIndent: 16),
+            ],
+          );
+        }).toList(),
+      ),
+    );
+  }
+
+  Widget _buildMenuItem(String title, IconData icon, VoidCallback onTap, {bool isWarning = false}) {
+    final theme = Theme.of(context);
+    return ListTile(
+      leading: Icon(icon, size: 20, color: isWarning ? Colors.red : theme.colorScheme.primary.withValues(alpha: 0.7)),
+      title: Text(title, style: theme.textTheme.bodyMedium?.copyWith(color: isWarning ? Colors.red : null, fontWeight: isWarning ? FontWeight.bold : null)),
+      trailing: const Icon(Icons.chevron_right, size: 18),
+      onTap: onTap,
     );
   }
 }

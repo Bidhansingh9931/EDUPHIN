@@ -32,7 +32,7 @@ class _MyRegisteredEventsPageState extends State<MyRegisteredEventsPage> {
       final registrations = await ApiService.getLibrarianRegisteredEvents();
       if (!mounted) return;
       setState(() {
-        _registeredRegistrations = registrations;
+        _registeredRegistrations = List<librarian_model.EventRegistration>.from(registrations);
         _isLoading = false;
       });
     } catch (e) {

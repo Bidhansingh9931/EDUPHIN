@@ -1,5 +1,6 @@
 import 'package:eduphin/services/api_service.dart';
 import 'package:eduphin/services/responsive_helper.dart';
+import 'package:eduphin/teacher/dashboard/app_drawer.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'accountant_profile.dart';
@@ -42,10 +43,9 @@ class _AccountantDashboardState extends State<AccountantDashboard> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
-    
+
     return Scaffold(
       appBar: AppBar(
-        automaticallyImplyLeading: false,
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -67,6 +67,7 @@ class _AccountantDashboardState extends State<AccountantDashboard> {
           const SizedBox(width: 8),
         ],
       ),
+      drawer: const AppDrawer(),
       body: RefreshIndicator(
         onRefresh: () async => _refreshData(),
         child: FutureBuilder<AccountantDashboardData>(
@@ -336,7 +337,7 @@ class _AccountantDashboardState extends State<AccountantDashboard> {
             Center(
               child: Column(
                 children: [
-                  Text("₹${lastSalary != null ? NumberFormat('#,##,###').format(double.parse(lastSalary.amount)) : '0.00'}", 
+                  Text("₹${lastSalary != null ? NumberFormat('#,##,###').format(double.parse(lastSalary.amount)) : '0.00'}",
                       style: const TextStyle(fontSize: 28, fontWeight: FontWeight.bold)),
                   Text("Last paid: ${lastSalary?.month ?? 'N/A'}", style: TextStyle(color: theme.hintColor, fontSize: 14)),
                 ],

@@ -175,7 +175,7 @@ class _OverdueBooksPageState extends State<OverdueBooksPage> {
                                 SingleChildScrollView(
                                   scrollDirection: Axis.horizontal,
                                   child: DataTable(
-                                    headingRowColor: WidgetStateProperty.all(theme.colorScheme.primary.withOpacity(0.05)),
+                                    headingRowColor: WidgetStateProperty.all(theme.colorScheme.primary.withValues(alpha: 0.05)),
                                     columnSpacing: 30,
                                     columns: const [
                                       DataColumn(label: Text("#", style: TextStyle(fontWeight: FontWeight.bold))),
@@ -262,9 +262,9 @@ class _OverdueBooksPageState extends State<OverdueBooksPage> {
       margin: const EdgeInsets.only(left: 8),
       padding: const EdgeInsets.all(8),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.1),
+        color: color.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: color.withOpacity(0.2)),
+        border: Border.all(color: color.withValues(alpha: 0.2)),
       ),
       child: Icon(icon, color: color, size: 16),
     );

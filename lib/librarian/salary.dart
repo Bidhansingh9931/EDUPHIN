@@ -27,7 +27,13 @@ class _SalaryBankDetailsPageState extends State<SalaryBankDetailsPage> {
       final data = await ApiService.getLibrarianSalaries();
       if (mounted) {
         setState(() {
-          _salaryData = data;
+          // The backend returns {account, salaries} or {userDetail, lastSalary, salaries}
+          // We normalize it based on what the UI expects
+          _salaryData = {
+            'userDetail': data['account'] ?? data['userDetail'],
+            'lastSalary': data['lastSalary'] ?? (data['salaries'] is List && (data['salaries'] as List).isNotEmpty ? data['salaries'][0] : null),
+            'salaries': data['salaries'] ?? [],
+          };
           _isLoading = false;
         });
       }
@@ -79,11 +85,11 @@ class _SalaryBankDetailsPageState extends State<SalaryBankDetailsPage> {
                   const SizedBox(height: 24),
                   Text("Salary Slip Details", style: theme.textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold)),
                   const Divider(height: 48),
-                  _buildSlipRow(context, "Basic Salary:", "₹${slipData['salary']?['basic_salary'] ?? '0.00'}"),
-                  _buildSlipRow(context, "Allowances:", "₹${slipData['salary']?['allowances'] ?? '0.00'}"),
-                  _buildSlipRow(context, "Deductions:", "₹${slipData['salary']?['deductions'] ?? '0.00'}"),
+                  _buildSlipRow(context, "Basic Salary:", "₹${slipData['salary']?['basic_salary'] ?? slipData['basic_salary'] ?? '0.00'}"),
+                  _buildSlipRow(context, "Allowances:", "₹${slipData['salary']?['allowances'] ?? slipData['allowance'] ?? '0.00'}"),
+                  _buildSlipRow(context, "Deductions:", "₹${slipData['salary']?['deductions'] ?? slipData['deduction'] ?? '0.00'}"),
                   const Divider(height: 32),
-                  _buildSlipRow(context, "Net Salary:", "₹${slipData['salary']?['net_salary'] ?? '0.00'}", isBold: true),
+                  _buildSlipRow(context, "Net Salary:", "₹${slipData['salary']?['net_salary'] ?? slipData['net_salary'] ?? '0.00'}", isBold: true),
                   const SizedBox(height: 12),
                   Text("In Words: ${slipData['amountInWords'] ?? 'N/A'}", 
                     style: theme.textTheme.bodySmall?.copyWith(fontStyle: FontStyle.italic, color: theme.hintColor)),
@@ -160,12 +166,12 @@ class _SalaryBankDetailsPageState extends State<SalaryBankDetailsPage> {
                                   ],
                                 ),
                                 const Divider(height: 40),
-                                _buildDetailRow(context, "Account Holder", _salaryData?['userDetail']?['fullName'] ?? "N/A"),
+                                _buildDetailRow(context, "Account Holder", _salaryData?['userDetail']?['first_name'] != null ? "${_salaryData?['userDetail']?['first_name']} ${_salaryData?['userDetail']?['last_name'] ?? ''}".trim() : "N/A"),
                                 _buildDetailRow(context, "Account Number", _salaryData?['userDetail']?['bank_account_number'] ?? "N/A"),
                                 _buildDetailRow(context, "Bank Name", _salaryData?['userDetail']?['bank_name'] ?? "N/A"),
                                 _buildDetailRow(context, "IFSC Code", _salaryData?['userDetail']?['ifsc_code'] ?? "N/A"),
                                 _buildDetailRow(context, "Branch", _salaryData?['userDetail']?['branch_name'] ?? "N/A"),
-                                _buildDetailRow(context, "Current Salary", "₹${_salaryData?['lastSalary']?['amount'] ?? '0.00'}", isLast: true),
+                                _buildDetailRow(context, "Current Salary", "₹${_salaryData?['lastSalary']?['amount'] ?? _salaryData?['lastSalary']?['net_salary'] ?? '0.00'}", isLast: true),
                               ],
                             ),
                           ),
@@ -202,21 +208,21 @@ class _SalaryBankDetailsPageState extends State<SalaryBankDetailsPage> {
                                       onTap: () => _viewSalarySlip(salary['id']),
                                       contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                                       leading: CircleAvatar(
-                                        backgroundColor: theme.colorScheme.primary.withOpacity(0.1),
+                                        backgroundColor: theme.colorScheme.primary.withValues(alpha: 0.1),
                                         child: Icon(Icons.receipt_long, color: theme.colorScheme.primary),
                                       ),
-                                      title: Text("₹${salary['amount']}", style: const TextStyle(fontWeight: FontWeight.bold)),
+                                      title: Text("₹${salary['amount'] ?? salary['net_salary'] ?? '0.00'}", style: const TextStyle(fontWeight: FontWeight.bold)),
                                       subtitle: Text(
                                         salary['payment_date'] != null 
                                           ? DateFormat('dd MMM yyyy').format(DateTime.parse(salary['payment_date'])) 
-                                          : "N/A",
+                                          : (salary['created_at'] != null ? DateFormat('dd MMM yyyy').format(DateTime.parse(salary['created_at'])) : "N/A"),
                                       ),
                                       trailing: Container(
                                         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                                         decoration: BoxDecoration(
-                                          color: (isPaid ? Colors.green : Colors.orange).withOpacity(0.1),
+                                          color: (isPaid ? Colors.green : Colors.orange).withValues(alpha: 0.1),
                                           borderRadius: BorderRadius.circular(6),
-                                          border: Border.all(color: (isPaid ? Colors.green : Colors.orange).withOpacity(0.5)),
+                                          border: Border.all(color: (isPaid ? Colors.green : Colors.orange).withValues(alpha: 0.5)),
                                         ),
                                         child: Text(
                                           (salary['status'] ?? "N/A").toUpperCase(), 
@@ -250,7 +256,7 @@ class _SalaryBankDetailsPageState extends State<SalaryBankDetailsPage> {
             ],
           ),
           if (!isLast) const SizedBox(height: 16),
-          if (!isLast) Divider(height: 1, color: theme.dividerTheme.color?.withOpacity(0.5)),
+          if (!isLast) Divider(height: 1, color: theme.dividerTheme.color?.withValues(alpha: 0.5)),
         ],
       ),
     );

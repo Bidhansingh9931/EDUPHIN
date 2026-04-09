@@ -1,4 +1,4 @@
-import 'package:eduphin/services/responsive_helper.dart';
+import '../../services/responsive_helper.dart';
 import 'package:flutter/material.dart';
 import '../../services/api_service.dart';
 import 'package:eduphin/teacher/dashboard/library_models.dart';
@@ -120,7 +120,7 @@ class _AllBooksPageState extends State<AllBooksPage> {
                             padding: const EdgeInsets.all(40.0),
                             child: Column(
                               children: [
-                                Icon(Icons.search_off, size: 64, color: theme.hintColor.withOpacity(0.3)),
+                                Icon(Icons.search_off, size: 64, color: theme.hintColor.withValues(alpha: 0.3)),
                                 const SizedBox(height: 16),
                                 Text("No books found matching your criteria.", style: TextStyle(color: theme.hintColor)),
                               ],
@@ -250,9 +250,9 @@ class _AllBooksPageState extends State<AllBooksPage> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
-        color: (isAvailable ? Colors.green : Colors.red).withOpacity(0.1),
+        color: (isAvailable ? Colors.green : Colors.red).withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(6),
-        border: Border.all(color: (isAvailable ? Colors.green : Colors.red).withOpacity(0.5)),
+        border: Border.all(color: (isAvailable ? Colors.green : Colors.red).withValues(alpha: 0.5)),
       ),
       child: Text(isAvailable ? "AVAILABLE" : "OUT OF STOCK", 
         style: TextStyle(color: isAvailable ? Colors.green : Colors.red, fontSize: 9, fontWeight: FontWeight.bold)),
