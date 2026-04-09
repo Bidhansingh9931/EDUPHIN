@@ -3,6 +3,7 @@ import 'package:eduphin/services/api_service.dart';
 import 'package:eduphin/student/student_dashboard_model.dart';
 import 'package:eduphin/student/support_ticket/create_tickets.dart';
 import 'package:eduphin/student/support_ticket/my_ticket.dart';
+import 'package:eduphin/student/support_ticket/ticket_details.dart';
 import 'package:eduphin/student/view_virtual_id_card.dart';
 import 'package:eduphin/student/student_profile.dart';
 import 'package:eduphin/student/faculty_remark.dart';
@@ -34,6 +35,13 @@ class _StudentDashboardState extends State<StudentDashboard> {
   StudentDashboardData? dashboardData;
   String? errorMessage;
 
+  // Theme Colors - Professional Dark UI
+  final Color _bg = const Color(0xff0B1220);
+  final Color _card = const Color(0xff1E2746);
+  final Color _primary = const Color(0xff3366FF);
+  final Color _surface = const Color(0xff2A3450);
+  final Color _textSecondary = const Color(0xff8F9BB3);
+
   @override
   void initState() {
     super.initState();
@@ -58,37 +66,32 @@ class _StudentDashboardState extends State<StudentDashboard> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
-    
-    // Responsive sizing logic
-    final screenWidth = MediaQuery.of(context).size.width;
-    final isTablet = screenWidth > 600;
-    final horizontalPadding = isTablet ? screenWidth * 0.05 : 20.0;
-
     if (isLoading) {
       return Scaffold(
-        body: Center(child: CircularProgressIndicator(color: colorScheme.primary, strokeWidth: 3)),
+        backgroundColor: _bg,
+        body: Center(child: CircularProgressIndicator(color: _primary, strokeWidth: 3)),
       );
     }
 
     if (errorMessage != null) {
       return Scaffold(
+        backgroundColor: _bg,
         body: Center(
           child: Padding(
             padding: const EdgeInsets.all(24.0),
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Icon(Icons.error_outline_rounded, color: colorScheme.error, size: 64),
+                const Icon(Icons.error_outline_rounded, color: Colors.redAccent, size: 64),
                 const SizedBox(height: 20),
-                Text("Dashboard Unavailable", style: theme.textTheme.headlineSmall),
+                const Text("Dashboard Unavailable", style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold)),
                 const SizedBox(height: 8),
-                Text(errorMessage!, style: theme.textTheme.bodyMedium, textAlign: TextAlign.center),
+                Text(errorMessage!, style: const TextStyle(color: Colors.white70), textAlign: TextAlign.center),
                 const SizedBox(height: 32),
                 ElevatedButton(
+                  style: ElevatedButton.styleFrom(backgroundColor: _primary, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8))),
                   onPressed: _fetchDashboardData,
-                  child: const Text("Retry Connection"),
+                  child: const Text("Retry Connection", style: TextStyle(color: Colors.white)),
                 )
               ],
             ),
@@ -98,53 +101,65 @@ class _StudentDashboardState extends State<StudentDashboard> {
     }
 
     return Scaffold(
+      backgroundColor: _bg,
       appBar: AppBar(
-        title: const Text("Eduphin"),
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        title: const Text("EDUPHIN", style: TextStyle(fontWeight: FontWeight.w900, color: Colors.white, letterSpacing: 1.5, fontSize: 18)),
+        centerTitle: true,
+        iconTheme: const IconThemeData(color: Colors.white),
         actions: [
           IconButton(
-            icon: const Icon(Icons.notifications_none_rounded),
+            icon: const Icon(Icons.notifications_none_rounded, color: Colors.white),
             onPressed: () {},
           ),
-          const SizedBox(width: 8),
         ],
       ),
       drawer: _buildDrawer(context),
       body: RefreshIndicator(
         onRefresh: _fetchDashboardData,
+        color: _primary,
         child: SingleChildScrollView(
           physics: const BouncingScrollPhysics(),
-          padding: EdgeInsets.symmetric(horizontal: horizontalPadding),
+          padding: const EdgeInsets.symmetric(horizontal: 20),
           child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const SizedBox(height: 10),
               _buildHeader(context),
-              const SizedBox(height: 24),
-              _buildIdCardButton(context),
               const SizedBox(height: 32),
+              
+              // Metrics Grid/Stack
+              _buildAttendanceCard(),
+              const SizedBox(height: 16),
+              _buildFeeStatusCard(),
+              const SizedBox(height: 16),
+              _buildSupportCard(),
+              const SizedBox(height: 16),
+              _buildStudyCard(),
+              
+              const SizedBox(height: 32),
+              _buildSectionHeader(Icons.calendar_today_outlined, "Upcoming Events", onTap: () {
+                Navigator.push(context, MaterialPageRoute(builder: (_) => const ManageEventsPage()));
+              }),
+              _buildUpcomingEvents(),
+              
+              const SizedBox(height: 32),
+              _buildSectionHeader(Icons.assignment_outlined, "Available Exams", onTap: () {
+                Navigator.push(context, MaterialPageRoute(builder: (_) => const ExamRegistrationPage()));
+              }),
+              _buildAvailableExams(),
 
-              // Statistics Section - Responsive Grid
-              LayoutBuilder(
-                builder: (context, constraints) {
-                  return GridView.count(
-                    shrinkWrap: true,
-                    physics: const NeverScrollableScrollPhysics(),
-                    crossAxisCount: isTablet ? 2 : 1,
-                    childAspectRatio: isTablet ? 1.8 : 1.5,
-                    mainAxisSpacing: 16,
-                    crossAxisSpacing: 16,
-                    children: [
-                      _buildAttendanceCard(context),
-                      _buildFeeStatusCard(context),
-                      _buildSupportCard(context),
-                      _buildStudyCard(context),
-                    ],
-                  );
-                },
-              ),
+              const SizedBox(height: 32),
+              _buildSectionHeader(Icons.book_outlined, "Study Materials", onTap: () {
+                Navigator.push(context, MaterialPageRoute(builder: (_) => const NotesPage()));
+              }),
+              _buildStudyMaterials(),
 
-              const SizedBox(height: 40),
-              _buildDynamicSections(context),
+              const SizedBox(height: 32),
+              _buildSectionHeader(Icons.list_alt_outlined, "Assignments", onTap: () {
+                Navigator.push(context, MaterialPageRoute(builder: (_) => const AssignmentsPage()));
+              }),
+              _buildAssignments(),
+              
               const SizedBox(height: 50),
             ],
           ),
@@ -154,243 +169,444 @@ class _StudentDashboardState extends State<StudentDashboard> {
   }
 
   Widget _buildHeader(BuildContext context) {
-    final theme = Theme.of(context);
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+    String? profileImageUrl = dashboardData?.student?.profileImage;
+    if (profileImageUrl != null && profileImageUrl.isNotEmpty && !profileImageUrl.startsWith('http')) {
+      profileImageUrl = "${ApiService.baseUrl}/storage/$profileImageUrl";
+    }
+
+    return Column(
       children: [
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text("Welcome Back,", style: theme.textTheme.bodyLarge?.copyWith(color: theme.colorScheme.onSurface.withValues(alpha: 0.6))),
-              const SizedBox(height: 4),
-              Text(
-                dashboardData?.user?.name ?? "Nisha Rao",
-                style: theme.textTheme.headlineMedium?.copyWith(fontWeight: FontWeight.w800),
-              ),
-              const SizedBox(height: 4),
-              Text("Here's your academic overview", style: theme.textTheme.bodyMedium),
-            ],
+        const SizedBox(height: 10),
+        if (profileImageUrl != null && profileImageUrl.isNotEmpty)
+          Container(
+            padding: const EdgeInsets.all(4),
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              border: Border.all(color: _primary.withValues(alpha: 0.5), width: 2),
+            ),
+            child: CircleAvatar(
+              radius: 50,
+              backgroundColor: _card,
+              backgroundImage: NetworkImage(profileImageUrl),
+            ),
+          )
+        else
+          Container(
+            padding: const EdgeInsets.all(4),
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              border: Border.all(color: _primary.withValues(alpha: 0.5), width: 2),
+            ),
+            child: CircleAvatar(
+              radius: 50,
+              backgroundColor: _card,
+              child: Icon(Icons.person, size: 50, color: _primary),
+            ),
+          ),
+        const SizedBox(height: 16),
+        Text("Welcome Back!", style: TextStyle(color: _textSecondary, fontSize: 16, fontWeight: FontWeight.w500)),
+        const SizedBox(height: 8),
+        Text(
+          dashboardData?.user?.name ?? "Student",
+          style: const TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.w800),
+        ),
+        const SizedBox(height: 24),
+        InkWell(
+          onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ViewVirtualIdCard())),
+          borderRadius: BorderRadius.circular(12),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+            decoration: BoxDecoration(
+              color: _surface,
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: const Text(
+              "VIEW VIRTUAL ID CARD",
+              style: TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w700, letterSpacing: 1.1),
+            ),
           ),
         ),
-        _buildAvatar(context),
       ],
     );
   }
 
-  Widget _buildAvatar(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        border: Border.all(color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.2), width: 3),
-      ),
-      child: const CircleAvatar(
-        radius: 28,
-        backgroundColor: Colors.transparent,
-        child: Icon(Icons.person_rounded, size: 32),
-      ),
-    );
-  }
-
-  Widget _buildIdCardButton(BuildContext context) {
-    return SizedBox(
-      width: double.infinity,
-      child: ElevatedButton.icon(
-        onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ViewVirtualIdCard())),
-        icon: const Icon(Icons.badge_rounded, size: 20),
-        label: const Text("VIEW VIRTUAL ID CARD"),
+  Widget _buildAttendanceCard() {
+    return InkWell(
+      onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const AttendanceReportPage())),
+      child: _buildMetricCard(
+        title: "ATTENDANCE",
+        value: "${dashboardData?.attendancePercentage.toStringAsFixed(1)}%",
+        subtitle: (dashboardData?.attendancePercentage ?? 0) >= 75 ? "Excellent! Meeting target." : "Attendance needs improvement",
+        icon: Icons.calendar_today_rounded,
+        iconColor: const Color(0xff00D68F),
       ),
     );
   }
 
-  Widget _buildOverviewCard({
-    required BuildContext context,
+  Widget _buildFeeStatusCard() {
+    return InkWell(
+      onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const StudentFeePage())),
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(20),
+        decoration: BoxDecoration(
+          color: _card,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text("FEE STATUS", style: TextStyle(color: _textSecondary, fontSize: 12, fontWeight: FontWeight.w700, letterSpacing: 1.2)),
+              Icon(Icons.account_balance_wallet_outlined, color: _primary, size: 32),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Text("₹${dashboardData?.due ?? 0}", style: const TextStyle(color: Colors.white, fontSize: 28, fontWeight: FontWeight.w800)),
+          Text("Current Due Amount", style: TextStyle(color: _textSecondary, fontSize: 13)),
+          const SizedBox(height: 24),
+          Row(
+            children: [
+              _buildFeeStat("Total Payable", "₹${dashboardData?.totalPayable ?? 0}"),
+              const SizedBox(width: 40),
+              _buildFeeStat("Total Paid", "₹${dashboardData?.totalPaid ?? 0}"),
+            ],
+          )
+        ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildFeeStat(String label, String value) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(label, style: TextStyle(color: _textSecondary, fontSize: 12)),
+        const SizedBox(height: 4),
+        Text(value, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 16)),
+      ],
+    );
+  }
+
+  Widget _buildSupportCard() {
+    return InkWell(
+      onTap: () {
+        if (dashboardData!.tickets.isNotEmpty) {
+          final ticket = dashboardData!.tickets.first;
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => StudentTicketDetailsPage(
+                ticketId: ticket.encryptedId ?? ticket.id.toString(),
+              ),
+            ),
+          ).then((_) => _fetchDashboardData());
+        } else {
+          Navigator.push(
+            context,
+            MaterialPageRoute(builder: (context) => const SupportTicketsPage()),
+          ).then((_) => _fetchDashboardData());
+        }
+      },
+      child: _buildMetricCard(
+        title: "SUPPORT",
+        value: "${dashboardData?.tickets.length ?? 0}",
+        subtitle: "Active Support Tickets",
+        icon: Icons.headset_mic_rounded,
+        iconColor: const Color(0xffFF3D71),
+        extraText: dashboardData!.tickets.isNotEmpty ? "Latest: ${dashboardData!.tickets.first.title}" : "No active tickets",
+      ),
+    );
+  }
+
+  Widget _buildStudyCard() {
+    return InkWell(
+      onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ExamRegistrationPage())),
+      child: _buildMetricCard(
+        title: "ACADEMIC SUMMARY",
+        value: "${dashboardData?.availableExams.length ?? 0}",
+        subtitle: "Available Examinations",
+        icon: Icons.auto_graph_rounded,
+        iconColor: const Color(0xffFFAA00),
+        extraText: "${dashboardData?.studyMaterials.length ?? 0} Materials • ${dashboardData?.assignments.length ?? 0} Assignments",
+      ),
+    );
+  }
+
+  Widget _buildMetricCard({
     required String title,
     required String value,
     required String subtitle,
     required IconData icon,
-    required Color accentColor,
+    Color? iconColor,
+    String? extraText,
   }) {
-    final theme = Theme.of(context);
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(title, style: theme.textTheme.labelLarge?.copyWith(letterSpacing: 1.2, fontWeight: FontWeight.bold)),
-                Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(color: accentColor.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(10)),
-                  child: Icon(icon, color: accentColor, size: 24),
-                ),
-              ],
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: _card,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(title, style: TextStyle(color: _textSecondary, fontSize: 12, fontWeight: FontWeight.w700, letterSpacing: 1.2)),
+                  const SizedBox(height: 8),
+                  Text(value, style: const TextStyle(color: Colors.white, fontSize: 28, fontWeight: FontWeight.w800)),
+                ],
+              ),
+              Icon(icon, color: iconColor ?? _primary, size: 32),
+            ],
+          ),
+          const SizedBox(height: 4),
+          Text(subtitle, style: TextStyle(color: _textSecondary, fontSize: 13)),
+          if (extraText != null) ...[
+            const Padding(
+              padding: EdgeInsets.symmetric(vertical: 16),
+              child: Divider(color: Colors.white10, height: 1),
             ),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                FittedBox(
-                  fit: BoxFit.scaleDown,
-                  child: Text(value, style: theme.textTheme.displaySmall?.copyWith(fontWeight: FontWeight.w900)),
-                ),
-                const SizedBox(height: 8),
-                Text(subtitle, style: theme.textTheme.bodySmall, maxLines: 2, overflow: TextOverflow.ellipsis),
-              ],
-            ),
+            Text(extraText, style: const TextStyle(color: Colors.white70, fontSize: 13, fontWeight: FontWeight.w500)),
           ],
-        ),
+        ],
       ),
     );
   }
 
-  Widget _buildAttendanceCard(BuildContext context) {
-    return _buildOverviewCard(
-      context: context,
-      title: "ATTENDANCE",
-      value: "${dashboardData?.attendancePercentage.toStringAsFixed(1)}%",
-      subtitle: dashboardData!.attendancePercentage >= 75 ? "Excellent! Meeting target." : "Warning: Below 75%.",
-      icon: Icons.analytics_rounded,
-      accentColor: Colors.greenAccent,
-    );
-  }
-
-  Widget _buildFeeStatusCard(BuildContext context) {
-    return _buildOverviewCard(
-      context: context,
-      title: "FEE STATUS",
-      value: "₹${dashboardData?.due ?? 0}",
-      subtitle: "Current Balance Due",
-      icon: Icons.account_balance_wallet_rounded,
-      accentColor: Colors.orangeAccent,
-    );
-  }
-
-  Widget _buildSupportCard(BuildContext context) {
-    return _buildOverviewCard(
-      context: context,
-      title: "SUPPORT",
-      value: "${dashboardData?.tickets.length ?? 0}",
-      subtitle: "Active Support Tickets",
-      icon: Icons.headset_mic_rounded,
-      accentColor: Colors.blueAccent,
-    );
-  }
-
-  Widget _buildStudyCard(BuildContext context) {
-    return _buildOverviewCard(
-      context: context,
-      title: "ACADEMICS",
-      value: "${dashboardData?.availableExams.length ?? 0}",
-      subtitle: "Upcoming Examinations",
-      icon: Icons.auto_graph_rounded,
-      accentColor: Colors.purpleAccent,
-    );
-  }
-
-  Widget _buildDynamicSections(BuildContext context) {
-    return Column(
-      children: [
-        _buildSectionHeader(context, Icons.event_available_rounded, "Upcoming Events", onTap: () {
-          Navigator.push(context, MaterialPageRoute(builder: (_) => const ManageEventsPage()));
-        }),
-        const SizedBox(height: 12),
-        _buildUpcomingEvents(),
-        const SizedBox(height: 32),
-
-        _buildSectionHeader(context, Icons.assignment_turned_in_rounded, "Available Exams", onTap: () {
-          Navigator.push(context, MaterialPageRoute(builder: (_) => const ExamSchedulePage()));
-        }),
-        const SizedBox(height: 12),
-        _buildAvailableExams(),
-      ],
-    );
-  }
-
-  Widget _buildSectionHeader(BuildContext context, IconData icon, String title, {VoidCallback? onTap}) {
-    final theme = Theme.of(context);
-    return Row(
-      children: [
-        Icon(icon, size: 20, color: theme.colorScheme.primary),
-        const SizedBox(width: 10),
-        Text(title, style: theme.textTheme.titleLarge),
-        const Spacer(),
-        TextButton(
-          onPressed: onTap,
-          child: const Text("See All"),
-        ),
-      ],
+  Widget _buildSectionHeader(IconData icon, String title, {VoidCallback? onTap}) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 16),
+      child: Row(
+        children: [
+          Icon(icon, size: 22, color: _primary),
+          const SizedBox(width: 12),
+          Text(title, style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w800)),
+          const Spacer(),
+          if (onTap != null)
+            TextButton(
+              onPressed: onTap,
+              child: Text("See All", style: TextStyle(color: _primary, fontSize: 13, fontWeight: FontWeight.w600)),
+            ),
+        ],
+      ),
     );
   }
 
   Widget _buildUpcomingEvents() {
-    if (dashboardData!.events.isEmpty) return _buildEmptyState("No upcoming events");
-    return Column(children: dashboardData!.events.take(2).map((e) => _buildListTile(Icons.event_rounded, Colors.blueAccent, e.title, e.eventDate ?? "")).toList());
+    if (dashboardData!.events.isEmpty) {
+      return _buildCenteredEmptyState(Icons.event_busy_rounded, "No upcoming events scheduled");
+    }
+    return Column(children: dashboardData!.events.take(2).map((e) => _buildEventTile(e)).toList());
+  }
+
+  Widget _buildEventTile(Event event) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: _card,
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(color: _primary.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(12)),
+            child: Icon(Icons.event_available_rounded, color: _primary, size: 22),
+          ),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(event.title, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 15)),
+                const SizedBox(height: 4),
+                Text(event.eventDate ?? "TBA", style: TextStyle(color: _textSecondary, fontSize: 12)),
+              ],
+            ),
+          ),
+          const Icon(Icons.arrow_forward_ios_rounded, color: Colors.white24, size: 16),
+        ],
+      ),
+    );
   }
 
   Widget _buildAvailableExams() {
-    if (dashboardData!.availableExams.isEmpty) return _buildEmptyState("No exams scheduled");
+    if (dashboardData!.availableExams.isEmpty) {
+      return _buildCenteredEmptyState(Icons.assignment_turned_in_rounded, "No examinations available");
+    }
     return Column(
       children: dashboardData!.availableExams.take(2).map((exam) {
         bool isReg = dashboardData!.registeredExamIds.contains(exam.id);
-        return Card(
+        return Container(
           margin: const EdgeInsets.only(bottom: 12),
-          child: ListTile(
-            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            title: Text(exam.name, style: const TextStyle(fontWeight: FontWeight.bold)),
-            subtitle: Text(exam.type ?? "General"),
-            trailing: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-              decoration: BoxDecoration(
-                color: (isReg ? Colors.green : Colors.blue).withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: (isReg ? Colors.green : Colors.blue).withValues(alpha: 0.5)),
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: _card,
+            borderRadius: BorderRadius.circular(16),
+          ),
+          child: Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(exam.name, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 15)),
+                    const SizedBox(height: 4),
+                    Text(exam.type ?? "General Exam", style: TextStyle(color: _textSecondary, fontSize: 12)),
+                  ],
+                ),
               ),
-              child: Text(isReg ? "REGISTERED" : "OPEN",
-                style: TextStyle(color: isReg ? Colors.green : Colors.blue, fontWeight: FontWeight.bold, fontSize: 10)),
-            ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                decoration: BoxDecoration(
+                  color: isReg ? const Color(0xff00D68F).withValues(alpha: 0.1) : _primary.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: isReg ? const Color(0xff00D68F).withValues(alpha: 0.5) : _primary.withValues(alpha: 0.5)),
+                ),
+                child: Text(
+                  isReg ? "REGISTERED" : "AVAILABLE",
+                  style: TextStyle(
+                    color: isReg ? const Color(0xff00D68F) : _primary,
+                    fontWeight: FontWeight.w800,
+                    fontSize: 10,
+                    letterSpacing: 0.5,
+                  ),
+                ),
+              ),
+            ],
           ),
         );
       }).toList(),
     );
   }
 
-  Widget _buildListTile(IconData icon, Color color, String title, String sub) {
-    return Card(
-      margin: const EdgeInsets.only(bottom: 12),
-      child: ListTile(
-        leading: CircleAvatar(
-          backgroundColor: color.withValues(alpha: 0.1),
-          child: Icon(icon, color: color, size: 20),
-        ),
-        title: Text(title, style: const TextStyle(fontWeight: FontWeight.bold)),
-        subtitle: Text(sub),
-        trailing: const Icon(Icons.chevron_right_rounded),
+  Widget _buildStudyMaterials() {
+    if (dashboardData!.studyMaterials.isEmpty) {
+      return _buildCenteredEmptyState(Icons.menu_book_rounded, "No study materials available");
+    }
+    return Column(
+      children: dashboardData!.studyMaterials.take(2).map((item) {
+        return Container(
+          margin: const EdgeInsets.only(bottom: 12),
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: _card,
+            borderRadius: BorderRadius.circular(16),
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 44, height: 44,
+                decoration: BoxDecoration(color: Colors.redAccent.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(12)),
+                child: const Icon(Icons.picture_as_pdf_rounded, color: Colors.redAccent, size: 24),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(item.title, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 15), maxLines: 1, overflow: TextOverflow.ellipsis),
+                    const SizedBox(height: 4),
+                    Text("PDF Document", style: TextStyle(color: _textSecondary, fontSize: 12)),
+                  ],
+                ),
+              ),
+              IconButton(
+                icon: const Icon(Icons.download_rounded, color: Colors.white70),
+                onPressed: () {},
+              ),
+            ],
+          ),
+        );
+      }).toList(),
+    );
+  }
+
+  Widget _buildAssignments() {
+    if (dashboardData!.assignments.isEmpty) {
+      return _buildCenteredEmptyState(Icons.checklist_rounded, "No assignments pending");
+    }
+    return Column(
+      children: dashboardData!.assignments.take(2).map((item) {
+        return Container(
+          margin: const EdgeInsets.only(bottom: 12),
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: _card,
+            borderRadius: BorderRadius.circular(16),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Expanded(child: Text(item.title, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 15))),
+                  const Icon(Icons.more_vert_rounded, color: Colors.white38, size: 18),
+                ],
+              ),
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  Icon(Icons.access_time_rounded, color: _primary, size: 14),
+                  const SizedBox(width: 6),
+                  Text("Academic Assignment", style: TextStyle(color: _textSecondary, fontSize: 12)),
+                  const Spacer(),
+                  const Text("View Details", style: TextStyle(color: Colors.white38, fontSize: 12, decoration: TextDecoration.underline)),
+                ],
+              ),
+            ],
+          ),
+        );
+      }).toList(),
+    );
+  }
+
+  Widget _buildCenteredEmptyState(IconData icon, String msg) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(vertical: 40),
+      decoration: BoxDecoration(
+        color: _card,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.03)),
+      ),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(icon, color: Colors.white10, size: 48),
+          const SizedBox(height: 16),
+          Text(msg, style: const TextStyle(color: Colors.white38, fontSize: 14, fontWeight: FontWeight.w500)),
+        ],
       ),
     );
   }
 
-  Widget _buildEmptyState(String msg) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 24),
-      child: Center(child: Text(msg, style: const TextStyle(color: Colors.grey))),
-    );
-  }
-
-  // Optimized Drawer using Theme
   Widget _buildDrawer(BuildContext context) {
-    final theme = Theme.of(context);
     return Drawer(
+      backgroundColor: _bg,
       child: Column(
         children: [
           UserAccountsDrawerHeader(
-            decoration: BoxDecoration(color: theme.colorScheme.primary),
-            currentAccountPicture: const CircleAvatar(backgroundColor: Colors.white24, child: Icon(Icons.person, color: Colors.white, size: 40)),
-            accountName: Text(dashboardData?.user?.name ?? "Student", style: const TextStyle(fontWeight: FontWeight.bold)),
-            accountEmail: Text(dashboardData?.user?.email ?? ""),
+            decoration: BoxDecoration(color: _surface),
+            currentAccountPicture: CircleAvatar(
+              backgroundColor: _primary,
+              child: Text(dashboardData?.user?.name[0] ?? "S", style: const TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold)),
+            ),
+            accountName: Text(dashboardData?.user?.name ?? "Student", style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 16)),
+            accountEmail: Text(dashboardData?.user?.email ?? "", style: const TextStyle(color: Colors.white70)),
           ),
           Expanded(
             child: ListView(
@@ -398,14 +614,38 @@ class _StudentDashboardState extends State<StudentDashboard> {
               children: [
                 _buildDrawerItem(context, "Dashboard", Icons.dashboard_rounded, null, isSelected: true),
                 _buildDrawerItem(context, "My Profile", Icons.person_outline_rounded, const StudentProfilePage()),
-                const Divider(),
-                _buildExpansionTile(context, "Academic", Icons.school_rounded, [
-                  _buildDrawerSubItem(context, "Timetable", Icons.calendar_today_rounded, const TimetablePage()),
+                _buildDrawerItem(context, "Virtual ID Card", Icons.badge_rounded, const ViewVirtualIdCard()),
+                const Padding(padding: EdgeInsets.symmetric(horizontal: 16), child: Divider(color: Colors.white10)),
+        _buildExpansionTile(context, "Academic", Icons.school_rounded, [
+                  _buildDrawerSubItem(context, "Weekly Timetable", Icons.calendar_view_week_rounded, const TimetablePage()),
+                  _buildDrawerSubItem(context, "Daily Schedule", Icons.calendar_today_rounded, const ClassSchedulePage()),
                   _buildDrawerSubItem(context, "Assignments", Icons.checklist_rounded, const AssignmentsPage()),
-                  _buildDrawerSubItem(context, "Results", Icons.auto_graph_rounded, const ExamResultPage()),
+                  _buildDrawerSubItem(context, "Study Materials", Icons.menu_book_rounded, const NotesPage()),
+                  _buildDrawerSubItem(context, "Faculty Remarks", Icons.comment_rounded, const RemarksPage()),
+                ]),
+                _buildExpansionTile(context, "Attendance", Icons.fact_check_rounded, [
+                  _buildDrawerSubItem(context, "Attendance Report", Icons.analytics_rounded, const AttendanceReportPage()),
+                  _buildDrawerSubItem(context, "Leave Applications", Icons.email_rounded, const LeaveApplicationPage()),
+                ]),
+                _buildExpansionTile(context, "Examinations", Icons.assignment_rounded, [
+                  _buildDrawerSubItem(context, "Exam Registration", Icons.app_registration_rounded, const ExamRegistrationPage()),
+                  _buildDrawerSubItem(context, "Admit Card", Icons.badge_rounded, const AdmitCardPage()),
+                  _buildDrawerSubItem(context, "Exam Results", Icons.grade_rounded, const ExamResultPage()),
+                ]),
+                _buildExpansionTile(context, "Library", Icons.local_library_rounded, [
+                  _buildDrawerSubItem(context, "Available Books", Icons.library_books_rounded, const LibraryBooksPage()),
+                  _buildDrawerSubItem(context, "My Lending Books", Icons.book_rounded, const MyLendingBooksPage()),
+                ]),
+                _buildExpansionTile(context, "Events", Icons.event_rounded, [
+                  _buildDrawerSubItem(context, "Explore Events", Icons.search_rounded, const ManageEventsPage()),
+                  _buildDrawerSubItem(context, "My Registered Events", Icons.event_available_rounded, const RegisteredEventsPage()),
+                ]),
+                _buildExpansionTile(context, "Support", Icons.headset_mic_rounded, [
+                  _buildDrawerSubItem(context, "My Tickets", Icons.confirmation_number_rounded, const SupportTicketsPage()),
+                  _buildDrawerSubItem(context, "Create Ticket", Icons.add_comment_rounded, const CreateSupportTicketPage()),
                 ]),
                 _buildDrawerItem(context, "Fees", Icons.payments_rounded, const StudentFeePage()),
-                const Divider(),
+                const Padding(padding: EdgeInsets.symmetric(horizontal: 16), child: Divider(color: Colors.white10)),
                 ListTile(
                   leading: const Icon(Icons.logout_rounded, color: Colors.redAccent),
                   title: const Text("Sign Out", style: TextStyle(color: Colors.redAccent, fontWeight: FontWeight.bold)),
@@ -416,6 +656,7 @@ class _StudentDashboardState extends State<StudentDashboard> {
                     }
                   },
                 ),
+                const SizedBox(height: 30),
               ],
             ),
           ),
@@ -425,18 +666,23 @@ class _StudentDashboardState extends State<StudentDashboard> {
   }
 
   Widget _buildExpansionTile(BuildContext context, String title, IconData icon, List<Widget> children) {
-    return ExpansionTile(
-      leading: Icon(icon),
-      title: Text(title),
-      children: children,
+    return Theme(
+      data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+      child: ExpansionTile(
+        leading: Icon(icon, color: Colors.white70),
+        title: Text(title, style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w500)),
+        iconColor: _primary,
+        collapsedIconColor: Colors.white38,
+        children: children,
+      ),
     );
   }
 
   Widget _buildDrawerSubItem(BuildContext context, String title, IconData icon, Widget dest) {
     return ListTile(
       contentPadding: const EdgeInsets.only(left: 32),
-      leading: Icon(icon, size: 20),
-      title: Text(title, style: const TextStyle(fontSize: 14)),
+      leading: Icon(icon, size: 20, color: Colors.white38),
+      title: Text(title, style: const TextStyle(fontSize: 13, color: Colors.white70)),
       onTap: () {
         Navigator.pop(context);
         Navigator.push(context, MaterialPageRoute(builder: (_) => dest));
@@ -445,11 +691,11 @@ class _StudentDashboardState extends State<StudentDashboard> {
   }
 
   Widget _buildDrawerItem(BuildContext context, String title, IconData icon, Widget? dest, {bool isSelected = false}) {
-    final theme = Theme.of(context);
     return ListTile(
       selected: isSelected,
-      leading: Icon(icon, color: isSelected ? theme.colorScheme.primary : null),
-      title: Text(title, style: TextStyle(fontWeight: isSelected ? FontWeight.bold : null)),
+      selectedTileColor: _primary.withValues(alpha: 0.1),
+      leading: Icon(icon, color: isSelected ? _primary : Colors.white70),
+      title: Text(title, style: TextStyle(fontWeight: isSelected ? FontWeight.bold : FontWeight.w500, color: isSelected ? _primary : Colors.white, fontSize: 14)),
       onTap: () {
         Navigator.pop(context);
         if (dest != null) Navigator.push(context, MaterialPageRoute(builder: (_) => dest));

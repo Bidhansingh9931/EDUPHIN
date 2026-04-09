@@ -22,11 +22,12 @@ class SupportTicketsPage extends StatefulWidget {
 }
 
 class _SupportTicketsPageState extends State<SupportTicketsPage> {
-  final Color bgColor = const Color(0xFF0B1026);
-  final Color cardColor = const Color(0xFF2F3757);
-  final Color fieldColor = const Color(0xFF4A5568);
-  final Color badgeColor = const Color(0xFF5F6B7A);
-  final Color buttonBlue = const Color(0xFF3F5BD9);
+  // Theme Colors
+  final Color _bg = const Color(0xff0B1220);
+  final Color _card = const Color(0xff1E2746);
+  final Color _primary = const Color(0xff3366FF);
+  final Color _secondary = const Color(0xff3E4764);
+  final Color _surface = const Color(0xff2A3450);
 
   List<SupportTicket> _tickets = [];
   bool _isLoading = true;
@@ -66,135 +67,314 @@ class _SupportTicketsPageState extends State<SupportTicketsPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: bgColor,
-      body: SafeArea(
-        child: Column(
-          children: [
-            const SizedBox(height: 20),
+      backgroundColor: _bg,
+      appBar: AppBar(
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back, color: Colors.white),
+          onPressed: () => Navigator.pop(context),
+        ),
+        title: const Text(
+          "Support Tickets",
+          style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white),
+        ),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.refresh, color: Colors.white70),
+            onPressed: _fetchTickets,
+          ),
+        ],
+      ),
+      body: RefreshIndicator(
+        onRefresh: _fetchTickets,
+        color: _primary,
+        child: SingleChildScrollView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              /// FILTER CARD
+              Container(
+                padding: const EdgeInsets.all(20),
+                decoration: BoxDecoration(
+                  color: _card,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: Colors.white12),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Row(
+                      children: [
+                        Icon(Icons.filter_list, color: Colors.white70, size: 20),
+                        SizedBox(width: 8),
+                        Text(
+                          "Filter Tickets",
+                          style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 20),
 
-            /// HEADER
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20),
-              child: Row(
-                children: const [
-                  Icon(Icons.access_time, color: Colors.white70),
-                  SizedBox(width: 12),
-                  Text(
-                    "Your Support Tickets",
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 26,
-                      fontWeight: FontWeight.bold,
+                    const Text("Search Query", style: TextStyle(color: Colors.white70, fontSize: 14)),
+                    const SizedBox(height: 8),
+                    TextField(
+                      style: const TextStyle(color: Colors.white),
+                      decoration: InputDecoration(
+                        hintText: "Search by title...",
+                        hintStyle: const TextStyle(color: Colors.white54, fontSize: 14),
+                        prefixIcon: const Icon(Icons.search, color: Colors.white38, size: 20),
+                        filled: true,
+                        fillColor: _secondary,
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide.none),
+                        contentPadding: const EdgeInsets.symmetric(vertical: 12),
+                      ),
+                      onChanged: (val) => _searchQuery = val,
+                      onSubmitted: (val) => _fetchTickets(),
+                    ),
+                    const SizedBox(height: 20),
+
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text("Priority", style: TextStyle(color: Colors.white70, fontSize: 14)),
+                              const SizedBox(height: 8),
+                              _buildDropdown(_selectedPriority, ["all", "low", "medium", "high"], (val) {
+                                setState(() => _selectedPriority = val!);
+                                _fetchTickets();
+                              }),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text("Status", style: TextStyle(color: Colors.white70, fontSize: 14)),
+                              const SizedBox(height: 8),
+                              _buildDropdown(_selectedStatus, ["all", "open", "closed"], (val) {
+                                setState(() => _selectedStatus = val!);
+                                _fetchTickets();
+                              }),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 24),
+                    SizedBox(
+                      width: double.infinity,
+                      height: 48,
+                      child: ElevatedButton.icon(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: _primary,
+                          foregroundColor: Colors.white,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                          elevation: 0,
+                        ),
+                        onPressed: () async {
+                          final result = await Navigator.push(
+                            context,
+                            MaterialPageRoute(builder: (context) => const CreateSupportTicketPage()),
+                          );
+                          if (result == true) {
+                            _fetchTickets();
+                          }
+                        },
+                        icon: const Icon(Icons.add, size: 20),
+                        label: const Text("CREATE NEW TICKET", style: TextStyle(fontWeight: FontWeight.bold)),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+
+              const SizedBox(height: 32),
+
+              /// TICKETS LIST
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text(
+                    "Ticket History",
+                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white),
+                  ),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: _primary.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: Text(
+                      "${_tickets.length} tickets",
+                      style: TextStyle(color: _primary, fontSize: 12, fontWeight: FontWeight.bold),
                     ),
                   ),
                 ],
               ),
-            ),
+              const SizedBox(height: 16),
 
-            const SizedBox(height: 25),
-
-            /// FILTER CARD
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20),
-              child: Container(
-                padding: const EdgeInsets.all(20),
-                decoration: BoxDecoration(
-                  color: cardColor,
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                child: Column(
-                  children: [
-                    _inputField("Search by Title...", fieldColor),
-                    const SizedBox(height: 20),
-                    _dropdownField("Priority", _selectedPriority, ["all", "low", "medium", "high"], (val) {
-                      setState(() => _selectedPriority = val!);
-                      _fetchTickets();
-                    }, fieldColor),
-                    const SizedBox(height: 20),
-                    _dropdownField("Status", _selectedStatus, ["all", "open", "closed"], (val) {
-                      setState(() => _selectedStatus = val!);
-                      _fetchTickets();
-                    }, fieldColor),
-                  ],
-                ),
-              ),
-            ),
-
-            const SizedBox(height: 20),
-
-            /// TABLE SECTION (SCROLLABLE ROW)
-            Expanded(
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 20),
-                child: _isLoading
-                    ? const Center(child: CircularProgressIndicator())
-                    : _tickets.isEmpty
-                        ? const Center(child: Text("No tickets found", style: TextStyle(color: Colors.white)))
-                        : SingleChildScrollView(
-                            scrollDirection: Axis.horizontal,
-                            child: Container(
-                              width: 1000,
-                              decoration: BoxDecoration(
-                                color: cardColor,
-                                borderRadius: BorderRadius.circular(10),
-                              ),
-                              child: SingleChildScrollView(
-                                child: Column(
-                                  children: [
-                                    _tableHeader(),
-                                    ..._tickets.map((ticket) => _tableRow(
-                                          id: ticket.id.toString(),
-                                          title: ticket.title,
-                                          priority: ticket.priority,
-                                          status: ticket.status,
-                                          category: ticket.category ?? "-",
-                                          assigned: ticket.assignedTo ?? "Unassigned",
-                                          date: _formatDate(ticket.createdAt),
-                                          badgeColor: badgeColor,
-                                        )),
-                                  ],
-                                ),
-                              ),
-                            ),
-                          ),
-              ),
-            ),
-
-            /// CREATE BUTTON
-            Padding(
-              padding: const EdgeInsets.all(20),
-              child: SizedBox(
-                width: double.infinity,
-                height: 60,
-                child: ElevatedButton.icon(
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: buttonBlue,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(15),
-                    ),
+              if (_isLoading)
+                Center(child: Padding(padding: const EdgeInsets.all(40.0), child: CircularProgressIndicator(color: _primary)))
+              else if (_tickets.isEmpty)
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.symmetric(vertical: 60),
+                  decoration: BoxDecoration(
+                    color: _card,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: Colors.white12),
                   ),
-                  onPressed: () async {
-                    final result = await Navigator.push(
-                      context,
-                      MaterialPageRoute(builder: (context) => const CreateSupportTicketPage()),
-                    );
-                    if (result == true) {
-                      _fetchTickets();
-                    }
+                  child: const Column(
+                    children: [
+                      Icon(Icons.confirmation_number_outlined, color: Colors.white10, size: 64),
+                      SizedBox(height: 16),
+                      Text("No tickets found", style: TextStyle(color: Colors.white38, fontSize: 16)),
+                    ],
+                  ),
+                )
+              else
+                ListView.builder(
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  itemCount: _tickets.length,
+                  itemBuilder: (context, index) {
+                    final ticket = _tickets[index];
+                    return _buildTicketCard(ticket);
                   },
-                  icon: const Icon(Icons.add, size: 28, color: Colors.white,),
-                  label: const Text(
-                    "CREATE NEW TICKET",
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.white,
-                    ),
-                  ),
                 ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildTicketCard(SupportTicket ticket) {
+    final priorityColor = _getPriorityColor(ticket.priority);
+    final statusColor = _getStatusColor(ticket.status);
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 16),
+      decoration: BoxDecoration(
+        color: _card,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.white12),
+      ),
+      child: InkWell(
+        onTap: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => StudentTicketDetailsPage(
+                ticketId: ticket.encryptedId ?? ticket.id.toString(),
               ),
             ),
-          ],
+          ).then((_) => _fetchTickets());
+        },
+        borderRadius: BorderRadius.circular(12),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    "#${ticket.id}",
+                    style: const TextStyle(color: Colors.white38, fontSize: 12, fontWeight: FontWeight.bold),
+                  ),
+                  Text(
+                    _formatDate(ticket.createdAt),
+                    style: const TextStyle(color: Colors.white38, fontSize: 12),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              Text(
+                ticket.title,
+                style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  const Icon(Icons.category_outlined, color: Colors.white54, size: 14),
+                  const SizedBox(width: 4),
+                  Text(
+                    ticket.category ?? "General",
+                    style: const TextStyle(color: Colors.white54, fontSize: 13),
+                  ),
+                  const Spacer(),
+                  const Icon(Icons.person_outline, color: Colors.white54, size: 14),
+                  const SizedBox(width: 4),
+                  Text(
+                    ticket.assignedTo ?? "Unassigned",
+                    style: const TextStyle(color: Colors.white54, fontSize: 13),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+              Row(
+                children: [
+                  _statusBadge(ticket.priority, priorityColor),
+                  const SizedBox(width: 8),
+                  _statusBadge(ticket.status, statusColor),
+                  const Spacer(),
+                  Icon(Icons.chevron_right, color: _primary.withValues(alpha: 0.5)),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _statusBadge(String text, Color color) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(4),
+        border: Border.all(color: color.withValues(alpha: 0.5)),
+      ),
+      child: Text(
+        text.toUpperCase(),
+        style: TextStyle(color: color, fontSize: 10, fontWeight: FontWeight.bold),
+      ),
+    );
+  }
+
+  Widget _buildDropdown(String value, List<String> items, ValueChanged<String?> onChanged) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12),
+      decoration: BoxDecoration(
+        color: _secondary,
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: DropdownButtonHideUnderline(
+        child: DropdownButton<String>(
+          value: value,
+          dropdownColor: _card,
+          icon: const Icon(Icons.keyboard_arrow_down, color: Colors.white70, size: 20),
+          isExpanded: true,
+          items: items.map((String item) {
+            return DropdownMenuItem<String>(
+              value: item,
+              child: Text(
+                item.toUpperCase(),
+                style: const TextStyle(color: Colors.white, fontSize: 13),
+              ),
+            );
+          }).toList(),
+          onChanged: onChanged,
         ),
       ),
     );
@@ -209,203 +389,19 @@ class _SupportTicketsPageState extends State<SupportTicketsPage> {
     }
   }
 
-  /// Input Field
-  Widget _inputField(String hint, Color color) {
-    return Container(
-      height: 55,
-      decoration: BoxDecoration(
-        color: color,
-        borderRadius: BorderRadius.circular(15),
-      ),
-      padding: const EdgeInsets.symmetric(horizontal: 15),
-      child: TextField(
-        style: const TextStyle(color: Colors.white),
-        decoration: InputDecoration(
-          hintText: hint,
-          hintStyle: const TextStyle(color: Colors.white70),
-          border: InputBorder.none,
-          suffixIcon: const Icon(Icons.search, color: Colors.white70),
-        ),
-        onChanged: (val) {
-          _searchQuery = val;
-        },
-        onSubmitted: (val) => _fetchTickets(),
-      ),
-    );
-  }
-
-  /// Dropdown Field
-  Widget _dropdownField(String label, String value, List<String> items, ValueChanged<String?> onChanged, Color color) {
-    return Container(
-      height: 55,
-      decoration: BoxDecoration(
-        color: color,
-        borderRadius: BorderRadius.circular(15),
-      ),
-      padding: const EdgeInsets.symmetric(horizontal: 15),
-      child: DropdownButtonHideUnderline(
-        child: DropdownButton<String>(
-          value: value,
-          dropdownColor: color,
-          icon: const Icon(Icons.keyboard_arrow_down, color: Colors.white),
-          isExpanded: true,
-          items: items.map((String item) {
-            return DropdownMenuItem<String>(
-              value: item,
-              child: Text(
-                "${label}: ${item.toUpperCase()}",
-                style: const TextStyle(color: Colors.white, fontSize: 16),
-              ),
-            );
-          }).toList(),
-          onChanged: onChanged,
-        ),
-      ),
-    );
-  }
-
-  /// Table Header
-  Widget _tableHeader() {
-    return Container(
-      padding: const EdgeInsets.symmetric(vertical: 15),
-      decoration: const BoxDecoration(
-        border: Border(bottom: BorderSide(color: Colors.white24)),
-      ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceAround,
-        children: const [
-          _headerText("#ID"),
-          _headerText("Title"),
-          _headerText("Priority"),
-          _headerText("Status"),
-          _headerText("Category"),
-          _headerText("Assigned To"),
-          _headerText("Created At"),
-          _headerText("Action"),
-        ],
-      ),
-    );
-  }
-
-  Widget _tableRow({
-    required String id,
-    required String title,
-    required String priority,
-    required String status,
-    required String category,
-    required String assigned,
-    required String date,
-    required Color badgeColor,
-  }) {
-    return Container(
-      padding: const EdgeInsets.symmetric(vertical: 20),
-      decoration: const BoxDecoration(
-        border: Border(bottom: BorderSide(color: Colors.white24)),
-      ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceAround,
-        children: [
-          _cellText(id),
-          _cellText(title),
-          _badge(priority, _getPriorityColor(priority)),
-          _badge(status, _getStatusColor(status)),
-          _cellText(category),
-          _cellText(assigned),
-          _cellText(date),
-          _actionButton(id),
-        ],
-      ),
-    );
-  }
-
   Color _getPriorityColor(String priority) {
     switch (priority.toLowerCase()) {
-      case 'high':
-        return Colors.redAccent;
-      case 'medium':
-        return Colors.orangeAccent;
-      default:
-        return Colors.greenAccent;
+      case 'high': return Colors.redAccent;
+      case 'medium': return Colors.orangeAccent;
+      default: return Colors.greenAccent;
     }
   }
 
   Color _getStatusColor(String status) {
     switch (status.toLowerCase()) {
-      case 'open':
-        return Colors.blueAccent;
-      case 'closed':
-        return Colors.grey;
-      default:
-        return Colors.blueGrey;
+      case 'open': return _primary;
+      case 'closed': return Colors.grey;
+      default: return Colors.blueGrey;
     }
-  }
-
-  Widget _cellText(String text) {
-    return SizedBox(
-      width: 120,
-      child: Text(
-        text,
-        style: const TextStyle(color: Colors.white, fontSize: 14),
-        overflow: TextOverflow.ellipsis,
-      ),
-    );
-  }
-
-  Widget _badge(String text, Color color) {
-    return Container(
-      width: 120,
-      alignment: Alignment.center,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 8),
-        decoration: BoxDecoration(
-          color: color.withOpacity(0.2),
-          border: Border.all(color: color),
-          borderRadius: BorderRadius.circular(20),
-        ),
-        child: Text(
-          text.toUpperCase(),
-          style: TextStyle(color: color, fontSize: 12, fontWeight: FontWeight.bold),
-        ),
-      ),
-    );
-  }
-
-  Widget _actionButton(String id) {
-    return ElevatedButton(
-      style: ElevatedButton.styleFrom(
-        backgroundColor: const Color(0xFF5F6B7A),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(15),
-        ),
-      ),
-      onPressed: () {
-         Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (context) => StudentTicketDetailsPage(ticketId: id),
-          ),
-        ).then((_) => _fetchTickets());
-      },
-      child: const Text("VIEW", style: TextStyle(color: Colors.white),),
-    );
-  }
-}
-
-class _headerText extends StatelessWidget {
-  final String text;
-  const _headerText(this.text);
-
-  @override
-  Widget build(BuildContext context) {
-    return SizedBox(
-      width: 120,
-      child: Text(
-        text,
-        style: const TextStyle(
-          color: Colors.white,
-          fontWeight: FontWeight.bold,
-        ),
-      ),
-    );
   }
 }

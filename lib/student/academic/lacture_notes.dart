@@ -14,6 +14,13 @@ class _NotesPageState extends State<NotesPage> {
   bool _isLoading = true;
   final Map<String, bool> _subjectOpenStates = {};
 
+  // Theme Colors
+  final Color _bg = const Color(0xff0B1220);
+  final Color _card = const Color(0xff1E2746);
+  final Color _primary = const Color(0xff3366FF);
+  final Color _secondary = const Color(0xff3E4764);
+  final Color _surface = const Color(0xff2A3450);
+
   @override
   void initState() {
     super.initState();
@@ -25,7 +32,6 @@ class _NotesPageState extends State<NotesPage> {
     try {
       final data = await ApiService.getStudentNotes();
       setState(() {
-        // Handle both List and Map response safely
         if (data is List) {
           _notes = data;
         } else if (data is Map && data.containsKey('notes')) {
@@ -47,7 +53,6 @@ class _NotesPageState extends State<NotesPage> {
 
   @override
   Widget build(BuildContext context) {
-    // Group notes by subject
     Map<String, List<dynamic>> groupedNotes = {};
     for (var note in _notes) {
       final subjectName = note['subject']?['name'] ?? 'General';
@@ -58,25 +63,30 @@ class _NotesPageState extends State<NotesPage> {
     }
 
     return Scaffold(
-      backgroundColor: const Color(0xff0a1230),
+      backgroundColor: _bg,
       appBar: AppBar(
-        backgroundColor: const Color(0xff0a1230),
+        backgroundColor: Colors.transparent,
         elevation: 0,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back, color: Colors.white),
+          onPressed: () => Navigator.pop(context),
+        ),
         title: const Text(
           "Lecture Notes",
           style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white),
         ),
       ),
       body: _isLoading
-          ? const Center(child: CircularProgressIndicator(color: Colors.white))
+          ? Center(child: CircularProgressIndicator(color: _primary))
           : groupedNotes.isEmpty
               ? const Center(child: Text("No notes available", style: TextStyle(color: Colors.white70)))
               : RefreshIndicator(
                   onRefresh: _fetchNotes,
+                  color: _primary,
                   child: ListView.separated(
-                    padding: const EdgeInsets.all(16),
+                    padding: const EdgeInsets.all(20),
                     itemCount: groupedNotes.length,
-                    separatorBuilder: (context, index) => const SizedBox(height: 15),
+                    separatorBuilder: (context, index) => const SizedBox(height: 16),
                     itemBuilder: (context, index) {
                       final subjectName = groupedNotes.keys.elementAt(index);
                       final subjectNotes = groupedNotes[subjectName]!;
@@ -84,23 +94,24 @@ class _NotesPageState extends State<NotesPage> {
 
                       return Container(
                         decoration: BoxDecoration(
-                          color: const Color(0xff3c4566),
-                          borderRadius: BorderRadius.circular(14),
+                          color: _card,
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: Colors.white12),
                         ),
                         child: Column(
                           children: [
-                            /// SUBJECT HEADER
                             ListTile(
                               title: Text(
                                 subjectName,
                                 style: const TextStyle(
                                     color: Colors.white,
-                                    fontSize: 18,
+                                    fontSize: 16,
                                     fontWeight: FontWeight.bold),
                               ),
-                              trailing: Icon(
-                                isOpen ? Icons.keyboard_arrow_up : Icons.keyboard_arrow_down,
-                                color: Colors.white,
+                              trailing: AnimatedRotation(
+                                duration: const Duration(milliseconds: 200),
+                                turns: isOpen ? 0.5 : 0,
+                                child: const Icon(Icons.expand_more, color: Colors.white70),
                               ),
                               onTap: () {
                                 setState(() {
@@ -108,10 +119,13 @@ class _NotesPageState extends State<NotesPage> {
                                 });
                               },
                             ),
-
-                            /// NOTES LIST
                             if (isOpen)
-                              ...subjectNotes.map((note) => noteCard(note)),
+                              Padding(
+                                padding: const EdgeInsets.only(bottom: 8),
+                                child: Column(
+                                  children: subjectNotes.map((note) => _noteCard(note)).toList(),
+                                ),
+                              ),
                           ],
                         ),
                       );
@@ -121,86 +135,85 @@ class _NotesPageState extends State<NotesPage> {
     );
   }
 
-  Widget noteCard(dynamic note) {
+  Widget _noteCard(dynamic note) {
     final uploadedAt = note['created_at'] != null ? DateTime.tryParse(note['created_at']) : null;
     final dateStr = uploadedAt != null ? DateFormat('dd MMM, yyyy').format(uploadedAt) : (note['created_at'] ?? 'N/A');
 
     return Container(
-      margin: const EdgeInsets.all(16),
+      margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: const Color(0xff46507a),
-        borderRadius: BorderRadius.circular(14),
+        color: _surface,
+        borderRadius: BorderRadius.circular(12),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          /// TITLE
           Row(
             children: [
-              const Icon(Icons.description, color: Colors.white),
-              const SizedBox(width: 8),
               Expanded(
-                child: Text(
-                  note['title'] ?? 'N/A',
-                  style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      note['title'] ?? 'N/A',
+                      style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold),
+                    ),
+                    const SizedBox(height: 4),
+                    Row(
+                      children: [
+                        const Icon(Icons.calendar_month, color: Colors.white54, size: 14),
+                        const SizedBox(width: 4),
+                        Text(
+                          "Uploaded: $dateStr",
+                          style: const TextStyle(color: Colors.white54, fontSize: 12),
+                        )
+                      ],
+                    ),
+                  ],
                 ),
-              )
-            ],
-          ),
-          const SizedBox(height: 15),
-          /// DATE
-          Row(
-            children: [
-              const Icon(Icons.calendar_month, color: Colors.white70, size: 20),
-              const SizedBox(width: 8),
-              Text(
-                "Uploaded: $dateStr",
-                style: const TextStyle(color: Colors.white70),
-              )
-            ],
-          ),
-          const SizedBox(height: 10),
-          /// UPLOADED BY
-          Row(
-            children: [
-              const Icon(Icons.person, color: Colors.white70, size: 20),
-              const SizedBox(width: 8),
-              Text(
-                "Uploaded by: ${note['uploaded_by_name'] ?? 'N/A'}",
-                style: const TextStyle(color: Colors.white70),
-              )
-            ],
-          ),
-          const SizedBox(height: 20),
-          Text(
-            note['description'] ?? '',
-            style: const TextStyle(color: Colors.white, fontSize: 16),
-          ),
-          const SizedBox(height: 20),
-          /// VIEW / DOWNLOAD BUTTON
-          GestureDetector(
-            onTap: () {
-              // Handle download using note['file_path']
-            },
-            child: Container(
-              width: double.infinity,
-              height: 50,
-              decoration: BoxDecoration(
-                color: const Color(0xff6b7685),
-                borderRadius: BorderRadius.circular(12),
               ),
-              child: const Center(
-                child: Text(
-                  "VIEW / DOWNLOAD",
-                  style: TextStyle(
-                      color: Colors.white,
-                      fontWeight: FontWeight.bold,
-                      fontSize: 16),
-                ),
+              const Icon(Icons.description, color: Colors.white38, size: 24),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              const Icon(Icons.person, color: Colors.white54, size: 14),
+              const SizedBox(width: 4),
+              Text(
+                "By: ${note['uploaded_by_name'] ?? 'N/A'}",
+                style: const TextStyle(color: Colors.white54, fontSize: 12),
+              )
+            ],
+          ),
+          if (note['description'] != null && note['description'].toString().isNotEmpty) ...[
+            const SizedBox(height: 12),
+            Text(
+              note['description'] ?? '',
+              style: const TextStyle(color: Colors.white70, fontSize: 13),
+              maxLines: 3,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ],
+          const SizedBox(height: 16),
+          SizedBox(
+            width: double.infinity,
+            height: 40,
+            child: ElevatedButton.icon(
+              onPressed: () {
+                // Handle download using note['file_path']
+              },
+              icon: const Icon(Icons.visibility_outlined, size: 18),
+              label: const Text("VIEW / DOWNLOAD", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: _secondary,
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                elevation: 0,
               ),
             ),
           )

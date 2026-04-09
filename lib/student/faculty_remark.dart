@@ -15,11 +15,17 @@ class _RemarksPageState extends State<RemarksPage> {
   List<Map<String, dynamic>> _allRemarks = [];
   bool _isLoading = true;
 
+  // Theme Colors
+  final Color _bg = const Color(0xff0B1220);
+  final Color _card = const Color(0xff1E2746);
+  final Color _primary = const Color(0xff3366FF);
+  final Color _secondary = const Color(0xff3E4764);
+  final Color _surface = const Color(0xff2A3450);
+
   @override
   void initState() {
     super.initState();
     _fetchRemarks();
-    // Re-build whenever user types in the search bar
     _searchController.addListener(() {
       setState(() {});
     });
@@ -56,10 +62,8 @@ class _RemarksPageState extends State<RemarksPage> {
     });
   }
 
-  // Reactive filtering logic
   List<Map<String, dynamic>> get _filteredRemarks {
     return _allRemarks.where((remark) {
-      // 1. Type Filter
       bool matchesType = true;
       if (selectedRemarkType != "All") {
         final rType = (remark['type'] ?? remark['category'] ?? '')
@@ -69,7 +73,6 @@ class _RemarksPageState extends State<RemarksPage> {
         matchesType = rType == selectedRemarkType.toLowerCase().trim();
       }
 
-      // 2. Search Filter (checks remark text and teacher name)
       bool matchesSearch = true;
       final query = _searchController.text.toLowerCase().trim();
       if (query.isNotEmpty) {
@@ -87,91 +90,95 @@ class _RemarksPageState extends State<RemarksPage> {
     final filtered = _filteredRemarks;
 
     return Scaffold(
-      backgroundColor: const Color(0xff0B1230),
+      backgroundColor: _bg,
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
-        iconTheme: const IconThemeData(color: Colors.white),
-        title: const Text("Faculty Remarks", style: TextStyle(color: Colors.white)),
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back, color: Colors.white),
+          onPressed: () => Navigator.pop(context),
+        ),
+        title: const Text(
+          "Faculty Remarks",
+          style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white),
+        ),
         actions: [
           IconButton(
-            icon: const Icon(Icons.refresh),
+            icon: const Icon(Icons.refresh, color: Colors.white70),
             onPressed: _fetchRemarks,
           ),
         ],
       ),
       body: SafeArea(
         child: _isLoading
-            ? const Center(child: CircularProgressIndicator(color: Colors.white))
+            ? Center(child: CircularProgressIndicator(color: _primary))
             : RefreshIndicator(
                 onRefresh: _fetchRemarks,
-                color: Colors.blueAccent,
+                color: _primary,
                 child: SingleChildScrollView(
                   physics: const AlwaysScrollableScrollPhysics(),
-                  padding: const EdgeInsets.all(16),
+                  padding: const EdgeInsets.all(20),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       // ================= FILTER CARD =================
                       Container(
-                        padding: const EdgeInsets.all(16),
+                        padding: const EdgeInsets.all(20),
                         decoration: BoxDecoration(
-                          color: const Color(0xff1E2746),
-                          borderRadius: BorderRadius.circular(14),
-                          border: Border.all(color: Colors.white10),
+                          color: _card,
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: Colors.white12),
                         ),
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             const Row(
                               children: [
-                                Icon(Icons.filter_alt, color: Colors.blueAccent),
-                                SizedBox(width: 10),
+                                Icon(Icons.filter_list, color: Colors.white70, size: 20),
+                                SizedBox(width: 8),
                                 Text(
-                                  "Filter Remarks",
-                                  style: TextStyle(
-                                      fontSize: 18,
-                                      fontWeight: FontWeight.bold,
-                                      color: Colors.white),
+                                  "Search Remarks",
+                                  style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
                                 ),
                               ],
                             ),
                             const SizedBox(height: 20),
-                            // Search Field
+                            
+                            const Text("Search Query", style: TextStyle(color: Colors.white70, fontSize: 14)),
+                            const SizedBox(height: 8),
                             TextField(
                               controller: _searchController,
                               style: const TextStyle(color: Colors.white),
                               decoration: InputDecoration(
-                                hintText: "Search remarks or faculty...",
-                                hintStyle: const TextStyle(color: Colors.white38),
-                                prefixIcon: const Icon(Icons.search, color: Colors.white38),
+                                hintText: "Search content or faculty name...",
+                                hintStyle: const TextStyle(color: Colors.white54, fontSize: 14),
+                                prefixIcon: const Icon(Icons.search, color: Colors.white38, size: 20),
                                 filled: true,
-                                fillColor: const Color(0xff0B1230),
-                                border: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(10),
-                                  borderSide: BorderSide.none,
-                                ),
-                                contentPadding: const EdgeInsets.symmetric(vertical: 0),
+                                fillColor: _secondary,
+                                border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide.none),
+                                contentPadding: const EdgeInsets.symmetric(vertical: 12),
                               ),
                             ),
-                            const SizedBox(height: 15),
-                            // Dropdown
+                            const SizedBox(height: 20),
+                            
+                            const Text("Remark Category", style: TextStyle(color: Colors.white70, fontSize: 14)),
+                            const SizedBox(height: 8),
                             Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 12),
+                              padding: const EdgeInsets.symmetric(horizontal: 16),
                               decoration: BoxDecoration(
-                                color: const Color(0xff0B1230),
-                                borderRadius: BorderRadius.circular(10),
+                                color: _secondary,
+                                borderRadius: BorderRadius.circular(8),
                               ),
                               child: DropdownButtonHideUnderline(
                                 child: DropdownButton<String>(
-                                  dropdownColor: const Color(0xff1E2746),
+                                  dropdownColor: _card,
                                   value: selectedRemarkType,
-                                  icon: const Icon(Icons.arrow_drop_down, color: Colors.blueAccent),
+                                  icon: const Icon(Icons.keyboard_arrow_down, color: Colors.white70),
                                   isExpanded: true,
                                   items: ["All", "Academic", "Discipline", "Attendance", "Behavior"]
                                       .map((e) => DropdownMenuItem(
                                             value: e,
-                                            child: Text(e, style: const TextStyle(color: Colors.white)),
+                                            child: Text(e, style: const TextStyle(color: Colors.white, fontSize: 14)),
                                           ))
                                       .toList(),
                                   onChanged: (value) {
@@ -182,46 +189,63 @@ class _RemarksPageState extends State<RemarksPage> {
                                 ),
                               ),
                             ),
-                            const SizedBox(height: 15),
+                            const SizedBox(height: 24),
                             SizedBox(
                               width: double.infinity,
-                              child: TextButton(
+                              height: 48,
+                              child: ElevatedButton(
                                 onPressed: _resetFilters,
-                                child: const Text("RESET FILTERS", style: TextStyle(color: Colors.blueAccent, fontWeight: FontWeight.bold)),
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: _secondary,
+                                  foregroundColor: Colors.white,
+                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                  elevation: 0,
+                                ),
+                                child: const Text("RESET FILTERS", style: TextStyle(fontWeight: FontWeight.bold)),
                               ),
                             )
                           ],
                         ),
                       ),
-                      const SizedBox(height: 24),
+                      const SizedBox(height: 32),
+                      
                       // ================= REMARK HISTORY =================
                       Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          const Icon(Icons.history, color: Colors.white70, size: 20),
-                          const SizedBox(width: 10),
                           Text(
-                            "History (${filtered.length})",
-                            style: const TextStyle(
-                                fontSize: 18,
-                                fontWeight: FontWeight.bold,
-                                color: Colors.white),
+                            "Remark History",
+                            style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white),
+                          ),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: _primary.withValues(alpha: 0.1),
+                              borderRadius: BorderRadius.circular(20),
+                            ),
+                            child: Text(
+                              "${filtered.length} entries",
+                              style: TextStyle(color: _primary, fontSize: 12, fontWeight: FontWeight.bold),
+                            ),
                           ),
                         ],
                       ),
-                      const SizedBox(height: 15),
+                      const SizedBox(height: 16),
+                      
                       filtered.isEmpty
                           ? Container(
                               width: double.infinity,
-                              padding: const EdgeInsets.symmetric(vertical: 40),
+                              padding: const EdgeInsets.symmetric(vertical: 60),
                               decoration: BoxDecoration(
-                                color: const Color(0xff1E2746).withOpacity(0.5),
-                                borderRadius: BorderRadius.circular(14),
+                                color: _card,
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(color: Colors.white12),
                               ),
-                              child: const Column(
+                              child: Column(
                                 children: [
-                                  Icon(Icons.notes, color: Colors.white24, size: 48),
-                                  SizedBox(height: 10),
-                                  Text("No remarks found matching your criteria", style: TextStyle(color: Colors.white38)),
+                                  Icon(Icons.notes, color: Colors.white10, size: 64),
+                                  const SizedBox(height: 16),
+                                  const Text("No remarks found", style: TextStyle(color: Colors.white38, fontSize: 16)),
                                 ],
                               ),
                             )
@@ -242,13 +266,15 @@ class _RemarksPageState extends State<RemarksPage> {
   }
 
   Widget _buildRemarkItem(Map<String, dynamic> remark) {
+    final category = (remark['type'] ?? 'General').toString();
+    
     return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.all(16),
+      margin: const EdgeInsets.only(bottom: 16),
+      padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: const Color(0xff1E2746),
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: Colors.white10),
+        color: _card,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.white12),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -259,33 +285,51 @@ class _RemarksPageState extends State<RemarksPage> {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                 decoration: BoxDecoration(
-                  color: Colors.blueAccent.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(6),
+                  color: _primary.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(4),
+                  border: Border.all(color: _primary.withValues(alpha: 0.5)),
                 ),
                 child: Text(
-                  (remark['type'] ?? 'General').toString().toUpperCase(),
-                  style: const TextStyle(color: Colors.blueAccent, fontWeight: FontWeight.bold, fontSize: 10),
+                  category.toUpperCase(),
+                  style: TextStyle(color: _primary, fontWeight: FontWeight.bold, fontSize: 10),
                 ),
               ),
               Text(
                 _formatDate(remark['created_at']),
-                style: const TextStyle(color: Colors.white38, fontSize: 11),
+                style: const TextStyle(color: Colors.white38, fontSize: 12),
               ),
             ],
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 16),
           Text(
             remark['remark'] ?? "No content provided",
-            style: const TextStyle(color: Colors.white, fontSize: 15, height: 1.4),
+            style: const TextStyle(color: Colors.white, fontSize: 15, height: 1.5),
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 20),
+          Divider(color: Colors.white.withValues(alpha: 0.05)),
+          const SizedBox(height: 12),
           Row(
             children: [
-              const Icon(Icons.person_pin, color: Colors.white38, size: 14),
-              const SizedBox(width: 6),
-              Text(
-                "By: ${remark['teacher']?['name'] ?? 'Faculty'}",
-                style: const TextStyle(color: Colors.white54, fontSize: 12, fontStyle: FontStyle.italic),
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: _secondary,
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(Icons.person, color: Colors.white70, size: 16),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text("Faculty Member", style: TextStyle(color: Colors.white38, fontSize: 11)),
+                    Text(
+                      remark['teacher']?['name'] ?? 'Faculty Member',
+                      style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w600),
+                    ),
+                  ],
+                ),
               ),
             ],
           ),

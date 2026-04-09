@@ -36,17 +36,11 @@ class _ClassSchedulePageState extends State<ClassSchedulePage> {
 
     try {
       final formattedDate = DateFormat('yyyy-MM-dd').format(selectedDate!);
-      final response = await ApiService.get('student/routine/date-wise', {'date': formattedDate});
-      
-      if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
-        setState(() {
-          _scheduleData = data['data'];
-          _isLoading = false;
-        });
-      } else {
-        throw Exception('Failed to load schedule');
-      }
+      final data = await ApiService.getStudentDateWiseRoutine(formattedDate);
+      setState(() {
+        _scheduleData = data;
+        _isLoading = false;
+      });
     } catch (e) {
       setState(() {
         _errorMessage = e.toString();

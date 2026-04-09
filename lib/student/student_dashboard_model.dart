@@ -104,6 +104,7 @@ class Student {
   final String? academicSession;
   final int? classId;
   final int? sectionId;
+  final String? profileImage;
 
   Student({
     required this.id,
@@ -115,6 +116,7 @@ class Student {
     this.academicSession,
     this.classId,
     this.sectionId,
+    this.profileImage,
   });
 
   factory Student.fromJson(Map<String, dynamic> json) {
@@ -128,6 +130,7 @@ class Student {
       academicSession: json['academic_session'],
       classId: json['class_id'] != null ? _toInt(json['class_id']) : null,
       sectionId: json['section_id'] != null ? _toInt(json['section_id']) : null,
+      profileImage: json['profile_image'],
     );
   }
 }
@@ -195,6 +198,7 @@ class Exam {
 
 class Ticket {
   final int id;
+  final String? encryptedId;
   final String title;
   final String? description;
   final String? priority;
@@ -202,6 +206,7 @@ class Ticket {
 
   Ticket({
     required this.id,
+    this.encryptedId,
     required this.title,
     this.description,
     this.priority,
@@ -211,6 +216,7 @@ class Ticket {
   factory Ticket.fromJson(Map<String, dynamic> json) {
     return Ticket(
       id: _toInt(json['id']),
+      encryptedId: json['encrypted_id']?.toString(),
       title: json['title'] ?? '',
       description: json['description'],
       priority: json['priority'],

@@ -20,7 +20,7 @@ import 'package:eduphin/teacher/dashboard/study_material_model.dart' as teacher_
 import 'package:eduphin/teacher/dashboard/my_class_model.dart' as teacher_my_class;
 import 'package:eduphin/staff/staff_dashboard/staff_models.dart' as staff_model;
 import 'package:eduphin/accountant/dashboard/accountant_dashboard_model.dart' as accountant_model;
-import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:flutter/foundation.dart' show kIsWeb, kDebugMode;
 import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -122,29 +122,72 @@ class ApiService {
   }
 
   static Future<http.Response> get(String endpoint, [Map<String, dynamic>? queryParameters]) async {
+    final uri = _uri(endpoint, queryParameters);
+    _logRequest('GET', uri);
     try {
-      return await http.get(_uri(endpoint, queryParameters), headers: await _getHeaders())
+      final response = await http.get(uri, headers: await _getHeaders())
           .timeout(const Duration(seconds: 15));
+      _logResponse('GET', uri, response);
+      return response;
     } catch (e) {
+      _logError('GET', uri, e);
       throw Exception('GET failed: $e');
     }
   }
 
   static Future<http.Response> post(String endpoint, Map<String, dynamic> data) async {
+    final uri = _uri(endpoint);
+    _logRequest('POST', uri, body: data);
     try {
-      return await http.post(_uri(endpoint), headers: await _getHeaders(), body: jsonEncode(data))
+      final response = await http.post(uri, headers: await _getHeaders(), body: jsonEncode(data))
           .timeout(const Duration(seconds: 15));
+      _logResponse('POST', uri, response);
+      return response;
     } catch (e) {
+      _logError('POST', uri, e);
       throw Exception('POST failed: $e');
     }
   }
 
   static Future<http.Response> put(String endpoint, Map<String, dynamic> data) async {
+    final uri = _uri(endpoint);
+    _logRequest('PUT', uri, body: data);
     try {
-      return await http.put(_uri(endpoint), headers: await _getHeaders(), body: jsonEncode(data))
+      final response = await http.put(uri, headers: await _getHeaders(), body: jsonEncode(data))
           .timeout(const Duration(seconds: 15));
+      _logResponse('PUT', uri, response);
+      return response;
     } catch (e) {
+      _logError('PUT', uri, e);
       throw Exception('PUT failed: $e');
+    }
+  }
+
+  // Debug Logging Helpers
+  static void _logRequest(String method, Uri uri, {Map<String, dynamic>? body}) {
+    if (kDebugMode) {
+      print('🚀 [API REQUEST] $method $uri');
+      if (body != null) print('📦 Body: ${jsonEncode(body)}');
+    }
+  }
+
+  static void _logResponse(String method, Uri uri, http.Response response) {
+    if (kDebugMode) {
+      final status = response.statusCode;
+      final icon = status >= 200 && status < 300 ? '✅' : '❌';
+      print('$icon [API RESPONSE] $method ($status) $uri');
+      try {
+        final decoded = jsonDecode(response.body);
+        print('📄 Data: ${const JsonEncoder.withIndent('  ').convert(decoded)}');
+      } catch (_) {
+        print('📄 Body: ${response.body}');
+      }
+    }
+  }
+
+  static void _logError(String method, Uri uri, dynamic error) {
+    if (kDebugMode) {
+      print('🚨 [API ERROR] $method $uri: $error');
     }
   }
 
@@ -1343,10 +1386,10 @@ class ApiService {
     throw Exception('Failed to load student assignments');
   }
 
-  static Future<void> submitStudentAssignment(String idHash, {File? file, String? text}) async {
-    final fields = {if (text != null) 'text_submission': text};
-    final files = file != null ? {'attachment': file} : null;
-    final response = await postMultipart('student/assignments/submit/$idHash', fields, files: files);
+  static Future<void> submitStudentAssignment(String id, {File? file, String? text}) async {
+    final fields = {if (text != null) 'submitted_text': text};
+    final files = file != null ? {'submitted_file': file} : null;
+    final response = await postMultipart('student/assignment/submit/$id', fields, files: files);
     if (response.statusCode != 200) throw Exception('Failed to submit assignment');
   }
 
@@ -1363,7 +1406,7 @@ class ApiService {
   }
 
   static Future<List<leave_model.StudentLeave>> getStudentLeaveList() async {
-    final response = await get('student/leaves');
+    final response = await get('student/leave');
     if (response.statusCode == 200) {
       final data = jsonDecode(response.body);
       if (data['status'] == true) return (data['data'] as List).map((i) => leave_model.StudentLeave.fromJson(i)).toList();
@@ -1372,7 +1415,7 @@ class ApiService {
   }
 
   static Future<void> applyStudentLeave({required String leaveType, required String fromDate, required String toDate, required String reason}) async {
-    final response = await post('student/leaves/apply', {
+    final response = await post('student/leave/store', {
       'leave_type': leaveType,
       'from_date': fromDate,
       'to_date': toDate,
@@ -1387,8 +1430,8 @@ class ApiService {
     throw Exception('Failed to load student fees');
   }
 
-  static Future<Map<String, dynamic>> getStudentFeeReceipt(String idHash) async {
-    final response = await get('student/fees/receipt/$idHash');
+  static Future<Map<String, dynamic>> getStudentFeeReceipt(String id) async {
+    final response = await get('student/fee/receipt/$id');
     if (response.statusCode == 200) return jsonDecode(response.body)['data'];
     throw Exception('Failed to load student fee receipt');
   }
@@ -1403,29 +1446,34 @@ class ApiService {
   }
 
   static Future<void> createStudentTicket(String title, String description, String priority, {String? category}) async {
-    final response = await post('student/tickets/create', {
+    final response = await post('student/ticket/create', {
       'title': title,
       'description': description,
       'priority': priority,
       if (category != null) 'category': category,
     });
-    if (response.statusCode != 201) throw Exception('Failed to create student ticket');
+    if (response.statusCode != 200 && response.statusCode != 201) throw Exception('Failed to create student ticket');
   }
 
   static Future<teacher_ticket_details.TicketDetails> getStudentTicketDetails(String ticketId) async {
-    final response = await get('student/tickets/$ticketId');
+    final response = await get('student/ticket/$ticketId');
     if (response.statusCode == 200) {
       final data = jsonDecode(response.body);
-      if (data['status'] == true) return teacher_ticket_details.TicketDetails.fromJson(data['data']);
+      if (data['status'] == true) {
+        // The API returns { "ticket": { ... }, "replies": [ ... ] } inside 'data'
+        return teacher_ticket_details.TicketDetails.fromJson(data['data']);
+      }
     }
+    // Handle the case where the API returns the list directly (like in the index)
+    // although for show() it should be an object.
     throw Exception('Failed to load student ticket details');
   }
 
   static Future<void> addStudentTicketReply(String ticketId, String message, {File? attachment}) async {
     final fields = {'message': message};
     final files = attachment != null ? {'attachment': attachment} : null;
-    final response = await postMultipart('student/tickets/$ticketId/reply', fields, files: files);
-    if (response.statusCode != 201) throw Exception('Failed to add student ticket reply');
+    final response = await postMultipart('student/ticket/reply/$ticketId', fields, files: files);
+    if (response.statusCode != 200 && response.statusCode != 201) throw Exception('Failed to add student ticket reply');
   }
 
   static Future<List<dynamic>> getStudentAllEvents({String? status, String? type}) async {
@@ -1443,35 +1491,35 @@ class ApiService {
   }
 
   static Future<void> registerForStudentEvent(int eventId, {String? paymentId}) async {
-    final response = await post('student/events/$eventId/register', {if (paymentId != null) 'payment_id': paymentId});
+    final response = await post('student/events/register/$eventId', {if (paymentId != null) 'payment_id': paymentId});
     if (response.statusCode != 200) throw Exception('Failed to register for student event');
   }
 
   static Future<void> cancelStudentEventRegistration(String registrationId, {String? reason}) async {
-    final response = await post('student/events/cancel/$registrationId', {if (reason != null) 'reason': reason});
+    final response = await post('student/events/cancel/$registrationId', {if (reason != null) 'reason_for_cancel': reason});
     if (response.statusCode != 200) throw Exception('Failed to cancel student event registration');
   }
 
   static Future<List<dynamic>> getAdmitCards() async {
-    final response = await get('student/exams/admit-cards');
+    final response = await get('student/admit-cards');
     if (response.statusCode == 200) return jsonDecode(response.body)['data'];
     throw Exception('Failed to load student admit cards');
   }
 
   static Future<dynamic> getAdmitCardDetails(String id) async {
-    final response = await get('student/exams/admit-cards/$id');
+    final response = await get('student/admit-card/$id');
     if (response.statusCode == 200) return jsonDecode(response.body)['data'];
     throw Exception('Failed to load student admit card details');
   }
 
   static Future<List<dynamic>> getExamResults() async {
-    final response = await get('student/exams/results');
+    final response = await get('student/results');
     if (response.statusCode == 200) return jsonDecode(response.body)['data'];
     throw Exception('Failed to load student exam results');
   }
 
-  static Future<dynamic> getReportCard(String idHash) async {
-    final response = await get('student/exams/report-card/$idHash');
+  static Future<dynamic> getReportCard(String id) async {
+    final response = await get('student/report/$id');
     if (response.statusCode == 200) return jsonDecode(response.body)['data'];
     throw Exception('Failed to load student report card');
   }
@@ -1482,9 +1530,12 @@ class ApiService {
     throw Exception('Failed to load student exams');
   }
 
-  static Future<void> registerForExam(String examId) async {
-    final response = await post('student/exams/$examId/register', {});
-    if (response.statusCode != 200) throw Exception('Failed to register for student exam');
+  static Future<void> registerForExam(String id) async {
+    final response = await post('student/exam/register/$id', {});
+    if (response.statusCode != 200) {
+      final data = jsonDecode(response.body);
+      throw Exception(data['message'] ?? 'Failed to register for student exam');
+    }
   }
 
   static Future<Map<String, dynamic>> getStudentLibraryBooks(Map<String, String> filters, int page) async {
@@ -1499,6 +1550,18 @@ class ApiService {
     final response = await get('student/library/lending', query);
     if (response.statusCode == 200) return jsonDecode(response.body);
     throw Exception('Failed to load student lending books');
+  }
+
+  static Future<Map<String, dynamic>> getStudentRoutine() async {
+    final response = await get('student/routine');
+    if (response.statusCode == 200) return jsonDecode(response.body)['data'];
+    throw Exception('Failed to load routine');
+  }
+
+  static Future<Map<String, dynamic>> getStudentDateWiseRoutine(String date) async {
+    final response = await get('student/routine/date-wise', {'date': date});
+    if (response.statusCode == 200) return jsonDecode(response.body)['data'];
+    throw Exception('Failed to load date-wise routine');
   }
 
   // Super Admin APIs

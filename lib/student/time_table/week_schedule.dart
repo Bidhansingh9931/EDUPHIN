@@ -10,6 +10,12 @@ class TimetablePage extends StatefulWidget {
 }
 
 class _TimetablePageState extends State<TimetablePage> {
+  // Theme Colors
+  final Color _bg = const Color(0xff0B1220);
+  final Color _card = const Color(0xff1E2746);
+  final Color _primary = const Color(0xff3366FF);
+  final Color _secondary = const Color(0xff3E4764);
+
   bool _isLoading = true;
   List<dynamic> _schedules = [];
   String? _errorMessage;
@@ -23,17 +29,11 @@ class _TimetablePageState extends State<TimetablePage> {
   Future<void> _fetchSchedule() async {
     setState(() => _isLoading = true);
     try {
-      // Corrected endpoint to match your Laravel routes: student/routine
-      final response = await ApiService.get('student/routine');
-      if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
-        setState(() {
-          _schedules = data['data']?['schedules'] ?? data['schedules'] ?? [];
-          _isLoading = false;
-        });
-      } else {
-        throw Exception('Failed to load schedule: ${response.statusCode}');
-      }
+      final data = await ApiService.getStudentRoutine();
+      setState(() {
+        _schedules = data['schedules'] ?? [];
+        _isLoading = false;
+      });
     } catch (e) {
       setState(() {
         _errorMessage = e.toString();
@@ -44,7 +44,6 @@ class _TimetablePageState extends State<TimetablePage> {
 
   @override
   Widget build(BuildContext context) {
-    // Group schedules by day
     Map<String, List<dynamic>> groupedSchedules = {
       'Monday': [],
       'Tuesday': [],
@@ -56,36 +55,52 @@ class _TimetablePageState extends State<TimetablePage> {
     };
 
     for (var schedule in _schedules) {
-      String day = schedule['day'] ?? '';
+      // API uses 'weekday', Flutter code was looking for 'day'
+      String weekdayRaw = schedule['weekday'] ?? schedule['day'] ?? '';
+      if (weekdayRaw.isEmpty) continue;
+
+      // Normalize to Title Case (e.g., "wednesday" -> "Wednesday")
+      // to match the keys in the groupedSchedules map
+      String day = weekdayRaw[0].toUpperCase() + weekdayRaw.substring(1).toLowerCase();
+
       if (groupedSchedules.containsKey(day)) {
         groupedSchedules[day]!.add(schedule);
       }
     }
 
     return Scaffold(
-      backgroundColor: const Color(0xff0a1230),
+      backgroundColor: _bg,
       appBar: AppBar(
-        backgroundColor: const Color(0xff0a1230),
+        backgroundColor: Colors.transparent,
         elevation: 0,
         title: const Text(
           "Weekly Timetable",
-          style: TextStyle(fontSize: 20),
+          style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.white),
         ),
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
+          icon: const Icon(Icons.arrow_back, color: Colors.white),
           onPressed: () => Navigator.pop(context),
         ),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.refresh, color: Colors.white70),
+            onPressed: _fetchSchedule,
+          ),
+        ],
       ),
       body: _isLoading
-          ? const Center(child: CircularProgressIndicator(color: Colors.white))
+          ? Center(child: CircularProgressIndicator(color: _primary))
           : _errorMessage != null
               ? Center(child: Text(_errorMessage!, style: const TextStyle(color: Colors.white70)))
               : RefreshIndicator(
                   onRefresh: _fetchSchedule,
+                  color: _primary,
                   child: ListView(
-                    padding: const EdgeInsets.all(16),
-                    children: groupedSchedules.entries.map((entry) {
-                      return timetableCard(
+                    padding: const EdgeInsets.all(20),
+                    children: groupedSchedules.entries
+                        .where((e) => e.value.isNotEmpty)
+                        .map((entry) {
+                      return _buildDaySection(
                         day: entry.key,
                         classes: entry.value,
                       );
@@ -95,92 +110,90 @@ class _TimetablePageState extends State<TimetablePage> {
     );
   }
 
-  Widget timetableCard({required String day, required List<dynamic> classes}) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 20),
-      decoration: BoxDecoration(
-        color: const Color(0xff3c4566),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.white24),
-      ),
-      child: Column(
-        children: [
-          /// DAY HEADER
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.all(16),
-            decoration: const BoxDecoration(
-              border: Border(
-                bottom: BorderSide(color: Colors.white24),
-              ),
-            ),
-            child: Text(
-              day,
-              style: const TextStyle(
-                fontSize: 22,
-                color: Colors.white,
-                fontWeight: FontWeight.bold,
-              ),
+  Widget _buildDaySection({required String day, required List<dynamic> classes}) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.only(left: 4, bottom: 12, top: 8),
+          child: Text(
+            day.toUpperCase(),
+            style: TextStyle(
+              color: _primary,
+              fontSize: 13,
+              fontWeight: FontWeight.bold,
+              letterSpacing: 1.2,
             ),
           ),
+        ),
+        ...classes.map((c) => _buildClassCard(c)),
+        const SizedBox(height: 16),
+      ],
+    );
+  }
 
-          if (classes.isNotEmpty)
-            Column(
-              children: [
-                /// TABLE HEADER
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-                  child: Row(
-                    children: const [
-                      Expanded(flex: 3, child: Text("Time", style: TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold))),
-                      Expanded(flex: 4, child: Text("Subject", style: TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold))),
-                      Expanded(flex: 3, child: Text("Teacher", style: TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold))),
-                    ],
-                  ),
-                ),
-                const Divider(color: Colors.white24, height: 1),
-
-                /// DATA ROWS
-                ...classes.map((c) => Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-                      child: Row(
-                        children: [
-                          Expanded(
-                            flex: 3,
-                            child: Text(
-                              "${c['start_time'] ?? ''}\n${c['end_time'] ?? ''}",
-                              style: const TextStyle(color: Colors.white, fontSize: 12),
-                            ),
-                          ),
-                          Expanded(
-                            flex: 4,
-                            child: Text(
-                              c['subject']?['name'] ?? 'N/A',
-                              style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w500),
-                            ),
-                          ),
-                          Expanded(
-                            flex: 3,
-                            child: Text(
-                              c['teacher']?['name'] ?? c['teacher_name'] ?? 'N/A',
-                              style: const TextStyle(color: Colors.white70, fontSize: 12),
-                            ),
-                          ),
-                        ],
-                      ),
-                    )),
-              ],
-            )
-          else
-            const Padding(
-              padding: EdgeInsets.all(20),
-              child: Text(
-                "No classes scheduled",
-                style: TextStyle(color: Colors.white54, fontStyle: FontStyle.italic),
-              ),
+  Widget _buildClassCard(dynamic c) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: _card,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Colors.white12),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 80,
+            padding: const EdgeInsets.symmetric(vertical: 8),
+            decoration: BoxDecoration(
+              color: _secondary.withValues(alpha: 0.3),
+              borderRadius: BorderRadius.circular(12),
             ),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Text(
+                  c['start_time'] ?? '',
+                  style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 2),
+                const Text("to", style: TextStyle(color: Colors.white38, fontSize: 10)),
+                const SizedBox(height: 2),
+                Text(
+                  c['end_time'] ?? '',
+                  style: const TextStyle(color: Colors.white70, fontSize: 12),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  c['subject']?['name'] ?? 'N/A',
+                  style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 4),
+                Row(
+                  children: [
+                    const Icon(Icons.person_outline, size: 14, color: Colors.white38),
+                    const SizedBox(width: 4),
+                    Text(
+                      c['teacher']?['name'] ?? c['teacher_name'] ?? 'N/A',
+                      style: const TextStyle(color: Colors.white54, fontSize: 13),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          Icon(Icons.chevron_right, color: Colors.white.withValues(alpha: 0.1)),
         ],
       ),
     );
   }
 }
+

@@ -13,6 +13,12 @@ class _LibraryBooksPageState extends State<LibraryBooksPage> {
   bool _isLoading = true;
   String? _errorMessage;
 
+  // Theme Colors
+  final Color _bg = const Color(0xff0B1220);
+  final Color _card = const Color(0xff1E2746);
+  final Color _primary = const Color(0xff3366FF);
+  final Color _secondary = const Color(0xff3E4764);
+
   // Filters
   Map<String, String> _filters = {
     'title': '',
@@ -98,42 +104,47 @@ class _LibraryBooksPageState extends State<LibraryBooksPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF0B102A),
-      appBar: PreferredSize(
-        preferredSize: const Size.fromHeight(70),
-        child: AppBar(
-          backgroundColor: const Color(0xFF3E466A),
-          elevation: 0,
-          leading: IconButton(
-            icon: const Icon(Icons.arrow_back, color: Colors.white),
-            onPressed: () => Navigator.pop(context),
-          ),
-          title: const Row(
-            children: [
-              Icon(Icons.menu_book_outlined, size: 28),
-              SizedBox(width: 10),
-              Text(
-                "Library Books",
-                style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
-              ),
-            ],
-          ),
+      backgroundColor: _bg,
+      appBar: AppBar(
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back, color: Colors.white),
+          onPressed: () => Navigator.pop(context),
+        ),
+        title: const Text(
+          "Available Resources",
+          style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white),
         ),
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(20),
         child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             /// FILTER CARD
             Container(
               padding: const EdgeInsets.all(20),
               decoration: BoxDecoration(
-                color: const Color(0xFF3E466A),
-                borderRadius: BorderRadius.circular(20),
+                color: _card,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: Colors.white12),
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  const Row(
+                    children: [
+                      Icon(Icons.filter_list, color: Colors.white70, size: 20),
+                      SizedBox(width: 8),
+                      Text(
+                        "Search Resources",
+                        style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 20),
+
                   buildLabel("Title"),
                   buildTextField(_titleController, "Search Title"),
 
@@ -155,40 +166,39 @@ class _LibraryBooksPageState extends State<LibraryBooksPage> {
                   buildLabel("Year"),
                   buildDropdown(_years, 'publication_year'),
 
-                  const SizedBox(height: 20),
+                  const SizedBox(height: 24),
 
                   /// Apply & Reset
                   Row(
                     children: [
                       Expanded(
-                        child: ElevatedButton(
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: const Color(0xFF4361EE),
-                            padding: const EdgeInsets.symmetric(vertical: 14),
-                            shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(10)),
-                          ),
-                          onPressed: _applyFilters,
-                          child: const Text(
-                            "APPLY",
-                            style: TextStyle(fontSize: 16),
+                        child: SizedBox(
+                          height: 48,
+                          child: ElevatedButton(
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: _primary,
+                              foregroundColor: Colors.white,
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                              elevation: 0,
+                            ),
+                            onPressed: _applyFilters,
+                            child: const Text("APPLY FILTERS", style: TextStyle(fontWeight: FontWeight.bold)),
                           ),
                         ),
                       ),
-                      const SizedBox(width: 15),
+                      const SizedBox(width: 12),
                       Expanded(
-                        child: ElevatedButton(
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: const Color(0xFF5E6A75),
-                            padding: const EdgeInsets.symmetric(vertical: 14),
-                            shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(10)),
-                            foregroundColor: Colors.white,
-                          ),
-                          onPressed: _resetFilters,
-                          child: const Text(
-                            "RESET",
-                            style: TextStyle(fontSize: 16),
+                        child: SizedBox(
+                          height: 48,
+                          child: ElevatedButton(
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: _secondary,
+                              foregroundColor: Colors.white,
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                              elevation: 0,
+                            ),
+                            onPressed: _resetFilters,
+                            child: const Text("RESET", style: TextStyle(fontWeight: FontWeight.bold)),
                           ),
                         ),
                       ),
@@ -198,46 +208,43 @@ class _LibraryBooksPageState extends State<LibraryBooksPage> {
               ),
             ),
 
-            const SizedBox(height: 25),
+            const SizedBox(height: 24),
 
-            /// ================= SHOW ENTRIES CARD =================
+            /// RESULTS TABLE
             Container(
-              padding: const EdgeInsets.all(20),
               decoration: BoxDecoration(
-                color: const Color(0xFF3E466A),
-                borderRadius: BorderRadius.circular(20),
+                color: _card,
+                borderRadius: BorderRadius.circular(4),
+                border: Border.all(color: Colors.white12),
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text(
-                    "Show Entries",
-                    style: TextStyle(
-                        fontSize: 22,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.white),
+                  const Padding(
+                    padding: EdgeInsets.all(16.0),
+                    child: Text(
+                      "Available Books",
+                      style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
+                    ),
                   ),
-                  const SizedBox(height: 15),
-
                   if (_isLoading)
-                    const Center(child: CircularProgressIndicator(color: Colors.white))
+                    Center(child: Padding(padding: const EdgeInsets.all(40.0), child: CircularProgressIndicator(color: _primary)))
                   else if (_errorMessage != null)
-                    Center(child: Text(_errorMessage!, style: const TextStyle(color: Colors.redAccent)))
+                    Center(child: Padding(padding: const EdgeInsets.all(40.0), child: Text(_errorMessage!, style: const TextStyle(color: Colors.redAccent))))
                   else if (_books.isEmpty)
-                    const Center(child: Text("No books found", style: TextStyle(color: Colors.white70)))
+                    const Center(child: Padding(padding: const EdgeInsets.all(40.0), child: Text("No books found", style: TextStyle(color: Colors.white70))))
                   else
                     SingleChildScrollView(
                       scrollDirection: Axis.horizontal,
                       child: DataTable(
-                        headingRowColor:
-                            WidgetStateProperty.all(const Color(0xFF4B557D)),
+                        headingRowColor: WidgetStateProperty.all(const Color(0xFF2A3450)),
+                        columnSpacing: 24,
                         columns: const [
-                          DataColumn(label: Text("#", style: TextStyle(color: Colors.white))),
-                          DataColumn(label: Text("Title", style: TextStyle(color: Colors.white))),
-                          DataColumn(label: Text("Author", style: TextStyle(color: Colors.white))),
-                          DataColumn(label: Text("ISBN", style: TextStyle(color: Colors.white))),
-                          DataColumn(label: Text("Category", style: TextStyle(color: Colors.white))),
-                          DataColumn(label: Text("Copies", style: TextStyle(color: Colors.white))),
+                          DataColumn(label: Text("#", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold))),
+                          DataColumn(label: Text("TITLE", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold))),
+                          DataColumn(label: Text("AUTHOR", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold))),
+                          DataColumn(label: Text("ISBN", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold))),
+                          DataColumn(label: Text("COPIES", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold))),
                         ],
                         rows: _books.asMap().entries.map((entry) {
                           int index = entry.key;
@@ -245,9 +252,8 @@ class _LibraryBooksPageState extends State<LibraryBooksPage> {
                           return DataRow(cells: [
                             DataCell(Text((index + 1).toString(), style: const TextStyle(color: Colors.white70))),
                             DataCell(Text(book['title'] ?? 'N/A', style: const TextStyle(color: Colors.white))),
-                            DataCell(Text(book['author'] ?? 'N/A', style: const TextStyle(color: Colors.white))),
-                            DataCell(Text(book['isbn'] ?? 'N/A', style: const TextStyle(color: Colors.white))),
-                            DataCell(Text(book['category'] ?? 'N/A', style: const TextStyle(color: Colors.white))),
+                            DataCell(Text(book['author'] ?? 'N/A', style: const TextStyle(color: Colors.white70))),
+                            DataCell(Text(book['isbn'] ?? 'N/A', style: const TextStyle(color: Colors.white70))),
                             DataCell(Text(book['available_copies']?.toString() ?? '0', style: const TextStyle(color: Colors.white))),
                           ]);
                         }).toList(),
@@ -266,11 +272,10 @@ class _LibraryBooksPageState extends State<LibraryBooksPage> {
 
   Widget buildLabel(String text) {
     return Padding(
-      padding: const EdgeInsets.only(top: 15, bottom: 6),
+      padding: const EdgeInsets.only(top: 15, bottom: 8),
       child: Text(
         text,
-        style: const TextStyle(
-            fontSize: 18, fontWeight: FontWeight.w600, color: Colors.white),
+        style: const TextStyle(fontSize: 14, color: Colors.white70),
       ),
     );
   }
@@ -281,12 +286,11 @@ class _LibraryBooksPageState extends State<LibraryBooksPage> {
       style: const TextStyle(color: Colors.white),
       decoration: InputDecoration(
         hintText: hint,
-        hintStyle: const TextStyle(color: Colors.white70),
+        hintStyle: const TextStyle(color: Colors.white54, fontSize: 14),
         filled: true,
-        fillColor: const Color(0xFF5E6A75),
-        border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(12),
-            borderSide: BorderSide.none),
+        fillColor: _secondary,
+        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide.none),
       ),
     );
   }
@@ -294,21 +298,21 @@ class _LibraryBooksPageState extends State<LibraryBooksPage> {
   Widget buildDropdown(List<String> items, String filterKey) {
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.symmetric(horizontal: 15),
+      padding: const EdgeInsets.symmetric(horizontal: 16),
       decoration: BoxDecoration(
-        color: const Color(0xFF5E6A75),
-        borderRadius: BorderRadius.circular(12),
+        color: _secondary,
+        borderRadius: BorderRadius.circular(8),
       ),
       child: DropdownButtonHideUnderline(
         child: DropdownButton<String>(
           isExpanded: true,
-          dropdownColor: const Color(0xFF3E466A),
+          dropdownColor: _card,
           value: _filters[filterKey],
-          icon: const Icon(Icons.keyboard_arrow_down, color: Colors.white),
+          icon: const Icon(Icons.keyboard_arrow_down, color: Colors.white70),
           items: items.map((String value) {
             return DropdownMenuItem<String>(
               value: value,
-              child: Text(value, style: const TextStyle(color: Colors.white)),
+              child: Text(value, style: const TextStyle(color: Colors.white, fontSize: 14)),
             );
           }).toList(),
           onChanged: (newValue) {

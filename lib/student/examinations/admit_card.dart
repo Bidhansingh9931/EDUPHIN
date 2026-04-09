@@ -2,19 +2,25 @@ import 'package:flutter/material.dart';
 import 'package:eduphin/services/api_service.dart';
 import 'package:intl/intl.dart';
 
-class RegisteredExamPage extends StatefulWidget {
-  const RegisteredExamPage({super.key});
+class AdmitCardPage extends StatefulWidget {
+  const AdmitCardPage({super.key});
 
   @override
-  State<RegisteredExamPage> createState() => _RegisteredExamPageState();
+  State<AdmitCardPage> createState() => _AdmitCardPageState();
 }
 
-class _RegisteredExamPageState extends State<RegisteredExamPage> {
+class _AdmitCardPageState extends State<AdmitCardPage> {
   List<dynamic> _registrations = [];
   bool _isLoading = true;
   final Map<dynamic, bool> _expandedRegistrations = {};
   final Map<dynamic, dynamic> _admitCardDetails = {};
   final Map<dynamic, bool> _isLoadingDetails = {};
+
+  final Color _bg = const Color(0xff0B1220);
+  final Color _card = const Color(0xff1E2746);
+  final Color _primary = const Color(0xff3366FF);
+  final Color _secondary = const Color(0xff3E4764);
+  final Color _headerRow = const Color(0xff2A3450);
 
   @override
   void initState() {
@@ -34,7 +40,10 @@ class _RegisteredExamPageState extends State<RegisteredExamPage> {
       setState(() => _isLoading = false);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text("Error fetching registered exams: $e")),
+          SnackBar(
+            content: Text("Error fetching registered exams: $e"),
+            backgroundColor: Colors.redAccent,
+          ),
         );
       }
     }
@@ -45,11 +54,9 @@ class _RegisteredExamPageState extends State<RegisteredExamPage> {
     if (regId == null) return;
     if (_admitCardDetails.containsKey(regId)) return;
 
-    // Try common names for hashed IDs
     final String? hash = registration['id_hash']?.toString() ?? 
                          registration['registration_id_hash']?.toString();
     
-    // Fallback to plain ID if hash is missing
     final String idToFetch = hash ?? regId.toString();
 
     setState(() => _isLoadingDetails[regId] = true);
@@ -63,7 +70,10 @@ class _RegisteredExamPageState extends State<RegisteredExamPage> {
       setState(() => _isLoadingDetails[regId] = false);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text("Error fetching admit card details: $e")),
+          SnackBar(
+            content: Text("Error fetching admit card details: $e"),
+            backgroundColor: Colors.redAccent,
+          ),
         );
       }
     }
@@ -75,11 +85,15 @@ class _RegisteredExamPageState extends State<RegisteredExamPage> {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        backgroundColor: const Color(0xff3c4566),
-        title: const Text("Print Admit Card", style: TextStyle(color: Colors.white)),
+        backgroundColor: _card,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Text("Download Admit Card", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
         content: const Text("Would you like to download the Admit Card as PDF?", style: TextStyle(color: Colors.white70)),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: const Text("CANCEL", style: TextStyle(color: Colors.white54))),
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text("CANCEL", style: TextStyle(color: Colors.white.withValues(alpha: 0.5))),
+          ),
           TextButton(
             onPressed: () {
               Navigator.pop(context);
@@ -87,7 +101,7 @@ class _RegisteredExamPageState extends State<RegisteredExamPage> {
                 const SnackBar(content: Text("Downloading Admit Card PDF...")),
               );
             },
-            child: const Text("DOWNLOAD", style: TextStyle(color: Color(0xff2ea44f), fontWeight: FontWeight.bold)),
+            child: Text("DOWNLOAD", style: TextStyle(color: _primary, fontWeight: FontWeight.bold)),
           ),
         ],
       ),
@@ -97,40 +111,48 @@ class _RegisteredExamPageState extends State<RegisteredExamPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xff0a1230),
+      backgroundColor: _bg,
       appBar: AppBar(
-        backgroundColor: const Color(0xff0a1230),
+        backgroundColor: Colors.transparent,
         elevation: 0,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back, color: Colors.white),
           onPressed: () => Navigator.pop(context),
         ),
         title: const Text(
-          "My Registered Exam",
+          "My Admit Cards",
           style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white),
         ),
       ),
       body: _isLoading
-          ? const Center(child: CircularProgressIndicator(color: Colors.white))
+          ? Center(child: CircularProgressIndicator(color: _primary))
           : _registrations.isEmpty
-              ? const Center(
-                  child: Text("No registered exams found",
-                      style: TextStyle(color: Colors.white70)))
+              ? Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.badge_outlined, size: 64, color: Colors.white.withValues(alpha: 0.2)),
+                      const SizedBox(height: 16),
+                      const Text("No registered exams found",
+                          style: TextStyle(color: Colors.white70, fontSize: 16)),
+                    ],
+                  ),
+                )
               : RefreshIndicator(
                   onRefresh: _fetchAdmitCards,
-                  color: const Color(0xff2ea44f),
+                  color: _primary,
+                  backgroundColor: _card,
                   child: ListView.separated(
-                    padding: const EdgeInsets.all(16),
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                     itemCount: _registrations.length,
-                    separatorBuilder: (context, index) =>
-                        const SizedBox(height: 20),
+                    separatorBuilder: (context, index) => const SizedBox(height: 16),
                     itemBuilder: (context, index) {
                       final registration = _registrations[index];
                       final exam = registration['exam'];
                       final dynamic regId = registration['id'];
                       final bool isOpen = _expandedRegistrations[regId] ?? false;
 
-                      return examCard(registration, exam, isOpen, () {
+                      return _buildExamCard(registration, exam, isOpen, () {
                         setState(() {
                           _expandedRegistrations[regId] = !isOpen;
                         });
@@ -144,8 +166,7 @@ class _RegisteredExamPageState extends State<RegisteredExamPage> {
     );
   }
 
-  Widget examCard(
-      dynamic registration, dynamic exam, bool open, VoidCallback onTap) {
+  Widget _buildExamCard(dynamic registration, dynamic exam, bool open, VoidCallback onTap) {
     if (exam == null) return const SizedBox.shrink();
 
     final startDateStr = exam['start_date'];
@@ -155,8 +176,7 @@ class _RegisteredExamPageState extends State<RegisteredExamPage> {
       try {
         DateTime start = DateTime.parse(startDateStr);
         DateTime end = DateTime.parse(endDateStr);
-        formattedRange =
-            "${DateFormat('dd MMM').format(start)} - ${DateFormat('dd MMM yyyy').format(end)}";
+        formattedRange = "${DateFormat('dd MMM').format(start)} - ${DateFormat('dd MMM yyyy').format(end)}";
       } catch (_) {}
     }
 
@@ -164,237 +184,207 @@ class _RegisteredExamPageState extends State<RegisteredExamPage> {
     final details = _admitCardDetails[regId];
     final bool loadingDetails = _isLoadingDetails[regId] ?? false;
 
-    return Container(
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 300),
       decoration: BoxDecoration(
-        color: const Color(0xff3c4566),
-        borderRadius: BorderRadius.circular(12),
+        color: _card,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: open ? _primary.withValues(alpha: 0.5) : Colors.white.withValues(alpha: 0.05)),
+        boxShadow: [
+          if (open) BoxShadow(color: _primary.withValues(alpha: 0.1), blurRadius: 10, offset: const Offset(0, 4)),
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           /// HEADER
-          ListTile(
-            title: Text(
-              exam['name'] ?? 'Exam Name',
-              style: const TextStyle(
-                  color: Colors.white, fontWeight: FontWeight.bold),
-            ),
-            subtitle: Text(
-              exam['type'] ?? "Written",
-              style: const TextStyle(color: Colors.white70),
-            ),
-            trailing: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                  decoration: BoxDecoration(
-                    color: const Color(0xff5f6a7a),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Text(
-                    formattedRange,
-                    style: const TextStyle(color: Colors.white, fontSize: 10),
-                  ),
-                ),
-                const SizedBox(height: 2),
-                Icon(
-                  open ? Icons.keyboard_arrow_up : Icons.keyboard_arrow_down,
-                  color: Colors.white,
-                  size: 20,
-                ),
-              ],
-            ),
+          InkWell(
             onTap: onTap,
+            borderRadius: BorderRadius.circular(16),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          exam['name'] ?? 'Exam Name',
+                          style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          exam['type'] ?? "Written Examination",
+                          style: TextStyle(color: Colors.white.withValues(alpha: 0.6), fontSize: 13),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: _secondary,
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: Text(
+                          formattedRange,
+                          textAlign: TextAlign.right,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 9,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Icon(
+                        open ? Icons.keyboard_arrow_up : Icons.keyboard_arrow_down,
+                        color: Colors.white70,
+                        size: 18,
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
           ),
 
           /// DETAILS
           if (open)
             Padding(
-              padding: const EdgeInsets.all(16),
+              padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
               child: loadingDetails
-                  ? const Center(
-                      child: CircularProgressIndicator(color: Colors.white))
+                  ? Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 32.0),
+                      child: Center(child: CircularProgressIndicator(color: _primary)),
+                    )
                   : details == null
-                      ? const Text("Failed to load details",
-                          style: TextStyle(color: Colors.redAccent))
+                      ? const Padding(
+                          padding: EdgeInsets.symmetric(vertical: 20.0),
+                          child: Center(child: Text("Failed to load details", style: TextStyle(color: Colors.redAccent))),
+                        )
                       : Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
+                            const Divider(color: Colors.white12, height: 1),
+                            const SizedBox(height: 16),
                             if (details['institute'] != null) ...[
                               Center(
                                 child: Column(
                                   children: [
                                     Text(
-                                      details['institute']['name']
-                                              ?.toString()
-                                              .toUpperCase() ??
-                                          '',
+                                      details['institute']['name']?.toString().toUpperCase() ?? '',
                                       textAlign: TextAlign.center,
-                                      style: const TextStyle(
-                                          color: Colors.white,
-                                          fontSize: 16,
-                                          fontWeight: FontWeight.bold),
+                                      style: const TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.w800),
                                     ),
+                                    const SizedBox(height: 4),
                                     Text(
                                       details['institute']['address'] ?? '',
                                       textAlign: TextAlign.center,
-                                      style: const TextStyle(
-                                          color: Colors.white70, fontSize: 12),
+                                      style: TextStyle(color: Colors.white.withValues(alpha: 0.5), fontSize: 11),
                                     ),
-                                    const SizedBox(height: 10),
-                                    const Divider(color: Colors.white24),
-                                    const SizedBox(height: 10),
                                   ],
                                 ),
                               ),
+                              const SizedBox(height: 20),
                             ],
-                            const Text(
-                              "Admit Card Details",
-                              style: TextStyle(
-                                  color: Colors.white,
-                                  fontWeight: FontWeight.bold),
-                            ),
-                            const SizedBox(height: 10),
-                            detailRow("Student Name",
-                                details['student']?['user']?['name']),
-                            detailRow("Roll No", details['student']?['roll_no']),
-                            detailRow("Class",
-                                details['student']?['class']?['name']),
-                            detailRow("Section",
-                                details['student']?['section']?['name']),
-                            const SizedBox(height: 20),
+                            
+                            _buildInfoSection("Student Information", [
+                              _buildDetailRow("Student Name", details['student']?['user']?['name']),
+                              _buildDetailRow("Roll Number", details['student']?['roll_no']),
+                              _buildDetailRow("Class / Section", "${details['student']?['class']?['name'] ?? ''} - ${details['student']?['section']?['name'] ?? ''}"),
+                            ]),
+
+                            const SizedBox(height: 24),
 
                             /// PAPER SCHEDULE
-                            const Row(
+                            Row(
                               children: [
-                                Icon(Icons.calendar_month,
-                                    color: Colors.white70, size: 18),
-                                SizedBox(width: 6),
-                                Text(
+                                Icon(Icons.calendar_month_rounded, color: _primary, size: 20),
+                                const SizedBox(width: 10),
+                                const Text(
                                   "Paper Schedule",
-                                  style: TextStyle(
-                                      color: Colors.white,
-                                      fontWeight: FontWeight.bold),
+                                  style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14),
                                 )
                               ],
                             ),
-                            const SizedBox(height: 15),
+                            const SizedBox(height: 16),
 
-                            /// TABLE HEADER
+                            /// TABLE
                             Container(
-                              padding: const EdgeInsets.all(10),
-                              color: const Color(0xff2f3756),
-                              child: const Row(
+                              decoration: BoxDecoration(
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
+                              ),
+                              clipBehavior: Clip.antiAlias,
+                              child: Column(
                                 children: [
-                                  Expanded(
-                                      flex: 2,
-                                      child: Text("Subject",
-                                          style: TextStyle(
-                                              color: Colors.white,
-                                              fontSize: 11,
-                                              fontWeight: FontWeight.bold))),
-                                  Expanded(
-                                      flex: 1,
-                                      child: Text("Date",
-                                          style: TextStyle(
-                                              color: Colors.white,
-                                              fontSize: 11,
-                                              fontWeight: FontWeight.bold))),
-                                  Expanded(
-                                      flex: 2,
-                                      child: Text("Time",
-                                          style: TextStyle(
-                                              color: Colors.white,
-                                              fontSize: 11,
-                                              fontWeight: FontWeight.bold))),
-                                  Expanded(
-                                      flex: 1,
-                                      child: Text("Venue",
-                                          style: TextStyle(
-                                              color: Colors.white,
-                                              fontSize: 11,
-                                              fontWeight: FontWeight.bold))),
+                                  /// TABLE HEADER
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                                    color: _headerRow,
+                                    child: const Row(
+                                      children: [
+                                        Expanded(flex: 2, child: Text("Subject", style: TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold))),
+                                        Expanded(flex: 1, child: Text("Date", textAlign: TextAlign.center, style: TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold))),
+                                        Expanded(flex: 2, child: Text("Time", textAlign: TextAlign.center, style: TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold))),
+                                        Expanded(flex: 1, child: Text("Venue", textAlign: TextAlign.right, style: TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold))),
+                                      ],
+                                    ),
+                                  ),
+
+                                  /// TABLE ROWS
+                                  ...(details['papers'] as List? ?? []).map((paper) {
+                                    final subject = paper['subject']?['name'] ?? 'N/A';
+                                    final date = paper['date'] != null
+                                        ? DateFormat('dd MMM').format(DateTime.parse(paper['date']))
+                                        : 'N/A';
+                                    final time = "${paper['start_time'] ?? ''}\n${paper['end_time'] ?? ''}";
+                                    final venue = paper['venue'] ?? 'N/A';
+
+                                    return Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                                      decoration: BoxDecoration(
+                                        border: Border(top: BorderSide(color: Colors.white.withValues(alpha: 0.05))),
+                                      ),
+                                      child: Row(
+                                        children: [
+                                          Expanded(flex: 2, child: Text(subject, style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.w500))),
+                                          Expanded(flex: 1, child: Text(date, textAlign: TextAlign.center, style: TextStyle(color: Colors.white.withValues(alpha: 0.7), fontSize: 10))),
+                                          Expanded(flex: 2, child: Text(time, textAlign: TextAlign.center, style: TextStyle(color: Colors.white.withValues(alpha: 0.7), fontSize: 10))),
+                                          Expanded(flex: 1, child: Text(venue, textAlign: TextAlign.right, style: TextStyle(color: Colors.white.withValues(alpha: 0.7), fontSize: 10))),
+                                        ],
+                                      ),
+                                    );
+                                  }).toList(),
                                 ],
                               ),
                             ),
 
-                            /// TABLE ROWS
-                            ...(details['papers'] as List? ?? []).map((paper) {
-                              final subject =
-                                  paper['subject']?['name'] ?? 'N/A';
-                              final date = paper['date'] != null
-                                  ? DateFormat('dd MMM yyyy')
-                                      .format(DateTime.parse(paper['date']))
-                                  : 'N/A';
-                              final time =
-                                  "${paper['start_time'] ?? ''} - ${paper['end_time'] ?? ''}";
-                              final venue = paper['venue'] ?? 'N/A';
-
-                              return Container(
-                                padding: const EdgeInsets.all(10),
-                                decoration: const BoxDecoration(
-                                    border: Border(
-                                        bottom:
-                                            BorderSide(color: Colors.white10))),
-                                child: Row(
-                                  children: [
-                                    Expanded(
-                                        flex: 2,
-                                        child: Text(subject,
-                                            style: const TextStyle(
-                                                color: Colors.white,
-                                                fontSize: 10))),
-                                    Expanded(
-                                        flex: 1,
-                                        child: Text(date,
-                                            style: const TextStyle(
-                                                color: Colors.white,
-                                                fontSize: 10))),
-                                    Expanded(
-                                        flex: 2,
-                                        child: Text(time,
-                                            style: const TextStyle(
-                                                color: Colors.white,
-                                                fontSize: 10))),
-                                    Expanded(
-                                        flex: 1,
-                                        child: Text(venue,
-                                            style: const TextStyle(
-                                                color: Colors.white,
-                                                fontSize: 10))),
-                                  ],
-                                ),
-                              );
-                            }).toList(),
-
-                            const SizedBox(height: 20),
+                            const SizedBox(height: 24),
 
                             /// PRINT BUTTON
-                            GestureDetector(
-                              onTap: () => _handlePrintAdmitCard(details),
-                              child: Container(
-                                width: double.infinity,
-                                height: 45,
-                                decoration: BoxDecoration(
-                                  color: const Color(0xff2ea44f),
-                                  borderRadius: BorderRadius.circular(8),
+                            SizedBox(
+                              width: double.infinity,
+                              height: 50,
+                              child: ElevatedButton.icon(
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: _primary,
+                                  foregroundColor: Colors.white,
+                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                  elevation: 0,
                                 ),
-                                child: const Row(
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  children: [
-                                    Icon(Icons.print,
-                                        color: Colors.white, size: 18),
-                                    SizedBox(width: 8),
-                                    Text(
-                                      "PRINT ADMIT CARD",
-                                      style: TextStyle(
-                                          color: Colors.white,
-                                          fontWeight: FontWeight.bold),
-                                    )
-                                  ],
+                                onPressed: () => _handlePrintAdmitCard(details),
+                                icon: const Icon(Icons.file_download_outlined, size: 20),
+                                label: const Text(
+                                  "DOWNLOAD ADMIT CARD",
+                                  style: TextStyle(fontWeight: FontWeight.bold, letterSpacing: 0.5),
                                 ),
                               ),
                             )
@@ -406,21 +396,33 @@ class _RegisteredExamPageState extends State<RegisteredExamPage> {
     );
   }
 
-  Widget detailRow(String label, dynamic value) {
+  Widget _buildInfoSection(String title, List<Widget> children) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          title,
+          style: TextStyle(color: _primary, fontWeight: FontWeight.bold, fontSize: 12, letterSpacing: 1),
+        ),
+        const SizedBox(height: 12),
+        ...children,
+      ],
+    );
+  }
+
+  Widget _buildDetailRow(String label, dynamic value) {
     return Padding(
-      padding: const EdgeInsets.only(bottom: 6),
+      padding: const EdgeInsets.only(bottom: 8),
       child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           Text(
-            "$label: ",
-            style: const TextStyle(
-                color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13),
+            label,
+            style: TextStyle(color: Colors.white.withValues(alpha: 0.5), fontSize: 13),
           ),
-          Expanded(
-            child: Text(
-              value?.toString() ?? 'N/A',
-              style: const TextStyle(color: Colors.white70, fontSize: 13),
-            ),
+          Text(
+            value?.toString() ?? 'N/A',
+            style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600, fontSize: 13),
           ),
         ],
       ),

@@ -1,5 +1,6 @@
 class SupportTicket {
   final int id;
+  final String? encryptedId;
   final String title;
   final String? description;
   final String priority;
@@ -12,6 +13,7 @@ class SupportTicket {
 
   SupportTicket({
     required this.id,
+    this.encryptedId,
     required this.title,
     this.description,
     required this.priority,
@@ -26,6 +28,7 @@ class SupportTicket {
   factory SupportTicket.fromJson(Map<String, dynamic> json) {
     return SupportTicket(
       id: json['id'],
+      encryptedId: json['encrypted_id']?.toString(),
       title: json['title'] ?? 'N/A',
       description: json['description'],
       priority: json['priority'] ?? 'medium',

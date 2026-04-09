@@ -16,6 +16,13 @@ class _AssignmentsPageState extends State<AssignmentsPage> {
   bool _isLoading = true;
   final Map<String, bool> _subjectOpenStates = {};
 
+  // Theme Colors
+  final Color _bg = const Color(0xff0B1220);
+  final Color _card = const Color(0xff1E2746);
+  final Color _primary = const Color(0xff3366FF);
+  final Color _secondary = const Color(0xff3E4764);
+  final Color _surface = const Color(0xff2A3450);
+
   @override
   void initState() {
     super.initState();
@@ -64,48 +71,70 @@ class _AssignmentsPageState extends State<AssignmentsPage> {
       context: context,
       builder: (context) => StatefulBuilder(
         builder: (context, setDialogState) => AlertDialog(
-          backgroundColor: const Color(0xff3c4566),
-          title: Text("Submit: ${assignment['title']}", style: const TextStyle(color: Colors.white, fontSize: 18)),
+          backgroundColor: _card,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          title: Text(
+            "Submit: ${assignment['title']}",
+            style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
+          ),
           content: SingleChildScrollView(
             child: Column(
               mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                const Text("Submission Note", style: TextStyle(color: Colors.white70, fontSize: 14)),
+                const SizedBox(height: 8),
                 TextField(
                   controller: textController,
                   maxLines: 3,
                   style: const TextStyle(color: Colors.white),
-                  decoration: const InputDecoration(
+                  decoration: InputDecoration(
                     hintText: "Enter submission text (optional)...",
-                    hintStyle: TextStyle(color: Colors.white54),
-                    enabledBorder: UnderlineInputBorder(borderSide: BorderSide(color: Colors.white24)),
+                    hintStyle: const TextStyle(color: Colors.white54, fontSize: 14),
+                    filled: true,
+                    fillColor: _secondary,
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide.none),
                   ),
                 ),
                 const SizedBox(height: 20),
-                ElevatedButton.icon(
-                  onPressed: () async {
-                    FilePickerResult? result = await FilePicker.platform.pickFiles(
-                      type: FileType.custom,
-                      allowedExtensions: ['pdf', 'doc', 'docx', 'txt'],
-                    );
-                    if (result != null) {
-                      setDialogState(() {
-                        selectedFile = File(result.files.single.path!);
-                        fileName = result.files.single.name;
-                      });
-                    }
-                  },
-                  icon: const Icon(Icons.attach_file),
-                  label: Text(fileName ?? "Attach File (PDF/Doc)"),
-                  style: ElevatedButton.styleFrom(backgroundColor: const Color(0xff46507a)),
+                const Text("Attachment", style: TextStyle(color: Colors.white70, fontSize: 14)),
+                const SizedBox(height: 8),
+                SizedBox(
+                  width: double.infinity,
+                  child: OutlinedButton.icon(
+                    onPressed: () async {
+                      FilePickerResult? result = await FilePicker.platform.pickFiles(
+                        type: FileType.custom,
+                        allowedExtensions: ['pdf', 'doc', 'docx', 'txt'],
+                      );
+                      if (result != null) {
+                        setDialogState(() {
+                          selectedFile = File(result.files.single.path!);
+                          fileName = result.files.single.name;
+                        });
+                      }
+                    },
+                    icon: const Icon(Icons.attach_file, size: 18),
+                    label: Text(fileName ?? "Pick File (PDF/Doc)"),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: Colors.white,
+                      side: BorderSide(color: _primary.withValues(alpha: 0.5)),
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                    ),
+                  ),
                 ),
               ],
             ),
           ),
           actions: [
-            TextButton(onPressed: () => Navigator.pop(context), child: const Text("CANCEL", style: TextStyle(color: Colors.white54))),
             TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text("CANCEL", style: TextStyle(color: Colors.white54)),
+            ),
+            ElevatedButton(
               onPressed: () => Navigator.pop(context, true),
-              child: const Text("SUBMIT", style: TextStyle(color: Colors.green, fontWeight: FontWeight.bold)),
+              style: ElevatedButton.styleFrom(backgroundColor: _primary, foregroundColor: Colors.white),
+              child: const Text("SUBMIT"),
             ),
           ],
         ),
@@ -113,7 +142,6 @@ class _AssignmentsPageState extends State<AssignmentsPage> {
     );
 
     if (confirmed == true) {
-      // Show loading
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Uploading submission...")));
       
       try {
@@ -150,25 +178,30 @@ class _AssignmentsPageState extends State<AssignmentsPage> {
     }
 
     return Scaffold(
-      backgroundColor: const Color(0xff0a1230),
+      backgroundColor: _bg,
       appBar: AppBar(
-        backgroundColor: const Color(0xff0a1230),
+        backgroundColor: Colors.transparent,
         elevation: 0,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back, color: Colors.white),
+          onPressed: () => Navigator.pop(context),
+        ),
         title: const Text(
           "Assignments",
           style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white),
         ),
       ),
       body: _isLoading
-          ? const Center(child: CircularProgressIndicator(color: Colors.white))
+          ? Center(child: CircularProgressIndicator(color: _primary))
           : groupedAssignments.isEmpty
               ? const Center(child: Text("No assignments available", style: TextStyle(color: Colors.white70)))
               : RefreshIndicator(
                   onRefresh: _fetchAssignments,
+                  color: _primary,
                   child: ListView.separated(
-                    padding: const EdgeInsets.all(16),
+                    padding: const EdgeInsets.all(20),
                     itemCount: groupedAssignments.length,
-                    separatorBuilder: (context, index) => const SizedBox(height: 15),
+                    separatorBuilder: (context, index) => const SizedBox(height: 16),
                     itemBuilder: (context, index) {
                       final subjectName = groupedAssignments.keys.elementAt(index);
                       final subjectAssignments = groupedAssignments[subjectName]!;
@@ -176,8 +209,9 @@ class _AssignmentsPageState extends State<AssignmentsPage> {
 
                       return Container(
                         decoration: BoxDecoration(
-                          color: const Color(0xff3c4566),
-                          borderRadius: BorderRadius.circular(14),
+                          color: _card,
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: Colors.white12),
                         ),
                         child: Column(
                           children: [
@@ -186,12 +220,13 @@ class _AssignmentsPageState extends State<AssignmentsPage> {
                                 subjectName,
                                 style: const TextStyle(
                                     color: Colors.white,
-                                    fontSize: 18,
+                                    fontSize: 16,
                                     fontWeight: FontWeight.bold),
                               ),
-                              trailing: Icon(
-                                isOpen ? Icons.keyboard_arrow_up : Icons.keyboard_arrow_down,
-                                color: Colors.white,
+                              trailing: AnimatedRotation(
+                                duration: const Duration(milliseconds: 200),
+                                turns: isOpen ? 0.5 : 0,
+                                child: const Icon(Icons.expand_more, color: Colors.white70),
                               ),
                               onTap: () {
                                 setState(() {
@@ -200,7 +235,12 @@ class _AssignmentsPageState extends State<AssignmentsPage> {
                               },
                             ),
                             if (isOpen)
-                              ...subjectAssignments.map((a) => assignmentCard(a)),
+                              Padding(
+                                padding: const EdgeInsets.only(bottom: 8),
+                                child: Column(
+                                  children: subjectAssignments.map((a) => _assignmentCard(a)).toList(),
+                                ),
+                              ),
                           ],
                         ),
                       );
@@ -210,7 +250,7 @@ class _AssignmentsPageState extends State<AssignmentsPage> {
     );
   }
 
-  Widget assignmentCard(dynamic assignment) {
+  Widget _assignmentCard(dynamic assignment) {
     final dueDateStr = assignment['due_date'];
     String formattedDate = "N/A";
     if (dueDateStr != null) {
@@ -220,70 +260,85 @@ class _AssignmentsPageState extends State<AssignmentsPage> {
       } catch (_) {}
     }
 
-    // Backend provides submission object if student already submitted
     final bool isSubmitted = assignment['submission'] != null;
 
     return Container(
-      margin: const EdgeInsets.all(16),
+      margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: const Color(0xff46507a),
-        borderRadius: BorderRadius.circular(14),
+        color: _surface,
+        borderRadius: BorderRadius.circular(12),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Icon(Icons.assignment, color: Colors.white),
-              const SizedBox(width: 8),
               Expanded(
-                child: Text(
-                  assignment['title'] ?? 'N/A',
-                  style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      assignment['title'] ?? 'N/A',
+                      style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold),
+                    ),
+                    const SizedBox(height: 4),
+                    Row(
+                      children: [
+                        const Icon(Icons.calendar_month, color: Colors.white54, size: 14),
+                        const SizedBox(width: 4),
+                        Text(
+                          "Due: $formattedDate",
+                          style: const TextStyle(color: Colors.white54, fontSize: 12),
+                        )
+                      ],
+                    ),
+                  ],
                 ),
               ),
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                 decoration: BoxDecoration(
-                  color: isSubmitted ? Colors.green : Colors.orange,
-                  borderRadius: BorderRadius.circular(6),
+                  color: (isSubmitted ? Colors.greenAccent : Colors.orangeAccent).withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(4),
+                  border: Border.all(color: (isSubmitted ? Colors.greenAccent : Colors.orangeAccent).withValues(alpha: 0.5)),
                 ),
                 child: Text(
                   isSubmitted ? "SUBMITTED" : "PENDING",
-                  style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold),
+                  style: TextStyle(color: isSubmitted ? Colors.greenAccent : Colors.orangeAccent, fontSize: 10, fontWeight: FontWeight.bold),
                 ),
               )
             ],
           ),
-          const SizedBox(height: 15),
-          Row(
-            children: [
-              const Icon(Icons.calendar_month, color: Colors.white70, size: 20),
-              const SizedBox(width: 8),
-              Text(
-                "Due Date: $formattedDate",
-                style: const TextStyle(color: Colors.white70),
-              )
-            ],
-          ),
-          const SizedBox(height: 20),
-          Text(
-            assignment['description'] ?? '',
-            style: const TextStyle(color: Colors.white, fontSize: 14),
-          ),
-          const SizedBox(height: 20),
-          ElevatedButton(
-            onPressed: isSubmitted ? null : () => _submitAssignment(assignment),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: isSubmitted ? Colors.grey : const Color(0xff6b7685),
-              minimumSize: const Size(double.infinity, 45),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          if (assignment['description'] != null && assignment['description'].toString().isNotEmpty) ...[
+            const SizedBox(height: 12),
+            Text(
+              assignment['description'] ?? '',
+              style: const TextStyle(color: Colors.white70, fontSize: 13),
+              maxLines: 3,
+              overflow: TextOverflow.ellipsis,
             ),
-            child: Text(isSubmitted ? "VIEW SUBMISSION" : "SUBMIT ASSIGNMENT"),
+          ],
+          const SizedBox(height: 16),
+          SizedBox(
+            width: double.infinity,
+            height: 40,
+            child: ElevatedButton(
+              onPressed: isSubmitted ? null : () => _submitAssignment(assignment),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: isSubmitted ? _secondary : _primary,
+                foregroundColor: Colors.white,
+                disabledBackgroundColor: _secondary.withValues(alpha: 0.5),
+                disabledForegroundColor: Colors.white38,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                elevation: 0,
+              ),
+              child: Text(isSubmitted ? "VIEW SUBMISSION" : "SUBMIT ASSIGNMENT", style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+            ),
           )
         ],
       ),

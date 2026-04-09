@@ -3,14 +3,21 @@ import 'package:eduphin/services/api_service.dart';
 import 'package:eduphin/teacher/dashboard/student_leave_model.dart';
 import 'package:intl/intl.dart';
 
-class MyLeaveApplication extends StatefulWidget {
-  const MyLeaveApplication({Key? key}) : super(key: key);
+class LeaveApplicationPage extends StatefulWidget {
+  const LeaveApplicationPage({super.key});
 
   @override
-  State<MyLeaveApplication> createState() => _MyLeaveApplicationState();
+  State<LeaveApplicationPage> createState() => _LeaveApplicationPageState();
 }
 
-class _MyLeaveApplicationState extends State<MyLeaveApplication> {
+class _LeaveApplicationPageState extends State<LeaveApplicationPage> {
+  // Theme Colors
+  final Color _bg = const Color(0xff0B1220);
+  final Color _card = const Color(0xff1E2746);
+  final Color _primary = const Color(0xff3366FF);
+  final Color _secondary = const Color(0xff3E4764);
+  final Color _surface = const Color(0xff2A3450);
+
   String? _selectedLeaveType;
   String? _selectedStatus;
   List<StudentLeave> _allLeaves = [];
@@ -37,7 +44,7 @@ class _MyLeaveApplicationState extends State<MyLeaveApplication> {
       setState(() => _isLoading = false);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text("Error: $e")),
+          SnackBar(content: Text("Error fetching leaves: $e")),
         );
       }
     }
@@ -46,13 +53,9 @@ class _MyLeaveApplicationState extends State<MyLeaveApplication> {
   void _applyFilters() {
     setState(() {
       _filteredLeaves = _allLeaves.where((leave) {
-        final matchesType = _selectedLeaveType == null ||
-            leave.leaveType.toLowerCase() == _selectedLeaveType!.toLowerCase();
-        final matchesStatus = _selectedStatus == null ||
-            leave.status.toLowerCase() == _selectedStatus!.toLowerCase();
-        final matchesSearch = _searchController.text.isEmpty ||
-            leave.reason.toLowerCase().contains(_searchController.text.toLowerCase()) ||
-            leave.leaveType.toLowerCase().contains(_searchController.text.toLowerCase());
+        final matchesType = _selectedLeaveType == null || leave.leaveType.toLowerCase() == _selectedLeaveType!.toLowerCase();
+        final matchesStatus = _selectedStatus == null || leave.status.toLowerCase() == _selectedStatus!.toLowerCase();
+        final matchesSearch = _searchController.text.isEmpty || leave.reason.toLowerCase().contains(_searchController.text.toLowerCase()) || leave.leaveType.toLowerCase().contains(_searchController.text.toLowerCase());
         return matchesType && matchesStatus && matchesSearch;
       }).toList();
     });
@@ -69,285 +72,285 @@ class _MyLeaveApplicationState extends State<MyLeaveApplication> {
 
   @override
   Widget build(BuildContext context) {
-    Color bg = const Color(0xff2e3556);
-    Color card = const Color(0xff394066);
-    Color button = const Color(0xff4b7bec);
-
     return Scaffold(
-      backgroundColor: bg,
-      body: SafeArea(
-        child: _isLoading
-            ? const Center(child: CircularProgressIndicator())
-            : RefreshIndicator(
-                onRefresh: _fetchLeaveApplications,
-                child: SingleChildScrollView(
-                  physics: const AlwaysScrollableScrollPhysics(),
-                  child: Padding(
-                    padding: const EdgeInsets.all(16),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        /// TOP BAR
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            const Text(
-                              "My Leave Applications",
-                              style: TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 20,
-                                  fontWeight: FontWeight.bold),
-                            ),
-                            ElevatedButton.icon(
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: button,
-                                padding: const EdgeInsets.symmetric(
-                                    horizontal: 20, vertical: 12),
-                              ),
-                              onPressed: () => _showApplyLeaveSheet(context),
-                              icon: const Icon(Icons.add, color: Colors.white),
-                              label: const Text("Apply For Leave", style: TextStyle(color: Colors.white)),
-                            )
-                          ],
+      backgroundColor: _bg,
+      appBar: AppBar(
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back, color: Colors.white),
+          onPressed: () => Navigator.pop(context),
+        ),
+        title: const Text(
+          "Leave Applications",
+          style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white),
+        ),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.refresh, color: Colors.white70),
+            onPressed: _fetchLeaveApplications,
+          ),
+        ],
+      ),
+      body: _isLoading
+          ? Center(child: CircularProgressIndicator(color: _primary))
+          : RefreshIndicator(
+              onRefresh: _fetchLeaveApplications,
+              color: _primary,
+              child: SingleChildScrollView(
+                physics: const AlwaysScrollableScrollPhysics(),
+                padding: const EdgeInsets.all(20),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    /// APPLY BUTTON
+                    SizedBox(
+                      width: double.infinity,
+                      height: 52,
+                      child: ElevatedButton.icon(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: _primary,
+                          foregroundColor: Colors.white,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                          elevation: 0,
                         ),
+                        onPressed: () => _showApplyLeaveSheet(context),
+                        icon: const Icon(Icons.add, size: 20),
+                        label: const Text("APPLY FOR NEW LEAVE", style: TextStyle(fontWeight: FontWeight.bold, letterSpacing: 0.5)),
+                      ),
+                    ),
+                    const SizedBox(height: 32),
 
-                        const SizedBox(height: 20),
-
-                        /// FILTER CARD
-                        Container(
-                          padding: const EdgeInsets.all(16),
-                          decoration: BoxDecoration(
-                            color: card,
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
+                    /// FILTER CARD
+                    Container(
+                      padding: const EdgeInsets.all(24),
+                      decoration: BoxDecoration(
+                        color: _card,
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(color: Colors.white12),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Row(
                             children: [
-                              const Text(
-                                "Filter Applications",
-                                style: TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.bold),
-                              ),
-                              const SizedBox(height: 15),
-                              const Text(
-                                "Filter by Leave Type",
-                                style: TextStyle(color: Colors.white70),
-                              ),
-                              const SizedBox(height: 6),
-                              DropdownButtonFormField<String>(
-                                dropdownColor: card,
-                                value: _selectedLeaveType,
-                                decoration: InputDecoration(
-                                  filled: true,
-                                  fillColor: const Color(0xff4a5178),
-                                  border: OutlineInputBorder(
-                                      borderRadius: BorderRadius.circular(8)),
-                                ),
-                                style: const TextStyle(color: Colors.white),
-                                hint: const Text("Select an option",
-                                    style: TextStyle(color: Colors.white70)),
-                                items: ["Sick", "Casual", "Emergency", "Other"]
-                                    .map((e) => DropdownMenuItem(
-                                          value: e,
-                                          child: Text(e),
-                                        ))
-                                    .toList(),
-                                onChanged: (v) {
-                                  _selectedLeaveType = v;
-                                  _applyFilters();
-                                },
-                              ),
-                              const SizedBox(height: 15),
-                              const Text(
-                                "Filter by Status",
-                                style: TextStyle(color: Colors.white70),
-                              ),
-                              const SizedBox(height: 6),
-                              DropdownButtonFormField<String>(
-                                dropdownColor: card,
-                                value: _selectedStatus,
-                                decoration: InputDecoration(
-                                  filled: true,
-                                  fillColor: const Color(0xff4a5178),
-                                  border: OutlineInputBorder(
-                                      borderRadius: BorderRadius.circular(8)),
-                                ),
-                                style: const TextStyle(color: Colors.white),
-                                hint: const Text("Select an option",
-                                    style: TextStyle(color: Colors.white70)),
-                                items: ["Pending", "Approved", "Rejected"]
-                                    .map((e) => DropdownMenuItem(
-                                          value: e,
-                                          child: Text(e),
-                                        ))
-                                    .toList(),
-                                onChanged: (v) {
-                                  _selectedStatus = v;
-                                  _applyFilters();
-                                },
-                              ),
-                              const SizedBox(height: 15),
-                              SizedBox(
-                                width: double.infinity,
-                                child: ElevatedButton(
-                                  style: ElevatedButton.styleFrom(
-                                      backgroundColor: Colors.grey),
-                                  onPressed: _resetFilters,
-                                  child: const Text("RESET", style: TextStyle(color: Colors.white)),
-                                ),
-                              )
+                              Icon(Icons.filter_list, color: Colors.white70, size: 20),
+                              SizedBox(width: 8),
+                              Text("Filter Leaves", style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
                             ],
                           ),
-                        ),
-
-                        const SizedBox(height: 20),
-
-                        /// APPLICATION HISTORY
-                        Container(
-                          padding: const EdgeInsets.all(16),
-                          decoration: BoxDecoration(
-                            color: card,
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
+                          const SizedBox(height: 24),
+                          Row(
                             children: [
-                              const Text(
-                                "Application History",
-                                style: TextStyle(
-                                    color: Colors.white,
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: 16),
-                              ),
-                              const SizedBox(height: 10),
-                              const Text(
-                                "View the status of your past and current leave requests.",
-                                style: TextStyle(color: Colors.white70),
-                              ),
-                              const SizedBox(height: 15),
-
-                              /// SEARCH
-                              TextField(
-                                controller: _searchController,
-                                style: const TextStyle(color: Colors.white),
-                                decoration: InputDecoration(
-                                  hintText: "search records",
-                                  hintStyle: const TextStyle(color: Colors.white54),
-                                  filled: true,
-                                  fillColor: const Color(0xff4a5178),
-                                  border: OutlineInputBorder(
-                                      borderRadius: BorderRadius.circular(8)),
-                                  suffixIcon: IconButton(
-                                    icon: const Icon(Icons.search, color: Colors.white),
-                                    onPressed: _applyFilters,
-                                  ),
-                                ),
-                                onChanged: (_) => _applyFilters(),
-                              ),
-
-                              const SizedBox(height: 15),
-
-                              /// TABLE
-                              SingleChildScrollView(
-                                scrollDirection: Axis.horizontal,
-                                child: DataTable(
-                                  headingRowColor: MaterialStateProperty.all(
-                                      const Color(0xff4a5178)),
-                                  columns: const [
-                                    DataColumn(label: Text("#", style: TextStyle(color: Colors.white))),
-                                    DataColumn(label: Text("Leave Type", style: TextStyle(color: Colors.white))),
-                                    DataColumn(label: Text("From", style: TextStyle(color: Colors.white))),
-                                    DataColumn(label: Text("To", style: TextStyle(color: Colors.white))),
-                                    DataColumn(label: Text("Reason", style: TextStyle(color: Colors.white))),
-                                    DataColumn(label: Text("Status", style: TextStyle(color: Colors.white))),
-                                    DataColumn(label: Text("Applied At", style: TextStyle(color: Colors.white))),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    const Text("Leave Type", style: TextStyle(color: Colors.white70, fontSize: 13)),
+                                    const SizedBox(height: 8),
+                                    _buildDropdownField(
+                                      value: _selectedLeaveType,
+                                      items: ["Sick", "Casual", "Emergency", "Other"],
+                                      onChanged: (v) {
+                                        setState(() => _selectedLeaveType = v);
+                                        _applyFilters();
+                                      },
+                                    ),
                                   ],
-                                  rows: _filteredLeaves.asMap().entries.map((entry) {
-                                    final index = entry.key + 1;
-                                    final leave = entry.value;
-                                    return DataRow(cells: [
-                                      DataCell(Text("$index", style: const TextStyle(color: Colors.white))),
-                                      DataCell(Text(leave.leaveType, style: const TextStyle(color: Colors.white))),
-                                      DataCell(Text(_formatDate(leave.fromDate), style: const TextStyle(color: Colors.white))),
-                                      DataCell(Text(_formatDate(leave.toDate), style: const TextStyle(color: Colors.white))),
-                                      DataCell(Text(leave.reason, style: const TextStyle(color: Colors.white))),
-                                      DataCell(_buildStatusBadge(leave.status)),
-                                      DataCell(Text(_formatDateTime(leave.appliedAt), style: const TextStyle(color: Colors.white))),
-                                    ]);
-                                  }).toList(),
                                 ),
-                              )
+                              ),
+                              const SizedBox(width: 16),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    const Text("Status", style: TextStyle(color: Colors.white70, fontSize: 13)),
+                                    const SizedBox(height: 8),
+                                    _buildDropdownField(
+                                      value: _selectedStatus,
+                                      items: ["Pending", "Approved", "Rejected"],
+                                      onChanged: (v) {
+                                        setState(() => _selectedStatus = v);
+                                        _applyFilters();
+                                      },
+                                    ),
+                                  ],
+                                ),
+                              ),
                             ],
                           ),
-                        )
+                          const SizedBox(height: 24),
+                          SizedBox(
+                            width: double.infinity,
+                            height: 48,
+                            child: TextButton(
+                              style: TextButton.styleFrom(
+                                foregroundColor: Colors.white70,
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8), side: const BorderSide(color: Colors.white12)),
+                              ),
+                              onPressed: _resetFilters,
+                              child: const Text("RESET FILTERS", style: TextStyle(fontWeight: FontWeight.bold)),
+                            ),
+                          )
+                        ],
+                      ),
+                    ),
+
+                    const SizedBox(height: 32),
+
+                    /// HISTORY HEADER
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text("Leave History", style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
+                        Text("${_filteredLeaves.length} applications", style: const TextStyle(color: Colors.white38, fontSize: 12)),
                       ],
                     ),
-                  ),
+                    const SizedBox(height: 16),
+
+                    if (_filteredLeaves.isEmpty)
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.symmetric(vertical: 60),
+                        decoration: BoxDecoration(color: _card, borderRadius: BorderRadius.circular(16), border: Border.all(color: Colors.white12)),
+                        child: const Column(
+                          children: [
+                            Icon(Icons.history, color: Colors.white10, size: 48),
+                            SizedBox(height: 16),
+                            Text("No leave records found", style: TextStyle(color: Colors.white38, fontSize: 14)),
+                          ],
+                        ),
+                      )
+                    else
+                      ListView.builder(
+                        shrinkWrap: true,
+                        physics: const NeverScrollableScrollPhysics(),
+                        itemCount: _filteredLeaves.length,
+                        itemBuilder: (context, index) {
+                          final leave = _filteredLeaves[index];
+                          return _buildLeaveCard(leave);
+                        },
+                      ),
+                    const SizedBox(height: 40),
+                  ],
                 ),
               ),
-      ),
+            ),
     );
   }
 
-  Widget _buildStatusBadge(String status) {
-    Color color;
-    switch (status.toLowerCase()) {
-      case 'approved':
-        color = Colors.green;
-        break;
-      case 'rejected':
-        color = Colors.red;
-        break;
-      default:
-        color = Colors.orange;
-    }
+  Widget _buildLeaveCard(StudentLeave leave) {
+    Color statusColor = Colors.orangeAccent;
+    if (leave.status.toLowerCase() == 'approved') statusColor = Colors.greenAccent;
+    if (leave.status.toLowerCase() == 'rejected') statusColor = Colors.redAccent;
+
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+      margin: const EdgeInsets.only(bottom: 16),
+      padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.2),
-        borderRadius: BorderRadius.circular(5),
-        border: Border.all(color: color),
+        color: _card,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Colors.white12),
       ),
-      child: Text(
-        status.toUpperCase(),
-        style: TextStyle(color: color, fontSize: 12, fontWeight: FontWeight.bold),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                decoration: BoxDecoration(color: _primary.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(6)),
+                child: Text(leave.leaveType.toUpperCase(), style: TextStyle(color: _primary, fontSize: 11, fontWeight: FontWeight.bold)),
+              ),
+              _statusBadge(leave.status.toUpperCase(), statusColor),
+            ],
+          ),
+          const SizedBox(height: 16),
+          Row(
+            children: [
+              _dateBlock("FROM", leave.fromDate),
+              const Padding(
+                padding: EdgeInsets.symmetric(horizontal: 16),
+                child: Icon(Icons.arrow_forward, color: Colors.white12, size: 16),
+              ),
+              _dateBlock("TO", leave.toDate),
+            ],
+          ),
+          const Padding(
+            padding: EdgeInsets.symmetric(vertical: 16),
+            child: Divider(color: Colors.white10, height: 1),
+          ),
+          const Text("Reason:", style: TextStyle(color: Colors.white38, fontSize: 12)),
+          const SizedBox(height: 4),
+          Text(leave.reason, style: const TextStyle(color: Colors.white70, fontSize: 14, height: 1.4)),
+        ],
       ),
     );
   }
 
-  String _formatDate(String dateStr) {
-    try {
-      DateTime dt = DateTime.parse(dateStr);
-      return DateFormat('dd MMM yyyy').format(dt);
-    } catch (e) {
-      return dateStr;
-    }
+  Widget _dateBlock(String label, String dateStr) {
+    DateTime dt = DateTime.tryParse(dateStr) ?? DateTime.now();
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(label, style: const TextStyle(color: Colors.white38, fontSize: 10, fontWeight: FontWeight.bold)),
+        const SizedBox(height: 4),
+        Text(DateFormat('dd MMM').format(dt), style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
+        Text(DateFormat('yyyy').format(dt), style: const TextStyle(color: Colors.white54, fontSize: 12)),
+      ],
+    );
   }
 
-  String _formatDateTime(String dateStr) {
-    try {
-      DateTime dt = DateTime.parse(dateStr);
-      return DateFormat('dd MMM yyyy hh:mm a').format(dt);
-    } catch (e) {
-      return dateStr;
-    }
+  Widget _buildDropdownField({String? value, required List<String> items, required Function(String?) onChanged}) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12),
+      decoration: BoxDecoration(
+        color: _secondary,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: Colors.white10),
+      ),
+      child: DropdownButtonHideUnderline(
+        child: DropdownButton<String>(
+          dropdownColor: _card,
+          value: value,
+          isExpanded: true,
+          icon: const Icon(Icons.keyboard_arrow_down, color: Colors.white60, size: 20),
+          hint: const Text("All", style: TextStyle(color: Colors.white38, fontSize: 13)),
+          style: const TextStyle(color: Colors.white, fontSize: 13),
+          items: items.map((e) => DropdownMenuItem(value: e, child: Text(e))).toList(),
+          onChanged: onChanged,
+        ),
+      ),
+    );
+  }
+
+  Widget _statusBadge(String text, Color color) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(4),
+        border: Border.all(color: color.withValues(alpha: 0.5)),
+      ),
+      child: Text(text, style: TextStyle(color: color, fontSize: 10, fontWeight: FontWeight.bold)),
+    );
   }
 
   void _showApplyLeaveSheet(BuildContext context) {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      backgroundColor: const Color(0xff2e3556),
-      builder: (context) => _ApplyLeaveBottomSheet(onSuccess: _fetchLeaveApplications),
+      backgroundColor: Colors.transparent,
+      builder: (context) => _ApplyLeaveBottomSheet(onSuccess: _fetchLeaveApplications, theme: {'bg': _bg, 'card': _card, 'primary': _primary, 'secondary': _secondary}),
     );
   }
 }
 
 class _ApplyLeaveBottomSheet extends StatefulWidget {
   final VoidCallback onSuccess;
-  const _ApplyLeaveBottomSheet({required this.onSuccess});
+  final Map<String, Color> theme;
+  const _ApplyLeaveBottomSheet({required this.onSuccess, required this.theme});
 
   @override
   State<_ApplyLeaveBottomSheet> createState() => _ApplyLeaveBottomSheetState();
@@ -376,7 +379,7 @@ class _ApplyLeaveBottomSheetState extends State<_ApplyLeaveBottomSheet> {
         Navigator.pop(context);
         widget.onSuccess();
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text("Leave applied successfully")),
+          const SnackBar(content: Text("Leave application submitted successfully")),
         );
       }
     } catch (e) {
@@ -391,101 +394,138 @@ class _ApplyLeaveBottomSheetState extends State<_ApplyLeaveBottomSheet> {
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: EdgeInsets.only(
-        bottom: MediaQuery.of(context).viewInsets.bottom,
-        left: 20,
-        right: 20,
-        top: 20,
+    final t = widget.theme;
+    return Container(
+      decoration: BoxDecoration(
+        color: t['card'],
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+        border: const Border(top: BorderSide(color: Colors.white12)),
       ),
+      padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom, left: 24, right: 24, top: 24),
       child: Form(
         key: _formKey,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text("Apply For Leave",
-                style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
-            const SizedBox(height: 20),
-            DropdownButtonFormField<String>(
-              dropdownColor: const Color(0xff394066),
-              decoration: const InputDecoration(
-                labelText: "Leave Type",
-                labelStyle: TextStyle(color: Colors.white70),
-                enabledBorder: UnderlineInputBorder(borderSide: BorderSide(color: Colors.white24)),
-              ),
-              style: const TextStyle(color: Colors.white),
-              items: ["Sick", "Casual", "Emergency", "Other"]
-                  .map((e) => DropdownMenuItem(value: e, child: Text(e)))
-                  .toList(),
-              onChanged: (v) => _leaveType = v,
-              validator: (v) => v == null ? "Required" : null,
-            ),
-            const SizedBox(height: 15),
-            Row(
-              children: [
-                Expanded(
-                  child: ListTile(
-                    title: const Text("From Date", style: TextStyle(color: Colors.white70, fontSize: 12)),
-                    subtitle: Text(_fromDate == null ? "Select" : DateFormat('dd MMM yyyy').format(_fromDate!),
-                        style: const TextStyle(color: Colors.white)),
-                    onTap: () async {
-                      final picked = await showDatePicker(
-                        context: context,
-                        initialDate: DateTime.now(),
-                        firstDate: DateTime.now(),
-                        lastDate: DateTime.now().add(const Duration(days: 365)),
-                      );
-                      if (picked != null) setState(() => _fromDate = picked);
-                    },
-                  ),
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Center(child: Container(width: 40, height: 4, decoration: BoxDecoration(color: Colors.white10, borderRadius: BorderRadius.circular(2)))),
+              const SizedBox(height: 24),
+              const Text("Apply for Leave", style: TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.bold)),
+              const SizedBox(height: 8),
+              const Text("Fill in the details below to request time off.", style: TextStyle(color: Colors.white54, fontSize: 14)),
+              const SizedBox(height: 32),
+              
+              const Text("Leave Type *", style: TextStyle(color: Colors.white70, fontSize: 14)),
+              const SizedBox(height: 8),
+              DropdownButtonFormField<String>(
+                dropdownColor: t['card'],
+                decoration: InputDecoration(
+                  filled: true,
+                  fillColor: t['secondary'],
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 16),
                 ),
-                Expanded(
-                  child: ListTile(
-                    title: const Text("To Date", style: TextStyle(color: Colors.white70, fontSize: 12)),
-                    subtitle: Text(_toDate == null ? "Select" : DateFormat('dd MMM yyyy').format(_toDate!),
-                        style: const TextStyle(color: Colors.white)),
-                    onTap: () async {
-                      final picked = await showDatePicker(
-                        context: context,
-                        initialDate: _fromDate ?? DateTime.now(),
-                        firstDate: _fromDate ?? DateTime.now(),
-                        lastDate: DateTime.now().add(const Duration(days: 365)),
-                      );
-                      if (picked != null) setState(() => _toDate = picked);
-                    },
+                style: const TextStyle(color: Colors.white),
+                items: ["Sick", "Casual", "Emergency", "Other"]
+                    .map((e) => DropdownMenuItem(value: e, child: Text(e)))
+                    .toList(),
+                onChanged: (v) => _leaveType = v,
+                validator: (v) => v == null ? "Please select a leave type" : null,
+              ),
+              const SizedBox(height: 24),
+              
+              Row(
+                children: [
+                  Expanded(child: _datePickerField("From Date *", _fromDate, (d) => setState(() => _fromDate = d))),
+                  const SizedBox(width: 16),
+                  Expanded(child: _datePickerField("To Date *", _toDate, (d) => setState(() => _toDate = d))),
+                ],
+              ),
+              const SizedBox(height: 24),
+              
+              const Text("Reason *", style: TextStyle(color: Colors.white70, fontSize: 14)),
+              const SizedBox(height: 8),
+              TextFormField(
+                controller: _reasonController,
+                style: const TextStyle(color: Colors.white),
+                maxLines: 4,
+                decoration: InputDecoration(
+                  hintText: "Why do you need leave?",
+                  hintStyle: const TextStyle(color: Colors.white24, fontSize: 14),
+                  filled: true,
+                  fillColor: t['secondary'],
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+                ),
+                validator: (v) => v!.isEmpty ? "Please provide a reason" : null,
+              ),
+              const SizedBox(height: 32),
+              
+              SizedBox(
+                width: double.infinity,
+                height: 52,
+                child: ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: t['primary'],
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    elevation: 0,
                   ),
+                  onPressed: _isSubmitting ? null : _submit,
+                  child: _isSubmitting
+                      ? const SizedBox(width: 24, height: 24, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                      : const Text("SUBMIT REQUEST", style: TextStyle(fontWeight: FontWeight.bold, letterSpacing: 1)),
+                ),
+              ),
+              const SizedBox(height: 12),
+              SizedBox(
+                width: double.infinity,
+                height: 52,
+                child: TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text("CANCEL", style: TextStyle(color: Colors.white38, fontWeight: FontWeight.bold)),
+                ),
+              ),
+              const SizedBox(height: 32),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _datePickerField(String label, DateTime? date, Function(DateTime) onPick) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(label, style: const TextStyle(color: Colors.white70, fontSize: 14)),
+        const SizedBox(height: 8),
+        InkWell(
+          onTap: () async {
+            final picked = await showDatePicker(
+              context: context,
+              initialDate: date ?? DateTime.now(),
+              firstDate: DateTime.now().subtract(const Duration(days: 30)),
+              lastDate: DateTime.now().add(const Duration(days: 365)),
+            );
+            if (picked != null) onPick(picked);
+          },
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+            decoration: BoxDecoration(color: widget.theme['secondary'], borderRadius: BorderRadius.circular(12)),
+            child: Row(
+              children: [
+                Icon(Icons.calendar_today, color: widget.theme['primary']!.withValues(alpha: 0.7), size: 16),
+                const SizedBox(width: 10),
+                Text(
+                  date == null ? "Select Date" : DateFormat('dd MMM, yyyy').format(date),
+                  style: TextStyle(color: date == null ? Colors.white24 : Colors.white, fontSize: 14),
                 ),
               ],
             ),
-            const SizedBox(height: 15),
-            TextFormField(
-              controller: _reasonController,
-              style: const TextStyle(color: Colors.white),
-              maxLines: 3,
-              decoration: const InputDecoration(
-                labelText: "Reason",
-                labelStyle: TextStyle(color: Colors.white70),
-                enabledBorder: UnderlineInputBorder(borderSide: BorderSide(color: Colors.white24)),
-              ),
-              validator: (v) => v!.isEmpty ? "Required" : null,
-            ),
-            const SizedBox(height: 30),
-            SizedBox(
-              width: double.infinity,
-              height: 50,
-              child: ElevatedButton(
-                style: ElevatedButton.styleFrom(backgroundColor: const Color(0xff4b7bec)),
-                onPressed: _isSubmitting ? null : _submit,
-                child: _isSubmitting
-                    ? const CircularProgressIndicator(color: Colors.white)
-                    : const Text("SUBMIT APPLICATION", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-              ),
-            ),
-            const SizedBox(height: 20),
-          ],
+          ),
         ),
-      ),
+      ],
     );
   }
 }

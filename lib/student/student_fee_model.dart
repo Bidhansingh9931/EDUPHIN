@@ -102,7 +102,7 @@ class Fee {
   factory Fee.fromJson(Map<String, dynamic> json) {
     return Fee(
       id: json['id'],
-      name: json['name'] ?? '',
+      name: json['fee_name'] ?? json['name'] ?? '',
       amount: json['amount'],
       classId: json['class_id'],
     );
@@ -169,10 +169,13 @@ class Payment {
       id: json['id'],
       idHash: json['id_hash'],
       paidAmount: json['paid_amount'],
-      date: json['date'] ?? '',
-      paymentMethod: json['payment_method'] ?? '',
-      referenceNo: json['reference_no'],
-      remark: json['remark'],
+      // Handle both 'date' and 'payment_date'
+      date: json['date'] ?? json['payment_date'] ?? '',
+      // Handle both 'payment_method' and 'mode'
+      paymentMethod: json['payment_method'] ?? json['mode'] ?? '',
+      // Handle both 'reference_no' and 'reference'
+      referenceNo: json['reference_no'] ?? json['reference'],
+      remark: json['remark'] ?? json['remarks'],
       submitter: json['submitter'] != null ? Submitter.fromJson(json['submitter']) : null,
     );
   }

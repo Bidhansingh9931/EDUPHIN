@@ -14,6 +14,12 @@ class _MyLendingBooksPageState extends State<MyLendingBooksPage> {
   bool _isLoading = true;
   String? _errorMessage;
 
+  // Theme Colors
+  final Color _bg = const Color(0xff0B1220);
+  final Color _card = const Color(0xff1E2746);
+  final Color _primary = const Color(0xff3366FF);
+  final Color _secondary = const Color(0xff3E4764);
+
   // Controllers
   final TextEditingController _titleController = TextEditingController();
   final TextEditingController _fromDateController = TextEditingController();
@@ -59,6 +65,19 @@ class _MyLendingBooksPageState extends State<MyLendingBooksPage> {
       initialDate: DateTime.now(),
       firstDate: DateTime(2000),
       lastDate: DateTime(2100),
+      builder: (context, child) {
+        return Theme(
+          data: Theme.of(context).copyWith(
+            colorScheme: ColorScheme.dark(
+              primary: _primary,
+              onPrimary: Colors.white,
+              surface: _card,
+              onSurface: Colors.white,
+            ),
+          ),
+          child: child!,
+        );
+      },
     );
 
     if (picked != null) {
@@ -79,6 +98,7 @@ class _MyLendingBooksPageState extends State<MyLendingBooksPage> {
     _titleController.clear();
     _fromDateController.clear();
     _toDateController.clear();
+    _searchController.clear();
     setState(() {
       _filters['book_title'] = '';
       _filters['due_from'] = '';
@@ -90,47 +110,53 @@ class _MyLendingBooksPageState extends State<MyLendingBooksPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF0B102A),
-      appBar: PreferredSize(
-        preferredSize: const Size.fromHeight(70),
-        child: AppBar(
-          backgroundColor: const Color(0xFF3E466A),
-          elevation: 0,
-          leading: IconButton(
-            icon: const Icon(Icons.arrow_back, color: Colors.white),
-            onPressed: () => Navigator.pop(context),
-          ),
-          title: const Row(
-            children: [
-              Icon(Icons.menu_book_outlined, size: 28),
-              SizedBox(width: 10),
-              Text(
-                "My Lending Books",
-                style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
-              ),
-            ],
-          ),
+      backgroundColor: _bg,
+      appBar: AppBar(
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back, color: Colors.white),
+          onPressed: () => Navigator.pop(context),
+        ),
+        title: const Text(
+          "My Lending Books",
+          style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white),
         ),
       ),
       body: RefreshIndicator(
         onRefresh: _fetchLendingBooks,
+        color: _primary,
         child: SingleChildScrollView(
           physics: const AlwaysScrollableScrollPhysics(),
           padding: const EdgeInsets.all(20),
           child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               /// ================= FILTER CARD =================
               Container(
                 padding: const EdgeInsets.all(20),
                 decoration: BoxDecoration(
-                  color: const Color(0xFF3E466A),
-                  borderRadius: BorderRadius.circular(20),
+                  color: _card,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: Colors.white12),
                 ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
+                    const Row(
+                      children: [
+                        Icon(Icons.filter_list, color: Colors.white70, size: 20),
+                        SizedBox(width: 8),
+                        Text(
+                          "Filter Lending History",
+                          style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 20),
+
                     buildLabel("Book Title"),
-                    buildTextField(_titleController, "e.g. Math, Physics"),
+                    buildTextField(_titleController, "Search by title..."),
 
                     buildLabel("Due Date From"),
                     buildDateField(_fromDateController, "due_from"),
@@ -138,35 +164,40 @@ class _MyLendingBooksPageState extends State<MyLendingBooksPage> {
                     buildLabel("Due Date To"),
                     buildDateField(_toDateController, "due_to"),
 
-                    const SizedBox(height: 20),
+                    const SizedBox(height: 24),
 
-                    /// Apply Reset
+                    /// Apply & Reset
                     Row(
                       children: [
                         Expanded(
-                          child: ElevatedButton(
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: const Color(0xFF4361EE),
-                              padding: const EdgeInsets.symmetric(vertical: 14),
-                              shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(10)),
+                          child: SizedBox(
+                            height: 48,
+                            child: ElevatedButton(
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: _primary,
+                                foregroundColor: Colors.white,
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                elevation: 0,
+                              ),
+                              onPressed: _applyFilters,
+                              child: const Text("APPLY FILTERS", style: TextStyle(fontWeight: FontWeight.bold)),
                             ),
-                            onPressed: _applyFilters,
-                            child: const Text("APPLY", style: TextStyle(color: Colors.white)),
                           ),
                         ),
-                        const SizedBox(width: 15),
+                        const SizedBox(width: 12),
                         Expanded(
-                          child: ElevatedButton(
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: const Color(0xFF5E6A75),
-                              padding: const EdgeInsets.symmetric(vertical: 14),
-                              shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(10)),
-                              foregroundColor: Colors.white,
+                          child: SizedBox(
+                            height: 48,
+                            child: ElevatedButton(
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: _secondary,
+                                foregroundColor: Colors.white,
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                elevation: 0,
+                              ),
+                              onPressed: _resetFilters,
+                              child: const Text("RESET", style: TextStyle(fontWeight: FontWeight.bold)),
                             ),
-                            onPressed: _resetFilters,
-                            child: const Text("RESET", style: TextStyle(color: Colors.white)),
                           ),
                         ),
                       ],
@@ -175,51 +206,44 @@ class _MyLendingBooksPageState extends State<MyLendingBooksPage> {
                 ),
               ),
 
-              const SizedBox(height: 25),
+              const SizedBox(height: 24),
 
-              /// ================= SHOW ENTRIES =================
+              /// ================= RESULTS TABLE =================
               Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(20),
                 decoration: BoxDecoration(
-                  color: const Color(0xFF3E466A),
-                  borderRadius: BorderRadius.circular(20),
+                  color: _card,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: Colors.white12),
                 ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text(
-                      "Show Entries",
-                      style: TextStyle(
-                          fontSize: 22,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.white),
+                    const Padding(
+                      padding: EdgeInsets.all(20.0),
+                      child: Text(
+                        "Lending Records",
+                        style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
+                      ),
                     ),
-                    const SizedBox(height: 15),
-
-                    buildTextField(_searchController, "search"),
-
-                    const SizedBox(height: 20),
-
                     if (_isLoading)
-                      const Center(child: CircularProgressIndicator(color: Colors.white))
+                      Center(child: Padding(padding: const EdgeInsets.all(40.0), child: CircularProgressIndicator(color: _primary)))
                     else if (_errorMessage != null)
-                      Center(child: Text(_errorMessage!, style: const TextStyle(color: Colors.redAccent)))
+                      Center(child: Padding(padding: const EdgeInsets.all(40.0), child: Text(_errorMessage!, style: const TextStyle(color: Colors.redAccent))))
                     else if (_issuedBooks.isEmpty)
-                      const Center(child: Text("No lending history found", style: TextStyle(color: Colors.white70)))
+                      const Center(child: Padding(padding: const EdgeInsets.all(40.0), child: Text("No lending history found", style: TextStyle(color: Colors.white70))))
                     else
                       SingleChildScrollView(
                         scrollDirection: Axis.horizontal,
                         child: DataTable(
-                          headingRowColor:
-                              WidgetStateProperty.all(const Color(0xFF4B557D)),
+                          headingRowColor: WidgetStateProperty.all(const Color(0xFF2A3450)),
+                          columnSpacing: 24,
                           columns: const [
-                            DataColumn(label: Text("#", style: TextStyle(color: Colors.white))),
-                            DataColumn(label: Text("Book Title", style: TextStyle(color: Colors.white))),
-                            DataColumn(label: Text("Issued At", style: TextStyle(color: Colors.white))),
-                            DataColumn(label: Text("Due Date", style: TextStyle(color: Colors.white))),
-                            DataColumn(label: Text("Days Status", style: TextStyle(color: Colors.white))),
-                            DataColumn(label: Text("Return At", style: TextStyle(color: Colors.white))),
+                            DataColumn(label: Text("#", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold))),
+                            DataColumn(label: Text("BOOK TITLE", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold))),
+                            DataColumn(label: Text("ISSUED AT", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold))),
+                            DataColumn(label: Text("DUE DATE", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold))),
+                            DataColumn(label: Text("STATUS", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold))),
+                            DataColumn(label: Text("RETURNED", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold))),
                           ],
                           rows: _issuedBooks.asMap().entries.map((entry) {
                             int index = entry.key;
@@ -240,17 +264,24 @@ class _MyLendingBooksPageState extends State<MyLendingBooksPage> {
                             return DataRow(cells: [
                               DataCell(Text((index + 1).toString(), style: const TextStyle(color: Colors.white70))),
                               DataCell(Text(record['book']?['title'] ?? 'N/A', style: const TextStyle(color: Colors.white))),
-                              DataCell(Text(record['issued_at'] ?? 'N/A', style: const TextStyle(color: Colors.white))),
-                              DataCell(Text(record['due_date'] ?? 'N/A', style: const TextStyle(color: Colors.white))),
+                              DataCell(Text(record['issued_at'] ?? 'N/A', style: const TextStyle(color: Colors.white70))),
+                              DataCell(Text(record['due_date'] ?? 'N/A', style: const TextStyle(color: Colors.white70))),
                               DataCell(Container(
-                                padding: const EdgeInsets.all(6),
+                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                                 decoration: BoxDecoration(
-                                  color: statusColor.withValues(alpha: 0.2),
-                                  borderRadius: BorderRadius.circular(6),
+                                  color: statusColor.withValues(alpha: 0.1),
+                                  borderRadius: BorderRadius.circular(4),
+                                  border: Border.all(color: statusColor.withValues(alpha: 0.5)),
                                 ),
-                                child: Text(statusText, style: TextStyle(color: statusColor, fontSize: 10, fontWeight: FontWeight.bold)),
+                                child: Text(statusText, style: TextStyle(color: statusColor, fontSize: 11, fontWeight: FontWeight.bold)),
                               )),
-                              DataCell(Text(record['returned_at'] ?? 'Not Returned', style: TextStyle(color: record['returned_at'] != null ? Colors.white : Colors.orangeAccent))),
+                              DataCell(Text(
+                                record['returned_at'] ?? 'Pending', 
+                                style: TextStyle(
+                                  color: record['returned_at'] != null ? Colors.white70 : Colors.orangeAccent,
+                                  fontWeight: record['returned_at'] == null ? FontWeight.bold : FontWeight.normal,
+                                )
+                              )),
                             ]);
                           }).toList(),
                         ),
@@ -269,11 +300,10 @@ class _MyLendingBooksPageState extends State<MyLendingBooksPage> {
 
   Widget buildLabel(String text) {
     return Padding(
-      padding: const EdgeInsets.only(top: 15, bottom: 6),
+      padding: const EdgeInsets.only(top: 15, bottom: 8),
       child: Text(
         text,
-        style: const TextStyle(
-            fontSize: 18, fontWeight: FontWeight.w600, color: Colors.white),
+        style: const TextStyle(fontSize: 14, color: Colors.white70),
       ),
     );
   }
@@ -284,12 +314,11 @@ class _MyLendingBooksPageState extends State<MyLendingBooksPage> {
       style: const TextStyle(color: Colors.white),
       decoration: InputDecoration(
         hintText: hint,
-        hintStyle: const TextStyle(color: Colors.white70),
+        hintStyle: const TextStyle(color: Colors.white54, fontSize: 14),
         filled: true,
-        fillColor: const Color(0xFF5E6A75),
-        border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(12),
-            borderSide: BorderSide.none),
+        fillColor: _secondary,
+        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide.none),
       ),
     );
   }
@@ -301,14 +330,13 @@ class _MyLendingBooksPageState extends State<MyLendingBooksPage> {
       onTap: () => pickDate(controller, filterKey),
       style: const TextStyle(color: Colors.white),
       decoration: InputDecoration(
-        hintText: "dd-mm-yyyy",
-        hintStyle: const TextStyle(color: Colors.white70),
+        hintText: "DD-MM-YYYY",
+        hintStyle: const TextStyle(color: Colors.white54, fontSize: 14),
         filled: true,
-        fillColor: const Color(0xFF5E6A75),
-        suffixIcon: const Icon(Icons.calendar_today, color: Colors.white70),
-        border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(12),
-            borderSide: BorderSide.none),
+        fillColor: _secondary,
+        suffixIcon: const Icon(Icons.calendar_today, color: Colors.white70, size: 18),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide.none),
       ),
     );
   }

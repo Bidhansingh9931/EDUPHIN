@@ -2,6 +2,7 @@ import 'dart:io';
 import 'package:eduphin/services/api_service.dart';
 import 'package:eduphin/services/responsive_helper.dart';
 import 'package:eduphin/student/student_profile_model.dart';
+import 'package:eduphin/student/faculty_remark.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 
@@ -232,7 +233,10 @@ class _StudentProfilePageState extends State<StudentProfilePage> {
                     ),
                     const SizedBox(height: 20),
                     ElevatedButton(
-                      onPressed: () => Navigator.pushNamed(context, '/faculty-remarks'),
+                      onPressed: () => Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (context) => const RemarksPage()),
+                      ),
                       style: ElevatedButton.styleFrom(
                         backgroundColor: theme.colorScheme.secondary,
                         minimumSize: const Size(200, 45),

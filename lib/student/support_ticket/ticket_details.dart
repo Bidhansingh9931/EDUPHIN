@@ -16,10 +16,12 @@ class StudentTicketDetailsPage extends StatefulWidget {
 }
 
 class _StudentTicketDetailsPageState extends State<StudentTicketDetailsPage> {
-  final Color bgColor = const Color(0xFF0B1026);
-  final Color cardColor = const Color(0xFF2F3757);
-  final Color fieldColor = const Color(0xFF4A5568);
-  final Color buttonBlue = const Color(0xFF3F5BD9);
+  // Theme Colors
+  final Color _bg = const Color(0xff0B1220);
+  final Color _card = const Color(0xff1E2746);
+  final Color _primary = const Color(0xff3366FF);
+  final Color _secondary = const Color(0xff3E4764);
+  final Color _surface = const Color(0xff2A3450);
 
   late Future<TicketDetails> _detailsFuture;
   final TextEditingController _replyController = TextEditingController();
@@ -75,19 +77,42 @@ class _StudentTicketDetailsPageState extends State<StudentTicketDetailsPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: bgColor,
+      backgroundColor: _bg,
       appBar: AppBar(
-        backgroundColor: cardColor,
-        iconTheme: const IconThemeData(color: Colors.white),
-        title: const Text("Ticket Details", style: TextStyle(color: Colors.white)),
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back, color: Colors.white),
+          onPressed: () => Navigator.pop(context),
+        ),
+        title: const Text(
+          "Ticket Details",
+          style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white),
+        ),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.refresh, color: Colors.white70, size: 20),
+            onPressed: _refreshDetails,
+          ),
+        ],
       ),
       body: FutureBuilder<TicketDetails>(
         future: _detailsFuture,
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
+            return Center(child: CircularProgressIndicator(color: _primary));
           } else if (snapshot.hasError) {
-            return Center(child: Text("Error: ${snapshot.error}", style: const TextStyle(color: Colors.white)));
+            return Center(
+                child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Icon(Icons.error_outline, color: Colors.redAccent, size: 48),
+                const SizedBox(height: 16),
+                Text("Error: ${snapshot.error}", style: const TextStyle(color: Colors.white70)),
+                const SizedBox(height: 16),
+                ElevatedButton(onPressed: _refreshDetails, child: const Text("RETRY"))
+              ],
+            ));
           } else if (!snapshot.hasData) {
             return const Center(child: Text("No data found", style: TextStyle(color: Colors.white)));
           }
@@ -97,16 +122,23 @@ class _StudentTicketDetailsPageState extends State<StudentTicketDetailsPage> {
             children: [
               Expanded(
                 child: ListView(
-                  padding: const EdgeInsets.all(16),
+                  padding: const EdgeInsets.all(20),
                   children: [
                     _buildTicketInfo(details.ticket),
-                    const SizedBox(height: 24),
-                    const Text(
-                      "Conversation",
-                      style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
+                    const SizedBox(height: 32),
+                    Row(
+                      children: [
+                        const Icon(Icons.forum_outlined, color: Colors.white70, size: 20),
+                        const SizedBox(width: 8),
+                        Text(
+                          "Conversation (${details.replies.length})",
+                          style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
+                        ),
+                      ],
                     ),
-                    const SizedBox(height: 12),
+                    const SizedBox(height: 16),
                     ...details.replies.map((reply) => _buildReplyBubble(reply)),
+                    const SizedBox(height: 20),
                   ],
                 ),
               ),
@@ -119,15 +151,16 @@ class _StudentTicketDetailsPageState extends State<StudentTicketDetailsPage> {
   }
 
   Widget _buildTicketInfo(SupportTicket ticket) {
-    // Note: If SupportTicket model is missing 'description', access it dynamically from json if possible
-    // or update the model. For now, using dynamic access for description if it might be missing from the model class definition.
-    final dynamic ticketData = ticket; 
-    
+    final dynamic ticketData = ticket;
+    final priorityColor = _getPriorityColor(ticket.priority);
+    final statusColor = _getStatusColor(ticket.status);
+
     return Container(
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
-        color: cardColor,
-        borderRadius: BorderRadius.circular(15),
+        color: _card,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Colors.white12),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -135,26 +168,37 @@ class _StudentTicketDetailsPageState extends State<StudentTicketDetailsPage> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text("ID: #${ticket.id}", style: const TextStyle(color: Colors.white70)),
-              _buildBadge(ticket.status, _getStatusColor(ticket.status)),
+              Text(
+                "ID: #${ticket.id}",
+                style: const TextStyle(color: Colors.white38, fontWeight: FontWeight.bold, fontSize: 12),
+              ),
+              Text(
+                _formatFullDate(ticket.createdAt),
+                style: const TextStyle(color: Colors.white38, fontSize: 12),
+              ),
             ],
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 16),
           Text(
             ticket.title,
             style: const TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.bold),
           ),
           const SizedBox(height: 12),
           Text(
-            (ticketData.description as String?) ?? "No description",
-            style: const TextStyle(color: Colors.white70, fontSize: 16),
+            (ticketData.description as String?) ?? "No description provided.",
+            style: const TextStyle(color: Colors.white70, fontSize: 15, height: 1.5),
           ),
-          const Divider(height: 32, color: Colors.white24),
-          Row(
+          const Padding(
+            padding: EdgeInsets.symmetric(vertical: 20),
+            child: Divider(color: Colors.white12, height: 1),
+          ),
+          Wrap(
+            spacing: 12,
+            runSpacing: 12,
             children: [
-              _infoItem("Priority", ticket.priority.toUpperCase()),
-              const SizedBox(width: 20),
-              _infoItem("Category", ticket.category ?? "N/A"),
+              _infoChip(Icons.priority_high, "Priority", ticket.priority.toUpperCase(), priorityColor),
+              _infoChip(Icons.category_outlined, "Category", ticket.category ?? "General", _primary),
+              _infoChip(Icons.info_outline, "Status", ticket.status.toUpperCase(), statusColor),
             ],
           ),
         ],
@@ -162,13 +206,29 @@ class _StudentTicketDetailsPageState extends State<StudentTicketDetailsPage> {
     );
   }
 
-  Widget _infoItem(String label, String value) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(label, style: const TextStyle(color: Colors.white54, fontSize: 12)),
-        Text(value, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-      ],
+  Widget _infoChip(IconData icon, String label, String value, Color color) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        color: _secondary,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: color.withValues(alpha: 0.3)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 14, color: color),
+          const SizedBox(width: 6),
+          Text(
+            "$label: ",
+            style: const TextStyle(color: Colors.white54, fontSize: 12),
+          ),
+          Text(
+            value,
+            style: TextStyle(color: color, fontSize: 12, fontWeight: FontWeight.bold),
+          ),
+        ],
+      ),
     );
   }
 
@@ -179,14 +239,22 @@ class _StudentTicketDetailsPageState extends State<StudentTicketDetailsPage> {
       margin: const EdgeInsets.only(bottom: 16),
       alignment: isSupport ? Alignment.centerLeft : Alignment.centerRight,
       child: Container(
-        padding: const EdgeInsets.all(12),
-        constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.75),
+        padding: const EdgeInsets.all(16),
+        constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.8),
         decoration: BoxDecoration(
-          color: isSupport ? fieldColor : buttonBlue,
+          color: isSupport ? _surface : _primary,
           borderRadius: BorderRadius.circular(12).copyWith(
             bottomLeft: isSupport ? const Radius.circular(0) : const Radius.circular(12),
             bottomRight: isSupport ? const Radius.circular(12) : const Radius.circular(0),
           ),
+          border: isSupport ? Border.all(color: Colors.white10) : null,
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.1),
+              blurRadius: 10,
+              offset: const Offset(0, 4),
+            )
+          ],
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -196,35 +264,54 @@ class _StudentTicketDetailsPageState extends State<StudentTicketDetailsPage> {
               children: [
                 Text(
                   reply.userName ?? "User",
-                  style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12),
+                  style: TextStyle(
+                    color: isSupport ? _primary.withValues(alpha: 0.8) : Colors.white,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 12,
+                  ),
                 ),
-                const SizedBox(width: 8),
+                const SizedBox(width: 12),
                 Text(
                   _formatDate(reply.createdAt),
-                  style: const TextStyle(color: Colors.white60, fontSize: 10),
+                  style: TextStyle(
+                    color: isSupport ? Colors.white38 : Colors.white70,
+                    fontSize: 10,
+                  ),
                 ),
               ],
             ),
-            const SizedBox(height: 6),
-            Text(reply.message, style: const TextStyle(color: Colors.white)),
+            const SizedBox(height: 8),
+            Text(
+              reply.message,
+              style: const TextStyle(color: Colors.white, fontSize: 14, height: 1.4),
+            ),
             if (reply.attachment != null) ...[
-              const SizedBox(height: 8),
+              const SizedBox(height: 12),
               InkWell(
                 onTap: () {
                   // Handle attachment download/view
                 },
                 child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                   decoration: BoxDecoration(
-                    color: Colors.black26,
-                    borderRadius: BorderRadius.circular(4),
+                    color: Colors.black12,
+                    borderRadius: BorderRadius.circular(6),
+                    border: Border.all(color: Colors.white10),
                   ),
-                  child: const Row(
+                  child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Icon(Icons.attach_file, color: Colors.white, size: 14),
-                      SizedBox(width: 4),
-                      Text("Attachment", style: TextStyle(color: Colors.white, fontSize: 12)),
+                      const Icon(Icons.attach_file, color: Colors.white70, size: 14),
+                      const SizedBox(width: 6),
+                      Text(
+                        "Attachment",
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 11,
+                          decoration: TextDecoration.underline,
+                          decorationColor: Colors.white30,
+                        ),
+                      ),
                     ],
                   ),
                 ),
@@ -238,32 +325,45 @@ class _StudentTicketDetailsPageState extends State<StudentTicketDetailsPage> {
 
   Widget _buildInputArea() {
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: EdgeInsets.fromLTRB(16, 12, 16, 12 + MediaQuery.of(context).padding.bottom),
       decoration: BoxDecoration(
-        color: cardColor,
-        boxShadow: const [BoxShadow(color: Colors.black26, blurRadius: 10)],
+        color: _card,
+        border: const Border(top: BorderSide(color: Colors.white12)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.2),
+            blurRadius: 20,
+            offset: const Offset(0, -5),
+          )
+        ],
       ),
       child: Column(
         children: [
           if (_selectedFile != null)
             Container(
-              margin: const EdgeInsets.only(bottom: 8),
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(color: fieldColor, borderRadius: BorderRadius.circular(8)),
+              margin: const EdgeInsets.only(bottom: 12),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              decoration: BoxDecoration(
+                color: _secondary,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: _primary.withValues(alpha: 0.3)),
+              ),
               child: Row(
                 children: [
-                  const Icon(Icons.description, color: Colors.white),
-                  const SizedBox(width: 8),
+                  const Icon(Icons.insert_drive_file, color: Colors.white70, size: 20),
+                  const SizedBox(width: 12),
                   Expanded(
                     child: Text(
                       _selectedFile!.path.split('/').last,
-                      style: const TextStyle(color: Colors.white),
+                      style: const TextStyle(color: Colors.white, fontSize: 13),
                       overflow: TextOverflow.ellipsis,
                     ),
                   ),
                   IconButton(
-                    icon: const Icon(Icons.close, color: Colors.redAccent),
+                    icon: const Icon(Icons.cancel, color: Colors.redAccent, size: 20),
                     onPressed: () => setState(() => _selectedFile = null),
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(),
                   ),
                 ],
               ),
@@ -271,30 +371,31 @@ class _StudentTicketDetailsPageState extends State<StudentTicketDetailsPage> {
           Row(
             children: [
               IconButton(
-                icon: const Icon(Icons.attach_file, color: Colors.white),
+                icon: const Icon(Icons.add_circle_outline, color: Colors.white54),
                 onPressed: _pickFile,
+                tooltip: "Attach file",
               ),
               Expanded(
                 child: TextField(
                   controller: _replyController,
-                  style: const TextStyle(color: Colors.white),
+                  style: const TextStyle(color: Colors.white, fontSize: 15),
                   decoration: InputDecoration(
-                    hintText: "Type your message...",
-                    hintStyle: const TextStyle(color: Colors.white54),
+                    hintText: "Write a reply...",
+                    hintStyle: const TextStyle(color: Colors.white30),
                     filled: true,
-                    fillColor: fieldColor,
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(25), borderSide: BorderSide.none),
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                    fillColor: _secondary,
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(24), borderSide: BorderSide.none),
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
                   ),
                 ),
               ),
               const SizedBox(width: 8),
               _isSending
-                  ? const CircularProgressIndicator()
-                  : CircleAvatar(
-                      backgroundColor: buttonBlue,
+                  ? SizedBox(width: 48, height: 48, child: Padding(padding: const EdgeInsets.all(12), child: CircularProgressIndicator(color: _primary, strokeWidth: 3)))
+                  : Container(
+                      decoration: BoxDecoration(color: _primary, shape: BoxShape.circle),
                       child: IconButton(
-                        icon: const Icon(Icons.send, color: Colors.white),
+                        icon: const Icon(Icons.send_rounded, color: Colors.white, size: 20),
                         onPressed: _sendReply,
                       ),
                     ),
@@ -305,24 +406,17 @@ class _StudentTicketDetailsPageState extends State<StudentTicketDetailsPage> {
     );
   }
 
-  Widget _buildBadge(String text, Color color) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-      decoration: BoxDecoration(
-        color: color.withOpacity(0.2),
-        border: Border.all(color: color),
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Text(
-        text.toUpperCase(),
-        style: TextStyle(color: color, fontSize: 10, fontWeight: FontWeight.bold),
-      ),
-    );
+  Color _getPriorityColor(String priority) {
+    switch (priority.toLowerCase()) {
+      case 'high': return Colors.redAccent;
+      case 'medium': return Colors.orangeAccent;
+      default: return Colors.greenAccent;
+    }
   }
 
   Color _getStatusColor(String status) {
     switch (status.toLowerCase()) {
-      case 'open': return Colors.blueAccent;
+      case 'open': return _primary;
       case 'closed': return Colors.grey;
       default: return Colors.blueGrey;
     }
@@ -332,6 +426,15 @@ class _StudentTicketDetailsPageState extends State<StudentTicketDetailsPage> {
     try {
       DateTime dt = DateTime.parse(dateStr);
       return DateFormat('dd MMM, HH:mm').format(dt);
+    } catch (e) {
+      return dateStr;
+    }
+  }
+
+  String _formatFullDate(String dateStr) {
+    try {
+      DateTime dt = DateTime.parse(dateStr);
+      return DateFormat('dd MMM yyyy, HH:mm').format(dt);
     } catch (e) {
       return dateStr;
     }
