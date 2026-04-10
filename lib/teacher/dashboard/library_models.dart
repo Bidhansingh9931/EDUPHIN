@@ -79,11 +79,17 @@ class BookFilters {
   });
 
   factory BookFilters.fromJson(Map<String, dynamic> json) {
+    List<String> _toList(dynamic val) {
+      if (val is List) return val.map((e) => e.toString()).toList();
+      if (val is Map) return val.values.map((e) => e.toString()).toList();
+      return [];
+    }
+
     return BookFilters(
-      categories: List<String>.from(json['categories'] ?? []),
-      languages: List<String>.from(json['languages'] ?? []),
-      formats: List<String>.from(json['formats'] ?? []),
-      years: (json['years'] as List?)?.map((y) => y.toString()).toList() ?? [],
+      categories: _toList(json['categories']),
+      languages: _toList(json['languages']),
+      formats: _toList(json['formats']),
+      years: _toList(json['years']),
     );
   }
 }

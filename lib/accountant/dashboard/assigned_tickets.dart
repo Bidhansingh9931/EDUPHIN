@@ -176,7 +176,7 @@ class _AssignedTicketsPageState extends State<AssignedTicketsPage> {
             boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.2), blurRadius: 8, offset: const Offset(0, 4))],
           ),
           child: ListTile(
-            onTap: () => Navigator.push(context, MaterialPageRoute(builder: (context) => TicketDetailsPage(ticketId: ticket.id.toString()))),
+            onTap: () => Navigator.push(context, MaterialPageRoute(builder: (context) => TicketDetailsPage(ticketId: ticket.encryptedId ?? ticket.id.toString()))),
             contentPadding: const EdgeInsets.all(16),
             title: Row(
               children: [

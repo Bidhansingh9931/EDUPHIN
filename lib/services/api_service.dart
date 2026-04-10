@@ -697,12 +697,48 @@ class ApiService {
   }
 
   static Future<teacher_ticket_details.TicketDetails> getTicketDetailsAccountant(String id) async {
-    final response = await get('accountants/tickets/$id');
+    // Attempt 1: General accountant see-reply endpoint (Matches PHP seeReply method)
+    var response = await get('accountants/tickets/see-reply/$id');
+    
+    // Attempt 2: Specific accountant view endpoint
+    if (response.statusCode != 200) {
+      final altResponse = await get('accountants/tickets/view/$id');
+      if (altResponse.statusCode == 200) response = altResponse;
+    }
+
+    // Attempt 3: Standard REST-style endpoint
+    if (response.statusCode != 200) {
+      final altResponse2 = await get('accountants/tickets/$id');
+      if (altResponse2.statusCode == 200) response = altResponse2;
+    }
+
+    // Attempt 4: Laravel common pattern for replies
+    if (response.statusCode != 200) {
+      final altResponse3 = await get('accountants/tickets/$id/replies');
+      if (altResponse3.statusCode == 200) response = altResponse3;
+    }
+
     if (response.statusCode == 200) {
       final data = jsonDecode(response.body);
-      if (data['success'] == true || data['status'] == true) return teacher_ticket_details.TicketDetails.fromJson(data['data']);
+      if (data['success'] == true || data['status'] == true) {
+        final payload = data['data'] ?? data;
+        
+        if (payload is Map<String, dynamic>) {
+          if (payload.containsKey('ticket')) {
+            return teacher_ticket_details.TicketDetails.fromJson(payload);
+          }
+          if (payload.containsKey('id') || payload.containsKey('title')) {
+            return teacher_ticket_details.TicketDetails(
+              ticket: teacher_ticket.SupportTicket.fromJson(payload),
+              replies: (payload['replies'] as List? ?? []).map((r) => teacher_ticket_details.TicketReply.fromJson(r as Map<String, dynamic>)).toList(),
+            );
+          }
+        }
+      }
+      if (data['message'] != null) throw Exception(data['message']);
     }
-    throw Exception('Failed to load ticket details');
+    
+    throw Exception('Failed to load ticket details (Status: ${response.statusCode})');
   }
 
   static Future<void> replyAccountantTicket(String id, Map<String, String> fields, {File? attachment}) async {
@@ -737,12 +773,35 @@ class ApiService {
   }
 
   static Future<Map<String, dynamic>> getAccountantStudentFeeDetails(String studentId) async {
-    final response = await get('accountants/students/$studentId');
+    // Attempt 1: The ID-specific endpoint (studentId could be encrypted or numeric)
+    var response = await get('accountants/students/$studentId');
+    
+    // Attempt 2: Laravel standard 'view' pattern
+    if (response.statusCode != 200) {
+      final altResponse = await get('accountants/students/view/$studentId');
+      if (altResponse.statusCode == 200) response = altResponse;
+    }
+
+    // Attempt 3: Specific 'show' pattern if previous failed
+    if (response.statusCode != 200) {
+      final altResponse2 = await get('accountants/students/show/$studentId');
+      if (altResponse2.statusCode == 200) response = altResponse2;
+    }
+
     if (response.statusCode == 200) {
       final data = jsonDecode(response.body);
-      if (data['success'] == true || data['status'] == true) return data['data'];
+      if (data['success'] == true || data['status'] == true) {
+        return data['data'] ?? data;
+      }
+      if (data['message'] != null) throw Exception(data['message']);
     }
-    throw Exception('Failed to load student fee details');
+    
+    // If we reach here, check if it's a 500 error specifically on a numeric ID
+    if (response.statusCode == 500 && RegExp(r'^\d+$').hasMatch(studentId)) {
+      throw Exception('Server error (500). The backend may require an ENCRYPTED student ID instead of "$studentId".');
+    }
+
+    throw Exception('Failed to load student fee details (Status: ${response.statusCode})');
   }
 
   static Future<void> storeAccountantPayment(Map<String, dynamic> data) async {
@@ -781,6 +840,20 @@ class ApiService {
       if (data['success'] == true || data['status'] == true) return data['data'];
     }
     throw Exception('Failed to load employee salary');
+  }
+
+  static Future<Map<String, dynamic>> getAccountantSalaryDetail(String id) async {
+    final response = await get('accountants/salary/view/$id');
+    if (response.statusCode == 200) {
+      final data = jsonDecode(response.body);
+      if (data['success'] == true || data['status'] == true) return data['data'];
+    }
+    throw Exception('Failed to load salary detail');
+  }
+
+  static Future<void> deleteAccountantSalary(String id) async {
+    final response = await delete('accountants/salary/destroy/$id');
+    if (response.statusCode != 200) throw Exception(jsonDecode(response.body)['message'] ?? 'Failed to delete salary');
   }
 
   static Future<void> storeAccountantEmployeeSalary(String id, Map<String, dynamic> data) async {
@@ -953,9 +1026,80 @@ class ApiService {
     throw Exception('Failed to load fees');
   }
 
+  static Future<List<accountant_model.UserDetail>> getEmployeesByRole(dynamic roleId) async {
+    final response = await get('accountants/accounts/$roleId');
+    if (response.statusCode == 200) {
+      final data = jsonDecode(response.body);
+      if (data['success'] == true || data['status'] == true) {
+        final payload = data['data'] ?? data;
+        final usersData = payload['users'] ?? payload['employees'] ?? (payload is List ? payload : []);
+        
+        List usersList = [];
+        if (usersData is List) {
+          usersList = usersData;
+        } else if (usersData is Map) {
+          usersList = usersData.values.toList();
+        }
+        
+        return usersList.map((e) => accountant_model.UserDetail.fromJson(e)).toList();
+      }
+    }
+    
+    final errorBody = response.body.isNotEmpty ? jsonDecode(response.body) : {};
+    final message = errorBody['message'] ?? 'Failed to load employees';
+    throw Exception('$message (Status: ${response.statusCode})');
+  }
+
+  static Future<Map<String, String>> getAccountantRoles() async {
+    final response = await get('accountants/dashboard');
+    if (response.statusCode == 200) {
+      final data = jsonDecode(response.body);
+      if (data['success'] == true || data['status'] == true) {
+        final payload = data['data'] ?? data;
+        
+        // Try to extract dynamic roles from the dashboard data if available
+        final rolesData = payload['roles'];
+        if (rolesData is List) {
+          final Map<String, String> dynamicRoles = {};
+          for (var role in rolesData) {
+            final id = (role['id'] ?? role['encrypted_id'])?.toString();
+            final name = role['name']?.toString();
+            if (id != null && name != null) {
+              dynamicRoles[id] = name;
+            }
+          }
+          if (dynamicRoles.isNotEmpty) return dynamicRoles;
+        }
+        
+        // Fallback to static map if the API doesn't provide dynamic roles
+        return {
+          '3': "Managers",
+          '4': "Counselors",
+          '5': "Teachers",
+          '7': "Librarians",
+          '8': "Accountants",
+          '9': "Staff",
+        };
+      }
+    }
+    return {};
+  }
+
   static Future<void> deleteAccountantFee(String feeId) async {
     final response = await delete('accountants/fees/delete/$feeId');
-    if (response.statusCode != 200) throw Exception(jsonDecode(response.body)['message'] ?? 'Failed to delete fee');
+    if (response.statusCode != 200) {
+      // If DELETE fails with 405 or 404, try POST as some Laravel versions/configs require POST for deletes
+      if (response.statusCode == 405 || response.statusCode == 404) {
+        final postResponse = await post('accountants/fees/delete/$feeId', {});
+        if (postResponse.statusCode == 200) return;
+        
+        final postData = jsonDecode(postResponse.body);
+        throw Exception(postData['message'] ?? 'Failed to delete fee (Status: ${postResponse.statusCode})');
+      }
+
+      final data = jsonDecode(response.body);
+      throw Exception(data['message'] ?? 'Failed to delete fee (Status: ${response.statusCode})');
+    }
   }
 
   static Future<List<dynamic>> getAccountantFeeCreateData() async {
@@ -969,11 +1113,13 @@ class ApiService {
 
   static Future<Map<String, dynamic>> getAccountantFeeEditData(String feeId) async {
     final response = await get('accountants/fees/edit/$feeId');
+    final data = jsonDecode(response.body);
     if (response.statusCode == 200) {
-      final data = jsonDecode(response.body);
-      if (data['success'] == true || data['status'] == true) return data['data'];
+      if (data['success'] == true || data['status'] == true || data['status'] == 'success') {
+        return data['data'] ?? data;
+      }
     }
-    throw Exception('Failed to load fee data');
+    throw Exception(data['message'] ?? 'Failed to load fee data (Status: ${response.statusCode})');
   }
 
   static Future<void> storeAccountantFee(Map<String, dynamic> data) async {
@@ -1342,6 +1488,49 @@ class ApiService {
       if (data['success'] == true || data['status'] == true) return accountant_model.UserDetail.fromJson(data['data']);
     }
     throw Exception('Failed to load virtual ID card');
+  }
+
+  static Future<Map<String, dynamic>> getAccountantExamSchedule(String id) async {
+    final response = await get('accountants/exams/schedule/$id');
+    if (response.statusCode == 200) {
+      final data = jsonDecode(response.body);
+      if (data['success'] == true || data['status'] == true) return data['data'] ?? data;
+    }
+    throw Exception('Failed to load exam schedule');
+  }
+
+  static Future<teacher_library.BookPagination> getAccountantLibraryBooks(Map<String, String> filters, int page) async {
+    final query = Map<String, String>.from(filters)..['page'] = page.toString();
+    final response = await get('accountants/library/books', query);
+    if (response.statusCode == 200) return teacher_library.BookPagination.fromJson(jsonDecode(response.body)['data'] ?? jsonDecode(response.body));
+    throw Exception('Failed to load books');
+  }
+
+  static Future<List<dynamic>> getAccountantStudents(Map<String, String> filters) async {
+    final response = await get('accountants/students', filters);
+    if (response.statusCode == 200) {
+      final data = jsonDecode(response.body);
+      if (data['success'] == true || data['status'] == true) return data['data']['students'] ?? data['data'];
+    }
+    throw Exception('Failed to load students');
+  }
+
+  static Future<Map<String, dynamic>> getAccountantStudentReceipt(String id) async {
+    final response = await get('accountants/students/receipt/$id');
+    if (response.statusCode == 200) {
+      final data = jsonDecode(response.body);
+      if (data['success'] == true || data['status'] == true) return data['data'];
+    }
+    throw Exception('Failed to load receipt');
+  }
+
+  static Future<Map<String, dynamic>> getAccountantSalaryView(String id) async {
+    final response = await get('accountants/salary/view/$id');
+    if (response.statusCode == 200) {
+      final data = jsonDecode(response.body);
+      if (data['success'] == true || data['status'] == true) return data['data'];
+    }
+    throw Exception('Failed to load salary details');
   }
 
   static Future<void> createAccountantTicket(Map<String, dynamic> data) async {

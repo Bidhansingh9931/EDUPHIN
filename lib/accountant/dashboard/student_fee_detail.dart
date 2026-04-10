@@ -34,15 +34,15 @@ class _StudentFeeDetailPageState extends State<StudentFeeDetailPage> {
       final response = await ApiService.get('accountants/students');
       if (response.statusCode == 200 && mounted) {
         final body = jsonDecode(response.body);
-        if (body['success'] == true) {
-          setState(() {
-            _classes = body['data']['classes'] ?? [];
-            _sections = body['data']['sections'] ?? [];
-            _students = body['data']['students'] ?? [];
-          });
-        }
+        final data = body['data'] ?? body;
+        setState(() {
+          _classes = data['classes'] ?? [];
+          _sections = data['sections'] ?? [];
+          _students = data['students'] ?? [];
+        });
       }
     } catch (e) {
+      debugPrint("Initial Data Error: $e");
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Error: $e")));
     } finally {
       if (mounted) setState(() => _isLoading = false);
@@ -57,16 +57,13 @@ class _StudentFeeDetailPageState extends State<StudentFeeDetailPage> {
       if (_selectedClassId != null) query['class_filter'] = _selectedClassId.toString();
       if (_selectedSectionId != null) query['section_filter'] = _selectedSectionId.toString();
 
-      final response = await ApiService.get('accountants/students', query);
-      if (response.statusCode == 200 && mounted) {
-        final body = jsonDecode(response.body);
-        if (body['success'] == true) {
-          setState(() {
-            _students = body['data']['students'] ?? [];
-            _studentDetails = null;
-            _selectedStudentId = null;
-          });
-        }
+      final students = await ApiService.getAccountantStudents(query);
+      if (mounted) {
+        setState(() {
+          _students = students;
+          _studentDetails = null;
+          _selectedStudentId = null;
+        });
       }
     } catch (e) {
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Error: $e")));
@@ -75,19 +72,33 @@ class _StudentFeeDetailPageState extends State<StudentFeeDetailPage> {
     }
   }
 
-  Future<void> _fetchStudentDetails(dynamic studentId) async {
-    if (!mounted) return;
+  Future<void> _fetchStudentDetails(dynamic id) async {
+    if (!mounted || id == null) return;
+    
+    final String studentId = id.toString();
     setState(() => _isLoading = true);
     try {
-      final details = await ApiService.getAccountantStudentFeeDetails(studentId.toString());
+      debugPrint("Fetching details for student: $studentId");
+      final details = await ApiService.getAccountantStudentFeeDetails(studentId);
       if (mounted) {
         setState(() {
           _studentDetails = details;
           _selectedStudentId = studentId;
         });
+        debugPrint("Successfully loaded details for $studentId");
       }
     } catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Error: $e")));
+      debugPrint("Student Fee Detail Error: $e");
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text("Error: $e"),
+            backgroundColor: Colors.red,
+            duration: const Duration(seconds: 5),
+            action: SnackBarAction(label: "Retry", textColor: Colors.white, onPressed: () => _fetchStudentDetails(id)),
+          ),
+        );
+      }
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
@@ -185,7 +196,7 @@ class _StudentFeeDetailPageState extends State<StudentFeeDetailPage> {
               children: [
                 Expanded(child: _buildDropdownField(context, _classes, _selectedClassId, "All Classes", (val) => setState(() => _selectedClassId = val))),
                 const SizedBox(width: 12),
-                Expanded(child: _buildDropdownField(context, _sections, _selectedSectionId, "All Sections", (val) => setState(() => _selectedSectionId = val))),
+                Expanded(child: _buildDropdownField(context, _sections, _selectedSectionId, "All Sections", (val) => setState(() => _selectedSectionId = val), isSection: true)),
               ],
             ),
             const SizedBox(height: 16),
@@ -202,7 +213,7 @@ class _StudentFeeDetailPageState extends State<StudentFeeDetailPage> {
     );
   }
 
-  Widget _buildDropdownField(BuildContext context, List<dynamic> items, dynamic value, String hint, Function(dynamic) onChanged) {
+  Widget _buildDropdownField(BuildContext context, List<dynamic> items, dynamic value, String hint, Function(dynamic) onChanged, {bool isSection = false}) {
     return DropdownButtonFormField<dynamic>(
       value: value,
       isExpanded: true,
@@ -211,7 +222,7 @@ class _StudentFeeDetailPageState extends State<StudentFeeDetailPage> {
         DropdownMenuItem<dynamic>(value: null, child: Text(hint)),
         ...items.map((c) => DropdownMenuItem<dynamic>(
               value: c['id'],
-              child: Text(c['name']?.toString() ?? 'N/A'),
+              child: Text((isSection ? (c['section_name'] ?? c['name']) : c['name'])?.toString() ?? 'N/A'),
             )),
       ],
       onChanged: onChanged,
@@ -240,7 +251,8 @@ class _StudentFeeDetailPageState extends State<StudentFeeDetailPage> {
               separatorBuilder: (context, index) => const Divider(height: 1),
               itemBuilder: (context, index) {
                 final student = _students[index];
-                final isSelected = _selectedStudentId == student['id'];
+                final studentId = student['encrypted_id'] ?? student['id'].toString();
+                final isSelected = _selectedStudentId == studentId;
                 return ListTile(
                   selected: isSelected,
                   selectedTileColor: theme.colorScheme.primary.withValues(alpha: 0.05),
@@ -250,21 +262,31 @@ class _StudentFeeDetailPageState extends State<StudentFeeDetailPage> {
                     backgroundColor: theme.colorScheme.primary.withValues(alpha: 0.1),
                     child: Text("${index + 1}", style: TextStyle(fontSize: 10, color: theme.colorScheme.primary, fontWeight: FontWeight.bold)),
                   ),
-                  title: Text(student["name"]?.toString() ?? 'N/A', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
-                  subtitle: Text("${student["class"]?["name"]} - ${student["section"]?["name"]}", style: TextStyle(fontSize: 11, color: theme.hintColor)),
-                  onTap: () => _fetchStudentDetails(student['id']),
+                  title: Text(
+                    "${student['first_name'] ?? ''} ${student['last_name'] ?? ''}".trim().isEmpty
+                        ? (student["name"]?.toString() ?? student["user"]?["name"]?.toString() ?? 'N/A')
+                        : "${student['first_name'] ?? ''} ${student['last_name'] ?? ''}",
+                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                  ),
+                  subtitle: Text("${student["class"]?["name"] ?? 'N/A'} - ${student["section"]?["section_name"] ?? student["section"]?["name"] ?? 'N/A'}", style: TextStyle(fontSize: 11, color: theme.hintColor)),
+                  onTap: () {
+                    final targetId = student['encrypted_id'] ?? student['id'].toString();
+                    _fetchStudentDetails(targetId);
+                  },
                 );
               },
             ),
+          const SizedBox(height: 12),
         ],
       ),
     );
   }
 
   Widget _buildStudentInfoCard(BuildContext context) {
+    if (_studentDetails == null || _studentDetails!['student'] == null) return const SizedBox();
     final theme = Theme.of(context);
     final info = _studentDetails!['student'];
-    final summary = _studentDetails!['summary'];
+    final summary = _studentDetails!['summary'] ?? {};
     return Card(
       color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
       child: Padding(
@@ -276,7 +298,12 @@ class _StudentFeeDetailPageState extends State<StudentFeeDetailPage> {
               children: [
                 CircleAvatar(backgroundColor: theme.colorScheme.primary, radius: 20, child: const Icon(Icons.person, color: Colors.white, size: 20)),
                 const SizedBox(width: 12),
-                Expanded(child: Text(info['name']?.toString() ?? 'N/A', style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold))),
+                Expanded(
+                  child: Text(
+                    "${info['first_name'] ?? ''} ${info['last_name'] ?? ''}".trim().isEmpty ? (info['name']?.toString() ?? 'N/A') : "${info['first_name'] ?? ''} ${info['last_name'] ?? ''}",
+                    style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+                  ),
+                ),
               ],
             ),
             const SizedBox(height: 24),
@@ -299,7 +326,7 @@ class _StudentFeeDetailPageState extends State<StudentFeeDetailPage> {
       runSpacing: 12,
       children: [
         _infoItem(context, "Roll No", info['roll_no']?.toString() ?? 'N/A'),
-        _infoItem(context, "Class", "${info['class']?['name']} - ${info['section']?['name']}"),
+        _infoItem(context, "Class", "${info['class']?['name'] ?? 'N/A'} - ${info['section']?['section_name'] ?? info['section']?['name'] ?? 'N/A'}"),
         _infoItem(context, "Email", info['email']?.toString() ?? 'N/A'),
       ],
     );
@@ -357,9 +384,10 @@ class _StudentFeeDetailPageState extends State<StudentFeeDetailPage> {
               separatorBuilder: (context, index) => const Divider(height: 1),
               itemBuilder: (context, index) {
                 final fee = fees[index];
-                final feeId = fee['id'].toString();
-                final isOverridden = overrides.containsKey(feeId);
-                final amount = isOverridden ? overrides[feeId]['overridden_amount'] : fee['amount'];
+                final feeId = fee['encrypted_id'] ?? fee['id'].toString();
+                final isOverridden = overrides.containsKey(feeId) || overrides.containsKey(fee['id'].toString());
+                final overrideData = overrides[feeId] ?? overrides[fee['id'].toString()];
+                final amount = isOverridden ? overrideData['overridden_amount'] : fee['amount'];
 
                 return ListTile(
                   title: Text(fee['fee_name'] ?? 'Fee', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
@@ -369,7 +397,7 @@ class _StudentFeeDetailPageState extends State<StudentFeeDetailPage> {
                     children: [
                       Text("₹$amount", style: TextStyle(fontWeight: FontWeight.bold, color: isOverridden ? Colors.orange : null)),
                       const SizedBox(width: 8),
-                      IconButton(icon: const Icon(Icons.edit_outlined, size: 18), onPressed: () => _showOverrideDialog(feeId, amount.toString(), overrides[feeId]?['reason'] ?? '')),
+                      IconButton(icon: const Icon(Icons.edit_outlined, size: 18), onPressed: () => _showOverrideDialog(feeId, amount.toString(), overrideData?['reason'] ?? '')),
                     ],
                   ),
                 );
@@ -420,18 +448,21 @@ class _StudentFeeDetailPageState extends State<StudentFeeDetailPage> {
           if (fines.isEmpty)
             const Padding(padding: EdgeInsets.all(32), child: Text("No fines recorded"))
           else
-            ...fines.map((fine) => ListTile(
-                  leading: const Icon(Icons.error_outline, color: Colors.red),
-                  title: Text(fine['reason'] ?? 'Fine', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
-                  subtitle: Text(fine['created_at']?.toString().split('T')[0] ?? '', style: const TextStyle(fontSize: 11)),
-                  trailing: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text("₹${fine['amount']}", style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.red)),
-                      IconButton(icon: const Icon(Icons.delete_outline, size: 18, color: Colors.red), onPressed: () => _deleteFine(fine['id'].toString())),
-                    ],
-                  ),
-                )),
+            ...fines.map((fine) {
+              final fineId = fine['encrypted_id'] ?? fine['id'].toString();
+              return ListTile(
+                leading: const Icon(Icons.error_outline, color: Colors.red),
+                title: Text(fine['reason'] ?? 'Fine', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                subtitle: Text(fine['created_at']?.toString().split('T')[0] ?? '', style: const TextStyle(fontSize: 11)),
+                trailing: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text("₹${fine['amount']}", style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.red)),
+                    IconButton(icon: const Icon(Icons.delete_outline, size: 18, color: Colors.red), onPressed: () => _deleteFine(fineId)),
+                  ],
+                ),
+              );
+            }),
         ],
       ),
     );

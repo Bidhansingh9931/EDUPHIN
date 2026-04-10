@@ -37,7 +37,7 @@ class _SupportTicketsPageState extends State<SupportTicketsPage> {
     setState(() => _isLoading = true);
     try {
       final filters = {
-        'title': _searchController.text,
+        'search': _searchController.text,
         'priority': _selectedPriority,
         'status': _selectedStatus,
       };
@@ -115,7 +115,7 @@ class _SupportTicketsPageState extends State<SupportTicketsPage> {
                 Expanded(child: _buildSmallDropdown(context, _selectedStatus, (val) {
                   setState(() => _selectedStatus = val!);
                   _fetchTickets();
-                }, ['all', 'open', 'closed', 'resolved'], "Status")),
+                }, ['all', 'open', 'in_progress', 'resolved', 'closed'], "Status")),
               ],
             ),
           ],
@@ -152,7 +152,7 @@ class _SupportTicketsPageState extends State<SupportTicketsPage> {
 
         return Card(
           child: ListTile(
-            onTap: () => Navigator.push(context, MaterialPageRoute(builder: (context) => TicketDetailsPage(ticketId: ticket.id.toString()))),
+            onTap: () => Navigator.push(context, MaterialPageRoute(builder: (context) => TicketDetailsPage(ticketId: ticket.encryptedId ?? ticket.id.toString()))),
             contentPadding: const EdgeInsets.all(16),
             title: Row(
               children: [
@@ -203,6 +203,7 @@ class _SupportTicketsPageState extends State<SupportTicketsPage> {
   Color _getStatusColor(String status) {
     switch (status.toLowerCase()) {
       case 'open': return Colors.blue;
+      case 'in_progress': return Colors.orange;
       case 'resolved': return Colors.green;
       case 'closed': return Colors.grey;
       default: return Colors.orange;

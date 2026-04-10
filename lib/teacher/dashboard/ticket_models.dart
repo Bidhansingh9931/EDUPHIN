@@ -27,17 +27,17 @@ class SupportTicket {
 
   factory SupportTicket.fromJson(Map<String, dynamic> json) {
     return SupportTicket(
-      id: json['id'],
+      id: int.tryParse(json['id']?.toString() ?? '') ?? 0,
       encryptedId: json['encrypted_id']?.toString(),
-      title: json['title'] ?? 'N/A',
-      description: json['description'],
-      priority: json['priority'] ?? 'medium',
-      status: json['status'] ?? 'open',
-      category: json['category'],
-      userId: json['created_by'] ?? json['user_id'],
+      title: json['title']?.toString() ?? 'N/A',
+      description: json['description']?.toString(),
+      priority: json['priority']?.toString() ?? 'medium',
+      status: json['status']?.toString() ?? 'open',
+      category: json['category']?.toString(),
+      userId: int.tryParse(json['created_by']?.toString() ?? json['user_id']?.toString() ?? '') ?? 0,
       user: json['user'] != null ? TicketUser.fromJson(json['user']) : null,
-      assignedTo: (json['assigned_to'] is Map ? json['assigned_to']['name'] : null) ?? 'Unassigned',
-      createdAt: json['created_at'] ?? '',
+      assignedTo: (json['assigned_to'] is Map ? json['assigned_to']['name']?.toString() : json['assigned_to']?.toString()) ?? 'Unassigned',
+      createdAt: json['created_at']?.toString() ?? '',
     );
   }
 }
@@ -51,9 +51,9 @@ class TicketUser {
 
   factory TicketUser.fromJson(Map<String, dynamic> json) {
     return TicketUser(
-      id: json['id'],
-      name: json['name'] ?? 'N/A',
-      email: json['email'],
+      id: int.tryParse(json['id']?.toString() ?? '') ?? 0,
+      name: json['name']?.toString() ?? 'N/A',
+      email: json['email']?.toString(),
     );
   }
 }

@@ -49,7 +49,6 @@ class _LibraryBooksPageState extends State<LibraryBooksPage> {
         'title': _titleController.text,
         'author': _authorController.text,
         'isbn': _isbnController.text,
-        'page': page.toString(),
         if (_selectedCategory != 'All') 'category': _selectedCategory,
         if (_selectedLanguage != 'All') 'language': _selectedLanguage,
         if (_selectedFormat != 'All') 'format': _selectedFormat,
@@ -58,44 +57,18 @@ class _LibraryBooksPageState extends State<LibraryBooksPage> {
         if (_selectedAvailability == 'Out of Stock') 'availability': '0',
       };
       
-      final response = await ApiService.get('accountants/library/books', filters);
+      final booksPagination = await ApiService.getAccountantLibraryBooks(filters, page);
       
-      if (response.statusCode == 200) {
-        final body = jsonDecode(response.body);
-        final json = body['data'] ?? body;
-        final booksPagination = json['books'] is Map ? json['books'] : json;
-        
-        List _parseList(dynamic val) {
-          if (val is List) return val;
-          if (val is Map) return val.values.toList();
-          return [];
-        }
-
-        final List booksData = _parseList(booksPagination['data']);
-        final List<Book> booksList = booksData.map((b) => Book.fromJson(b)).toList();
-        final rawFilters = json['filters'] ?? {};
-        
-        List<String> _parseFilterList(dynamic val) {
-          if (val is List) return val.map((e) => e.toString()).toList();
-          if (val is Map) return val.values.map((e) => e.toString()).toList();
-          return [];
-        }
-
-        if (mounted) {
-          setState(() {
-            _books = booksList;
-            _filterOptions = BookFilters(
-              categories: _parseFilterList(rawFilters['categories']),
-              languages: _parseFilterList(rawFilters['languages']),
-              formats: _parseFilterList(rawFilters['formats']),
-              years: _parseFilterList(rawFilters['years']),
-            );
-            _currentPage = booksPagination['current_page'] ?? 1;
-            _totalPages = booksPagination['last_page'] ?? 1;
-          });
-        }
+      if (mounted) {
+        setState(() {
+          _books = booksPagination.books;
+          _filterOptions = booksPagination.filters;
+          _currentPage = booksPagination.currentPage;
+          _totalPages = booksPagination.lastPage;
+        });
       }
     } catch (e) {
+      debugPrint("Library Fetch Error: $e");
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Error: $e")));
     } finally {
       if (mounted) setState(() => _isLoading = false);

@@ -27,27 +27,18 @@ class _ExamPaperSchedulePageState extends State<ExamPaperSchedulePage> {
     if (!mounted) return;
     setState(() => _isLoading = true);
     try {
-      final response = await ApiService.get('accountants/exams/schedule/${widget.examId}');
-      if (response.statusCode == 200) {
-        final body = jsonDecode(response.body);
-        if (body['success'] == true) {
-          final data = body['data'];
-          if (mounted) {
-            setState(() {
-              _exam = Exam.fromJson(data['exam']);
-              final List schedulesData = data['schedules'] is List ? data['schedules'] : [];
-              _schedules = schedulesData
-                  .map((e) => ExamPaperSchedule.fromJson(e))
-                  .toList();
-            });
-          }
-        } else {
-          throw Exception(body['message'] ?? 'Failed to load exam schedule');
-        }
-      } else {
-        throw Exception('Failed to load exam schedule');
+      final data = await ApiService.getAccountantExamSchedule(widget.examId);
+      if (mounted) {
+        setState(() {
+          _exam = Exam.fromJson(data['exam'] ?? {});
+          final List schedulesData = data['schedules'] is List ? data['schedules'] : [];
+          _schedules = schedulesData
+              .map((e) => ExamPaperSchedule.fromJson(e))
+              .toList();
+        });
       }
     } catch (e) {
+      debugPrint("Schedule Fetch Error: $e");
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(

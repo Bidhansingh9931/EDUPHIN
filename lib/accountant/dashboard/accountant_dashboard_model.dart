@@ -72,6 +72,7 @@ class UserDetail {
   final String? xMarks;
   final String? xiiMarks;
   final String? aadhaarNumber;
+  final String? encryptedId;
 
   UserDetail({
     required this.id,
@@ -103,6 +104,7 @@ class UserDetail {
     this.xMarks,
     this.xiiMarks,
     this.aadhaarNumber,
+    this.encryptedId,
   });
 
   factory UserDetail.fromJson(Map<String, dynamic> json) {
@@ -136,6 +138,7 @@ class UserDetail {
       xMarks: json['x_marks']?.toString(),
       xiiMarks: json['xii_marks']?.toString(),
       aadhaarNumber: json['aadhaar_number']?.toString(),
+      encryptedId: json['encrypted_id']?.toString(),
     );
   }
 
@@ -164,15 +167,19 @@ class Salary {
   final int id;
   final String amount;
   final String? month;
+  final String? year;
   final String? paymentDate;
   final String status;
+  final String? encryptedId;
 
   Salary({
     required this.id,
     required this.amount,
     this.month,
+    this.year,
     this.paymentDate,
     required this.status,
+    this.encryptedId,
   });
 
   factory Salary.fromJson(Map<String, dynamic> json) {
@@ -180,8 +187,10 @@ class Salary {
       id: json['id'] ?? 0,
       amount: json['amount']?.toString() ?? '0',
       month: json['month']?.toString(),
+      year: json['year']?.toString(),
       paymentDate: json['payment_date']?.toString(),
       status: json['status']?.toString() ?? 'Pending',
+      encryptedId: json['encrypted_id']?.toString(),
     );
   }
 }
@@ -191,12 +200,14 @@ class Fine {
   final String amount;
   final String reason;
   final String date;
+  final String? encryptedId;
 
   Fine({
     required this.id,
     required this.amount,
     required this.reason,
     required this.date,
+    this.encryptedId,
   });
 
   factory Fine.fromJson(Map<String, dynamic> json) {
@@ -205,6 +216,7 @@ class Fine {
       amount: json['amount']?.toString() ?? '0',
       reason: json['reason']?.toString() ?? '',
       date: json['created_at']?.toString() ?? '',
+      encryptedId: json['encrypted_id']?.toString(),
     );
   }
 }
@@ -213,11 +225,13 @@ class Payment {
   final int id;
   final String amount;
   final String date;
+  final String? encryptedId;
 
   Payment({
     required this.id,
     required this.amount,
     required this.date,
+    this.encryptedId,
   });
 
   factory Payment.fromJson(Map<String, dynamic> json) {
@@ -225,6 +239,7 @@ class Payment {
       id: json['id'] ?? 0,
       amount: json['amount']?.toString() ?? '0',
       date: json['created_at']?.toString() ?? '',
+      encryptedId: json['encrypted_id']?.toString(),
     );
   }
 }
@@ -237,6 +252,7 @@ class Event {
   final bool isTicketed;
   final String? ticketPrice;
   final String? image;
+  final String? encryptedId;
 
   Event({
     required this.id,
@@ -246,6 +262,7 @@ class Event {
     this.isTicketed = false,
     this.ticketPrice,
     this.image,
+    this.encryptedId,
   });
 
   factory Event.fromJson(Map<String, dynamic> json) {
@@ -257,6 +274,7 @@ class Event {
       isTicketed: json['is_ticketed'] == 1 || json['is_ticketed'] == true,
       ticketPrice: json['ticket_price']?.toString(),
       image: json['image']?.toString(),
+      encryptedId: json['encrypted_id']?.toString(),
     );
   }
 }
@@ -266,12 +284,14 @@ class EventRegistration {
   final String status;
   final String? reasonForCancel;
   final Event event;
+  final String? encryptedId;
 
   EventRegistration({
     required this.id,
     required this.status,
     this.reasonForCancel,
     required this.event,
+    this.encryptedId,
   });
 
   factory EventRegistration.fromJson(Map<String, dynamic> json) {
@@ -280,6 +300,7 @@ class EventRegistration {
       status: json['status']?.toString() ?? '',
       reasonForCancel: json['reason_for_cancel']?.toString(),
       event: Event.fromJson(json['event']),
+      encryptedId: json['encrypted_id']?.toString(),
     );
   }
 }
@@ -352,11 +373,13 @@ class Ticket {
   final int id;
   final String title;
   final String status;
+  final String? encryptedId;
 
   Ticket({
     required this.id,
     required this.title,
     required this.status,
+    this.encryptedId,
   });
 
   factory Ticket.fromJson(Map<String, dynamic> json) {
@@ -364,6 +387,7 @@ class Ticket {
       id: json['id'] ?? 0,
       title: json['title']?.toString() ?? '',
       status: json['status']?.toString() ?? '',
+      encryptedId: json['encrypted_id']?.toString(),
     );
   }
 }
@@ -395,9 +419,9 @@ class Fee {
       feeName: json['fee_name']?.toString() ?? '',
       amount: json['amount']?.toString() ?? '0',
       description: json['description']?.toString(),
-      isOptional: json['is_optional'] == 1 || json['is_optional'] == true,
+      isOptional: json['is_optional'] == 1 || json['is_optional'] == true || json['is_optional'] == '1',
       classId: json['class_id'],
-      className: json['class'] != null ? json['class']['name']?.toString() : null,
+      className: json['class'] != null ? (json['class'] is Map ? json['class']['name']?.toString() : null) : null,
       encryptedId: json['encrypted_id']?.toString(),
     );
   }

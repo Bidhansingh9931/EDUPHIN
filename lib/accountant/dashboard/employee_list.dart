@@ -1,12 +1,11 @@
-import 'dart:convert';
 import 'package:eduphin/services/responsive_helper.dart';
 import 'package:flutter/material.dart';
 import 'package:eduphin/services/api_service.dart';
-import 'accountant_dashboard_model.dart';
+import 'accountant_dashboard_model.dart' as accountant_model;
 import 'salary_slips.dart';
 
 class EmployeeListPage extends StatefulWidget {
-  final int? roleId;
+  final dynamic roleId;
   const EmployeeListPage({super.key, this.roleId});
 
   @override
@@ -15,60 +14,77 @@ class EmployeeListPage extends StatefulWidget {
 
 class _EmployeeListPageState extends State<EmployeeListPage> {
   bool _isLoading = true;
-  List<UserDetail> _employees = [];
-  List<UserDetail> _filteredEmployees = [];
-  late int _selectedRoleId;
+  List<accountant_model.UserDetail> _employees = [];
+  List<accountant_model.UserDetail> _filteredEmployees = [];
+  dynamic _selectedRoleId;
 
-  final Map<int, String> _roles = {
-    3: "Managers",
-    4: "Counselors",
-    5: "Teachers",
-    7: "Librarians",
-    8: "Accountants",
-    9: "Staff",
+  Map<dynamic, String> _roles = {
+    '3': "Managers",
+    '4': "Counselors",
+    '5': "Teachers",
+    '7': "Librarians",
+    '8': "Accountants",
+    '9': "Staff",
   };
 
   @override
   void initState() {
     super.initState();
-    _selectedRoleId = widget.roleId ?? 5;
-    _fetchEmployees();
+    _initializeData();
+  }
+
+  Future<void> _initializeData() async {
+    setState(() => _isLoading = true);
+    try {
+      // First try to fetch dynamic roles with encrypted IDs
+      final dynamicRoles = await ApiService.getAccountantRoles();
+      if (dynamicRoles.isNotEmpty && mounted) {
+        setState(() => _roles = dynamicRoles);
+      }
+      
+      // Determine which role to select initially
+      if (widget.roleId != null) {
+        // If a roleId was passed (likely numeric from dashboard), 
+        // try to find the corresponding encrypted ID in our new roles map
+        final roleName = _roles[widget.roleId.toString()];
+        if (roleName != null) {
+          _selectedRoleId = widget.roleId.toString();
+        } else {
+          // Try to find by value name (e.g. if we have encrypted IDs now)
+          final entry = _roles.entries.firstWhere(
+            (e) => e.value.toLowerCase().contains(roleName?.toLowerCase() ?? ''),
+            orElse: () => _roles.entries.first,
+          );
+          _selectedRoleId = entry.key;
+        }
+      } else {
+        _selectedRoleId = _roles.keys.first;
+      }
+
+      await _fetchEmployees();
+    } catch (e) {
+      debugPrint("Init Error: $e");
+      if (mounted) _fetchEmployees(); // Fallback to fetch with what we have
+    }
   }
 
   Future<void> _fetchEmployees() async {
-    if (!mounted) return;
+    if (!mounted || _selectedRoleId == null) return;
     setState(() => _isLoading = true);
     try {
-      final response = await ApiService.get('accountants/accounts/$_selectedRoleId');
-      
-      if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
-        if (data['success'] == true) {
-          final usersData = data['data']?['users'] ?? data['users'] ?? [];
-          
-          List usersList = [];
-          if (usersData is List) {
-            usersList = usersData;
-          } else if (usersData is Map) {
-            usersList = usersData.values.toList();
-          }
-
-          final employees = usersList.map((e) => UserDetail.fromJson(e)).toList();
-          if (mounted) {
-            setState(() {
-              _employees = employees;
-              _filteredEmployees = employees;
-            });
-          }
-        } else {
-          throw Exception(data['message'] ?? 'Failed to load employees');
-        }
-      } else {
-        throw Exception('Failed to load employees');
+      final employees = await ApiService.getEmployeesByRole(_selectedRoleId);
+      if (mounted) {
+        setState(() {
+          _employees = employees;
+          _filteredEmployees = employees;
+        });
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Error: $e")));
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text("Error: $e"),
+          action: SnackBarAction(label: "Retry", onPressed: _fetchEmployees),
+        ));
       }
     } finally {
       if (mounted) setState(() => _isLoading = false);
@@ -163,7 +179,10 @@ class _EmployeeListPageState extends State<EmployeeListPage> {
                               final employee = _filteredEmployees[index];
                               return ListTile(
                                 contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
-                                onTap: () => Navigator.push(context, MaterialPageRoute(builder: (context) => SalarySlipsPage(employeeId: employee.userId))),
+                                onTap: () {
+                                  final targetId = employee.encryptedId ?? employee.userId.toString();
+                                  Navigator.push(context, MaterialPageRoute(builder: (context) => SalarySlipsPage(employeeId: targetId)));
+                                },
                                 leading: CircleAvatar(
                                   backgroundColor: theme.colorScheme.primary.withValues(alpha: 0.1),
                                   child: Text(employee.name.isNotEmpty ? employee.name[0] : '?', style: TextStyle(color: theme.colorScheme.primary, fontWeight: FontWeight.bold)),

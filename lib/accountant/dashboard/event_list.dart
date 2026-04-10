@@ -71,7 +71,10 @@ class _EventListPageState extends State<EventListPage> with SingleTickerProvider
     }
   }
 
-  Future<void> _register(dynamic eventId, bool isPaid) async {
+  Future<void> _register(Event event) async {
+    final eventId = event.encryptedId ?? event.id;
+    final isPaid = event.isTicketed;
+
     if (isPaid) {
       _showPaymentDialog(eventId);
       return;
@@ -91,7 +94,8 @@ class _EventListPageState extends State<EventListPage> with SingleTickerProvider
     }
   }
 
-  Future<void> _cancelRegistration(dynamic registrationId) async {
+  Future<void> _cancelRegistration(EventRegistration registration) async {
+    final registrationId = registration.encryptedId ?? registration.id;
     final reasonController = TextEditingController();
     final confirmed = await showDialog<bool>(
       context: context,
@@ -343,7 +347,7 @@ class _EventListPageState extends State<EventListPage> with SingleTickerProvider
                 SizedBox(
                   width: double.infinity,
                   child: ElevatedButton(
-                    onPressed: () => _register(event.id, event.isTicketed),
+                    onPressed: () => _register(event),
                     child: const Text("REGISTER"),
                   ),
                 ),
@@ -389,7 +393,7 @@ class _EventListPageState extends State<EventListPage> with SingleTickerProvider
                 if (!isCancelled) ...[
                   const SizedBox(width: 12),
                   InkWell(
-                    onTap: () => _cancelRegistration(registration.id),
+                    onTap: () => _cancelRegistration(registration),
                     child: const Text("Cancel Registration", style: TextStyle(color: Colors.red, fontSize: 12, fontWeight: FontWeight.bold, decoration: TextDecoration.underline)),
                   ),
                 ],

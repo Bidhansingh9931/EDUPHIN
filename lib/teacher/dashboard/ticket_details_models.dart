@@ -39,13 +39,13 @@ class TicketReply {
   factory TicketReply.fromJson(Map<String, dynamic> json) {
     final user = json['user'] as Map<String, dynamic>? ?? {};
     return TicketReply(
-      id: json['id'] ?? 0,
-      userId: json['user_id'] ?? 0,
-      message: json['message'] ?? '',
-      attachment: json['attachment'],
-      createdAt: json['created_at'] ?? '',
-      userName: user['name'],
-      userRole: user['role']?['name'],
+      id: int.tryParse(json['id']?.toString() ?? '') ?? 0,
+      userId: int.tryParse(json['user_id']?.toString() ?? '') ?? 0,
+      message: json['message']?.toString() ?? '',
+      attachment: json['attachment']?.toString(),
+      createdAt: json['created_at']?.toString() ?? '',
+      userName: user['name']?.toString(),
+      userRole: user['role'] is Map ? user['role']['name']?.toString() : user['role']?.toString(),
     );
   }
 }

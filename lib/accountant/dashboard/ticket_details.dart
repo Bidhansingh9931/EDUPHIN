@@ -38,6 +38,7 @@ class _TicketDetailsPageState extends State<TicketDetailsPage> {
       final details = await ApiService.getTicketDetailsAccountant(widget.ticketId);
       if (mounted) setState(() => _details = details);
     } catch (e) {
+      debugPrint("Ticket Details Error: $e");
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Error: $e")));
     } finally {
       if (mounted) setState(() => _isLoading = false);
@@ -90,26 +91,88 @@ class _TicketDetailsPageState extends State<TicketDetailsPage> {
     return Scaffold(
       appBar: AppBar(
         title: Text(_details != null ? "Ticket #${_details!.ticket.id}" : "Ticket Details"),
+        actions: [
+          if (_details != null && _details!.ticket.status != 'resolved' && _details!.ticket.status != 'closed')
+            _buildStatusMenu(context),
+          IconButton(icon: const Icon(Icons.refresh), onPressed: _fetchDetails),
+        ],
       ),
       body: _isLoading && _details == null
           ? const Center(child: CircularProgressIndicator())
-          : Column(
-              children: [
-                if (_details != null) _buildHeader(context),
-                Expanded(
-                  child: ListView.builder(
-                    padding: context.pagePadding,
-                    itemCount: _details?.replies.length ?? 0,
-                    itemBuilder: (context, index) {
-                      final reply = _details!.replies[index];
-                      final isCreator = reply.userId == _details!.ticket.userId; 
-                      return _buildReplyBubble(context, reply, isCreator);
-                    },
-                  ),
+          : _details == null
+              ? _buildErrorState(context)
+              : Column(
+                  children: [
+                    _buildHeader(context),
+                    Expanded(
+                      child: ListView.builder(
+                        padding: context.pagePadding,
+                        itemCount: _details!.replies.length,
+                        itemBuilder: (context, index) {
+                          final reply = _details!.replies[index];
+                          // Show replies on the right if they are from the ticket creator
+                          final isRightAligned = reply.userId == _details!.ticket.userId; 
+                          return _buildReplyBubble(context, reply, isRightAligned);
+                        },
+                      ),
+                    ),
+                    if (_details!.ticket.status != 'resolved' && _details!.ticket.status != 'closed') _buildInputArea(context),
+                  ],
                 ),
-                if (_details != null && _details!.ticket.status != 'resolved') _buildInputArea(context),
-              ],
+    );
+  }
+
+  Widget _buildErrorState(BuildContext context) {
+    final theme = Theme.of(context);
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(32.0),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.error_outline, size: 64, color: theme.colorScheme.error),
+            const SizedBox(height: 16),
+            const Text(
+              "Failed to Load Ticket Details",
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
             ),
+            const SizedBox(height: 8),
+            Text(
+              "The server returned an error (500). This often happens if the ticket ID is not correctly encrypted.",
+              textAlign: TextAlign.center,
+              style: TextStyle(color: theme.hintColor),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              "ID Used: ${widget.ticketId}",
+              style: TextStyle(fontFamily: 'monospace', fontSize: 12, color: theme.colorScheme.primary),
+            ),
+            const SizedBox(height: 24),
+            ElevatedButton.icon(
+              onPressed: _fetchDetails,
+              icon: const Icon(Icons.refresh),
+              label: const Text("RETRY"),
+            ),
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text("GO BACK"),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildStatusMenu(BuildContext context) {
+    return PopupMenuButton<String>(
+      icon: const Icon(Icons.edit_note),
+      onSelected: _updateStatus,
+      itemBuilder: (context) => [
+        const PopupMenuItem(value: 'open', child: Text('Open')),
+        const PopupMenuItem(value: 'in_progress', child: Text('In Progress')),
+        const PopupMenuItem(value: 'resolved', child: Text('Resolved')),
+        const PopupMenuItem(value: 'closed', child: Text('Closed')),
+      ],
     );
   }
 
@@ -130,7 +193,7 @@ class _TicketDetailsPageState extends State<TicketDetailsPage> {
                 const SizedBox(width: 8),
                 _buildTag(context, _details!.ticket.priority.toUpperCase(), _getPriorityColor(_details!.ticket.priority)),
                 const Spacer(),
-                if (_details!.ticket.status != 'resolved')
+                if (_details!.ticket.status != 'resolved' && _details!.ticket.status != 'closed')
                   TextButton.icon(
                     onPressed: () => _updateStatus('resolved'),
                     icon: const Icon(Icons.check_circle_outline, size: 16),

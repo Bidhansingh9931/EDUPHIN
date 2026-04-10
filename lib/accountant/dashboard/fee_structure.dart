@@ -222,8 +222,8 @@ class _FeeStructurePageState extends State<FeeStructurePage> {
           builder: (context) => FeeFormDialog(
             title: "Update Fee Structure",
             buttonLabel: "UPDATE STRUCTURE",
-            classes: editData['classes'],
-            fee: Fee.fromJson(editData['fee']),
+            classes: editData['classes'] ?? [],
+            fee: Fee.fromJson(editData['fee'] ?? editData),
             onSuccess: _fetchFees,
           ),
         );
@@ -289,7 +289,7 @@ class _FeeFormDialogState extends State<FeeFormDialog> {
         'fee_name': _feeNameController.text,
         'amount': _amountController.text,
         'description': _descController.text,
-        'class_id': _selectedClassId,
+        'class_id': _selectedClassId?.toString(),
       };
       if (_isOptional) data['is_optional'] = '1';
 

@@ -1,6 +1,5 @@
 import 'package:eduphin/services/api_service.dart';
 import 'package:eduphin/services/responsive_helper.dart';
-import 'package:eduphin/teacher/dashboard/app_drawer.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'accountant_profile.dart';
@@ -15,7 +14,7 @@ import 'support_tickets.dart';
 import 'create_ticket.dart';
 import 'event_list.dart';
 import 'exam_list.dart';
-import 'accountant_dashboard_model.dart';
+import 'accountant_dashboard_model.dart' as accountant_model;
 
 class AccountantDashboard extends StatefulWidget {
   const AccountantDashboard({super.key});
@@ -25,7 +24,7 @@ class AccountantDashboard extends StatefulWidget {
 }
 
 class _AccountantDashboardState extends State<AccountantDashboard> {
-  late Future<AccountantDashboardData> _dashboardFuture;
+  late Future<accountant_model.AccountantDashboardData> _dashboardFuture;
 
   @override
   void initState() {
@@ -67,10 +66,9 @@ class _AccountantDashboardState extends State<AccountantDashboard> {
           const SizedBox(width: 8),
         ],
       ),
-      drawer: const AppDrawer(),
       body: RefreshIndicator(
         onRefresh: () async => _refreshData(),
-        child: FutureBuilder<AccountantDashboardData>(
+        child: FutureBuilder<accountant_model.AccountantDashboardData>(
           future: _dashboardFuture,
           builder: (context, snapshot) {
             if (snapshot.connectionState == ConnectionState.waiting) {
@@ -134,12 +132,12 @@ class _AccountantDashboardState extends State<AccountantDashboard> {
                   ]),
                   const SizedBox(height: 12),
                   _buildMenuSection(context, "Employee Detail", Icons.groups_outlined, [
-                    _MenuItem("Manager", Icons.chevron_right, const EmployeeListPage(roleId: 3)),
-                    _MenuItem("Counselors", Icons.chevron_right, const EmployeeListPage(roleId: 4)),
-                    _MenuItem("Teachers", Icons.chevron_right, const EmployeeListPage(roleId: 5)),
-                    _MenuItem("Librarian", Icons.chevron_right, const EmployeeListPage(roleId: 7)),
-                    _MenuItem("Accountants", Icons.chevron_right, const EmployeeListPage(roleId: 8)),
-                    _MenuItem("Staff", Icons.chevron_right, const EmployeeListPage(roleId: 9)),
+                    _MenuItem("Manager", Icons.chevron_right, const EmployeeListPage(roleId: '3')),
+                    _MenuItem("Counselors", Icons.chevron_right, const EmployeeListPage(roleId: '4')),
+                    _MenuItem("Teachers", Icons.chevron_right, const EmployeeListPage(roleId: '5')),
+                    _MenuItem("Librarian", Icons.chevron_right, const EmployeeListPage(roleId: '7')),
+                    _MenuItem("Accountants", Icons.chevron_right, const EmployeeListPage(roleId: '8')),
+                    _MenuItem("Staff", Icons.chevron_right, const EmployeeListPage(roleId: '9')),
                   ]),
                   const SizedBox(height: 24),
                   _buildListSection(context, "Institute Salaries", Icons.account_balance_wallet_outlined, data.salaryList, "salary"),
@@ -174,7 +172,7 @@ class _AccountantDashboardState extends State<AccountantDashboard> {
     );
   }
 
-  Widget _buildStatsGrid(BuildContext context, AccountantDashboardData data) {
+  Widget _buildStatsGrid(BuildContext context, accountant_model.AccountantDashboardData data) {
     final theme = Theme.of(context);
     double totalPayments = data.payments.fold(0.0, (sum, item) => sum + double.parse(item.amount));
     double instFees = data.instituteFees.fold(0.0, (sum, item) => sum + double.parse(item.amount));
@@ -188,27 +186,59 @@ class _AccountantDashboardState extends State<AccountantDashboard> {
       mainAxisSpacing: 12,
       childAspectRatio: 1.5,
       children: [
-        _buildStatCard(context, "₹${NumberFormat('#,##,###').format(totalPayments)}", "Top Payments", Icons.camera_alt_outlined, Colors.purpleAccent),
-        _buildStatCard(context, "84%", "Compliance", Icons.trending_up_rounded, theme.colorScheme.secondary),
-        _buildStatCard(context, "₹${NumberFormat('#,##,###').format(instFees)}", "Institute Fees", Icons.account_balance_rounded, Colors.orangeAccent),
-        _buildStatCard(context, "₹${NumberFormat('#,##,###').format(classFees)}", "Class Fees", Icons.school_outlined, Colors.greenAccent),
+        _buildStatCard(
+          context,
+          "₹${NumberFormat('#,##,###').format(totalPayments)}",
+          "Top Payments",
+          Icons.camera_alt_outlined,
+          Colors.purpleAccent,
+          () => Navigator.push(context, MaterialPageRoute(builder: (context) => const StudentFeeDetailPage())),
+        ),
+        _buildStatCard(
+          context,
+          "84%",
+          "Compliance",
+          Icons.trending_up_rounded,
+          theme.colorScheme.secondary,
+          () {},
+        ),
+        _buildStatCard(
+          context,
+          "₹${NumberFormat('#,##,###').format(instFees)}",
+          "Institute Fees",
+          Icons.account_balance_rounded,
+          Colors.orangeAccent,
+          () => Navigator.push(context, MaterialPageRoute(builder: (context) => const FeeStructurePage())),
+        ),
+        _buildStatCard(
+          context,
+          "₹${NumberFormat('#,##,###').format(classFees)}",
+          "Class Fees",
+          Icons.school_outlined,
+          Colors.greenAccent,
+          () => Navigator.push(context, MaterialPageRoute(builder: (context) => const FeeStructurePage())),
+        ),
       ],
     );
   }
 
-  Widget _buildStatCard(BuildContext context, String value, String label, IconData icon, Color color) {
+  Widget _buildStatCard(BuildContext context, String value, String label, IconData icon, Color color, VoidCallback onTap) {
     final theme = Theme.of(context);
     return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Icon(icon, color: color, size: 22),
-            const Spacer(),
-            FittedBox(child: Text(value, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold))),
-            Text(label, style: TextStyle(color: theme.hintColor, fontSize: 12)),
-          ],
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(16),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Icon(icon, color: color, size: 22),
+              const Spacer(),
+              FittedBox(child: Text(value, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold))),
+              Text(label, style: TextStyle(color: theme.hintColor, fontSize: 12)),
+            ],
+          ),
         ),
       ),
     );
@@ -259,7 +289,7 @@ class _AccountantDashboardState extends State<AccountantDashboard> {
     );
   }
 
-  Widget _buildProfileOverview(BuildContext context, UserDetail user) {
+  Widget _buildProfileOverview(BuildContext context, accountant_model.UserDetail user) {
     final theme = Theme.of(context);
     return Card(
       child: Padding(
@@ -287,7 +317,7 @@ class _AccountantDashboardState extends State<AccountantDashboard> {
             ),
             const SizedBox(height: 12),
             Text(user.name, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-            Text("Senior Accountant", style: TextStyle(color: theme.colorScheme.secondary, fontSize: 13)),
+            Text(user.position ?? "Senior Accountant", style: TextStyle(color: theme.colorScheme.secondary, fontSize: 13)),
             const SizedBox(height: 20),
             _buildProfileDetail(context, Icons.badge_outlined, "Employee ID", user.userId.toString()),
             const Divider(height: 24),
@@ -313,7 +343,7 @@ class _AccountantDashboardState extends State<AccountantDashboard> {
     );
   }
 
-  Widget _buildMySalarySection(BuildContext context, Salary? lastSalary) {
+  Widget _buildMySalarySection(BuildContext context, accountant_model.Salary? lastSalary) {
     final theme = Theme.of(context);
     return Card(
       child: Padding(
@@ -401,83 +431,93 @@ class _AccountantDashboardState extends State<AccountantDashboard> {
 
   Widget _buildListSection(BuildContext context, String title, IconData icon, List<dynamic> items, String type) {
     final theme = Theme.of(context);
+    Widget targetPage = const Scaffold();
+    if (type == "salary") targetPage = const SalarySlipsPage();
+    if (type == "payment") targetPage = const StudentFeeDetailPage();
+    if (type == "fine") targetPage = const StudentFeeDetailPage(); // Assuming fines are managed here
+
     return Card(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Padding(
-            padding: const EdgeInsets.all(16.0),
-            child: Row(
-              children: [
-                Icon(icon, color: theme.colorScheme.primary, size: 18),
-                const SizedBox(width: 8),
-                Text(title, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-              ],
-            ),
-          ),
-          if (items.isEmpty)
-             Padding(
-              padding: const EdgeInsets.fromLTRB(16, 0, 16, 20),
-              child: Text("No $type records available.", style: TextStyle(color: theme.hintColor, fontSize: 13)),
-            )
-          else
-            ...items.take(3).map((item) {
-              String mainText = "";
-              String subText = "";
-              String amount = "";
-
-              if (type == "salary") {
-                mainText = item.month ?? "Salary Record";
-                subText = "Salary Paid";
-                amount = "₹${NumberFormat('#,##,###').format(double.parse(item.amount))}";
-              } else if (type == "payment") {
-                mainText = item.date;
-                subText = "Payment Received";
-                amount = "₹${NumberFormat('#,##,###').format(double.parse(item.amount))}";
-              } else if (type == "fine") {
-                mainText = item.reason;
-                subText = item.date;
-                amount = "₹${NumberFormat('#,##,###').format(double.parse(item.amount))}";
-              }
-
-              return Column(
+      child: InkWell(
+        onTap: () => Navigator.push(context, MaterialPageRoute(builder: (context) => targetPage)),
+        borderRadius: BorderRadius.circular(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: Row(
                 children: [
-                  const Divider(height: 1),
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                    child: Row(
-                      children: [
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(mainText, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
-                              const SizedBox(height: 2),
-                              Text(subText, style: TextStyle(color: theme.hintColor, fontSize: 12)),
-                            ],
-                          ),
-                        ),
-                        Text(amount, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
-                      ],
-                    ),
-                  ),
+                  Icon(icon, color: theme.colorScheme.primary, size: 18),
+                  const SizedBox(width: 8),
+                  Text(title, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                  const Spacer(),
+                  Icon(Icons.chevron_right, color: theme.hintColor, size: 18),
                 ],
-              );
-            }),
-          if (items.length > 3)
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.symmetric(vertical: 12),
-              decoration: BoxDecoration(
-                color: theme.colorScheme.onSurface.withValues(alpha: 0.05),
-                borderRadius: const BorderRadius.vertical(bottom: Radius.circular(16)),
-              ),
-              child: Center(
-                child: Text("+${items.length - 3} more records", 
-                  style: TextStyle(color: theme.hintColor, fontSize: 12, fontWeight: FontWeight.w500)),
               ),
             ),
-        ],
+            if (items.isEmpty)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 20),
+                child: Text("No $type records available.", style: TextStyle(color: theme.hintColor, fontSize: 13)),
+              )
+            else
+              ...items.take(3).map((item) {
+                String mainText = "";
+                String subText = "";
+                String amount = "";
+
+                if (type == "salary") {
+                  mainText = item.month ?? "Salary Record";
+                  subText = "Salary Paid";
+                  amount = "₹${NumberFormat('#,##,###').format(double.parse(item.amount))}";
+                } else if (type == "payment") {
+                  mainText = item.date;
+                  subText = "Payment Received";
+                  amount = "₹${NumberFormat('#,##,###').format(double.parse(item.amount))}";
+                } else if (type == "fine") {
+                  mainText = item.reason;
+                  subText = item.date;
+                  amount = "₹${NumberFormat('#,##,###').format(double.parse(item.amount))}";
+                }
+
+                return Column(
+                  children: [
+                    const Divider(height: 1),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(mainText, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
+                                const SizedBox(height: 2),
+                                Text(subText, style: TextStyle(color: theme.hintColor, fontSize: 12)),
+                              ],
+                            ),
+                          ),
+                          Text(amount, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
+                        ],
+                      ),
+                    ),
+                  ],
+                );
+              }),
+            if (items.length > 3)
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(vertical: 12),
+                decoration: BoxDecoration(
+                  color: theme.colorScheme.onSurface.withValues(alpha: 0.05),
+                  borderRadius: const BorderRadius.vertical(bottom: Radius.circular(16)),
+                ),
+                child: Center(
+                  child: Text("+${items.length - 3} more records", style: TextStyle(color: theme.hintColor, fontSize: 12, fontWeight: FontWeight.w500)),
+                ),
+              ),
+          ],
+        ),
       ),
     );
   }

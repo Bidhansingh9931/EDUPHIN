@@ -28,10 +28,11 @@ class _ExamListPageState extends State<ExamListPage> {
       final examsData = await ApiService.getAccountantExams();
       if (mounted) {
         setState(() {
-          _exams = (examsData as List).map((e) => Exam.fromJson(e)).toList();
+          _exams = examsData;
         });
       }
     } catch (e) {
+      debugPrint("Exams Fetch Error: $e");
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Error fetching exams: $e")));
     } finally {
       if (mounted) setState(() => _isLoading = false);

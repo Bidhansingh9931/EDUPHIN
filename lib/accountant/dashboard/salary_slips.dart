@@ -1,11 +1,11 @@
 import 'package:eduphin/services/responsive_helper.dart';
 import 'package:flutter/material.dart';
 import 'package:eduphin/services/api_service.dart';
-import 'accountant_dashboard_model.dart';
+import 'accountant_dashboard_model.dart' as accountant_model;
 import 'package:intl/intl.dart';
 
 class SalarySlipsPage extends StatefulWidget {
-  final int? employeeId;
+  final String? employeeId;
   const SalarySlipsPage({super.key, this.employeeId});
 
   @override
@@ -14,8 +14,8 @@ class SalarySlipsPage extends StatefulWidget {
 
 class _SalarySlipsPageState extends State<SalarySlipsPage> {
   bool _isLoading = true;
-  List<Salary> _salaries = [];
-  UserDetail? _employeeDetail;
+  List<accountant_model.Salary> _salaries = [];
+  accountant_model.UserDetail? _employeeDetail;
 
   @override
   void initState() {
@@ -29,7 +29,7 @@ class _SalarySlipsPageState extends State<SalarySlipsPage> {
     try {
       final Map<String, dynamic> responseData;
       if (widget.employeeId != null) {
-        responseData = await ApiService.getAccountantEmployeeSalary(widget.employeeId.toString());
+        responseData = await ApiService.getAccountantEmployeeSalary(widget.employeeId!);
       } else {
         responseData = await ApiService.getAccountantMySalaries();
       }
@@ -37,10 +37,10 @@ class _SalarySlipsPageState extends State<SalarySlipsPage> {
       if (mounted) {
         setState(() {
           if (responseData['account'] != null) {
-            _employeeDetail = UserDetail.fromJson(responseData['account']);
+            _employeeDetail = accountant_model.UserDetail.fromJson(responseData['account']);
           }
           if (responseData['salaries'] != null) {
-            _salaries = (responseData['salaries'] as List).map((e) => Salary.fromJson(e)).toList();
+            _salaries = (responseData['salaries'] as List).map((e) => accountant_model.Salary.fromJson(e)).toList();
           }
         });
       }
@@ -119,7 +119,7 @@ class _SalarySlipsPageState extends State<SalarySlipsPage> {
     );
   }
 
-  Widget _buildSalaryCard(BuildContext context, Salary salary) {
+  Widget _buildSalaryCard(BuildContext context, accountant_model.Salary salary) {
     final theme = Theme.of(context);
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
@@ -158,43 +158,108 @@ class _SalarySlipsPageState extends State<SalarySlipsPage> {
     );
   }
 
-  void _showSalaryDetail(Salary salary) {
+  void _showSalaryDetail(accountant_model.Salary salary) async {
+    final theme = Theme.of(context);
+    final scaffoldMessenger = ScaffoldMessenger.of(context);
+    
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (context) {
-        final theme = Theme.of(context);
-        return Container(
-          decoration: BoxDecoration(color: theme.scaffoldBackgroundColor, borderRadius: const BorderRadius.vertical(top: Radius.circular(24))),
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text("Salary Breakdown", style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold)),
-              const SizedBox(height: 32),
-              _detailRow(context, "Month/Year", salary.month ?? "N/A"),
-              _detailRow(context, "Basic Pay", "₹${salary.amount}"),
-              _detailRow(context, "Date", salary.paymentDate ?? "N/A"),
-              _detailRow(context, "Status", salary.status),
-              const SizedBox(height: 32),
-              SizedBox(width: double.infinity, child: ElevatedButton(onPressed: () => Navigator.pop(context), child: const Text("CLOSE"))),
-              const SizedBox(height: 24),
-            ],
-          ),
+        return StatefulBuilder(
+          builder: (context, setModalState) {
+            return FutureBuilder<Map<String, dynamic>>(
+              future: ApiService.getAccountantSalaryDetail(salary.encryptedId ?? salary.id.toString()),
+              builder: (context, snapshot) {
+                final isLoading = snapshot.connectionState == ConnectionState.waiting;
+                final data = snapshot.data?['salary'] ?? {};
+                final amountInWords = snapshot.data?['amount_in_words'] ?? '';
+
+                return Container(
+                  decoration: BoxDecoration(color: theme.scaffoldBackgroundColor, borderRadius: const BorderRadius.vertical(top: Radius.circular(24))),
+                  padding: const EdgeInsets.fromLTRB(24, 12, 24, 24),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Container(width: 40, height: 4, decoration: BoxDecoration(color: theme.hintColor.withValues(alpha: 0.3), borderRadius: BorderRadius.circular(2)), margin: const EdgeInsets.only(bottom: 24)),
+                      Text("Salary Slip Detail", style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold)),
+                      const SizedBox(height: 32),
+                      if (isLoading)
+                        const Center(child: Padding(padding: EdgeInsets.all(40), child: CircularProgressIndicator()))
+                      else ...[
+                        _detailRow(context, "Month/Year", "${data['month'] ?? salary.month}/${data['year'] ?? salary.year}"),
+                        _detailRow(context, "Basic Pay", "₹${data['basic_salary'] ?? salary.amount}"),
+                        _detailRow(context, "Allowances", "₹${data['allowances'] ?? '0'}"),
+                        _detailRow(context, "Deductions", "₹${data['deductions'] ?? '0'}"),
+                        const Divider(height: 24),
+                        _detailRow(context, "Net Salary", "₹${data['net_salary'] ?? salary.amount}", isBold: true),
+                        if (amountInWords.isNotEmpty)
+                          Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 8.0),
+                            child: Text(amountInWords, textAlign: TextAlign.center, style: TextStyle(color: theme.colorScheme.primary, fontStyle: FontStyle.italic, fontSize: 13)),
+                          ),
+                        _detailRow(context, "Payment Date", data['payment_date'] ?? salary.paymentDate ?? "N/A"),
+                        _detailRow(context, "Status", salary.status),
+                        const SizedBox(height: 32),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: OutlinedButton.icon(
+                                onPressed: () async {
+                                  final confirm = await showDialog<bool>(
+                                    context: context,
+                                    builder: (context) => AlertDialog(
+                                      title: const Text("Delete Salary Slip"),
+                                      content: const Text("Are you sure you want to delete this salary record?"),
+                                      actions: [
+                                        TextButton(onPressed: () => Navigator.pop(context, false), child: const Text("CANCEL")),
+                                        TextButton(onPressed: () => Navigator.pop(context, true), child: const Text("DELETE", style: TextStyle(color: Colors.red))),
+                                      ],
+                                    ),
+                                  );
+                                  if (confirm == true) {
+                                    try {
+                                      await ApiService.deleteAccountantSalary(salary.encryptedId ?? salary.id.toString());
+                                      if (mounted) {
+                                        Navigator.pop(context);
+                                        _fetchSalaries();
+                                      }
+                                    } catch (e) {
+                                      scaffoldMessenger.showSnackBar(SnackBar(content: Text("Error: $e")));
+                                    }
+                                  }
+                                },
+                                icon: const Icon(Icons.delete_outline, color: Colors.red),
+                                label: const Text("DELETE", style: TextStyle(color: Colors.red)),
+                                style: OutlinedButton.styleFrom(side: const BorderSide(color: Colors.red)),
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(child: ElevatedButton(onPressed: () => Navigator.pop(context), child: const Text("CLOSE"))),
+                          ],
+                        ),
+                      ],
+                      const SizedBox(height: 16),
+                    ],
+                  ),
+                );
+              },
+            );
+          },
         );
-      }
+      },
     );
   }
 
-  Widget _detailRow(BuildContext context, String label, String value) {
+  Widget _detailRow(BuildContext context, String label, String value, {bool isBold = false}) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 8.0),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           Text(label, style: TextStyle(color: Theme.of(context).hintColor)),
-          Text(value, style: const TextStyle(fontWeight: FontWeight.bold)),
+          Text(value, style: TextStyle(fontWeight: isBold ? FontWeight.bold : FontWeight.w500)),
         ],
       ),
     );
@@ -238,10 +303,10 @@ class _SalarySlipsPageState extends State<SalarySlipsPage> {
           actions: [
             TextButton(onPressed: () => Navigator.pop(context), child: const Text("CANCEL")),
             ElevatedButton(
-              onPressed: () async {
+                onPressed: () async {
                 if (selectedMonth == null || basicController.text.isEmpty) return;
                 try {
-                  await ApiService.storeAccountantEmployeeSalary(widget.employeeId.toString(), {
+                  await ApiService.storeAccountantEmployeeSalary(widget.employeeId!, {
                     'month': selectedMonth,
                     'year': DateTime.now().year,
                     'basic_salary': double.parse(basicController.text),
