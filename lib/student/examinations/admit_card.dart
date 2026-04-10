@@ -54,10 +54,8 @@ class _AdmitCardPageState extends State<AdmitCardPage> {
     if (regId == null) return;
     if (_admitCardDetails.containsKey(regId)) return;
 
-    final String? hash = registration['id_hash']?.toString() ?? 
-                         registration['registration_id_hash']?.toString();
-    
-    final String idToFetch = hash ?? regId.toString();
+    // Use plain ID as the backend no longer expects encrypted hashes
+    final String idToFetch = regId.toString();
 
     setState(() => _isLoadingDetails[regId] = true);
     try {

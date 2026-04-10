@@ -53,19 +53,13 @@ class _ExamResultPageState extends State<ExamResultPage> {
   }
 
   Future<void> _viewReportCard(dynamic registration) async {
-    final String? idHash = registration['id_hash']?.toString();
-    if (idHash == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Report ID not found.")),
-      );
-      return;
-    }
+    final String id = registration['id'].toString();
 
     try {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text("Opening Report Card...")),
       );
-      final reportData = await ApiService.getReportCard(idHash);
+      final reportData = await ApiService.getReportCard(id);
       debugPrint("Report Data Loaded: ${reportData['exam']?['name']}");
       
     } catch (e) {

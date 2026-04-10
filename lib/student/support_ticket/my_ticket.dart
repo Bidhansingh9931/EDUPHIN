@@ -273,7 +273,7 @@ class _SupportTicketsPageState extends State<SupportTicketsPage> {
             context,
             MaterialPageRoute(
               builder: (context) => StudentTicketDetailsPage(
-                ticketId: ticket.encryptedId ?? ticket.id.toString(),
+                ticketId: ticket.id.toString(),
               ),
             ),
           ).then((_) => _fetchTickets());

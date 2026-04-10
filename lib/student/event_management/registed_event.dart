@@ -115,7 +115,7 @@ class _RegisteredEventsPageState extends State<RegisteredEventsPage> {
 
     if (confirm == true) {
       try {
-        final String registrationId = registration['id_hash']?.toString() ?? registration['id'].toString();
+        final String registrationId = registration['id']?.toString() ?? registration['id_hash'].toString();
         await ApiService.cancelStudentEventRegistration(
           registrationId,
           reason: reasonController.text.isEmpty ? null : reasonController.text,

@@ -49,7 +49,7 @@ class _ExamRegistrationPageState extends State<ExamRegistrationPage> {
         _registrationHashes = {
           for (var reg in admitCards)
             if (reg['exam_id'] != null)
-              reg['exam_id'] as int: reg['id_hash']?.toString() ?? reg['id'].toString()
+              (reg['exam_id'] as num).toInt(): reg['id']?.toString() ?? reg['id_hash'].toString()
         };
 
         _isLoading = false;
@@ -73,9 +73,10 @@ class _ExamRegistrationPageState extends State<ExamRegistrationPage> {
 
   Future<void> _registerExam(dynamic exam) async {
     try {
-      final String examIdToUse = exam['id_hash']?.toString() ?? exam['id'].toString();
+      // Use plain ID as the backend no longer expects encrypted hashes
+      final String examId = exam['id'].toString();
       
-      await ApiService.registerForExam(examIdToUse);
+      await ApiService.registerForExam(examId);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
@@ -87,10 +88,15 @@ class _ExamRegistrationPageState extends State<ExamRegistrationPage> {
       }
     } catch (e) {
       if (mounted) {
+        String errorMessage = e.toString();
+        if (errorMessage.startsWith("Exception: ")) {
+          errorMessage = errorMessage.replaceFirst("Exception: ", "");
+        }
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text("Registration failed: $e"),
+            content: Text(errorMessage),
             backgroundColor: Colors.redAccent,
+            duration: const Duration(seconds: 4),
           ),
         );
       }

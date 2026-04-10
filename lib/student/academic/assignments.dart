@@ -145,11 +145,11 @@ class _AssignmentsPageState extends State<AssignmentsPage> {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Uploading submission...")));
       
       try {
-        final String? idHash = assignment['id_hash']?.toString();
-        if (idHash == null) throw Exception("Assignment ID missing");
+        final String? assignmentId = assignment['id']?.toString();
+        if (assignmentId == null) throw Exception("Assignment ID missing");
 
         await ApiService.submitStudentAssignment(
-          idHash,
+          assignmentId,
           file: selectedFile,
           text: textController.text.isNotEmpty ? textController.text : null,
         );

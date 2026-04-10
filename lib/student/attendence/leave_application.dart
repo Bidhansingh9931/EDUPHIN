@@ -55,7 +55,9 @@ class _LeaveApplicationPageState extends State<LeaveApplicationPage> {
       _filteredLeaves = _allLeaves.where((leave) {
         final matchesType = _selectedLeaveType == null || leave.leaveType.toLowerCase() == _selectedLeaveType!.toLowerCase();
         final matchesStatus = _selectedStatus == null || leave.status.toLowerCase() == _selectedStatus!.toLowerCase();
-        final matchesSearch = _searchController.text.isEmpty || leave.reason.toLowerCase().contains(_searchController.text.toLowerCase()) || leave.leaveType.toLowerCase().contains(_searchController.text.toLowerCase());
+        final matchesSearch = _searchController.text.isEmpty || 
+                             leave.reason.toLowerCase().contains(_searchController.text.toLowerCase()) || 
+                             leave.leaveType.toLowerCase().contains(_searchController.text.toLowerCase());
         return matchesType && matchesStatus && matchesSearch;
       }).toList();
     });
@@ -183,53 +185,48 @@ class _LeaveApplicationPageState extends State<LeaveApplicationPage> {
                           SizedBox(
                             width: double.infinity,
                             height: 48,
-                            child: TextButton(
-                              style: TextButton.styleFrom(
-                                foregroundColor: Colors.white70,
-                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8), side: const BorderSide(color: Colors.white12)),
+                            child: OutlinedButton(
+                              style: OutlinedButton.styleFrom(
+                                side: const BorderSide(color: Colors.white10),
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                               ),
                               onPressed: _resetFilters,
-                              child: const Text("RESET FILTERS", style: TextStyle(fontWeight: FontWeight.bold)),
+                              child: const Text("RESET FILTERS", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13, letterSpacing: 1)),
                             ),
-                          )
+                          ),
                         ],
                       ),
                     ),
+                    const SizedBox(height: 40),
 
-                    const SizedBox(height: 32),
-
-                    /// HISTORY HEADER
+                    /// HISTORY LIST
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        const Text("Leave History", style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
+                        const Text("Leave History", style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold)),
                         Text("${_filteredLeaves.length} applications", style: const TextStyle(color: Colors.white38, fontSize: 12)),
                       ],
                     ),
                     const SizedBox(height: 16),
 
                     if (_filteredLeaves.isEmpty)
-                      Container(
-                        width: double.infinity,
-                        padding: const EdgeInsets.symmetric(vertical: 60),
-                        decoration: BoxDecoration(color: _card, borderRadius: BorderRadius.circular(16), border: Border.all(color: Colors.white12)),
-                        child: const Column(
+                      Center(
+                        child: Column(
                           children: [
-                            Icon(Icons.history, color: Colors.white10, size: 48),
-                            SizedBox(height: 16),
-                            Text("No leave records found", style: TextStyle(color: Colors.white38, fontSize: 14)),
+                            const SizedBox(height: 40),
+                            Icon(Icons.history_toggle_off, color: Colors.white.withValues(alpha: 0.1), size: 80),
+                            const SizedBox(height: 16),
+                            const Text("No leave history found", style: TextStyle(color: Colors.white24, fontSize: 16)),
                           ],
                         ),
                       )
                     else
-                      ListView.builder(
+                      ListView.separated(
                         shrinkWrap: true,
                         physics: const NeverScrollableScrollPhysics(),
                         itemCount: _filteredLeaves.length,
-                        itemBuilder: (context, index) {
-                          final leave = _filteredLeaves[index];
-                          return _buildLeaveCard(leave);
-                        },
+                        separatorBuilder: (_, __) => const SizedBox(height: 16),
+                        itemBuilder: (context, index) => _buildLeaveCard(_filteredLeaves[index]),
                       ),
                     const SizedBox(height: 40),
                   ],
@@ -240,17 +237,16 @@ class _LeaveApplicationPageState extends State<LeaveApplicationPage> {
   }
 
   Widget _buildLeaveCard(StudentLeave leave) {
-    Color statusColor = Colors.orangeAccent;
-    if (leave.status.toLowerCase() == 'approved') statusColor = Colors.greenAccent;
-    if (leave.status.toLowerCase() == 'rejected') statusColor = Colors.redAccent;
+    Color statusColor = Colors.orange;
+    if (leave.status.toLowerCase() == 'approved') statusColor = Colors.green;
+    if (leave.status.toLowerCase() == 'rejected') statusColor = Colors.red;
 
     return Container(
-      margin: const EdgeInsets.only(bottom: 16),
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         color: _card,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.white12),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -266,7 +262,7 @@ class _LeaveApplicationPageState extends State<LeaveApplicationPage> {
               _statusBadge(leave.status.toUpperCase(), statusColor),
             ],
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 20),
           Row(
             children: [
               _dateBlock("FROM", leave.fromDate),
@@ -282,8 +278,8 @@ class _LeaveApplicationPageState extends State<LeaveApplicationPage> {
             child: Divider(color: Colors.white10, height: 1),
           ),
           const Text("Reason:", style: TextStyle(color: Colors.white38, fontSize: 12)),
-          const SizedBox(height: 4),
-          Text(leave.reason, style: const TextStyle(color: Colors.white70, fontSize: 14, height: 1.4)),
+          const SizedBox(height: 6),
+          Text(leave.reason, style: const TextStyle(color: Colors.white70, fontSize: 14, height: 1.5)),
         ],
       ),
     );
@@ -342,7 +338,10 @@ class _LeaveApplicationPageState extends State<LeaveApplicationPage> {
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (context) => _ApplyLeaveBottomSheet(onSuccess: _fetchLeaveApplications, theme: {'bg': _bg, 'card': _card, 'primary': _primary, 'secondary': _secondary}),
+      builder: (context) => _ApplyLeaveBottomSheet(
+        onSuccess: _fetchLeaveApplications,
+        theme: {'bg': _bg, 'card': _card, 'primary': _primary, 'secondary': _secondary, 'surface': _surface},
+      ),
     );
   }
 }
@@ -370,7 +369,7 @@ class _ApplyLeaveBottomSheetState extends State<_ApplyLeaveBottomSheet> {
     setState(() => _isSubmitting = true);
     try {
       await ApiService.applyStudentLeave(
-        leaveType: _leaveType!,
+        leaveType: _leaveType!.toLowerCase(),
         fromDate: DateFormat('yyyy-MM-dd').format(_fromDate!),
         toDate: DateFormat('yyyy-MM-dd').format(_toDate!),
         reason: _reasonController.text,
