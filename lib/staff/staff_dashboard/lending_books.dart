@@ -51,18 +51,6 @@ class _MyLendingBooksPageState extends State<MyLendingBooksPage> {
     } catch (e) {
       if (!mounted) return;
       setState(() => _isLoading = false);
-      if (_lendingBooks.isEmpty) {
-        _lendingBooks = [
-          IssuedBook(
-            id: 2,
-            bookId: 4,
-            bookTitle: "Advanced Taxation Concepts",
-            issuedAt: "2025-10-30",
-            dueDate: "2025-11-15",
-            returnedAt: "2025-11-09",
-          ),
-        ];
-      }
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Error fetching books: $e")));
     }
   }
@@ -221,23 +209,6 @@ class _MyLendingBooksPageState extends State<MyLendingBooksPage> {
                             ),
                           ),
                           const SizedBox(height: 20),
-                          SingleChildScrollView(
-                            scrollDirection: Axis.horizontal,
-                            child: Row(
-                              children: [
-                                exportIconBtn(Icons.copy, Colors.blue),
-                                const SizedBox(width: 10),
-                                exportIconBtn(Icons.description, Colors.teal),
-                                const SizedBox(width: 10),
-                                exportIconBtn(Icons.table_chart, Colors.green),
-                                const SizedBox(width: 10),
-                                exportIconBtn(Icons.picture_as_pdf, Colors.red),
-                                const SizedBox(width: 10),
-                                exportIconBtn(Icons.print, Colors.grey),
-                              ],
-                            ),
-                          ),
-                          const SizedBox(height: 20),
                           if (_lendingBooks.isEmpty)
                             const Center(child: Padding(
                               padding: EdgeInsets.symmetric(vertical: 20),
@@ -311,18 +282,6 @@ class _MyLendingBooksPageState extends State<MyLendingBooksPage> {
           ),
         ),
       ),
-    );
-  }
-
-  Widget exportIconBtn(IconData icon, Color color) {
-    return Container(
-      padding: const EdgeInsets.all(10),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.1),
-        border: Border.all(color: color, width: 2),
-        borderRadius: BorderRadius.circular(6),
-      ),
-      child: Icon(icon, color: Colors.white, size: 24),
     );
   }
 

@@ -1256,9 +1256,13 @@ class ApiService {
     final response = await get('staff/tickets/$ticketId/replies');
     if (response.statusCode == 200) {
       final data = jsonDecode(response.body);
-      if (data['success'] == true || data['status'] == true) return teacher_ticket_details.TicketDetails.fromJson(data['data']);
+      if (data['success'] == true || data['status'] == true) {
+        // Handle both simple and nested data: { success: true, data: { ticket: ..., replies: ... } }
+        final resultData = data['data'] ?? data;
+        return teacher_ticket_details.TicketDetails.fromJson(resultData);
+      }
     }
-    throw Exception('Failed to load ticket details');
+    throw Exception('Failed to load ticket details (Status: ${response.statusCode})');
   }
 
   static Future<void> replyStaffTicket(String ticketId, Map<String, String> fields, {File? attachment}) async {
@@ -1272,7 +1276,16 @@ class ApiService {
     final response = await get('staff/library/lending', query);
     if (response.statusCode == 200) {
       final data = jsonDecode(response.body);
-      if (data['success'] == true || data['status'] == true) return (data['data'] as List).map((e) => librarian_model.IssuedBook.fromJson(e)).toList();
+      if (data['success'] == true || data['status'] == true) {
+        // Handle Laravel pagination: actual list is in data['data']['data']
+        final nestedData = data['data'];
+        if (nestedData is Map && nestedData.containsKey('data')) {
+          final List list = nestedData['data'];
+          return list.map((e) => librarian_model.IssuedBook.fromJson(e)).toList();
+        } else if (nestedData is List) {
+          return nestedData.map((e) => librarian_model.IssuedBook.fromJson(e)).toList();
+        }
+      }
     }
     throw Exception('Failed to load issued books');
   }
@@ -1316,27 +1329,24 @@ class ApiService {
   }
 
   static Future<List<staff_model.Fee>> getStaffFees() async {
-    // Teachers and Staff use the same UI, but different endpoints.
-    // Try teacher/fees first as this is currently being called from the Teacher Dashboard.
-    final response = await get('teacher/fees');
+    final response = await get('staff/fees');
     
     if (response.statusCode == 200) {
       final data = jsonDecode(response.body);
       if (data['success'] == true || data['status'] == true) {
-        return (data['data'] as List).map((f) => staff_model.Fee.fromJson(f)).toList();
+        // Handle both simple lists and pagination/nested data
+        var listData = data['data'];
+        if (listData is Map && listData.containsKey('data')) {
+          listData = listData['data'];
+        }
+        
+        if (listData is List) {
+          return listData.map((f) => staff_model.Fee.fromJson(f)).toList();
+        }
       }
     }
     
-    // Fallback to staff/fees if teacher/fees fails (for actual staff members)
-    final staffResponse = await get('staff/fees');
-    if (staffResponse.statusCode == 200) {
-      final data = jsonDecode(staffResponse.body);
-      if (data['success'] == true || data['status'] == true) {
-        return (data['data'] as List).map((f) => staff_model.Fee.fromJson(f)).toList();
-      }
-    }
-
-    throw Exception('Failed to load fees');
+    throw Exception('Failed to load fees (Status: ${response.statusCode})');
   }
 
   static Future<List<staff_model.Fee>> getTeacherFees() async {

@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import '../../services/api_service.dart';
 import '../../services/responsive_helper.dart';
+import '../../login_logout/login.dart';
 import 'staff_models.dart';
 
 class StaffProfilePage extends StatefulWidget {
@@ -334,9 +335,39 @@ class _StaffProfilePageState extends State<StaffProfilePage> {
   }
 
   Widget _buildSaveButton() {
-    return ElevatedButton(
-      onPressed: _saveChanges,
-      child: const Text("SAVE CHANGES"),
+    return Column(
+      children: [
+        SizedBox(
+          width: double.infinity,
+          child: ElevatedButton(
+            onPressed: _saveChanges,
+            child: const Text("SAVE CHANGES"),
+          ),
+        ),
+        const SizedBox(height: 12),
+        SizedBox(
+          width: double.infinity,
+          child: OutlinedButton.icon(
+            onPressed: () async {
+              await ApiService.logout();
+              if (mounted) {
+                Navigator.pushAndRemoveUntil(
+                  context,
+                  MaterialPageRoute(builder: (context) => const LoginPage()),
+                  (route) => false,
+                );
+              }
+            },
+            icon: const Icon(Icons.logout_rounded, size: 20),
+            label: const Text("LOGOUT"),
+            style: OutlinedButton.styleFrom(
+              foregroundColor: Colors.red,
+              side: const BorderSide(color: Colors.red),
+              padding: const EdgeInsets.symmetric(vertical: 16),
+            ),
+          ),
+        ),
+      ],
     );
   }
 }
