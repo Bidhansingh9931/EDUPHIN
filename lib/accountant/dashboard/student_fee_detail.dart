@@ -107,10 +107,21 @@ class _StudentFeeDetailPageState extends State<StudentFeeDetailPage> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    
+    final bool isMobile = !context.isTablet;
+    final bool showDetails = _studentDetails != null;
+
     return Scaffold(
       appBar: AppBar(
-        title: const Text("Student Fees Management"),
+        title: Text(showDetails && isMobile ? "Student Details" : "Student Fees Management"),
+        leading: showDetails && isMobile
+            ? IconButton(
+                icon: const Icon(Icons.arrow_back),
+                onPressed: () => setState(() {
+                  _studentDetails = null;
+                  _selectedStudentId = null;
+                }),
+              )
+            : null,
       ),
       body: Stack(
         children: [
@@ -121,23 +132,21 @@ class _StudentFeeDetailPageState extends State<StudentFeeDetailPage> {
                 constraints: const BoxConstraints(maxWidth: 1000),
                 child: Column(
                   children: [
-                    _buildFilterSection(context),
-                    const SizedBox(height: 24),
+                    if (!showDetails || !isMobile) ...[
+                      _buildFilterSection(context),
+                      const SizedBox(height: 24),
+                    ],
                     if (context.isTablet)
                       Row(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Expanded(flex: 4, child: _buildStudentList(context)),
                           const SizedBox(width: 24),
-                          Expanded(flex: 6, child: _studentDetails != null ? _buildDetailedView(context) : _buildEmptyDetail(context)),
+                          Expanded(flex: 6, child: showDetails ? _buildDetailedView(context) : _buildEmptyDetail(context)),
                         ],
                       )
                     else ...[
-                      _buildStudentList(context),
-                      if (_studentDetails != null) ...[
-                        const SizedBox(height: 24),
-                        _buildDetailedView(context),
-                      ]
+                      if (!showDetails) _buildStudentList(context) else _buildDetailedView(context),
                     ],
                     const SizedBox(height: 40),
                   ],
@@ -311,9 +320,9 @@ class _StudentFeeDetailPageState extends State<StudentFeeDetailPage> {
             const Divider(height: 40),
             Text("Financial Overview", style: theme.textTheme.labelMedium?.copyWith(fontWeight: FontWeight.bold, color: theme.hintColor)),
             const SizedBox(height: 16),
-            _buildSummaryRow(context, "Total Payable", "₹${summary['total_payable']}", theme.colorScheme.primary),
-            _buildSummaryRow(context, "Total Paid", "₹${summary['total_paid']}", Colors.green),
-            _buildSummaryRow(context, "Balance Due", "₹${summary['due']}", Colors.orange, isBold: true),
+            _buildSummaryRow(context, "Total Payable", "₹${summary['total_payable'] ?? '0'}", theme.colorScheme.primary),
+            _buildSummaryRow(context, "Total Paid", "₹${summary['total_paid'] ?? '0'}", Colors.green),
+            _buildSummaryRow(context, "Balance Due", "₹${summary['due'] ?? '0'}", Colors.orange, isBold: true),
           ],
         ),
       ),
@@ -358,7 +367,8 @@ class _StudentFeeDetailPageState extends State<StudentFeeDetailPage> {
   Widget _buildFeeSummarySection(BuildContext context) {
     final theme = Theme.of(context);
     final List<dynamic> fees = _studentDetails!['fees'] ?? [];
-    final overrides = _studentDetails!['overrides'] as Map<String, dynamic>? ?? {};
+    final overridesData = _studentDetails!['overrides'];
+    final Map<String, dynamic> overrides = (overridesData is Map) ? Map<String, dynamic>.from(overridesData) : {};
 
     return Card(
       child: Column(
@@ -419,7 +429,8 @@ class _StudentFeeDetailPageState extends State<StudentFeeDetailPage> {
 
   Widget _buildFineDetailsSection(BuildContext context) {
     final theme = Theme.of(context);
-    final List<dynamic> fines = _studentDetails!['fines'] ?? [];
+    final finesData = _studentDetails!['fines'];
+    final List<dynamic> fines = (finesData is List) ? finesData : [];
     return Card(
       child: Column(
         children: [
@@ -470,7 +481,8 @@ class _StudentFeeDetailPageState extends State<StudentFeeDetailPage> {
 
   Widget _buildPaymentHistorySection(BuildContext context) {
     final theme = Theme.of(context);
-    final List<dynamic> history = _studentDetails!['payments'] ?? [];
+    final paymentsData = _studentDetails!['payments'];
+    final List<dynamic> history = (paymentsData is List) ? paymentsData : [];
     return Card(
       child: Column(
         children: [

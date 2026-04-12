@@ -81,7 +81,13 @@ class _CreateTicketPageState extends State<CreateTicketPage> {
                               hintText: "Briefly describe the issue",
                               controller: _titleController,
                               icon: Icons.title,
-                              validator: (val) => val!.isEmpty ? "Required" : null,
+                              validator: (val) {
+                                if (val == null || val.isEmpty) return "Required";
+                                if (!RegExp(r'^[a-zA-Z0-9\s,.\-/#()]+$').hasMatch(val)) {
+                                  return "Special characters not allowed";
+                                }
+                                return null;
+                              },
                             ),
                             _buildTextField(
                               context,
@@ -90,7 +96,13 @@ class _CreateTicketPageState extends State<CreateTicketPage> {
                               controller: _descController,
                               maxLines: 5,
                               icon: Icons.description,
-                              validator: (val) => val!.isEmpty ? "Required" : null,
+                              validator: (val) {
+                                if (val == null || val.isEmpty) return "Required";
+                                if (!RegExp(r'^[a-zA-Z0-9\s,.\-/#()]+$').hasMatch(val)) {
+                                  return "Special characters not allowed";
+                                }
+                                return null;
+                              },
                             ),
                           ],
                         ),
@@ -106,6 +118,12 @@ class _CreateTicketPageState extends State<CreateTicketPage> {
                                 hintText: "e.g., IT, Finance",
                                 controller: _categoryController,
                                 icon: Icons.category,
+                                validator: (val) {
+                                  if (val != null && val.isNotEmpty && !RegExp(r'^[a-zA-Z0-9\s,.\-/#()]+$').hasMatch(val)) {
+                                    return "Special characters not allowed";
+                                  }
+                                  return null;
+                                },
                               ),
                             ]),
                           ],

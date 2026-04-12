@@ -773,18 +773,19 @@ class ApiService {
   }
 
   static Future<Map<String, dynamic>> getAccountantStudentFeeDetails(String studentId) async {
+    final encodedId = Uri.encodeComponent(studentId);
     // Attempt 1: The ID-specific endpoint (studentId could be encrypted or numeric)
-    var response = await get('accountants/students/$studentId');
+    var response = await get('accountants/students/$encodedId');
     
     // Attempt 2: Laravel standard 'view' pattern
     if (response.statusCode != 200) {
-      final altResponse = await get('accountants/students/view/$studentId');
+      final altResponse = await get('accountants/students/view/$encodedId');
       if (altResponse.statusCode == 200) response = altResponse;
     }
 
     // Attempt 3: Specific 'show' pattern if previous failed
     if (response.statusCode != 200) {
-      final altResponse2 = await get('accountants/students/show/$studentId');
+      final altResponse2 = await get('accountants/students/show/$encodedId');
       if (altResponse2.statusCode == 200) response = altResponse2;
     }
 
@@ -810,7 +811,9 @@ class ApiService {
   }
 
   static Future<void> storeFeeOverride(String studentId, String feeId, Map<String, dynamic> data) async {
-    final response = await post('accountants/fee-override/$studentId/$feeId', data);
+    final encodedStudentId = Uri.encodeComponent(studentId);
+    final encodedFeeId = Uri.encodeComponent(feeId);
+    final response = await post('accountants/fee-override/$encodedStudentId/$encodedFeeId', data);
     if (response.statusCode != 200) throw Exception(jsonDecode(response.body)['message'] ?? 'Failed to store fee override');
   }
 
@@ -834,7 +837,8 @@ class ApiService {
   }
 
   static Future<Map<String, dynamic>> getAccountantEmployeeSalary(String id) async {
-    final response = await get('accountants/account/$id');
+    final encodedId = Uri.encodeComponent(id);
+    final response = await get('accountants/account/$encodedId');
     if (response.statusCode == 200) {
       final data = jsonDecode(response.body);
       if (data['success'] == true || data['status'] == true) return data['data'];
@@ -843,7 +847,8 @@ class ApiService {
   }
 
   static Future<Map<String, dynamic>> getAccountantSalaryDetail(String id) async {
-    final response = await get('accountants/salary/view/$id');
+    final encodedId = Uri.encodeComponent(id);
+    final response = await get('accountants/salary/view/$encodedId');
     if (response.statusCode == 200) {
       final data = jsonDecode(response.body);
       if (data['success'] == true || data['status'] == true) return data['data'];
@@ -852,12 +857,14 @@ class ApiService {
   }
 
   static Future<void> deleteAccountantSalary(String id) async {
-    final response = await delete('accountants/salary/destroy/$id');
+    final encodedId = Uri.encodeComponent(id);
+    final response = await delete('accountants/salary/destroy/$encodedId');
     if (response.statusCode != 200) throw Exception(jsonDecode(response.body)['message'] ?? 'Failed to delete salary');
   }
 
   static Future<void> storeAccountantEmployeeSalary(String id, Map<String, dynamic> data) async {
-    final response = await post('accountants/salary/store/$id', data);
+    final encodedId = Uri.encodeComponent(id);
+    final response = await post('accountants/salary/store/$encodedId', data);
     if (response.statusCode != 200) throw Exception(jsonDecode(response.body)['message'] ?? 'Failed to store salary');
   }
 
@@ -1027,7 +1034,9 @@ class ApiService {
   }
 
   static Future<List<accountant_model.UserDetail>> getEmployeesByRole(dynamic roleId) async {
-    final response = await get('accountants/accounts/$roleId');
+    final encodedId = Uri.encodeComponent(roleId.toString());
+    final response = await get('accountants/accounts/$encodedId');
+    
     if (response.statusCode == 200) {
       final data = jsonDecode(response.body);
       if (data['success'] == true || data['status'] == true) {
@@ -1045,6 +1054,11 @@ class ApiService {
       }
     }
     
+    // Handle specific encryption error from Laravel
+    if (response.statusCode == 500 && response.body.contains("The payload is invalid")) {
+      throw Exception('Backend decryption failed. The role ID "$roleId" might need to be encrypted.');
+    }
+
     final errorBody = response.body.isNotEmpty ? jsonDecode(response.body) : {};
     final message = errorBody['message'] ?? 'Failed to load employees';
     throw Exception('$message (Status: ${response.statusCode})');
@@ -1059,6 +1073,10 @@ class ApiService {
         
         // Try to extract dynamic roles from the dashboard data if available
         final rolesData = payload['roles'];
+        if (rolesData is Map) {
+          return Map<String, String>.from(rolesData.map((key, value) => MapEntry(key.toString(), value.toString())));
+        }
+
         if (rolesData is List) {
           final Map<String, String> dynamicRoles = {};
           for (var role in rolesData) {
@@ -1086,11 +1104,12 @@ class ApiService {
   }
 
   static Future<void> deleteAccountantFee(String feeId) async {
-    final response = await delete('accountants/fees/delete/$feeId');
+    final encodedId = Uri.encodeComponent(feeId);
+    final response = await delete('accountants/fees/delete/$encodedId');
     if (response.statusCode != 200) {
       // If DELETE fails with 405 or 404, try POST as some Laravel versions/configs require POST for deletes
       if (response.statusCode == 405 || response.statusCode == 404) {
-        final postResponse = await post('accountants/fees/delete/$feeId', {});
+        final postResponse = await post('accountants/fees/delete/$encodedId', {});
         if (postResponse.statusCode == 200) return;
         
         final postData = jsonDecode(postResponse.body);
@@ -1112,7 +1131,8 @@ class ApiService {
   }
 
   static Future<Map<String, dynamic>> getAccountantFeeEditData(String feeId) async {
-    final response = await get('accountants/fees/edit/$feeId');
+    final encodedId = Uri.encodeComponent(feeId);
+    final response = await get('accountants/fees/edit/$encodedId');
     final data = jsonDecode(response.body);
     if (response.statusCode == 200) {
       if (data['success'] == true || data['status'] == true || data['status'] == 'success') {
@@ -1128,7 +1148,8 @@ class ApiService {
   }
 
   static Future<void> updateAccountantFee(String feeId, Map<String, dynamic> data) async {
-    final response = await post('accountants/fees/update/$feeId', data);
+    final encodedId = Uri.encodeComponent(feeId);
+    final response = await post('accountants/fees/update/$encodedId', data);
     if (response.statusCode != 200) throw Exception(jsonDecode(response.body)['message'] ?? 'Failed to update fee');
   }
 
@@ -1463,7 +1484,7 @@ class ApiService {
       final data = jsonDecode(response.body);
       if (data['success'] == true || data['status'] == true) return (data['data'] as List).map((e) => accountant_model.Exam.fromJson(e)).toList();
     }
-    throw Exception('Failed to load exams');
+    throw Exception('Failed to load exams (Status: ${response.statusCode})');
   }
 
   static Future<accountant_model.UserDetail> getAccountantProfile() async {
@@ -1491,12 +1512,20 @@ class ApiService {
   }
 
   static Future<Map<String, dynamic>> getAccountantExamSchedule(String id) async {
-    final response = await get('accountants/exams/schedule/$id');
+    final encodedId = Uri.encodeComponent(id);
+    final response = await get('accountants/exams/schedule/$encodedId');
+    
     if (response.statusCode == 200) {
       final data = jsonDecode(response.body);
       if (data['success'] == true || data['status'] == true) return data['data'] ?? data;
     }
-    throw Exception('Failed to load exam schedule');
+
+    // Handle Laravel encryption/decryption crash (500) or validation error (400)
+    if ((response.statusCode == 500 || response.statusCode == 400) && RegExp(r'^\d+$').hasMatch(id)) {
+      throw Exception('The backend requires an ENCRYPTED exam ID. The raw ID "$id" cannot be decrypted.');
+    }
+
+    throw Exception('Failed to load exam schedule (Status: ${response.statusCode})');
   }
 
   static Future<teacher_library.BookPagination> getAccountantLibraryBooks(Map<String, String> filters, int page) async {
@@ -1516,7 +1545,8 @@ class ApiService {
   }
 
   static Future<Map<String, dynamic>> getAccountantStudentReceipt(String id) async {
-    final response = await get('accountants/students/receipt/$id');
+    final encodedId = Uri.encodeComponent(id);
+    final response = await get('accountants/students/receipt/$encodedId');
     if (response.statusCode == 200) {
       final data = jsonDecode(response.body);
       if (data['success'] == true || data['status'] == true) return data['data'];
@@ -1525,7 +1555,8 @@ class ApiService {
   }
 
   static Future<Map<String, dynamic>> getAccountantSalaryView(String id) async {
-    final response = await get('accountants/salary/view/$id');
+    final encodedId = Uri.encodeComponent(id);
+    final response = await get('accountants/salary/view/$encodedId');
     if (response.statusCode == 200) {
       final data = jsonDecode(response.body);
       if (data['success'] == true || data['status'] == true) return data['data'];

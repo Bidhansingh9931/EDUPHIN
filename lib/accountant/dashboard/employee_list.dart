@@ -39,24 +39,14 @@ class _EmployeeListPageState extends State<EmployeeListPage> {
       // First try to fetch dynamic roles with encrypted IDs
       final dynamicRoles = await ApiService.getAccountantRoles();
       if (dynamicRoles.isNotEmpty && mounted) {
-        setState(() => _roles = dynamicRoles);
+        setState(() {
+          _roles = dynamicRoles;
+        });
       }
-      
+
       // Determine which role to select initially
-      if (widget.roleId != null) {
-        // If a roleId was passed (likely numeric from dashboard), 
-        // try to find the corresponding encrypted ID in our new roles map
-        final roleName = _roles[widget.roleId.toString()];
-        if (roleName != null) {
-          _selectedRoleId = widget.roleId.toString();
-        } else {
-          // Try to find by value name (e.g. if we have encrypted IDs now)
-          final entry = _roles.entries.firstWhere(
-            (e) => e.value.toLowerCase().contains(roleName?.toLowerCase() ?? ''),
-            orElse: () => _roles.entries.first,
-          );
-          _selectedRoleId = entry.key;
-        }
+      if (widget.roleId != null && widget.roleId.toString().isNotEmpty) {
+        _selectedRoleId = widget.roleId.toString();
       } else {
         _selectedRoleId = _roles.keys.first;
       }

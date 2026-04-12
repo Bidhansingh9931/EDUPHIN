@@ -10,6 +10,7 @@ class AccountantDashboardData {
   final List<Ticket> assignedTickets;
   final List<Fee> instituteFees;
   final List<Fee> classFees;
+  final Map<String, String> roles;
 
   AccountantDashboardData({
     required this.userDetail,
@@ -23,6 +24,7 @@ class AccountantDashboardData {
     required this.assignedTickets,
     required this.instituteFees,
     required this.classFees,
+    required this.roles,
   });
 
   factory AccountantDashboardData.fromJson(Map<String, dynamic> json) {
@@ -38,6 +40,7 @@ class AccountantDashboardData {
       assignedTickets: (json['assigned_tickets'] as List? ?? []).map((e) => Ticket.fromJson(e)).toList(),
       instituteFees: (json['institute_fees'] as List? ?? []).map((e) => Fee.fromJson(e)).toList(),
       classFees: (json['class_fees'] as List? ?? []).map((e) => Fee.fromJson(e)).toList(),
+      roles: Map<String, String>.from(json['roles'] ?? {}),
     );
   }
 }
@@ -364,7 +367,7 @@ class ExamPaperSchedule {
       startTime: json['start_time']?.toString(),
       endTime: json['end_time']?.toString(),
       venue: json['venue']?.toString(),
-      subject: json['subject'],
+      subject: json['subject'] is Map<String, dynamic> ? json['subject'] : null,
     );
   }
 }

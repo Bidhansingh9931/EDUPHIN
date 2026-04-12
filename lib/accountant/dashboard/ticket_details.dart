@@ -54,7 +54,18 @@ class _TicketDetailsPageState extends State<TicketDetailsPage> {
   }
 
   Future<void> _sendReply() async {
-    if (_replyController.text.isEmpty) return;
+    if (_replyController.text.trim().isEmpty) return;
+    
+    // Validation for special characters to prevent backend decryption/parsing issues
+    if (!RegExp(r'^[a-zA-Z0-9\s,.\-/#()]+$').hasMatch(_replyController.text)) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("Special characters not allowed in reply")),
+        );
+      }
+      return;
+    }
+
     setState(() => _isLoading = true);
     try {
       await ApiService.replyAccountantTicket(
@@ -210,6 +221,8 @@ class _TicketDetailsPageState extends State<TicketDetailsPage> {
 
   Widget _buildReplyBubble(BuildContext context, TicketReply reply, bool isMe) {
     final theme = Theme.of(context);
+    final displayName = reply.userName ?? 'User';
+    
     return Align(
       alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
       child: Container(
@@ -228,7 +241,7 @@ class _TicketDetailsPageState extends State<TicketDetailsPage> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(reply.userName ?? 'User', style: TextStyle(color: theme.hintColor, fontSize: 10, fontWeight: FontWeight.bold)),
+            Text(displayName, style: TextStyle(color: theme.hintColor, fontSize: 10, fontWeight: FontWeight.bold)),
             const SizedBox(height: 4),
             Text(reply.message, style: const TextStyle(fontSize: 13)),
             if (reply.attachment != null)
@@ -279,19 +292,32 @@ class _TicketDetailsPageState extends State<TicketDetailsPage> {
                         borderRadius: BorderRadius.circular(12),
                       ),
                       child: Row(
+                        mainAxisSize: MainAxisSize.min, // Constrain inner row
                         children: [
                           Icon(Icons.image_outlined, size: 18, color: theme.hintColor),
                           const SizedBox(width: 8),
-                          Expanded(child: Text(_selectedFile?.path.split('/').last ?? "Choose File", style: TextStyle(color: theme.hintColor, fontSize: 12), overflow: TextOverflow.ellipsis)),
+                          Flexible( // Using Flexible instead of Expanded for safer sizing
+                            child: Text(
+                              _selectedFile?.path.split('/').last ?? "Choose File",
+                              style: TextStyle(color: theme.hintColor, fontSize: 12),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
                         ],
                       ),
                     ),
                   ),
                 ),
                 const SizedBox(width: 12),
-                ElevatedButton(
-                  onPressed: _isLoading ? null : _sendReply,
-                  child: const Text("SEND"),
+                SizedBox( 
+                  height: 48,
+                  child: ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                      minimumSize: const Size(80, 48), // Prevent infinite width crash from global themes
+                    ),
+                    onPressed: _isLoading ? null : _sendReply,
+                    child: const Text("SEND"),
+                  ),
                 ),
               ],
             ),
@@ -314,6 +340,7 @@ class _TicketDetailsPageState extends State<TicketDetailsPage> {
       case 'open': return Colors.blue;
       case 'in_progress': return Colors.orange;
       case 'resolved': return Colors.green;
+      case 'closed': return Colors.grey;
       default: return Colors.grey;
     }
   }

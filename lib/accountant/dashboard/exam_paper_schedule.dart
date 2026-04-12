@@ -30,11 +30,17 @@ class _ExamPaperSchedulePageState extends State<ExamPaperSchedulePage> {
       final data = await ApiService.getAccountantExamSchedule(widget.examId);
       if (mounted) {
         setState(() {
-          _exam = Exam.fromJson(data['exam'] ?? {});
-          final List schedulesData = data['schedules'] is List ? data['schedules'] : [];
-          _schedules = schedulesData
-              .map((e) => ExamPaperSchedule.fromJson(e))
-              .toList();
+          final examData = data['exam'] ?? data;
+          _exam = (examData is Map<String, dynamic>) ? Exam.fromJson(examData) : null;
+          
+          final schedulesData = data['schedules'] ?? [];
+          if (schedulesData is List) {
+            _schedules = schedulesData
+                .map((e) => ExamPaperSchedule.fromJson(e))
+                .toList();
+          } else {
+            _schedules = [];
+          }
         });
       }
     } catch (e) {
@@ -42,8 +48,10 @@ class _ExamPaperSchedulePageState extends State<ExamPaperSchedulePage> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text("Error fetching schedule: $e"),
-            action: SnackBarAction(label: "Retry", onPressed: _fetchSchedule),
+            content: Text(e.toString().replaceAll("Exception: ", "")),
+            backgroundColor: Colors.red,
+            duration: const Duration(seconds: 5),
+            action: SnackBarAction(label: "Retry", textColor: Colors.white, onPressed: _fetchSchedule),
           ),
         );
       }
@@ -140,6 +148,10 @@ class _ExamPaperSchedulePageState extends State<ExamPaperSchedulePage> {
 
   Widget _buildScheduleCard(BuildContext context, ExamPaperSchedule schedule) {
     final theme = Theme.of(context);
+    final subjectName = (schedule.subject is Map) 
+        ? (schedule.subject?['name'] ?? 'Unknown Subject') 
+        : (schedule.paperName ?? 'N/A');
+
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
       child: Padding(
@@ -158,7 +170,7 @@ class _ExamPaperSchedulePageState extends State<ExamPaperSchedulePage> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    schedule.subject?['name'] ?? schedule.paperName ?? 'N/A',
+                    subjectName,
                     style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
                   ),
                   const SizedBox(height: 8),
@@ -170,7 +182,7 @@ class _ExamPaperSchedulePageState extends State<ExamPaperSchedulePage> {
                       const SizedBox(width: 12),
                       Icon(Icons.access_time, color: theme.hintColor, size: 12),
                       const SizedBox(width: 6),
-                      Text("${schedule.startTime} - ${schedule.endTime}", style: TextStyle(color: theme.hintColor, fontSize: 12)),
+                      Text("${schedule.startTime ?? '--'} - ${schedule.endTime ?? '--'}", style: TextStyle(color: theme.hintColor, fontSize: 12)),
                     ],
                   ),
                 ],
