@@ -126,8 +126,6 @@ class _CounselorProfilePageState extends State<CounselorProfilePage> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
     if (_isLoading && _userDetail == null) {
       return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
@@ -186,6 +184,41 @@ class _CounselorProfilePageState extends State<CounselorProfilePage> {
                       child: _isLoading ? const CircularProgressIndicator() : const Text("UPDATE PROFILE"),
                     ),
                   ),
+                  const SizedBox(height: 32),
+                  SizedBox(
+                    width: double.infinity,
+                    child: OutlinedButton.icon(
+                      onPressed: () async {
+                        final confirm = await showDialog<bool>(
+                          context: context,
+                          builder: (context) => AlertDialog(
+                            title: const Text("Logout"),
+                            content: const Text("Are you sure you want to logout?"),
+                            actions: [
+                              TextButton(onPressed: () => Navigator.pop(context, false), child: const Text("CANCEL")),
+                              TextButton(
+                                onPressed: () => Navigator.pop(context, true),
+                                child: const Text("LOGOUT", style: TextStyle(color: Colors.red)),
+                              ),
+                            ],
+                          ),
+                        );
+
+                        if (confirm == true) {
+                          await ApiService.logout();
+                          if (mounted) {
+                            Navigator.pushNamedAndRemoveUntil(context, '/login', (route) => false);
+                          }
+                        }
+                      },
+                      icon: const Icon(Icons.logout, color: Colors.red),
+                      label: const Text("LOGOUT", style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold)),
+                      style: OutlinedButton.styleFrom(
+                        side: const BorderSide(color: Colors.red),
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                      ),
+                    ),
+                  ),
                   const SizedBox(height: 40),
                 ],
               ),
@@ -198,6 +231,13 @@ class _CounselorProfilePageState extends State<CounselorProfilePage> {
 
   Widget _buildProfileHeader(BuildContext context) {
     final theme = Theme.of(context);
+    ImageProvider? profileImage;
+    if (_imageFile != null) {
+      profileImage = FileImage(_imageFile!);
+    } else if (_userDetail?.photo != null && _userDetail!.photo!.isNotEmpty) {
+      profileImage = NetworkImage(ApiService.getStorageUrl(_userDetail!.photo));
+    }
+
     return Center(
       child: Column(
         children: [
@@ -209,16 +249,8 @@ class _CounselorProfilePageState extends State<CounselorProfilePage> {
                 child: CircleAvatar(
                   radius: 60,
                   backgroundColor: theme.colorScheme.surfaceContainerHighest,
-                  backgroundImage: _imageFile != null ? FileImage(_imageFile!) : null,
-                  child: _imageFile == null
-                      ? ClipOval(
-                          child: Image.network(
-                            "${ApiService.baseImageUrl}/${_userDetail?.photo}",
-                            width: 120, height: 120, fit: BoxFit.cover,
-                            errorBuilder: (context, error, stackTrace) => Icon(Icons.person, size: 60, color: theme.colorScheme.primary),
-                          ),
-                        )
-                      : null,
+                  backgroundImage: const AssetImage('assets/images/girl_image.webp'),
+                  foregroundImage: profileImage,
                 ),
               ),
               Positioned(

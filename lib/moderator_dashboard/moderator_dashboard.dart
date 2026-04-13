@@ -1,6 +1,7 @@
 import 'package:eduphin/moderator_dashboard/dashboard_cards/role_distribution.dart';
 import 'package:eduphin/moderator_dashboard/notification.dart';
 import 'package:eduphin/moderator_dashboard/profile.dart';
+import 'package:eduphin/services/api_service.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 
@@ -148,12 +149,26 @@ class _ModeratorDashboardPageState extends State<ModeratorDashboardPage> {
                         const ModeratorProfilePage())),
                 child: ClipRRect(
                   borderRadius: BorderRadius.circular(40),
-                  child: Image.asset(
-                    'assets/images/girl_image.webp',
-                    width: 45,
-                    height: 45,
-                    fit: BoxFit.cover,
-                  ),
+                  child: data.userPhoto.isNotEmpty
+                      ? Image.network(
+                          ApiService.getStorageUrl(data.userPhoto),
+                          width: 45,
+                          height: 45,
+                          fit: BoxFit.cover,
+                          errorBuilder: (context, error, stackTrace) =>
+                              Image.asset(
+                            'assets/images/girl_image.webp',
+                            width: 45,
+                            height: 45,
+                            fit: BoxFit.cover,
+                          ),
+                        )
+                      : Image.asset(
+                          'assets/images/girl_image.webp',
+                          width: 45,
+                          height: 45,
+                          fit: BoxFit.cover,
+                        ),
                 ),
               ),
               const SizedBox(width: 12),
@@ -161,7 +176,7 @@ class _ModeratorDashboardPageState extends State<ModeratorDashboardPage> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text("Welcome back, Sarah!",
+                    Text("Welcome back, ${data.userName}!",
                         style: TextStyle(
                             color: Colors.white,
                             fontSize: responsiveFontSize(18),

@@ -252,20 +252,20 @@ class _ProfilePageState extends State<ProfilePage> {
 
   Widget _buildProfileHeader(TeacherProfile profile) {
     final theme = Theme.of(context);
-    final baseUrl = ApiService.baseUrl.replaceFirst('api/', '');
-    final photoUrl = profile.photoUrl != null ? '$baseUrl${profile.photoUrl}' : null;
+    final photoUrl = profile.photoUrl != null ? ApiService.getStorageUrl(profile.photoUrl) : null;
 
     return Column(
       children: [
         CircleAvatar(
           radius: 45,
           backgroundColor: theme.colorScheme.surfaceContainerHighest,
-          backgroundImage: photoUrl != null ? NetworkImage(photoUrl) : null,
-          child: photoUrl == null ? Icon(Icons.person, size: 50, color: theme.colorScheme.primary.withValues(alpha: 0.5)) : null,
+          backgroundImage: const AssetImage('assets/images/girl_image.webp'),
+          foregroundImage: photoUrl != null && photoUrl.isNotEmpty ? NetworkImage(photoUrl) : null,
         ),
         const SizedBox(height: 12),
         Text(profile.name, style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold)),
         Text(profile.position ?? "Teacher", style: theme.textTheme.bodySmall?.copyWith(color: theme.hintColor)),
+        const SizedBox(height: 4),
         Text(profile.email, style: theme.textTheme.bodySmall?.copyWith(color: theme.hintColor)),
       ],
     );

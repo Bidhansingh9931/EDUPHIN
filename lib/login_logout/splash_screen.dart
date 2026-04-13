@@ -2,6 +2,13 @@ import 'dart:math';
 
 import 'package:eduphin/login_logout/login.dart';
 import 'package:eduphin/manager_dashboard/manager_dashboard.dart';
+import 'package:eduphin/moderator_dashboard/moderator_dashboard.dart';
+import 'package:eduphin/student/student_dashboard.dart';
+import 'package:eduphin/teacher/dashboard/teacher_dashboard.dart';
+import 'package:eduphin/librarian/librarian_dashboard.dart';
+import 'package:eduphin/accountant/dashboard/accountant_dashbard.dart';
+import 'package:eduphin/staff/staff_dashboard/staff_dashboard.dart';
+import 'package:eduphin/superAdmin/super_admin_dashboard.dart';
 import 'package:eduphin/services/api_service.dart';
 import 'package:flutter/material.dart';
 
@@ -84,10 +91,25 @@ class _SplashScreenState extends State<SplashScreen>
       if (!mounted) return;
 
       if (token != null) {
+        final roleId = await ApiService.getRoleId();
+        
+        Widget nextScreen;
+        switch (roleId) {
+          case 1: nextScreen = const SuperAdminDashboard(); break;
+          case 2: nextScreen = const ModeratorDashboardPage(); break;
+          case 3: nextScreen = const ManagerDashboardPage(); break;
+          case 5: nextScreen = const TeacherDashboardPage(); break;
+          case 6: nextScreen = const StudentDashboard(); break;
+          case 7: nextScreen = const LibrarianDashboard(); break;
+          case 8: nextScreen = const AccountantDashboard(); break;
+          case 9: nextScreen = const StaffDashboard(); break;
+          default: nextScreen = const LoginPage(); break;
+        }
+
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(
-            builder: (context) => const ManagerDashboardPage(),
+            builder: (context) => nextScreen,
           ),
         );
       } else {

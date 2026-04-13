@@ -67,12 +67,11 @@ class ManagerProfile {
   });
 
   factory ManagerProfile.fromJson(Map<String, dynamic> json) {
-    String rawImageUrl = json['photo']?.toString() ?? '';
     return ManagerProfile(
       name: json['name']?.toString() ?? 'N/A',
       role: json['role']?['name']?.toString() ?? 'Manager',
       email: json['email']?.toString() ?? 'N/A',
-      avatar: rawImageUrl.isNotEmpty ? '${ApiService.baseImageUrl}/storage/$rawImageUrl' : '',
+      avatar: ApiService.getStorageUrl(json['photo']?.toString()),
       gender: json['gender']?.toString() ?? '',
       dob: json['date_of_birth']?.toString() ?? '',
       phone: json['phone']?.toString() ?? '',
@@ -545,8 +544,10 @@ class _ManagerProfilePageState extends State<ManagerProfilePage> {
                 child: CircleAvatar(
                   radius: 60,
                   backgroundColor: colorScheme.surface,
-                  backgroundImage: data.avatar.isNotEmpty ? NetworkImage(data.avatar) : null,
-                  child: data.avatar.isEmpty ? Icon(Icons.person_rounded, size: 60, color: colorScheme.primary) : null,
+                  backgroundImage: const AssetImage('assets/images/girl_image.webp'),
+                  foregroundImage: data.avatar.isNotEmpty 
+                      ? NetworkImage(data.avatar) 
+                      : null,
                 ),
               ),
               Positioned(

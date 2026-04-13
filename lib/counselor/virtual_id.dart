@@ -100,11 +100,9 @@ class _VirtualIdCardPageState extends State<VirtualIdCardPage> {
                             CircleAvatar(
                               radius: 50,
                               backgroundColor: colorScheme.surfaceContainerHighest,
-                              backgroundImage: _userDetail?.photo != null
-                                  ? NetworkImage("${ApiService.baseImageUrl}/${_userDetail!.photo}")
-                                  : null,
-                              child: _userDetail?.photo == null
-                                  ? Icon(Icons.person, size: 50, color: colorScheme.primary)
+                              backgroundImage: const AssetImage('assets/images/girl_image.webp'),
+                              foregroundImage: _userDetail?.photo != null && _userDetail!.photo!.isNotEmpty
+                                  ? NetworkImage(ApiService.getStorageUrl(_userDetail!.photo))
                                   : null,
                             ),
                             const SizedBox(height: 16),

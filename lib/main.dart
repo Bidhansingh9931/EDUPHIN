@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:eduphin/login_logout/login.dart';
 import 'package:eduphin/login_logout/splash_screen.dart';
 import 'package:eduphin/services/theme_service.dart';
 import 'package:flutter/material.dart';
@@ -48,6 +49,9 @@ class MyApp extends StatelessWidget {
       },
 
       home: const SplashScreen(),
+      routes: {
+        '/login': (context) => const LoginPage(),
+      },
     );
   }
 }

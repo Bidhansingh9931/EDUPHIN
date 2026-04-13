@@ -1,3 +1,5 @@
+import 'package:eduphin/login_logout/login.dart';
+import 'package:eduphin/services/api_service.dart';
 import 'package:flutter/material.dart';
 import '../../teacher/dashboard/app_drawer.dart';
 import '../../services/api_service.dart';
@@ -51,6 +53,18 @@ class _StaffDashboardState extends State<StaffDashboard> {
           IconButton(
             onPressed: () {},
             icon: const Icon(Icons.notifications_none_rounded),
+          ),
+          IconButton(
+            onPressed: () async {
+              await ApiService.logout();
+              if (context.mounted) {
+                Navigator.of(context).pushAndRemoveUntil(
+                  MaterialPageRoute(builder: (context) => const LoginPage()),
+                  (route) => false,
+                );
+              }
+            },
+            icon: const Icon(Icons.logout),
           ),
         ],
       ),

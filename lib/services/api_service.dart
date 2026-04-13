@@ -46,13 +46,19 @@ class ApiService {
     if (kIsWeb) {
       return _envUrl;
     } else if (Platform.isAndroid) {
-      return 'http://10.0.2.2:8000';
+      return 'http://10.41.172.42:8000';
     } else {
       return _envUrl;
     }
   }
 
   static String get baseImageUrl => baseUrl;
+
+  static String getStorageUrl(String? path) {
+    if (path == null || path.isEmpty) return "";
+    if (path.startsWith('http')) return path;
+    return "$baseUrl/storage/$path";
+  }
 
   static Uri _uri(String endpoint, [Map<String, dynamic>? queryParameters]) {
     final uri = Uri.parse('$baseUrl/api/$endpoint');
@@ -67,9 +73,16 @@ class ApiService {
     return prefs.getString('auth_token');
   }
 
+  static Future<int?> getRoleId() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getInt('role_id');
+  }
+
   static Future<void> logout() async {
-    final famine = await SharedPreferences.getInstance();
-    await famine.remove('auth_token');
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove('auth_token');
+    await prefs.remove('role_id');
+    await prefs.remove('user_name');
     try {
       await post('logout', {});
     } catch (_) {}
@@ -128,6 +141,11 @@ class ApiService {
       final response = await http.get(uri, headers: await _getHeaders())
           .timeout(const Duration(seconds: 15));
       _logResponse('GET', uri, response);
+
+      if (response.statusCode == 401) {
+        await logout();
+      }
+
       return response;
     } catch (e) {
       _logError('GET', uri, e);

@@ -54,13 +54,12 @@ class Profile {
   });
 
   factory Profile.fromJson(Map<String, dynamic> json) {
-    String rawImageUrl = json['photo'] ?? '';
     return Profile(
       name: json['name'] ?? 'N/A',
       role: json['role']?['name'] ?? 'Manager', // Role might not be in profile data
       email: json['email'] ?? 'N/A',
       phone: json['phone'] ?? 'N/A',
-      imageUrl: rawImageUrl.isNotEmpty ? '${ApiService.baseImageUrl}/storage/$rawImageUrl' : '',
+      imageUrl: ApiService.getStorageUrl(json['photo']),
     );
   }
 }
@@ -463,39 +462,15 @@ class CustomProfileBox extends StatelessWidget {
             CircleAvatar(
               radius: 40,
               backgroundColor: theme.colorScheme.onPrimary.withAlpha(26), // 10% opacity
-              child: profile.imageUrl.isNotEmpty
-                  ? ClipOval(
-                child: Image.network(
-                  profile.imageUrl,
-                  width: 80,
-                  height: 80,
-                  fit: BoxFit.cover,
-                  loadingBuilder: (context, child, loadingProgress) {
-                    if (loadingProgress == null) return child;
-                    return Center(
-                      child: CircularProgressIndicator(
-                        value: loadingProgress.expectedTotalBytes != null
-                            ? loadingProgress.cumulativeBytesLoaded / (loadingProgress.expectedTotalBytes ?? 1)
-                            : null,
-                        strokeWidth: 2,
-                        valueColor: AlwaysStoppedAnimation<Color>(theme.colorScheme.onPrimary),
-                      ),
-                    );
-                  },
-                  errorBuilder: (context, error, stackTrace) {
-                    return Icon(
-                      Icons.person,
-                      size: 40,
-                      color: theme.colorScheme.primary,
-                    );
-                  },
-                ),
-              )
-                  : Icon(
-                Icons.person,
-                size: 40,
-                color: theme.colorScheme.primary,
-              ),
+              backgroundImage: profile.imageUrl.isNotEmpty
+                  ? NetworkImage(profile.imageUrl)
+                  : const AssetImage('assets/images/girl_image.webp') as ImageProvider,
+              onBackgroundImageError: (exception, stackTrace) {
+                // Silently handle error or log it
+              },
+              child: profile.imageUrl.isEmpty
+                  ? null
+                  : null, // backgroundImage handles it
             ),
             const SizedBox(height: 8),
             Text(profile.name, style: textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold, color: theme.colorScheme.onPrimary)),

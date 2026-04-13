@@ -78,6 +78,15 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
             onPressed: _fetchDashboard,
             icon: const Icon(Icons.refresh),
           ),
+          IconButton(
+            onPressed: () async {
+              await ApiService.logout();
+              if (mounted) {
+                Navigator.of(context).pushNamedAndRemoveUntil('/login', (route) => false);
+              }
+            },
+            icon: const Icon(Icons.logout),
+          ),
         ],
       ),
       body: _isLoading

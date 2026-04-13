@@ -152,6 +152,8 @@ class DashboardData {
   final String systemUptime;
   final List<RecentActivity> recentActivities;
   final List<Testimonial> testimonials;
+  final String userName;
+  final String userPhoto;
 
   DashboardData({
     required this.gridItems,
@@ -161,9 +163,11 @@ class DashboardData {
     required this.systemUptime,
     required this.recentActivities,
     required this.testimonials,
+    this.userName = 'User',
+    this.userPhoto = '',
   });
 
-  factory DashboardData.fromJson(Map<String, dynamic> json) {
+  factory DashboardData.fromJson(Map<String, dynamic> json, {Map<String, dynamic>? profileJson}) {
     final roles = (json['roles'] as List<dynamic>? ?? []).cast<Map<String, dynamic>>();
     final List<GridItem> gridItems = [];
 
@@ -202,6 +206,14 @@ class DashboardData {
     ));
     final testimonialsList = (json['testimonials'] as List<dynamic>? ?? []).cast<Map<String, dynamic>>();
     final testimonials = testimonialsList.map((i) => Testimonial.fromJson(i)).toList();
+
+    String name = 'User';
+    String photo = '';
+    if (profileJson != null) {
+      name = profileJson['user']?['name'] ?? 'User';
+      photo = profileJson['details']?['photo'] ?? '';
+    }
+
     return DashboardData(
       gridItems: gridItems,
       reviews: reviews,
@@ -210,6 +222,8 @@ class DashboardData {
       systemUptime: json['uptime']?.toString() ?? 'N/A',
       recentActivities: recentActivities,
       testimonials: testimonials,
+      userName: name,
+      userPhoto: photo,
     );
   }
 

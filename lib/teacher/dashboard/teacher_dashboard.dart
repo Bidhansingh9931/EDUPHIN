@@ -158,8 +158,7 @@ class _TeacherDashboardPageState extends State<TeacherDashboardPage> {
 
   Widget _buildProfileOverview(UserDetail user) {
     final theme = Theme.of(context);
-    final baseUrl = ApiService.baseUrl.replaceFirst('api/', '');
-    final photoUrl = user.photo != null ? "${ApiService.baseImageUrl}/storage/${user.photo}" : null;
+    final photoUrl = user.photo != null ? ApiService.getStorageUrl(user.photo) : null;
 
     return Card(
       child: Padding(
@@ -172,8 +171,8 @@ class _TeacherDashboardPageState extends State<TeacherDashboardPage> {
                 CircleAvatar(
                   radius: 40,
                   backgroundColor: theme.colorScheme.primary.withValues(alpha: 0.1),
-                  backgroundImage: photoUrl != null ? NetworkImage(photoUrl) : null,
-                  child: photoUrl == null ? Icon(Icons.person, size: 50, color: theme.colorScheme.primary) : null,
+                  backgroundImage: const AssetImage('assets/images/girl_image.webp'),
+                  foregroundImage: photoUrl != null && photoUrl.isNotEmpty ? NetworkImage(photoUrl) : null,
                 ),
                 Container(
                   padding: const EdgeInsets.all(4),

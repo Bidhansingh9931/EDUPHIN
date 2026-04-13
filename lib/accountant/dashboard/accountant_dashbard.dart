@@ -1,5 +1,7 @@
 import 'package:eduphin/services/api_service.dart';
 import 'package:eduphin/services/responsive_helper.dart';
+import 'package:eduphin/login_logout/login.dart';
+import 'package:eduphin/services/api_service.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'accountant_profile.dart';
@@ -62,6 +64,18 @@ class _AccountantDashboardState extends State<AccountantDashboard> {
           IconButton(
             icon: const Icon(Icons.notifications_none_rounded),
             onPressed: () {},
+          ),
+          IconButton(
+            icon: const Icon(Icons.logout),
+            onPressed: () async {
+              await ApiService.logout();
+              if (context.mounted) {
+                Navigator.of(context).pushAndRemoveUntil(
+                  MaterialPageRoute(builder: (context) => const LoginPage()),
+                  (route) => false,
+                );
+              }
+            },
           ),
           const SizedBox(width: 8),
         ],

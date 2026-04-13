@@ -193,14 +193,12 @@ class _StudentProfilePageState extends State<StudentProfilePage> {
                           child: CircleAvatar(
                             radius: 50,
                             backgroundColor: theme.colorScheme.surfaceContainerHighest,
-                            backgroundImage: _selectedImage != null
+                            backgroundImage: const AssetImage('assets/images/girl_image.webp'),
+                            foregroundImage: _selectedImage != null
                                 ? FileImage(_selectedImage!)
-                                : (student?.profileImage != null
-                                    ? NetworkImage("${ApiService.baseUrl}/storage/${student!.profileImage}")
-                                    : null) as ImageProvider?,
-                            child: _selectedImage == null && student?.profileImage == null
-                                ? Icon(Icons.person, size: 50, color: theme.colorScheme.primary)
-                                : null,
+                                : (student?.profileImage != null && student!.profileImage!.isNotEmpty
+                                    ? NetworkImage(ApiService.getStorageUrl(student.profileImage)) as ImageProvider
+                                    : null),
                           ),
                         ),
                         Positioned(
@@ -264,6 +262,42 @@ class _StudentProfilePageState extends State<StudentProfilePage> {
 
             // Content based on tab
             _buildTabContent(),
+            const SizedBox(height: 32),
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                onPressed: () async {
+                  final confirm = await showDialog<bool>(
+                    context: context,
+                    builder: (context) => AlertDialog(
+                      title: const Text("Logout"),
+                      content: const Text("Are you sure you want to logout?"),
+                      actions: [
+                        TextButton(onPressed: () => Navigator.pop(context, false), child: const Text("CANCEL")),
+                        TextButton(
+                          onPressed: () => Navigator.pop(context, true),
+                          child: const Text("LOGOUT", style: TextStyle(color: Colors.red)),
+                        ),
+                      ],
+                    ),
+                  );
+
+                  if (confirm == true) {
+                    await ApiService.logout();
+                    if (mounted) {
+                      Navigator.pushNamedAndRemoveUntil(context, '/login', (route) => false);
+                    }
+                  }
+                },
+                icon: const Icon(Icons.logout, color: Colors.red),
+                label: const Text("LOGOUT", style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold)),
+                style: OutlinedButton.styleFrom(
+                  side: const BorderSide(color: Colors.red),
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                ),
+              ),
+            ),
+            const SizedBox(height: 40),
           ],
         ),
       ),

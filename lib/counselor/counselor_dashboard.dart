@@ -226,8 +226,10 @@ class _CounselorDashboardPageState extends State<CounselorDashboardPage> {
                 CircleAvatar(
                   radius: 35,
                   backgroundColor: theme.colorScheme.onPrimaryContainer.withValues(alpha: 0.1),
-                  backgroundImage: user?.photo != null ? NetworkImage('${ApiService.baseImageUrl}/${user!.photo}') : null,
-                  child: user?.photo == null ? Icon(Icons.person, color: theme.colorScheme.onPrimaryContainer, size: 35) : null,
+                  backgroundImage: const AssetImage('assets/images/girl_image.webp'),
+                  foregroundImage: user?.photo != null && user!.photo!.isNotEmpty
+                      ? NetworkImage(ApiService.getStorageUrl(user.photo))
+                      : null,
                 ),
                 const SizedBox(width: 20),
                 Expanded(

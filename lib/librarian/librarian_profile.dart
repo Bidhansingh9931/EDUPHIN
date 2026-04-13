@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'package:eduphin/login_logout/login.dart';
 import 'package:eduphin/services/responsive_helper.dart';
 import 'package:flutter/material.dart';
 import '../services/api_service.dart';
@@ -281,6 +282,26 @@ class _LibrarianProfilePageState extends State<LibrarianProfilePage> {
                   onPressed: _isLoading ? null : _saveProfile,
                   icon: _isLoading ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white)) : const Icon(Icons.save_outlined),
                   label: const Text("UPDATE PROFILE"),
+                ),
+                const SizedBox(height: 16),
+                OutlinedButton.icon(
+                  onPressed: () async {
+                    await ApiService.logout();
+                    if (mounted) {
+                      Navigator.pushAndRemoveUntil(
+                        context,
+                        MaterialPageRoute(builder: (context) => const LoginPage()),
+                        (route) => false,
+                      );
+                    }
+                  },
+                  icon: const Icon(Icons.logout),
+                  label: const Text("LOGOUT"),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: Colors.red,
+                    side: const BorderSide(color: Colors.red),
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                  ),
                 ),
                 const SizedBox(height: 40),
               ],

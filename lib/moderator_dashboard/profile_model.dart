@@ -105,7 +105,7 @@ class ProfileData {
       position: map['position'] ?? '',
       employmentType: map['employment_type'] ?? '',
       userId: map['user_id'] ?? 0,
-      photo: map['photo'] ?? 'assets/images/girl_image.webp',
+      photo: map['photo'] ?? '',
       gender: map['gender'] ?? '',
       dateOfBirth: map['date_of_birth'] ?? '',
       aadharNumber: map['aadhar_number'] ?? '',
@@ -166,6 +166,7 @@ class ProfileData {
       'experience': experience,
       'status': status,
       'reference': reference,
+      'photo': photo,
     };
   }
 }

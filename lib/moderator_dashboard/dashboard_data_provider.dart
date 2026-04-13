@@ -7,25 +7,41 @@ import 'dashboard_models.dart';
 class DashboardDataProvider {
   Future<DashboardData> fetchDashboardData() async {
     try {
-      final response = await ApiService.get('moderator/dashboard');
+      final responses = await Future.wait([
+        ApiService.get('moderator/dashboard'),
+        ApiService.get('moderator/profile'),
+      ]);
+
+      final dashboardResponse = responses[0];
+      final profileResponse = responses[1];
 
       if (kDebugMode) {
-        print('API Response Status Code: \${response.statusCode}');
+        print('Dashboard API Response Status Code: ${dashboardResponse.statusCode}');
+        print('Profile API Response Status Code: ${profileResponse.statusCode}');
       }
 
-      if (response.statusCode == 200) {
+      if (dashboardResponse.statusCode == 200) {
         try {
-          final responseBody = json.decode(response.body);
+          final dashboardBody = json.decode(dashboardResponse.body);
+          Map<String, dynamic>? profileBody;
+
+          if (profileResponse.statusCode == 200) {
+            profileBody = json.decode(profileResponse.body);
+          }
+
           if (kDebugMode) {
-            print('API Response Body: $responseBody');
+            print('Dashboard API Response Body: $dashboardBody');
+            if (profileBody != null) {
+              print('Profile API Response Data: $profileBody');
+            }
           }
 
           // The actual dashboard data is nested under the 'data' key.
-          if (responseBody['success'] == true && responseBody['data'] != null) {
-            return DashboardData.fromJson(responseBody['data']);
+          if (dashboardBody['success'] == true && dashboardBody['data'] != null) {
+            return DashboardData.fromJson(dashboardBody['data'], profileJson: profileBody);
           } else {
             // Handle cases where success is false or data is null.
-            throw Exception('API call successful but returned no data or indicated failure.');
+            throw Exception('Dashboard API call successful but returned no data or indicated failure.');
           }
         } catch (e) {
           if (kDebugMode) {
@@ -35,7 +51,7 @@ class DashboardDataProvider {
         }
       } else {
         if (kDebugMode) {
-          print('API responded with error code: \${response.statusCode}');
+          print('Dashboard API responded with error code: ${dashboardResponse.statusCode}');
         }
         throw Exception('Failed to load dashboard data.');
       }

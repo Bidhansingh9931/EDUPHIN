@@ -185,7 +185,7 @@ class _ModeratorProfilePageState extends State<ModeratorProfilePage> {
             return Center(child: Text('Error: ${snapshot.error}', style: TextStyle(color: colorScheme.error)));
           } else if (snapshot.hasData) {
             final data = snapshot.data!;
-            final imageUrl = data.photo.startsWith('http') ? data.photo : '${ApiService.baseUrl.replaceAll("/api", "")}/storage/${data.photo}';
+            final imageUrl = ApiService.getStorageUrl(data.photo);
 
             return SingleChildScrollView(
               padding: context.pagePadding,
@@ -289,8 +289,10 @@ class _ModeratorProfilePageState extends State<ModeratorProfilePage> {
           CircleAvatar(
             radius: 60,
             backgroundColor: theme.colorScheme.surface,
-            backgroundImage: NetworkImage(imageUrl),
-            child: data.photo.isEmpty ? Icon(Icons.person_rounded, size: 60, color: theme.colorScheme.primary) : null,
+            backgroundImage: const AssetImage('assets/images/girl_image.webp'),
+            foregroundImage: data.photo.isNotEmpty
+                ? NetworkImage(imageUrl)
+                : null,
           ),
           const SizedBox(height: 24),
           Text(data.name, style: theme.textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w900)),

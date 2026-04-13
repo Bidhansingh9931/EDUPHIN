@@ -169,40 +169,26 @@ class _StudentDashboardState extends State<StudentDashboard> {
   }
 
   Widget _buildHeader(BuildContext context) {
-    String? profileImageUrl = dashboardData?.student?.profileImage;
-    if (profileImageUrl != null && profileImageUrl.isNotEmpty && !profileImageUrl.startsWith('http')) {
-      profileImageUrl = "${ApiService.baseUrl}/storage/$profileImageUrl";
-    }
+    String? photoPath = dashboardData?.student?.profileImage;
 
     return Column(
       children: [
         const SizedBox(height: 10),
-        if (profileImageUrl != null && profileImageUrl.isNotEmpty)
-          Container(
-            padding: const EdgeInsets.all(4),
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              border: Border.all(color: _primary.withValues(alpha: 0.5), width: 2),
-            ),
-            child: CircleAvatar(
-              radius: 50,
-              backgroundColor: _card,
-              backgroundImage: NetworkImage(profileImageUrl),
-            ),
-          )
-        else
-          Container(
-            padding: const EdgeInsets.all(4),
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              border: Border.all(color: _primary.withValues(alpha: 0.5), width: 2),
-            ),
-            child: CircleAvatar(
-              radius: 50,
-              backgroundColor: _card,
-              child: Icon(Icons.person, size: 50, color: _primary),
-            ),
+        Container(
+          padding: const EdgeInsets.all(4),
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            border: Border.all(color: _primary.withValues(alpha: 0.5), width: 2),
           ),
+          child: CircleAvatar(
+            radius: 50,
+            backgroundColor: _card,
+            backgroundImage: const AssetImage('assets/images/girl_image.webp'),
+            foregroundImage: photoPath != null && photoPath.isNotEmpty
+                ? NetworkImage(ApiService.getStorageUrl(photoPath))
+                : null,
+          ),
+        ),
         const SizedBox(height: 16),
         Text("Welcome Back!", style: TextStyle(color: _textSecondary, fontSize: 16, fontWeight: FontWeight.w500)),
         const SizedBox(height: 8),
@@ -603,7 +589,10 @@ class _StudentDashboardState extends State<StudentDashboard> {
             decoration: BoxDecoration(color: _surface),
             currentAccountPicture: CircleAvatar(
               backgroundColor: _primary,
-              child: Text(dashboardData?.user?.name[0] ?? "S", style: const TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold)),
+              backgroundImage: const AssetImage('assets/images/girl_image.webp'),
+              foregroundImage: (dashboardData?.student?.profileImage != null && dashboardData!.student!.profileImage!.isNotEmpty)
+                  ? NetworkImage(ApiService.getStorageUrl(dashboardData!.student!.profileImage))
+                  : null,
             ),
             accountName: Text(dashboardData?.user?.name ?? "Student", style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 16)),
             accountEmail: Text(dashboardData?.user?.email ?? "", style: const TextStyle(color: Colors.white70)),

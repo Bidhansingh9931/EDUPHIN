@@ -156,16 +156,20 @@ class _StudentCardPageState extends State<StudentCardPage> {
                     decoration: BoxDecoration(
                       color: const Color(0xFFCFD3DA),
                       borderRadius: BorderRadius.circular(14),
-                      image: student?.profileImage != null
-                          ? DecorationImage(
-                              image: NetworkImage("${ApiService.baseUrl}/storage/${student!.profileImage}"),
-                              fit: BoxFit.cover,
-                            )
-                          : null,
+                      image: const DecorationImage(
+                        image: AssetImage('assets/images/girl_image.webp'),
+                        fit: BoxFit.cover,
+                      ),
                     ),
-                    child: student?.profileImage == null
-                        ? const Icon(Icons.person,
-                            size: 50, color: Color(0xFF3F476B))
+                    child: student?.profileImage != null && student!.profileImage!.isNotEmpty
+                        ? ClipRRect(
+                            borderRadius: BorderRadius.circular(14),
+                            child: Image.network(
+                              ApiService.getStorageUrl(student.profileImage),
+                              fit: BoxFit.cover,
+                              errorBuilder: (context, error, stackTrace) => const SizedBox.shrink(),
+                            ),
+                          )
                         : null,
                   ),
 
