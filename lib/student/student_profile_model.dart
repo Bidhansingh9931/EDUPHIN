@@ -81,7 +81,10 @@ class StudentDetail {
       firstName: json['first_name'] ?? '',
       middleName: json['middle_name'],
       lastName: json['last_name'],
-      profileImage: json['profile_image'],
+      profileImage: (json['profile_image'] ?? 
+                    json['photo'] ?? 
+                    json['image'] ?? 
+                    json['avatar'])?.toString(),
       studentRollNo: json['student_roll_no'],
       registrationNo: json['registration_no'],
       academicSession: json['academic_session'],

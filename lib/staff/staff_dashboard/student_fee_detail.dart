@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../services/api_service.dart';
+import '../../services/responsive_helper.dart';
 import 'staff_models.dart';
 
 class StaffStudentFeeDetailPage extends StatefulWidget {
@@ -10,17 +11,14 @@ class StaffStudentFeeDetailPage extends StatefulWidget {
 }
 
 class _StaffStudentFeeDetailPageState extends State<StaffStudentFeeDetailPage> {
-  static const Color bgColor = Color(0xFF0F1630);
-  static const Color cardColor = Color(0xFF1D2645);
-  static const Color primaryColor = Color(0xFF6C63FF);
-
   final TextEditingController _searchController = TextEditingController();
   StudentFeeDetail? _feeDetail;
   bool _isLoading = false;
   String? _error;
 
   Future<void> _fetchDetail() async {
-    if (_searchController.text.trim().isEmpty) return;
+    final query = _searchController.text.trim();
+    if (query.isEmpty) return;
 
     setState(() {
       _isLoading = true;
@@ -29,7 +27,7 @@ class _StaffStudentFeeDetailPageState extends State<StaffStudentFeeDetailPage> {
     });
 
     try {
-      final detail = await ApiService.getStaffStudentFeeDetail(_searchController.text.trim());
+      final detail = await ApiService.getStaffStudentFeeDetail(query);
       setState(() {
         _feeDetail = detail;
         _isLoading = false;
@@ -44,108 +42,226 @@ class _StaffStudentFeeDetailPageState extends State<StaffStudentFeeDetailPage> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = context.theme;
     return Scaffold(
-      backgroundColor: bgColor,
+      backgroundColor: theme.colorScheme.surface,
       appBar: AppBar(
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        title: const Text("Student Fee Detail", style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white)),
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white, size: 20),
-          onPressed: () => Navigator.pop(context),
-        ),
+        title: const Text("Student Fee Detail"),
       ),
       body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16.0),
+        padding: context.pagePadding,
+        child: Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 800),
+            child: Column(
+              children: [
+                _buildSearchBox(context),
+                SizedBox(height: context.scale(24)),
+                if (_isLoading)
+                  Padding(
+                    padding: EdgeInsets.all(context.scale(32)),
+                    child: const CircularProgressIndicator(),
+                  )
+                else if (_error != null)
+                  _buildErrorState(context)
+                else if (_feeDetail != null) ...[
+                  _buildStudentInfo(context, _feeDetail!),
+                  SizedBox(height: context.scale(24)),
+                  _buildFeeSummary(context, _feeDetail!),
+                ] else
+                  _buildEmptyState(context),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSearchBox(BuildContext context) {
+    final theme = context.theme;
+    return Card(
+      elevation: 0,
+      color: theme.colorScheme.surfaceContainerLow,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(context.scale(20)),
+        side: BorderSide(color: theme.colorScheme.outlineVariant, width: 0.5),
+      ),
+      child: Padding(
+        padding: EdgeInsets.all(context.scale(20)),
         child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            _buildSearchBox(),
-            const SizedBox(height: 20),
-            if (_isLoading)
-              const Center(child: CircularProgressIndicator())
-            else if (_error != null)
-              Center(child: Text(_error!, style: const TextStyle(color: Colors.redAccent)))
-            else if (_feeDetail != null) ...[
-              _buildStudentInfo(_feeDetail!),
-              const SizedBox(height: 20),
-              _buildFeeSummary(_feeDetail!),
-            ] else
-              const Center(child: Text("Enter Student ID to search details", style: TextStyle(color: Colors.white38))),
+            Text(
+              "Query Fee Status",
+              style: theme.textTheme.titleMedium?.copyWith(
+                fontWeight: FontWeight.bold,
+                fontSize: context.font(16),
+              ),
+            ),
+            SizedBox(height: context.scale(16)),
+            TextField(
+              controller: _searchController,
+              style: TextStyle(fontSize: context.font(14)),
+              onSubmitted: (_) => _fetchDetail(),
+              decoration: InputDecoration(
+                hintText: "Enter Student ID...",
+                prefixIcon: Icon(Icons.search, size: context.scale(20)),
+                filled: true,
+                fillColor: theme.colorScheme.surface,
+                suffixIcon: IconButton(
+                  icon: Icon(Icons.arrow_forward_rounded, color: theme.colorScheme.primary, size: context.scale(20)),
+                  onPressed: _fetchDetail,
+                ),
+              ),
+            ),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildSearchBox() {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(color: cardColor, borderRadius: BorderRadius.circular(12)),
-      child: TextField(
-        controller: _searchController,
-        style: const TextStyle(color: Colors.white),
-        onSubmitted: (_) => _fetchDetail(),
-        decoration: InputDecoration(
-          hintText: "Search Student ID...",
-          hintStyle: const TextStyle(color: Colors.white24),
-          prefixIcon: const Icon(Icons.search, color: Colors.white38),
-          suffixIcon: IconButton(
-            icon: const Icon(Icons.send_rounded, color: primaryColor),
-            onPressed: _fetchDetail,
-          ),
-          filled: true,
-          fillColor: Colors.white.withValues(alpha: 0.05),
-          border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide.none),
+  Widget _buildErrorState(BuildContext context) {
+    return Column(
+      children: [
+        Icon(Icons.error_outline, color: context.theme.colorScheme.error, size: context.scale(48)),
+        SizedBox(height: context.scale(16)),
+        Text(_error!, 
+          style: TextStyle(color: context.theme.colorScheme.error, fontSize: context.font(14)),
+          textAlign: TextAlign.center,
+        ),
+      ],
+    );
+  }
+
+  Widget _buildEmptyState(BuildContext context) {
+    return Column(
+      children: [
+        Icon(Icons.person_search_outlined, color: context.theme.colorScheme.primary.withValues(alpha: 0.2), size: context.scale(64)),
+        SizedBox(height: context.scale(16)),
+        Text("Search by Student ID to view detailed fee reports", 
+          style: TextStyle(color: context.theme.hintColor, fontSize: context.font(14))),
+      ],
+    );
+  }
+
+  Widget _buildStudentInfo(BuildContext context, StudentFeeDetail detail) {
+    final theme = context.theme;
+    return Card(
+      elevation: 0,
+      color: theme.colorScheme.surfaceContainerLow,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(context.scale(20)),
+        side: BorderSide(color: theme.colorScheme.outlineVariant, width: 0.5),
+      ),
+      child: Padding(
+        padding: EdgeInsets.all(context.scale(20)),
+        child: Row(
+          children: [
+            CircleAvatar(
+              radius: context.scale(28),
+              backgroundColor: theme.colorScheme.primary.withValues(alpha: 0.1),
+              child: Icon(Icons.person_rounded, color: theme.colorScheme.primary, size: context.scale(28)),
+            ),
+            SizedBox(width: context.scale(16)),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(detail.studentName, 
+                    style: theme.textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.bold,
+                      fontSize: context.font(18),
+                    ),
+                  ),
+                  SizedBox(height: context.scale(4)),
+                  Text("Roll No: ${detail.rollNo} • Class: ${detail.className}", 
+                    style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: context.font(13))),
+                ],
+              ),
+            ),
+          ],
         ),
       ),
     );
   }
 
-  Widget _buildStudentInfo(StudentFeeDetail detail) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(color: cardColor, borderRadius: BorderRadius.circular(16)),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(detail.studentName, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 18)),
-          const SizedBox(height: 4),
-          Text("Roll No: ${detail.rollNo}", style: const TextStyle(color: Colors.white38, fontSize: 13)),
-          Text("Class: ${detail.className}", style: const TextStyle(color: Colors.white38, fontSize: 13)),
-        ],
+  Widget _buildFeeSummary(BuildContext context, StudentFeeDetail detail) {
+    final theme = context.theme;
+    return Card(
+      elevation: 0,
+      color: theme.colorScheme.surfaceContainerLow,
+      clipBehavior: Clip.antiAlias,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(context.scale(20)),
+        side: BorderSide(color: theme.colorScheme.outlineVariant, width: 0.5),
       ),
-    );
-  }
-
-  Widget _buildFeeSummary(StudentFeeDetail detail) {
-    return Container(
-      decoration: BoxDecoration(color: cardColor, borderRadius: BorderRadius.circular(16)),
       child: Column(
         children: [
           Container(
-            padding: const EdgeInsets.all(16),
-            decoration: const BoxDecoration(color: Colors.green, borderRadius: BorderRadius.vertical(top: Radius.circular(16))),
-            child: const Row(
+            padding: EdgeInsets.all(context.scale(20)),
+            decoration: BoxDecoration(
+              color: theme.colorScheme.primary.withValues(alpha: 0.05),
+              border: Border(bottom: BorderSide(color: theme.colorScheme.outlineVariant, width: 0.5)),
+            ),
+            child: Row(
               children: [
-                Icon(Icons.receipt_long, color: Colors.white),
-                SizedBox(width: 12),
-                Text("Fee Summary", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                Icon(Icons.receipt_long, color: theme.colorScheme.primary, size: context.scale(20)),
+                SizedBox(width: context.scale(12)),
+                Text("Payment Records", 
+                  style: theme.textTheme.titleSmall?.copyWith(
+                    fontWeight: FontWeight.bold,
+                    fontSize: context.font(14),
+                  ),
+                ),
               ],
             ),
           ),
-          ...detail.fees.map((fee) => _buildFeeItem(fee.title, "₹${fee.amount}", fee.status)).toList(),
+          ...detail.fees.map((fee) => _buildFeeItem(context, fee)),
         ],
       ),
     );
   }
 
-  Widget _buildFeeItem(String title, String amount, String status) {
-    bool isPaid = status.toLowerCase() == 'paid';
-    return ListTile(
-      title: Text(title, style: const TextStyle(color: Colors.white, fontSize: 14)),
-      subtitle: Text(amount, style: const TextStyle(color: Color(0xFF00D1FF), fontWeight: FontWeight.bold)),
-      trailing: Text(status.toUpperCase(), style: TextStyle(color: isPaid ? Colors.greenAccent : Colors.orangeAccent, fontWeight: FontWeight.bold, fontSize: 12)),
+  Widget _buildFeeItem(BuildContext context, StudentFeeItem fee) {
+    final theme = context.theme;
+    bool isPaid = fee.status.toLowerCase() == 'paid';
+    // Semantic Colors: Emerald (Paid/Success) 0xFF10B981, Amber (Pending/Warning) 0xFFF59E0B
+    Color statusColor = isPaid ? const Color(0xFF10B981) : const Color(0xFFF59E0B);
+
+    return Container(
+      decoration: BoxDecoration(
+        border: Border(bottom: BorderSide(color: theme.colorScheme.outlineVariant, width: 0.5)),
+      ),
+      child: Padding(
+        padding: EdgeInsets.symmetric(horizontal: context.scale(20), vertical: context.scale(16)),
+        child: Row(
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(fee.title, style: TextStyle(color: theme.colorScheme.onSurface, fontSize: context.font(14), fontWeight: FontWeight.bold)),
+                  SizedBox(height: context.scale(4)),
+                  Text("₹${fee.amount}", style: TextStyle(color: theme.colorScheme.primary, fontWeight: FontWeight.bold, fontSize: context.font(13))),
+                ],
+              ),
+            ),
+            Container(
+              padding: EdgeInsets.symmetric(horizontal: context.scale(12), vertical: context.scale(6)),
+              decoration: BoxDecoration(
+                color: statusColor.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(context.scale(12)),
+                border: Border.all(color: statusColor.withValues(alpha: 0.2)),
+              ),
+              child: Text(
+                fee.status.toUpperCase(),
+                style: TextStyle(color: statusColor, fontWeight: FontWeight.bold, fontSize: context.font(11), letterSpacing: 0.5),
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

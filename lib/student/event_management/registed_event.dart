@@ -1,3 +1,4 @@
+import 'package:eduphin/services/responsive_helper.dart';
 import 'package:flutter/material.dart';
 import 'package:eduphin/services/api_service.dart';
 import 'package:intl/intl.dart';
@@ -14,12 +15,6 @@ class _RegisteredEventsPageState extends State<RegisteredEventsPage> {
   String _typeValue = "All";
   List<dynamic> _registeredEvents = [];
   bool _isLoading = true;
-
-  final Color _bg = const Color(0xff0B1220);
-  final Color _card = const Color(0xff1E2746);
-  final Color _primary = const Color(0xff3366FF);
-  final Color _secondary = const Color(0xff3E4764);
-  final Color _headerRow = const Color(0xff2A3450);
 
   @override
   void initState() {
@@ -50,10 +45,11 @@ class _RegisteredEventsPageState extends State<RegisteredEventsPage> {
     } catch (e) {
       setState(() => _isLoading = false);
       if (mounted) {
+        final theme = context.theme;
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text("Error fetching registered events: $e"),
-            backgroundColor: Colors.redAccent,
+            backgroundColor: theme.colorScheme.error,
           ),
         );
       }
@@ -61,53 +57,59 @@ class _RegisteredEventsPageState extends State<RegisteredEventsPage> {
   }
 
   Future<void> _cancelRegistration(dynamic registration) async {
+    final theme = context.theme;
+    final colorScheme = theme.colorScheme;
     final TextEditingController reasonController = TextEditingController();
     final bool? confirm = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        backgroundColor: _card,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Text("Cancel Registration", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text("Are you sure you want to cancel your registration for this event?", 
-              style: TextStyle(color: Colors.white70, fontSize: 13, height: 1.5)),
-            const SizedBox(height: 20),
-            TextField(
-              controller: reasonController,
-              style: const TextStyle(color: Colors.white),
-              decoration: InputDecoration(
-                labelText: "Reason (Optional)",
-                labelStyle: TextStyle(color: Colors.white.withValues(alpha: 0.5)),
-                filled: true,
-                fillColor: _bg.withValues(alpha: 0.5),
-                enabledBorder: OutlineInputBorder(
-                  borderSide: BorderSide(color: Colors.white.withValues(alpha: 0.1)),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                focusedBorder: OutlineInputBorder(
-                  borderSide: BorderSide(color: Colors.redAccent),
-                  borderRadius: BorderRadius.circular(12),
+        backgroundColor: colorScheme.surfaceContainerLow,
+        surfaceTintColor: colorScheme.surfaceTint,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(context.scale(16))),
+        title: Text("Cancel Registration", style: TextStyle(color: theme.textTheme.titleLarge?.color, fontWeight: FontWeight.bold, fontSize: context.font(20))),
+        content: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 400),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text("Are you sure you want to cancel your registration for this event?", 
+                style: TextStyle(color: colorScheme.onSurfaceVariant, fontSize: context.font(13), height: 1.5)),
+              SizedBox(height: context.lg),
+              TextField(
+                controller: reasonController,
+                style: TextStyle(color: theme.textTheme.bodyLarge?.color, fontSize: context.font(14)),
+                decoration: InputDecoration(
+                  labelText: "Reason (Optional)",
+                  labelStyle: TextStyle(color: colorScheme.onSurfaceVariant, fontSize: context.font(14)),
+                  filled: true,
+                  fillColor: colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
+                  enabledBorder: OutlineInputBorder(
+                    borderSide: BorderSide(color: colorScheme.outlineVariant),
+                    borderRadius: BorderRadius.circular(context.scale(12)),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderSide: BorderSide(color: colorScheme.error),
+                    borderRadius: BorderRadius.circular(context.scale(12)),
+                  ),
                 ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false), 
-            child: Text("NO, KEEP IT", style: TextStyle(color: Colors.white.withValues(alpha: 0.5)))
+            child: Text("NO, KEEP IT", style: TextStyle(color: colorScheme.onSurfaceVariant, fontSize: context.font(14)))
           ),
           ElevatedButton(
             onPressed: () => Navigator.pop(context, true),
             style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.redAccent,
-              foregroundColor: Colors.white,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              backgroundColor: colorScheme.error,
+              foregroundColor: colorScheme.onError,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(context.scale(8))),
             ),
-            child: const Text("YES, CANCEL"),
+            child: Text("YES, CANCEL", style: TextStyle(fontSize: context.font(14))),
           ),
         ],
       ),
@@ -124,7 +126,7 @@ class _RegisteredEventsPageState extends State<RegisteredEventsPage> {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
               content: Text("Registration cancelled successfully"),
-              backgroundColor: Colors.green,
+              backgroundColor: Color(0xFF10B981), // Emerald
             ),
           );
           _fetchRegisteredEvents();
@@ -134,7 +136,7 @@ class _RegisteredEventsPageState extends State<RegisteredEventsPage> {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text("Cancellation failed: $e"),
-              backgroundColor: Colors.redAccent,
+              backgroundColor: theme.colorScheme.error,
             ),
           );
         }
@@ -144,59 +146,61 @@ class _RegisteredEventsPageState extends State<RegisteredEventsPage> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = context.theme;
     return Scaffold(
-      backgroundColor: _bg,
+      backgroundColor: theme.scaffoldBackgroundColor,
       appBar: AppBar(
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.white),
-          onPressed: () => Navigator.pop(context),
-        ),
-        title: const Text(
-          "My Registered Events",
-          style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white),
-        ),
+        title: const Text("My Registered Events"),
       ),
       body: RefreshIndicator(
         onRefresh: _fetchRegisteredEvents,
-        color: _primary,
-        backgroundColor: _card,
+        color: theme.colorScheme.primary,
+        backgroundColor: theme.cardColor,
         child: SingleChildScrollView(
           physics: const AlwaysScrollableScrollPhysics(),
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              _buildFilters(),
-              const SizedBox(height: 24),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          padding: context.pagePadding,
+          child: Center(
+            child: Container(
+              constraints: const BoxConstraints(maxWidth: 1100),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text(
-                    "Participations",
-                    style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
+                  _buildFilters(),
+                  SizedBox(height: context.xl),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        "Participations",
+                        style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold, fontSize: context.font(20)),
+                      ),
+                      Text(
+                        "${_registeredEvents.length} registrations",
+                        style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant, fontSize: context.font(12)),
+                      ),
+                    ],
                   ),
-                  Text(
-                    "${_registeredEvents.length} registrations",
-                    style: TextStyle(color: Colors.white.withValues(alpha: 0.5), fontSize: 13),
-                  ),
+                  SizedBox(height: context.lg),
+                  _isLoading
+                      ? Center(child: Padding(padding: EdgeInsets.all(context.scale(40)), child: CircularProgressIndicator(color: theme.colorScheme.primary)))
+                      : _registeredEvents.isEmpty
+                          ? _buildEmptyState()
+                          : GridView.builder(
+                              shrinkWrap: true,
+                              physics: const NeverScrollableScrollPhysics(),
+                              gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                                crossAxisCount: context.responsive(1, tablet: 2, desktop: 3),
+                                crossAxisSpacing: context.md,
+                                mainAxisSpacing: context.md,
+                                mainAxisExtent: context.scale(360),
+                              ),
+                              itemCount: _registeredEvents.length,
+                              itemBuilder: (context, index) => _buildRegistrationCard(_registeredEvents[index]),
+                            ),
+                  SizedBox(height: context.xl),
                 ],
               ),
-              const SizedBox(height: 16),
-              _isLoading
-                  ? Center(child: Padding(padding: const EdgeInsets.all(40.0), child: CircularProgressIndicator(color: _primary)))
-                  : _registeredEvents.isEmpty
-                      ? _buildEmptyState()
-                      : ListView.separated(
-                          shrinkWrap: true,
-                          physics: const NeverScrollableScrollPhysics(),
-                          itemCount: _registeredEvents.length,
-                          separatorBuilder: (context, index) => const SizedBox(height: 16),
-                          itemBuilder: (context, index) => _buildRegistrationCard(_registeredEvents[index]),
-                        ),
-              const SizedBox(height: 32),
-            ],
+            ),
           ),
         ),
       ),
@@ -204,109 +208,120 @@ class _RegisteredEventsPageState extends State<RegisteredEventsPage> {
   }
 
   Widget _buildFilters() {
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: _card,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
+    final theme = context.theme;
+    final colorScheme = theme.colorScheme;
+    return Card(
+      elevation: 0,
+      color: colorScheme.surfaceContainerLow,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(context.scale(16)),
+        side: BorderSide(color: colorScheme.outlineVariant.withValues(alpha: 0.5)),
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Icon(Icons.filter_list, color: _primary, size: 20),
-              const SizedBox(width: 10),
-              const Text("Filter History", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)),
-            ],
-          ),
-          const SizedBox(height: 20),
-          Row(
-            children: [
-              Expanded(
-                child: _buildDropdown(
-                  "Status", 
-                  _statusValue, 
-                  ["All", "Active", "Completed", "Cancelled"], 
-                  (val) => setState(() => _statusValue = val!)
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: _buildDropdown(
-                  "Type", 
-                  _typeValue, 
-                  ["All", "Paid", "Free"], 
-                  (val) => setState(() => _typeValue = val!)
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 20),
-          Row(
-            children: [
-              Expanded(
-                child: OutlinedButton(
-                  onPressed: () {
-                    setState(() {
-                      _statusValue = "All";
-                      _typeValue = "All";
-                    });
-                    _fetchRegisteredEvents();
-                  },
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: Colors.white,
-                    side: BorderSide(color: Colors.white.withValues(alpha: 0.2)),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                    padding: const EdgeInsets.symmetric(vertical: 14),
+      child: Padding(
+        padding: EdgeInsets.all(context.scale(24)),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(Icons.filter_list, color: colorScheme.primary, size: context.scale(24)),
+                SizedBox(width: context.scale(12)),
+                Text("Filter History", style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold, fontSize: context.font(18))),
+              ],
+            ),
+            SizedBox(height: context.scale(24)),
+            LayoutBuilder(builder: (context, constraints) {
+              final isWide = constraints.maxWidth > 600;
+              return Wrap(
+                spacing: context.scale(20),
+                runSpacing: context.scale(16),
+                children: [
+                  SizedBox(
+                    width: isWide ? (constraints.maxWidth - context.scale(20)) / 2 : double.infinity,
+                    child: _buildDropdown(
+                      "Status", 
+                      _statusValue, 
+                      ["All", "Active", "Completed", "Cancelled"], 
+                      (val) => setState(() => _statusValue = val!)
+                    ),
                   ),
-                  child: const Text("RESET"),
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: ElevatedButton(
-                  onPressed: _fetchRegisteredEvents,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: _primary,
-                    foregroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                    padding: const EdgeInsets.symmetric(vertical: 14),
-                    elevation: 0,
+                  SizedBox(
+                    width: isWide ? (constraints.maxWidth - context.scale(20)) / 2 : double.infinity,
+                    child: _buildDropdown(
+                      "Type", 
+                      _typeValue, 
+                      ["All", "Paid", "Free"], 
+                      (val) => setState(() => _typeValue = val!)
+                    ),
                   ),
-                  child: const Text("APPLY", style: TextStyle(fontWeight: FontWeight.bold)),
+                ],
+              );
+            }),
+            SizedBox(height: context.scale(24)),
+            Row(
+              children: [
+                const Spacer(flex: 2),
+                Expanded(
+                  child: OutlinedButton(
+                    onPressed: () {
+                      setState(() {
+                        _statusValue = "All";
+                        _typeValue = "All";
+                      });
+                      _fetchRegisteredEvents();
+                    },
+                    style: OutlinedButton.styleFrom(
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(context.scale(12))),
+                      padding: EdgeInsets.symmetric(vertical: context.scale(16)),
+                    ),
+                    child: Text("RESET", style: TextStyle(fontSize: context.font(14))),
+                  ),
                 ),
-              ),
-            ],
-          ),
-        ],
+                SizedBox(width: context.scale(16)),
+                Expanded(
+                  child: ElevatedButton(
+                    onPressed: _fetchRegisteredEvents,
+                    style: ElevatedButton.styleFrom(
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(context.scale(12))),
+                      padding: EdgeInsets.symmetric(vertical: context.scale(16)),
+                      elevation: 0,
+                    ),
+                    child: Text("APPLY", style: TextStyle(fontWeight: FontWeight.bold, fontSize: context.font(14))),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
       ),
     );
   }
 
   Widget _buildDropdown(String label, String value, List<String> items, Function(String?) onChanged) {
+    final theme = context.theme;
+    final colorScheme = theme.colorScheme;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(label, style: TextStyle(color: Colors.white.withValues(alpha: 0.5), fontSize: 12)),
-        const SizedBox(height: 8),
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 12),
-          decoration: BoxDecoration(
-            color: _bg.withValues(alpha: 0.5),
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
-          ),
-          child: DropdownButtonHideUnderline(
-            child: DropdownButton<String>(
-              value: value,
-              dropdownColor: _card,
-              icon: const Icon(Icons.keyboard_arrow_down, color: Colors.white70, size: 20),
-              isExpanded: true,
-              style: const TextStyle(color: Colors.white, fontSize: 14),
-              items: items.map((e) => DropdownMenuItem(value: e, child: Text(e))).toList(),
-              onChanged: onChanged,
+        Text(label, style: theme.textTheme.labelSmall?.copyWith(color: colorScheme.onSurfaceVariant, fontWeight: FontWeight.bold, fontSize: context.font(12))),
+        SizedBox(height: context.scale(8)),
+        DropdownButtonFormField<String>(
+          value: value,
+          dropdownColor: colorScheme.surfaceContainerLow,
+          onChanged: onChanged,
+          items: items.map((e) => DropdownMenuItem(value: e, child: Text(e, style: TextStyle(fontSize: context.font(14))))).toList(),
+          decoration: InputDecoration(
+            isDense: true,
+            filled: true,
+            fillColor: colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
+            contentPadding: EdgeInsets.symmetric(horizontal: context.scale(16), vertical: context.scale(12)),
+            enabledBorder: OutlineInputBorder(
+              borderSide: BorderSide(color: colorScheme.outlineVariant),
+              borderRadius: BorderRadius.circular(context.scale(12)),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderSide: BorderSide(color: colorScheme.primary),
+              borderRadius: BorderRadius.circular(context.scale(12)),
             ),
           ),
         ),
@@ -315,6 +330,8 @@ class _RegisteredEventsPageState extends State<RegisteredEventsPage> {
   }
 
   Widget _buildRegistrationCard(dynamic registration) {
+    final theme = context.theme;
+    final colorScheme = theme.colorScheme;
     final event = registration['event'];
     if (event == null) return const SizedBox.shrink();
 
@@ -331,68 +348,83 @@ class _RegisteredEventsPageState extends State<RegisteredEventsPage> {
     final bool isCancelled = status == 'CANCELLED';
     final eventDate = eventDateStr != null ? DateTime.tryParse(eventDateStr) : null;
     final bool isExpired = eventDate != null && eventDate.isBefore(DateTime.now());
+    final primaryColor = colorScheme.primary;
 
-    Color statusColor = Colors.greenAccent;
-    if (isCancelled) statusColor = Colors.redAccent;
-    else if (isExpired) statusColor = Colors.grey;
+    Color statusColor = const Color(0xFF10B981); // Emerald
+    if (isCancelled) {
+      statusColor = const Color(0xFFEF4444); // Red
+    } else if (isExpired) {
+      statusColor = colorScheme.onSurfaceVariant;
+    }
 
-    return Container(
-      decoration: BoxDecoration(
-        color: _card,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
+    return Card(
+      elevation: 0,
+      clipBehavior: Clip.antiAlias,
+      color: colorScheme.surfaceContainerLow,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(context.scale(16)),
+        side: BorderSide(color: colorScheme.outlineVariant.withValues(alpha: 0.5)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Padding(
-            padding: const EdgeInsets.all(16),
+            padding: EdgeInsets.all(context.scale(16)),
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 ClipRRect(
-                  borderRadius: BorderRadius.circular(12),
+                  borderRadius: BorderRadius.circular(context.scale(12)),
                   child: Container(
-                    height: 60,
-                    width: 60,
-                    color: _headerRow,
+                    height: context.scale(64),
+                    width: context.scale(64),
+                    color: colorScheme.surfaceContainerHighest,
                     child: event['image'] != null
                         ? Image.network(
-                            "${ApiService.baseUrl}/${event['image']}",
+                            ApiService.getStorageUrl(event['image']),
                             fit: BoxFit.cover,
-                            errorBuilder: (context, error, stackTrace) => Icon(Icons.event_available, color: _primary, size: 24),
+                            errorBuilder: (context, error, stackTrace) => Icon(Icons.event_available, color: primaryColor, size: context.scale(24)),
                           )
-                        : Icon(Icons.event_available, color: _primary, size: 24),
+                        : Icon(Icons.event_available, color: primaryColor, size: context.scale(24)),
                   ),
                 ),
-                const SizedBox(width: 16),
+                SizedBox(width: context.scale(16)),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
                         event['title'] ?? 'Untitled Event',
-                        style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16),
+                        style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold, fontSize: context.font(16)),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                       ),
-                      const SizedBox(height: 4),
-                      Text(
-                        event['venue'] ?? 'TBA',
-                        style: TextStyle(color: Colors.white.withValues(alpha: 0.5), fontSize: 12),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
+                      SizedBox(height: context.scale(6)),
+                      Row(
+                        children: [
+                          Icon(Icons.location_on_outlined, size: context.scale(12), color: colorScheme.onSurfaceVariant),
+                          SizedBox(width: context.scale(4)),
+                          Expanded(
+                            child: Text(
+                              event['venue'] ?? 'TBA',
+                              style: theme.textTheme.bodySmall?.copyWith(color: colorScheme.onSurfaceVariant, fontSize: context.font(12)),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        ],
                       ),
-                      const SizedBox(height: 8),
+                      SizedBox(height: context.scale(10)),
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                        padding: EdgeInsets.symmetric(horizontal: context.scale(10), vertical: context.scale(4)),
                         decoration: BoxDecoration(
-                          color: statusColor.withValues(alpha: 0.15),
-                          borderRadius: BorderRadius.circular(6),
+                          color: statusColor.withValues(alpha: 0.1),
+                          borderRadius: BorderRadius.circular(context.scale(6)),
+                          border: Border.all(color: statusColor.withValues(alpha: 0.2)),
                         ),
                         child: Text(
                           status,
-                          style: TextStyle(color: statusColor, fontSize: 10, fontWeight: FontWeight.w800),
+                          style: TextStyle(color: statusColor, fontSize: context.font(10), fontWeight: FontWeight.w800),
                         ),
                       ),
                     ],
@@ -401,27 +433,27 @@ class _RegisteredEventsPageState extends State<RegisteredEventsPage> {
               ],
             ),
           ),
-          const Divider(color: Colors.white12, height: 1),
+          Divider(color: colorScheme.outlineVariant.withValues(alpha: 0.5), height: 1),
           Padding(
-            padding: const EdgeInsets.all(16),
+            padding: EdgeInsets.all(context.scale(16)),
             child: Column(
               children: [
                 _buildInfoDetail(Icons.calendar_today, "Event Date", "$formattedDate at ${event['start_time'] ?? 'N/A'}"),
-                const SizedBox(height: 12),
+                SizedBox(height: context.scale(12)),
                 _buildInfoDetail(Icons.how_to_reg, "Registered On", _formatRegDate(registration['registered_at'])),
-                const SizedBox(height: 20),
+                SizedBox(height: context.scale(24)),
                 if (!isCancelled && !isExpired)
                   SizedBox(
                     width: double.infinity,
-                    height: 44,
+                    height: context.scale(48),
                     child: OutlinedButton.icon(
                       onPressed: () => _cancelRegistration(registration),
-                      icon: const Icon(Icons.cancel_outlined, size: 18),
-                      label: const Text("CANCEL REGISTRATION", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+                      icon: Icon(Icons.cancel_outlined, size: context.scale(18)),
+                      label: Text("CANCEL REGISTRATION", style: TextStyle(fontWeight: FontWeight.bold, fontSize: context.font(12))),
                       style: OutlinedButton.styleFrom(
-                        foregroundColor: Colors.redAccent,
-                        side: BorderSide(color: Colors.redAccent.withValues(alpha: 0.5)),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                        foregroundColor: colorScheme.error,
+                        side: BorderSide(color: colorScheme.error),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(context.scale(12))),
                       ),
                     ),
                   ),
@@ -434,17 +466,19 @@ class _RegisteredEventsPageState extends State<RegisteredEventsPage> {
   }
 
   Widget _buildInfoDetail(IconData icon, String label, String value) {
+    final theme = context.theme;
+    final colorScheme = theme.colorScheme;
     return Row(
       children: [
-        Icon(icon, size: 14, color: _primary.withValues(alpha: 0.7)),
-        const SizedBox(width: 8),
+        Icon(icon, size: context.scale(14), color: colorScheme.primary),
+        SizedBox(width: context.scale(8)),
         Text(
           "$label: ",
-          style: TextStyle(color: Colors.white.withValues(alpha: 0.5), fontSize: 12),
+          style: theme.textTheme.bodySmall?.copyWith(color: colorScheme.onSurfaceVariant, fontSize: context.font(12)),
         ),
         Text(
           value,
-          style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w500),
+          style: theme.textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w500, fontSize: context.font(12)),
         ),
       ],
     );
@@ -461,16 +495,18 @@ class _RegisteredEventsPageState extends State<RegisteredEventsPage> {
   }
 
   Widget _buildEmptyState() {
+    final theme = context.theme;
+    final colorScheme = theme.colorScheme;
     return Center(
       child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 64.0),
+        padding: EdgeInsets.symmetric(vertical: context.scale(80)),
         child: Column(
           children: [
-            Icon(Icons.history_outlined, size: 64, color: Colors.white.withValues(alpha: 0.1)),
-            const SizedBox(height: 16),
-            const Text("No registration history", style: TextStyle(color: Colors.white70, fontSize: 16)),
-            const SizedBox(height: 8),
-            Text("Events you join will appear here", style: TextStyle(color: Colors.white.withValues(alpha: 0.4), fontSize: 13)),
+            Icon(Icons.history_outlined, size: context.scale(64), color: colorScheme.outlineVariant),
+            SizedBox(height: context.scale(16)),
+            Text("No registration history", style: theme.textTheme.titleMedium?.copyWith(color: colorScheme.onSurfaceVariant, fontSize: context.font(18))),
+            SizedBox(height: context.scale(8)),
+            Text("Events you join will appear here", style: theme.textTheme.bodySmall?.copyWith(color: colorScheme.onSurfaceVariant.withValues(alpha: 0.5), fontSize: context.font(12))),
           ],
         ),
       ),

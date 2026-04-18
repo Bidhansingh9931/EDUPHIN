@@ -74,7 +74,7 @@ class _StudentFeeDetailPageState extends State<StudentFeeDetailPage> {
 
   Future<void> _fetchStudentDetails(dynamic id) async {
     if (!mounted || id == null) return;
-    
+
     final String studentId = id.toString();
     setState(() => _isLoading = true);
     try {
@@ -90,9 +90,12 @@ class _StudentFeeDetailPageState extends State<StudentFeeDetailPage> {
     } catch (e) {
       debugPrint("Student Fee Detail Error: $e");
       if (mounted) {
+        String msg = e.toString();
+        if (msg.startsWith('Exception: ')) msg = msg.replaceFirst('Exception: ', '');
+        
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text("Error: $e"),
+            content: Text(msg),
             backgroundColor: Colors.red,
             duration: const Duration(seconds: 5),
             action: SnackBarAction(label: "Retry", textColor: Colors.white, onPressed: () => _fetchStudentDetails(id)),
@@ -115,12 +118,12 @@ class _StudentFeeDetailPageState extends State<StudentFeeDetailPage> {
         title: Text(showDetails && isMobile ? "Student Details" : "Student Fees Management"),
         leading: showDetails && isMobile
             ? IconButton(
-                icon: const Icon(Icons.arrow_back),
-                onPressed: () => setState(() {
-                  _studentDetails = null;
-                  _selectedStudentId = null;
-                }),
-              )
+          icon: const Icon(Icons.arrow_back),
+          onPressed: () => setState(() {
+            _studentDetails = null;
+            _selectedStudentId = null;
+          }),
+        )
             : null,
       ),
       body: Stack(
@@ -230,9 +233,9 @@ class _StudentFeeDetailPageState extends State<StudentFeeDetailPage> {
       items: [
         DropdownMenuItem<dynamic>(value: null, child: Text(hint)),
         ...items.map((c) => DropdownMenuItem<dynamic>(
-              value: c['id'],
-              child: Text((isSection ? (c['section_name'] ?? c['name']) : c['name'])?.toString() ?? 'N/A'),
-            )),
+          value: c['id'],
+          child: Text((isSection ? (c['section_name'] ?? c['name']) : c['name'])?.toString() ?? 'N/A'),
+        )),
       ],
       onChanged: onChanged,
       decoration: const InputDecoration(contentPadding: EdgeInsets.symmetric(horizontal: 12)),
@@ -501,12 +504,12 @@ class _StudentFeeDetailPageState extends State<StudentFeeDetailPage> {
             const Padding(padding: EdgeInsets.all(32), child: Text("No transactions yet"))
           else
             ...history.map((pay) => ListTile(
-                  leading: const CircleAvatar(backgroundColor: Colors.green, radius: 14, child: Icon(Icons.arrow_downward, size: 14, color: Colors.white)),
-                  title: Text("₹${pay['paid_amount']}", style: const TextStyle(fontWeight: FontWeight.bold)),
-                  subtitle: Text("${pay['payment_date']} • ${pay['mode']}", style: const TextStyle(fontSize: 11)),
-                  trailing: const Icon(Icons.receipt_long_outlined, size: 20),
-                  onTap: () {},
-                )),
+              leading: const CircleAvatar(backgroundColor: Colors.green, radius: 14, child: Icon(Icons.arrow_downward, size: 14, color: Colors.white)),
+              title: Text("₹${pay['paid_amount']}", style: const TextStyle(fontWeight: FontWeight.bold)),
+              subtitle: Text("${pay['payment_date']} • ${pay['mode']}", style: const TextStyle(fontSize: 11)),
+              trailing: const Icon(Icons.receipt_long_outlined, size: 20),
+              onTap: () {},
+            )),
         ],
       ),
     );
@@ -518,63 +521,63 @@ class _StudentFeeDetailPageState extends State<StudentFeeDetailPage> {
     String selectedMode = 'Cash';
 
     showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (sheetContext) {
-        final theme = Theme.of(sheetContext);
-        return Container(
-          decoration: BoxDecoration(color: theme.scaffoldBackgroundColor, borderRadius: const BorderRadius.vertical(top: Radius.circular(24))),
-          padding: EdgeInsets.only(bottom: MediaQuery.of(sheetContext).viewInsets.bottom, top: 24, left: 24, right: 24),
-          child: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text("Record Payment", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-                const SizedBox(height: 24),
-                TextField(controller: amountController, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: "Amount (₹)")),
-                const SizedBox(height: 20),
-                DropdownButtonFormField<String>(
-                  value: selectedMode,
-                  items: ['Cash', 'UPI', 'Bank Transfer', 'Cheque'].map((m) => DropdownMenuItem(value: m, child: Text(m))).toList(),
-                  onChanged: (v) => selectedMode = v!,
-                  decoration: const InputDecoration(labelText: "Mode"),
-                ),
-                const SizedBox(height: 20),
-                TextField(controller: remarkController, decoration: const InputDecoration(labelText: "Remarks (Optional)")),
-                const SizedBox(height: 32),
-                SizedBox(
-                  width: double.infinity,
-                  child: ElevatedButton(
-                    onPressed: () async {
-                      if (amountController.text.isEmpty) return;
-                      Navigator.pop(sheetContext);
-                      setState(() => _isLoading = true);
-                      try {
-                        await ApiService.storeAccountantPayment({
-                          'student_id': _selectedStudentId,
-                          'paid_amount': amountController.text,
-                          'payment_date': DateFormat('yyyy-MM-dd').format(DateTime.now()),
-                          'mode': selectedMode,
-                          'remarks': remarkController.text,
-                        });
-                        _fetchStudentDetails(_selectedStudentId);
-                      } catch (e) {
-                        if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Error: $e")));
-                      } finally {
-                        if (mounted) setState(() => _isLoading = false);
-                      }
-                    },
-                    child: const Text("SUBMIT PAYMENT"),
+        context: context,
+        isScrollControlled: true,
+        backgroundColor: Colors.transparent,
+        builder: (sheetContext) {
+          final theme = Theme.of(sheetContext);
+          return Container(
+            decoration: BoxDecoration(color: theme.scaffoldBackgroundColor, borderRadius: const BorderRadius.vertical(top: Radius.circular(24))),
+            padding: EdgeInsets.only(bottom: MediaQuery.of(sheetContext).viewInsets.bottom, top: 24, left: 24, right: 24),
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text("Record Payment", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                  const SizedBox(height: 24),
+                  TextField(controller: amountController, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: "Amount (₹)")),
+                  const SizedBox(height: 20),
+                  DropdownButtonFormField<String>(
+                    value: selectedMode,
+                    items: ['Cash', 'UPI', 'Bank Transfer', 'Cheque'].map((m) => DropdownMenuItem(value: m, child: Text(m))).toList(),
+                    onChanged: (v) => selectedMode = v!,
+                    decoration: const InputDecoration(labelText: "Mode"),
                   ),
-                ),
-                const SizedBox(height: 40),
-              ],
+                  const SizedBox(height: 20),
+                  TextField(controller: remarkController, decoration: const InputDecoration(labelText: "Remarks (Optional)")),
+                  const SizedBox(height: 32),
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton(
+                      onPressed: () async {
+                        if (amountController.text.isEmpty) return;
+                        Navigator.pop(sheetContext);
+                        setState(() => _isLoading = true);
+                        try {
+                          await ApiService.storeAccountantPayment({
+                            'student_id': _selectedStudentId,
+                            'paid_amount': amountController.text,
+                            'payment_date': DateFormat('yyyy-MM-dd').format(DateTime.now()),
+                            'mode': selectedMode,
+                            'remarks': remarkController.text,
+                          });
+                          _fetchStudentDetails(_selectedStudentId);
+                        } catch (e) {
+                          if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Error: $e")));
+                        } finally {
+                          if (mounted) setState(() => _isLoading = false);
+                        }
+                      },
+                      child: const Text("SUBMIT PAYMENT"),
+                    ),
+                  ),
+                  const SizedBox(height: 40),
+                ],
+              ),
             ),
-          ),
-        );
-      }
+          );
+        }
     );
   }
 

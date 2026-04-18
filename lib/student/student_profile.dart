@@ -1,8 +1,10 @@
 import 'dart:io';
 import 'package:eduphin/services/api_service.dart';
 import 'package:eduphin/services/responsive_helper.dart';
+import 'package:eduphin/services/common_widgets.dart';
 import 'package:eduphin/student/student_profile_model.dart';
 import 'package:eduphin/student/faculty_remark.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 
@@ -20,9 +22,10 @@ class _StudentProfilePageState extends State<StudentProfilePage> {
   StudentProfileData? profileData;
   int selectedTabIndex = 0;
 
-  // Controllers for update fields
   final Map<String, TextEditingController> _controllers = {};
   File? _selectedImage;
+  Uint8List? _webImage;
+  String? _fileName;
 
   @override
   void initState() {
@@ -63,11 +66,10 @@ class _StudentProfilePageState extends State<StudentProfilePage> {
     final f = data.family;
     final h = data.health;
 
-    // Personal
     _controllers['place_of_birth'] = TextEditingController(text: s?.placeOfBirth);
-    _controllers['gender'] = TextEditingController(text: s?.gender);
+    _controllers['gender'] = TextEditingController(text: _capitalize(s?.gender));
     _controllers['mobile'] = TextEditingController(text: s?.mobile);
-    _controllers['blood_group'] = TextEditingController(text: s?.bloodGroup);
+    _controllers['blood_group'] = TextEditingController(text: s?.bloodGroup?.toUpperCase());
     _controllers['nationality'] = TextEditingController(text: s?.nationality);
     _controllers['religion'] = TextEditingController(text: s?.religion);
     _controllers['caste'] = TextEditingController(text: s?.caste);
@@ -75,41 +77,65 @@ class _StudentProfilePageState extends State<StudentProfilePage> {
     _controllers['age'] = TextEditingController(text: s?.age?.toString());
     _controllers['dob'] = TextEditingController(text: s?.dob);
 
-    // Address
     _controllers['address_line1'] = TextEditingController(text: s?.addressLine1);
     _controllers['city'] = TextEditingController(text: s?.city);
     _controllers['state'] = TextEditingController(text: s?.state);
     _controllers['pincode'] = TextEditingController(text: s?.pincode);
 
-    // Family
     _controllers['father_mobile'] = TextEditingController(text: f?.fatherMobile);
     _controllers['mother_mobile'] = TextEditingController(text: f?.motherMobile);
 
-    // Health
     _controllers['height'] = TextEditingController(text: h?.height?.toString());
     _controllers['weight'] = TextEditingController(text: h?.weight?.toString());
+    _controllers['blood_group_health'] = TextEditingController(text: h?.bloodGroup?.toUpperCase());
+    
+    _controllers['password'] = TextEditingController();
+    _controllers['password_confirmation'] = TextEditingController();
+  }
+
+  String? _capitalize(String? s) {
+    if (s == null || s.isEmpty) return null;
+    return s[0].toUpperCase() + s.substring(1).toLowerCase();
   }
 
   Future<void> _updateProfile() async {
+    if (_controllers['password']!.text.isNotEmpty && _controllers['password']!.text != _controllers['password_confirmation']!.text) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Passwords do not match')));
+      return;
+    }
+
     setState(() => isUpdating = true);
     try {
       final Map<String, String> data = {};
       _controllers.forEach((key, controller) {
-        data[key] = controller.text;
+        if (controller.text.isNotEmpty || (key != 'password' && key != 'password_confirmation')) {
+          data[key] = controller.text;
+        }
       });
 
-      await ApiService.updateStudentProfile(data, profileImage: _selectedImage);
-      
+      if (kIsWeb && _webImage != null) {
+        await ApiService.updateStudentProfileFromBytes(data, _webImage!, _fileName);
+      } else {
+        await ApiService.updateStudentProfile(data, profileImage: _selectedImage);
+      }
+
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Profile updated successfully')),
         );
         _fetchProfileData();
+        setState(() {
+          _controllers['password']?.clear();
+          _controllers['password_confirmation']?.clear();
+        });
       }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Update failed: $e')),
+          SnackBar(
+            content: Text('Update failed: $e'),
+            backgroundColor: context.theme.colorScheme.error,
+          ),
         );
       }
     } finally {
@@ -119,21 +145,32 @@ class _StudentProfilePageState extends State<StudentProfilePage> {
 
   Future<void> _pickImage() async {
     final picker = ImagePicker();
-    final pickedFile = await picker.pickImage(source: ImageSource.gallery);
+    final pickedFile = await picker.pickImage(
+      source: ImageSource.gallery,
+      imageQuality: 50,
+      maxWidth: 1024,
+      maxHeight: 1024,
+    );
     if (pickedFile != null) {
-      setState(() {
-        _selectedImage = File(pickedFile.path);
-      });
+      if (kIsWeb) {
+        final bytes = await pickedFile.readAsBytes();
+        setState(() {
+          _webImage = bytes;
+          _fileName = pickedFile.name;
+        });
+      } else {
+        setState(() {
+          _selectedImage = File(pickedFile.path);
+        });
+      }
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    
     if (isLoading) {
-      return Scaffold(
-        body: Center(child: CircularProgressIndicator(color: theme.colorScheme.primary)),
+      return const Scaffold(
+        body: Center(child: CircularProgressIndicator()),
       );
     }
 
@@ -141,14 +178,14 @@ class _StudentProfilePageState extends State<StudentProfilePage> {
       return Scaffold(
         body: Center(
           child: Padding(
-            padding: const EdgeInsets.all(24.0),
+            padding: EdgeInsets.all(context.xl),
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Icon(Icons.error_outline, size: 60, color: theme.colorScheme.error),
-                const SizedBox(height: 16),
-                Text(errorMessage!, textAlign: TextAlign.center),
-                const SizedBox(height: 20),
+                Icon(Icons.error_outline_rounded, size: context.scale(60), color: context.theme.colorScheme.error),
+                SizedBox(height: context.md),
+                Text(errorMessage!, textAlign: TextAlign.center, style: TextStyle(fontSize: context.font(14))),
+                SizedBox(height: context.lg),
                 ElevatedButton(
                   onPressed: () {
                     setState(() {
@@ -157,7 +194,7 @@ class _StudentProfilePageState extends State<StudentProfilePage> {
                     });
                     _fetchProfileData();
                   },
-                  child: const Text("Retry"),
+                  child: const Text("Retry Connection"),
                 )
               ],
             ),
@@ -170,188 +207,179 @@ class _StudentProfilePageState extends State<StudentProfilePage> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text("Student Profile"),
+        title: Text("Student Profile", style: TextStyle(fontWeight: FontWeight.bold, fontSize: context.font(20))),
       ),
       body: SingleChildScrollView(
         padding: context.pagePadding,
-        child: Column(
-          children: [
-            // PROFILE CARD
-            Card(
-              child: Padding(
-                padding: const EdgeInsets.all(20),
-                child: Column(
-                  children: [
-                    Stack(
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.all(3),
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            border: Border.all(color: theme.colorScheme.primary, width: 2),
-                          ),
-                          child: CircleAvatar(
-                            radius: 50,
-                            backgroundColor: theme.colorScheme.surfaceContainerHighest,
-                            backgroundImage: const AssetImage('assets/images/girl_image.webp'),
-                            foregroundImage: _selectedImage != null
-                                ? FileImage(_selectedImage!)
-                                : (student?.profileImage != null && student!.profileImage!.isNotEmpty
-                                    ? NetworkImage(ApiService.getStorageUrl(student.profileImage)) as ImageProvider
-                                    : null),
-                          ),
-                        ),
-                        Positioned(
-                          bottom: 0,
-                          right: 0,
-                          child: InkWell(
-                            onTap: _pickImage,
-                            child: CircleAvatar(
-                              radius: 18,
-                              backgroundColor: theme.colorScheme.primary,
-                              child: const Icon(Icons.camera_alt, size: 18, color: Colors.white),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 16),
-                    Text(
-                      "${student?.firstName ?? ""} ${student?.lastName ?? ""}",
-                      style: theme.textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      "Roll No: ${student?.studentRollNo ?? "N/A"}",
-                      style: theme.textTheme.bodyMedium?.copyWith(color: theme.hintColor),
-                    ),
-                    Text(
-                      "Reg. No: ${student?.registrationNo ?? "N/A"}",
-                      style: theme.textTheme.bodyMedium?.copyWith(color: theme.hintColor),
-                    ),
-                    const SizedBox(height: 20),
-                    ElevatedButton(
-                      onPressed: () => Navigator.push(
-                        context,
-                        MaterialPageRoute(builder: (context) => const RemarksPage()),
-                      ),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: theme.colorScheme.secondary,
-                        minimumSize: const Size(200, 45),
-                      ),
-                      child: const Text("CHECK REMARKS"),
-                    )
-                  ],
-                ),
-              ),
-            ),
-
-            const SizedBox(height: 24),
-
-            // TABS
-            Row(
+        child: Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 1000),
+            child: Column(
               children: [
-                tabButton("PERSONAL", 0),
-                tabButton("ADDRESS", 1),
-                tabButton("FAMILY", 2),
-                tabButton("HEALTH", 3),
+                _buildHeader(student),
+                SizedBox(height: context.xl),
+                
+                // TABS
+                Container(
+                  margin: EdgeInsets.only(bottom: context.lg),
+                  decoration: BoxDecoration(
+                    color: context.theme.colorScheme.surfaceContainerLow,
+                    borderRadius: BorderRadius.circular(context.scale(12)),
+                    border: Border.all(color: context.theme.colorScheme.outlineVariant.withValues(alpha: 0.5)),
+                  ),
+                  child: Row(
+                    children: [
+                      _tabButton("PERSONAL", 0),
+                      _tabButton("ADDRESS", 1),
+                      _tabButton("FAMILY", 2),
+                      _tabButton("HEALTH", 3),
+                      _tabButton("SECURITY", 4),
+                    ],
+                  ),
+                ),
+
+                _buildTabContent(),
+                
+                SizedBox(height: context.xl),
+                SizedBox(
+                  width: double.infinity,
+                  child: OutlinedButton.icon(
+                    onPressed: _handleLogout,
+                    icon: Icon(Icons.logout_rounded, color: context.theme.colorScheme.error, size: context.scale(20)),
+                    label: Text("LOGOUT", style: TextStyle(color: context.theme.colorScheme.error, fontWeight: FontWeight.w800, fontSize: context.font(14))),
+                    style: OutlinedButton.styleFrom(
+                      side: BorderSide(color: context.theme.colorScheme.error),
+                      padding: EdgeInsets.symmetric(vertical: context.scale(16)),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(context.scale(12))),
+                    ),
+                  ),
+                ),
+                SizedBox(height: context.xl * 2),
               ],
             ),
-
-            const SizedBox(height: 24),
-
-            // Content based on tab
-            _buildTabContent(),
-            const SizedBox(height: 32),
-            SizedBox(
-              width: double.infinity,
-              child: OutlinedButton.icon(
-                onPressed: () async {
-                  final confirm = await showDialog<bool>(
-                    context: context,
-                    builder: (context) => AlertDialog(
-                      title: const Text("Logout"),
-                      content: const Text("Are you sure you want to logout?"),
-                      actions: [
-                        TextButton(onPressed: () => Navigator.pop(context, false), child: const Text("CANCEL")),
-                        TextButton(
-                          onPressed: () => Navigator.pop(context, true),
-                          child: const Text("LOGOUT", style: TextStyle(color: Colors.red)),
-                        ),
-                      ],
-                    ),
-                  );
-
-                  if (confirm == true) {
-                    await ApiService.logout();
-                    if (mounted) {
-                      Navigator.pushNamedAndRemoveUntil(context, '/login', (route) => false);
-                    }
-                  }
-                },
-                icon: const Icon(Icons.logout, color: Colors.red),
-                label: const Text("LOGOUT", style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold)),
-                style: OutlinedButton.styleFrom(
-                  side: const BorderSide(color: Colors.red),
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                ),
-              ),
-            ),
-            const SizedBox(height: 40),
-          ],
+          ),
         ),
       ),
+    );
+  }
+
+  Widget _buildHeader(StudentDetail? student) {
+    return Flex(
+      direction: context.isMobile ? Axis.vertical : Axis.horizontal,
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        ProfileAvatar(
+          radius: context.scale(60),
+          imageUrl: student?.profileImage != null ? ApiService.getStorageUrl(student!.profileImage) : null,
+          localImage: _selectedImage,
+          webImage: _webImage,
+          onCameraTap: _pickImage,
+        ),
+        if (!context.isMobile) SizedBox(width: context.xl),
+        if (context.isMobile) SizedBox(height: context.md),
+        Column(
+          crossAxisAlignment: context.isMobile ? CrossAxisAlignment.center : CrossAxisAlignment.start,
+          children: [
+            Text(
+              "${student?.firstName ?? ""} ${student?.lastName ?? ""}",
+              style: context.theme.textTheme.headlineSmall?.copyWith(
+                fontWeight: FontWeight.bold,
+                fontSize: context.font(24),
+              ),
+            ),
+            Text(
+              "Roll No: ${student?.studentRollNo ?? "N/A"}",
+              style: context.theme.textTheme.bodyMedium?.copyWith(
+                color: context.theme.colorScheme.onSurfaceVariant,
+                fontSize: context.font(16),
+              ),
+            ),
+            Text(
+              "Reg. No: ${student?.registrationNo ?? "N/A"}",
+              style: context.theme.textTheme.bodyMedium?.copyWith(
+                color: context.theme.colorScheme.onSurfaceVariant,
+                fontSize: context.font(14),
+              ),
+            ),
+            SizedBox(height: context.md),
+            ElevatedButton(
+              onPressed: () => Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => const RemarksPage()),
+              ),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: context.theme.colorScheme.primary,
+                foregroundColor: context.theme.colorScheme.onPrimary,
+                padding: EdgeInsets.symmetric(horizontal: context.scale(24), vertical: context.scale(12)),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(context.scale(30))),
+              ),
+              child: Text("VIEW REMARKS", style: TextStyle(fontWeight: FontWeight.bold, fontSize: context.font(12))),
+            ),
+          ],
+        ),
+      ],
     );
   }
 
   Widget _buildTabContent() {
-    final theme = Theme.of(context);
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+    return Column(
+      children: [
+        if (selectedTabIndex != 4)
+        ProfileSection(
+          title: _getTabTitle(),
+          icon: _getTabIcon(),
+          status: "Information",
+          isReadOnly: true,
           children: [
-            _getTabTitle(),
-            const SizedBox(height: 24),
-            ..._getTabInfoFields(),
-            const Divider(height: 48),
-            Text(
-              "Update Information",
-              style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 24),
+            AdaptiveFieldRow(children: _getTabInfoFields()),
+          ],
+        ),
+        ProfileSection(
+          title: selectedTabIndex == 4 ? "Update Password" : "Update Information",
+          icon: selectedTabIndex == 4 ? Icons.lock_outline_rounded : Icons.edit_outlined,
+          status: "Editable",
+          children: [
             ..._getTabUpdateFields(),
-            const SizedBox(height: 32),
-            ElevatedButton(
-              onPressed: isUpdating ? null : _updateProfile,
-              child: isUpdating
-                  ? const SizedBox(
-                      height: 20,
-                      width: 20,
-                      child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
-                    )
-                  : const Text("UPDATE PROFILE"),
+            SizedBox(height: context.lg),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                onPressed: isUpdating ? null : _updateProfile,
+                style: ElevatedButton.styleFrom(
+                  padding: EdgeInsets.symmetric(vertical: context.scale(16)),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(context.scale(12))),
+                ),
+                child: isUpdating
+                    ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2))
+                    : Text("UPDATE PROFILE", style: TextStyle(fontWeight: FontWeight.bold, fontSize: context.font(14))),
+              ),
             )
           ],
         ),
-      ),
+      ],
     );
   }
 
-  Widget _getTabTitle() {
-    final theme = Theme.of(context);
-    String title = "";
+  String _getTabTitle() {
     switch (selectedTabIndex) {
-      case 0: title = "Student Information"; break;
-      case 1: title = "Address Details"; break;
-      case 2: title = "Family Details"; break;
-      case 3: title = "Health Details"; break;
+      case 0: return "Student Information";
+      case 1: return "Address Details";
+      case 2: return "Family Details";
+      case 3: return "Health Details";
+      case 4: return "Security Settings";
+      default: return "";
     }
-    return Text(
-      title,
-      style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
-    );
+  }
+
+  IconData _getTabIcon() {
+    switch (selectedTabIndex) {
+      case 0: return Icons.person_outline;
+      case 1: return Icons.home_outlined;
+      case 2: return Icons.family_restroom_outlined;
+      case 3: return Icons.medical_services_outlined;
+      case 4: return Icons.lock_outline_rounded;
+      default: return Icons.info_outline;
+    }
   }
 
   List<Widget> _getTabInfoFields() {
@@ -362,32 +390,31 @@ class _StudentProfilePageState extends State<StudentProfilePage> {
     switch (selectedTabIndex) {
       case 0:
         return [
-          infoText("Full Name", "${s?.firstName ?? ""} ${s?.lastName ?? ""}"),
-          infoText("Registration Number", s?.registrationNo ?? "N/A"),
-          infoText("Student Roll Number", s?.studentRollNo ?? "N/A"),
-          infoText("Academic Session", s?.academicSession ?? "N/A"),
-          infoText("Date of Admission", s?.dateOfAdmission ?? "N/A"),
-          infoText("Academic Year", s?.academicYear ?? "N/A"),
-          infoText("Admission Category", s?.admissionCategory ?? "N/A"),
-          infoText("Mentor Name", s?.mentorName ?? "N/A"),
+          Column(children: [
+            ProfileBadge(label: "Registration Number", value: s?.registrationNo ?? "N/A"),
+            ProfileBadge(label: "Academic Session", value: s?.academicSession ?? "N/A"),
+            ProfileBadge(label: "Admission Category", value: s?.admissionCategory ?? "N/A"),
+          ]),
+          Column(children: [
+            ProfileBadge(label: "Date of Admission", value: s?.dateOfAdmission ?? "N/A"),
+            ProfileBadge(label: "Academic Year", value: s?.academicYear ?? "N/A"),
+            ProfileBadge(label: "Mentor Name", value: s?.mentorName ?? "N/A"),
+          ]),
         ];
       case 1:
         return [
-          infoText("Address Line 1", s?.addressLine1 ?? "N/A"),
-          infoText("City", s?.city ?? "N/A"),
-          infoText("State", s?.state ?? "N/A"),
-          infoText("Pincode", s?.pincode ?? "N/A"),
+          ProfileBadge(label: "Current Address", value: "${s?.addressLine1 ?? "N/A"}, ${s?.city ?? ""}, ${s?.state ?? ""} - ${s?.pincode ?? ""}"),
         ];
       case 2:
         return [
-          infoText("Father's Name", f?.fatherName ?? "N/A"),
-          infoText("Mother's Name", f?.motherName ?? "N/A"),
+          ProfileBadge(label: "Father's Name", value: f?.fatherName ?? "N/A"),
+          ProfileBadge(label: "Mother's Name", value: f?.motherName ?? "N/A"),
         ];
       case 3:
         return [
-          infoText("Height", h?.height != null ? "${h!.height} cm" : "N/A"),
-          infoText("Weight", h?.weight != null ? "${h!.weight} kg" : "N/A"),
-          infoText("Blood Group", h?.bloodGroup ?? "N/A"),
+          ProfileBadge(label: "Height", value: h?.height != null ? "${h!.height} cm" : "N/A"),
+          ProfileBadge(label: "Weight", value: h?.weight != null ? "${h!.weight} kg" : "N/A"),
+          ProfileBadge(label: "Blood Group", value: h?.bloodGroup ?? "N/A"),
         ];
       default: return [];
     }
@@ -397,117 +424,133 @@ class _StudentProfilePageState extends State<StudentProfilePage> {
     switch (selectedTabIndex) {
       case 0:
         return [
-          buildField("Place of Birth", _controllers['place_of_birth']!),
-          buildField("Gender *", _controllers['gender']!),
-          buildField("Mobile", _controllers['mobile']!),
-          buildField("Date of Birth", _controllers['dob']!),
-          buildField("Blood Group", _controllers['blood_group']!),
-          buildField("Nationality", _controllers['nationality']!),
-          buildField("Religion", _controllers['religion']!),
-          buildField("Caste", _controllers['caste']!),
-          buildField("Domicile State", _controllers['domicile_state']!),
-          buildField("Age", _controllers['age']!),
+          AdaptiveFieldRow(children: [
+            ProfileTextField(label: "Place of Birth", controller: _controllers['place_of_birth']!),
+            ProfileDropdown(
+              label: "Gender",
+              value: _controllers['gender']!.text.isEmpty ? null : _controllers['gender']!.text,
+              items: const ["Male", "Female", "Other"],
+              onChanged: (val) => setState(() => _controllers['gender']!.text = val!),
+            ),
+          ]),
+          AdaptiveFieldRow(children: [
+            ProfileTextField(label: "Mobile", controller: _controllers['mobile']!, keyboardType: TextInputType.phone),
+            ProfileTextField(
+              label: "Date of Birth",
+              controller: _controllers['dob']!,
+              readOnly: true,
+              icon: Icons.calendar_today_rounded,
+              onTap: () async {
+                final date = await showDatePicker(
+                  context: context,
+                  initialDate: DateTime.tryParse(_controllers['dob']!.text) ?? DateTime.now(),
+                  firstDate: DateTime(1900),
+                  lastDate: DateTime.now(),
+                );
+                if (date != null) {
+                  setState(() => _controllers['dob']!.text = "${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}");
+                }
+              },
+            ),
+          ]),
+          AdaptiveFieldRow(children: [
+            ProfileDropdown(
+              label: "Blood Group",
+              value: _controllers['blood_group']!.text.isEmpty ? null : _controllers['blood_group']!.text,
+              items: const ["A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-"],
+              onChanged: (val) => setState(() => _controllers['blood_group']!.text = val!),
+            ),
+            ProfileTextField(label: "Nationality", controller: _controllers['nationality']!),
+          ]),
+          AdaptiveFieldRow(children: [
+            ProfileTextField(label: "Religion", controller: _controllers['religion']!),
+            ProfileTextField(label: "Caste", controller: _controllers['caste']!),
+          ]),
+          AdaptiveFieldRow(children: [
+            ProfileTextField(label: "Domicile State", controller: _controllers['domicile_state']!),
+            ProfileTextField(label: "Age", controller: _controllers['age']!, keyboardType: TextInputType.number),
+          ]),
         ];
       case 1:
         return [
-          buildField("Address Line 1", _controllers['address_line1']!),
-          buildField("City", _controllers['city']!),
-          buildField("State", _controllers['state']!),
-          buildField("Pincode", _controllers['pincode']!),
+          ProfileTextField(label: "Address Line 1", controller: _controllers['address_line1']!, maxLines: 2),
+          AdaptiveFieldRow(children: [
+            ProfileTextField(label: "City", controller: _controllers['city']!),
+            ProfileTextField(label: "State", controller: _controllers['state']!),
+          ]),
+          ProfileTextField(label: "Pincode", controller: _controllers['pincode']!, keyboardType: TextInputType.number),
         ];
       case 2:
         return [
-          buildField("Father's Mobile", _controllers['father_mobile']!),
-          buildField("Mother's Mobile", _controllers['mother_mobile']!),
+          AdaptiveFieldRow(children: [
+            ProfileTextField(label: "Father's Mobile", controller: _controllers['father_mobile']!, keyboardType: TextInputType.phone),
+            ProfileTextField(label: "Mother's Mobile", controller: _controllers['mother_mobile']!, keyboardType: TextInputType.phone),
+          ]),
         ];
       case 3:
         return [
-          buildField("Height", _controllers['height']!),
-          buildField("Weight", _controllers['weight']!),
+          AdaptiveFieldRow(children: [
+            ProfileTextField(label: "Height (cm)", controller: _controllers['height']!, keyboardType: TextInputType.number),
+            ProfileTextField(label: "Weight (kg)", controller: _controllers['weight']!, keyboardType: TextInputType.number),
+          ]),
+        ];
+      case 4:
+        return [
+          AdaptiveFieldRow(children: [
+            ProfileTextField(label: "New Password", controller: _controllers['password']!, isPassword: true),
+            ProfileTextField(label: "Confirm Password", controller: _controllers['password_confirmation']!, isPassword: true),
+          ]),
         ];
       default: return [];
     }
   }
 
-  // ================= TAB BUTTON =================
-
-  Widget tabButton(String title, int index) {
-    final theme = Theme.of(context);
+  Widget _tabButton(String title, int index) {
     bool isSelected = selectedTabIndex == index;
     return Expanded(
       child: InkWell(
         onTap: () => setState(() => selectedTabIndex = index),
+        borderRadius: BorderRadius.circular(context.scale(12)),
         child: Container(
-          padding: const EdgeInsets.symmetric(vertical: 16),
+          padding: EdgeInsets.symmetric(vertical: context.scale(16)),
           decoration: BoxDecoration(
-            color: isSelected ? theme.colorScheme.primary : theme.cardTheme.color,
-            border: Border(
-              bottom: BorderSide(
-                color: isSelected ? theme.colorScheme.primary : theme.dividerColor,
-                width: 2,
-              ),
-            ),
+            color: isSelected ? context.theme.colorScheme.primary : Colors.transparent,
+            borderRadius: BorderRadius.circular(context.scale(12)),
           ),
           child: Text(
             title,
             textAlign: TextAlign.center,
-            style: theme.textTheme.labelSmall?.copyWith(
-                color: isSelected ? Colors.white : theme.colorScheme.onSurface,
-                fontWeight: isSelected ? FontWeight.bold : FontWeight.normal),
+            style: TextStyle(
+                color: isSelected ? context.theme.colorScheme.onPrimary : context.theme.colorScheme.onSurfaceVariant,
+                fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                fontSize: context.font(10)),
           ),
         ),
       ),
     );
   }
 
-  // ================= INFO TEXT =================
-
-  Widget infoText(String title, String value) {
-    final theme = Theme.of(context);
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            title,
-            style: theme.textTheme.labelSmall?.copyWith(
-                color: theme.hintColor,
-                fontWeight: FontWeight.bold),
+  Future<void> _handleLogout() async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text("Logout"),
+        content: const Text("Are you sure you want to logout?"),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text("CANCEL")),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: Text("LOGOUT", style: TextStyle(color: context.theme.colorScheme.error)),
           ),
-          const SizedBox(height: 4),
-          Text(
-            value,
-            style: theme.textTheme.bodyLarge,
-          )
         ],
       ),
     );
-  }
 
-  // ================= INPUT FIELD =================
-
-  Widget buildField(String label, TextEditingController controller) {
-    final theme = Theme.of(context);
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            label,
-            style: theme.textTheme.labelSmall?.copyWith(color: theme.hintColor),
-          ),
-          const SizedBox(height: 8),
-          TextField(
-            controller: controller,
-            style: const TextStyle(fontSize: 14),
-            decoration: const InputDecoration(
-              contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-            ),
-          )
-        ],
-      ),
-    );
+    if (confirm == true) {
+      await ApiService.logout();
+      if (mounted) {
+        Navigator.pushReplacementNamed(context, '/login');
+      }
+    }
   }
 }

@@ -1,13 +1,34 @@
 class StudentVirtualIdData {
   final User? user;
   final Student? student;
+  final String? instituteName;
+  final String? instituteLogo;
+  final String? instituteAddress;
+  final String? institutePhone;
+  final String? instituteWebsite;
+  final String? instituteEmail;
 
-  StudentVirtualIdData({this.user, this.student});
+  StudentVirtualIdData({
+    this.user,
+    this.student,
+    this.instituteName,
+    this.instituteLogo,
+    this.instituteAddress,
+    this.institutePhone,
+    this.instituteWebsite,
+    this.instituteEmail,
+  });
 
   factory StudentVirtualIdData.fromJson(Map<String, dynamic> json) {
     return StudentVirtualIdData(
       user: json['user'] != null ? User.fromJson(json['user']) : null,
       student: json['student'] != null ? Student.fromJson(json['student']) : null,
+      instituteName: json['institute_name'],
+      instituteLogo: json['institute_logo'],
+      instituteAddress: json['institute_address'],
+      institutePhone: json['institute_phone'],
+      instituteWebsite: json['institute_website'],
+      instituteEmail: json['institute_email'],
     );
   }
 }
@@ -82,7 +103,10 @@ class Student {
       guardianFirstName: json['guardian_first_name'],
       guardianMobile: json['guardian_mobile'],
       academicYear: json['academic_year'],
-      profileImage: json['profile_image'],
+      profileImage: (json['profile_image'] ?? 
+                    json['photo'] ?? 
+                    json['image'] ?? 
+                    json['avatar'])?.toString(),
     );
   }
 }

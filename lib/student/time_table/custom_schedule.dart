@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:eduphin/services/responsive_helper.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:eduphin/services/api_service.dart';
@@ -67,182 +68,222 @@ class _ClassSchedulePageState extends State<ClassSchedulePage> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = context.theme;
+    final colorScheme = theme.colorScheme;
     final schedules = _scheduleData?['schedules'] as List? ?? [];
     final overrides = _scheduleData?['overrides'] as List? ?? [];
     final student = _scheduleData?['student'];
 
     return Scaffold(
-      backgroundColor: const Color(0xff0a1230),
+      backgroundColor: theme.scaffoldBackgroundColor,
       appBar: AppBar(
-        backgroundColor: const Color(0xff0a1230),
-        elevation: 0,
-        title: const Text(
-          "Class Schedule",
-          style: TextStyle(fontSize: 26, fontWeight: FontWeight.bold),
-        ),
+        title: const Text("Class Schedule"),
       ),
-      body: ListView(
-        padding: const EdgeInsets.all(16),
-        children: [
-          /// COURSE / STUDENT INFO CARD
-          if (student != null)
-            Container(
-              padding: const EdgeInsets.all(20),
-              decoration: BoxDecoration(
-                color: const Color(0xff3c4566),
-                borderRadius: BorderRadius.circular(16),
-              ),
+      body: RefreshIndicator(
+        onRefresh: _fetchDatewiseSchedule,
+        color: colorScheme.primary,
+        child: SingleChildScrollView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          padding: context.pagePadding,
+          child: Center(
+            child: Container(
+              constraints: const BoxConstraints(maxWidth: 1000),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    "${student['first_name']} ${student['last_name'] ?? ''}",
-                    style: const TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.bold),
+                  /// COURSE / STUDENT INFO CARD
+                  if (student != null)
+                    Card(
+                      elevation: 0,
+                      color: colorScheme.surfaceContainerLow,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16),
+                        side: BorderSide(color: colorScheme.outlineVariant),
+                      ),
+                      child: Padding(
+                        padding: EdgeInsets.all(context.md),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              "${student['first_name']} ${student['last_name'] ?? ''}",
+                              style: theme.textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold),
+                            ),
+                            SizedBox(height: context.xs),
+                            Text(
+                              "Roll No: ${student['student_roll_no'] ?? 'N/A'}",
+                              style: theme.textTheme.bodyMedium?.copyWith(color: colorScheme.onSurfaceVariant),
+                            ),
+                            SizedBox(height: context.md),
+                            Row(
+                              children: [
+                                statusBox("Regular: ${schedules.length}"),
+                                SizedBox(width: context.md),
+                                statusBox("Overrides: ${overrides.length}"),
+                              ],
+                            )
+                          ],
+                        ),
+                      ),
+                    ),
+
+                  SizedBox(height: context.lg),
+
+                  /// SELECT DATE CARD
+                  Card(
+                    elevation: 0,
+                    color: colorScheme.surfaceContainerLow,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(16),
+                      side: BorderSide(color: colorScheme.outlineVariant),
+                    ),
+                    child: Padding(
+                      padding: EdgeInsets.all(context.md),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            "Select Date",
+                            style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+                          ),
+                          SizedBox(height: context.md),
+                          TextField(
+                            controller: dateController,
+                            readOnly: true,
+                            onTap: pickDate,
+                            style: theme.textTheme.bodyLarge,
+                            decoration: InputDecoration(
+                              hintText: "yyyy-mm-dd",
+                              suffixIcon: Icon(Icons.calendar_today, color: colorScheme.primary, size: 20),
+                            ),
+                          ),
+                          SizedBox(height: context.lg),
+                          Row(
+                            children: [
+                              Expanded(
+                                child: SizedBox(
+                                  height: context.scale(48),
+                                  child: ElevatedButton(
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: colorScheme.primary,
+                                      foregroundColor: colorScheme.onPrimary,
+                                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                      elevation: 0,
+                                    ),
+                                    onPressed: _isLoading ? null : _fetchDatewiseSchedule,
+                                    child: _isLoading 
+                                      ? SizedBox(height: 20, width: 20, child: CircularProgressIndicator(color: colorScheme.onPrimary, strokeWidth: 2))
+                                      : const Text("SHOW SCHEDULE", style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
+                                  ),
+                                ),
+                              ),
+                              SizedBox(width: context.md),
+                              Expanded(
+                                child: SizedBox(
+                                  height: context.scale(48),
+                                  child: OutlinedButton(
+                                    style: OutlinedButton.styleFrom(
+                                      side: BorderSide(color: colorScheme.primary),
+                                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                    ),
+                                    onPressed: () {
+                                      setState(() {
+                                        selectedDate = DateTime.now();
+                                        dateController.text = DateFormat('yyyy-MM-dd').format(selectedDate!);
+                                      });
+                                      _fetchDatewiseSchedule();
+                                    },
+                                    child: const Text("TODAY", style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
                   ),
-                  const SizedBox(height: 8),
-                  Text(
-                    "Roll No: ${student['student_roll_no'] ?? 'N/A'}",
-                    style: const TextStyle(color: Colors.white70, fontSize: 16),
-                  ),
-                  const SizedBox(height: 16),
-                  Row(
-                    children: [
-                      statusBox("Regular: ${schedules.length}"),
-                      statusBox("Overrides: ${overrides.length}"),
-                    ],
-                  )
+
+                  SizedBox(height: context.lg),
+
+                  /// SCHEDULE RESULT CARD
+                  if (_errorMessage != null)
+                    Center(child: Text(_errorMessage!, style: TextStyle(color: theme.colorScheme.error)))
+                  else if (_scheduleData != null)
+                    Card(
+                      elevation: 0,
+                      color: colorScheme.surfaceContainerLow,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16),
+                        side: BorderSide(color: colorScheme.outlineVariant),
+                      ),
+                      child: Padding(
+                        padding: EdgeInsets.all(context.md),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                Icon(Icons.list, color: colorScheme.primary, size: 22),
+                                SizedBox(width: context.sm),
+                                Expanded(
+                                  child: Text(
+                                    "Schedule for ${DateFormat('EEEE, d MMM yyyy').format(selectedDate ?? DateTime.now())}",
+                                    style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            SizedBox(height: context.xs),
+                            Text(
+                              "Total classes: ${schedules.length + overrides.length}",
+                              style: theme.textTheme.bodyMedium?.copyWith(color: colorScheme.onSurfaceVariant),
+                            ),
+                            SizedBox(height: context.lg),
+                            
+                            GridView.builder(
+                              shrinkWrap: true,
+                              physics: const NeverScrollableScrollPhysics(),
+                              itemCount: schedules.length + overrides.length,
+                              gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                                crossAxisCount: context.responsive(1, tablet: 2, desktop: 2),
+                                crossAxisSpacing: context.md,
+                                mainAxisSpacing: context.md,
+                                mainAxisExtent: context.scale(140),
+                              ),
+                              itemBuilder: (context, index) {
+                                if (index < schedules.length) {
+                                  return classCard(schedules[index], isOverride: false);
+                                } else {
+                                  return classCard(overrides[index - schedules.length], isOverride: true);
+                                }
+                              },
+                            ),
+                            
+                            if (schedules.isEmpty && overrides.isEmpty)
+                              Center(
+                                child: Padding(
+                                  padding: EdgeInsets.symmetric(vertical: context.xl),
+                                  child: Text("No classes scheduled for this date", style: theme.textTheme.bodyMedium?.copyWith(color: colorScheme.onSurfaceVariant)),
+                                ),
+                              ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  SizedBox(height: context.xl),
                 ],
               ),
-            ),
-
-          const SizedBox(height: 20),
-
-          /// SELECT DATE CARD
-          Container(
-            padding: const EdgeInsets.all(20),
-            decoration: BoxDecoration(
-              color: const Color(0xff3c4566),
-              borderRadius: BorderRadius.circular(16),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  "Select Date",
-                  style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold),
-                ),
-                const SizedBox(height: 15),
-                TextField(
-                  controller: dateController,
-                  readOnly: true,
-                  onTap: pickDate,
-                  style: const TextStyle(color: Colors.white),
-                  decoration: InputDecoration(
-                    hintText: "yyyy-mm-dd",
-                    hintStyle: const TextStyle(color: Colors.white70),
-                    filled: true,
-                    fillColor: const Color(0xff5d6a7a),
-                    suffixIcon: const Icon(Icons.calendar_today, color: Colors.white),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: BorderSide.none,
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 20),
-                Row(
-                  children: [
-                    Expanded(
-                      child: ElevatedButton(
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xff3d64d8),
-                          padding: const EdgeInsets.symmetric(vertical: 14),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                        ),
-                        onPressed: _isLoading ? null : _fetchDatewiseSchedule,
-                        child: _isLoading 
-                          ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
-                          : const Text("SHOW SCHEDULE", style: TextStyle(fontSize: 16, color: Colors.white)),
-                      ),
-                    ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: ElevatedButton(
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xff5d6a7a),
-                          padding: const EdgeInsets.symmetric(vertical: 14),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                        ),
-                        onPressed: () {
-                          setState(() {
-                            selectedDate = DateTime.now();
-                            dateController.text = DateFormat('yyyy-MM-dd').format(selectedDate!);
-                          });
-                          _fetchDatewiseSchedule();
-                        },
-                        child: const Text("TODAY", style: TextStyle(fontSize: 16, color: Colors.white)),
-                      ),
-                    ),
-                  ],
-                ),
-              ],
             ),
           ),
-
-          const SizedBox(height: 20),
-
-          /// SCHEDULE RESULT CARD
-          if (_errorMessage != null)
-            Center(child: Text(_errorMessage!, style: const TextStyle(color: Colors.redAccent)))
-          else if (_scheduleData != null)
-            Container(
-              padding: const EdgeInsets.all(20),
-              decoration: BoxDecoration(
-                color: const Color(0xff3c4566),
-                borderRadius: BorderRadius.circular(16),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      const Icon(Icons.list, color: Colors.white),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Text(
-                          "Schedule for ${DateFormat('EEEE, d MMM yyyy').format(selectedDate ?? DateTime.now())}",
-                          style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 10),
-                  Text(
-                    "Total classes: ${schedules.length + overrides.length}",
-                    style: const TextStyle(color: Colors.white70, fontSize: 16),
-                  ),
-                  const SizedBox(height: 20),
-                  
-                  ...schedules.map((s) => classCard(s, isOverride: false)),
-                  ...overrides.map((o) => classCard(o, isOverride: true)),
-                  
-                  if (schedules.isEmpty && overrides.isEmpty)
-                    const Center(
-                      child: Padding(
-                        padding: EdgeInsets.symmetric(vertical: 20),
-                        child: Text("No classes scheduled for this date", style: TextStyle(color: Colors.white54)),
-                      ),
-                    ),
-                ],
-              ),
-            )
-        ],
+        ),
       ),
     );
   }
 
   Widget classCard(dynamic schedule, {required bool isOverride}) {
-    // Corrected null-aware bracket access for Maps
+    final theme = context.theme;
+    final colorScheme = theme.colorScheme;
     final classSchedule = isOverride ? schedule['class_schedule'] : null;
     final subject = isOverride 
         ? (classSchedule != null ? classSchedule['subject'] : null) 
@@ -256,14 +297,15 @@ class _ClassSchedulePageState extends State<ClassSchedulePage> {
         : (schedule['teacher_name'] ?? 'N/A');
 
     return Container(
-      margin: const EdgeInsets.only(bottom: 15),
-      padding: const EdgeInsets.all(16),
+      padding: EdgeInsets.all(context.md),
       decoration: BoxDecoration(
+        color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: isOverride ? Colors.orangeAccent.withAlpha(128) : Colors.white30),
+        border: Border.all(color: isOverride ? const Color(0xFFF59E0B).withValues(alpha: 0.5) : colorScheme.outlineVariant),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisAlignment: MainAxisAlignment.center,
         children: [
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -271,35 +313,44 @@ class _ClassSchedulePageState extends State<ClassSchedulePage> {
               Expanded(
                 child: Text(
                   subject != null ? (subject['name'] ?? 'Subject N/A') : 'Subject N/A',
-                  style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
+                  style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                 ),
               ),
               if (isOverride)
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                  decoration: BoxDecoration(color: Colors.orange, borderRadius: BorderRadius.circular(8)),
-                  child: const Text("OVERRIDE", style: TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold)),
+                  decoration: BoxDecoration(color: const Color(0xFFF59E0B).withValues(alpha: 0.1), borderRadius: BorderRadius.circular(6), border: Border.all(color: const Color(0xFFF59E0B).withValues(alpha: 0.5))),
+                  child: const Text("OVERRIDE", style: TextStyle(color: Color(0xFFF59E0B), fontSize: 9, fontWeight: FontWeight.bold)),
                 ),
             ],
           ),
-          const SizedBox(height: 8),
+          SizedBox(height: context.xs),
           Row(
             children: [
-              const Icon(Icons.person, color: Colors.white70, size: 16),
+              Icon(Icons.person, color: colorScheme.onSurfaceVariant, size: 14),
               const SizedBox(width: 6),
-              Text(teacher ?? 'N/A', style: const TextStyle(color: Colors.white, fontSize: 14)),
+              Expanded(
+                child: Text(
+                  teacher ?? 'N/A', 
+                  style: theme.textTheme.bodySmall?.copyWith(color: colorScheme.onSurfaceVariant),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
             ],
           ),
-          const SizedBox(height: 12),
+          SizedBox(height: context.md),
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text("$startTime - $endTime", style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
+              Text("$startTime - $endTime", style: theme.textTheme.bodyLarge?.copyWith(fontWeight: FontWeight.bold)),
               if (!isOverride)
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                  decoration: BoxDecoration(color: Colors.green, borderRadius: BorderRadius.circular(20)),
-                  child: const Text("REGULAR", style: TextStyle(color: Colors.white, fontSize: 12)),
+                  decoration: BoxDecoration(color: const Color(0xFF10B981).withValues(alpha: 0.1), borderRadius: BorderRadius.circular(20), border: Border.all(color: const Color(0xFF10B981).withValues(alpha: 0.5))),
+                  child: const Text("REGULAR", style: TextStyle(color: Color(0xFF10B981), fontSize: 10, fontWeight: FontWeight.bold)),
                 ),
             ],
           ),
@@ -309,17 +360,18 @@ class _ClassSchedulePageState extends State<ClassSchedulePage> {
   }
 
   Widget statusBox(String text) {
+    final theme = context.theme;
+    final colorScheme = theme.colorScheme;
     return Expanded(
       child: Container(
-        padding: const EdgeInsets.all(10),
-        margin: const EdgeInsets.only(right: 5),
+        padding: EdgeInsets.symmetric(vertical: context.sm),
         decoration: BoxDecoration(
-          color: const Color(0xff5d6a7a),
-          border: Border.all(color: Colors.white30),
-          borderRadius: BorderRadius.circular(8),
+          color: colorScheme.surfaceContainerHighest,
+          border: Border.all(color: colorScheme.outlineVariant),
+          borderRadius: BorderRadius.circular(10),
         ),
         child: Center(
-          child: Text(text, style: const TextStyle(color: Colors.white, fontSize: 14)),
+          child: Text(text, style: theme.textTheme.labelMedium?.copyWith(color: colorScheme.onSurfaceVariant, fontWeight: FontWeight.bold)),
         ),
       ),
     );

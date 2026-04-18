@@ -1,4 +1,6 @@
-import 'package:eduphin/login_logout/login.dart';
+import 'package:flutter/material.dart';
+import 'package:eduphin/teacher/dashboard/app_drawer.dart';
+import 'package:eduphin/services/responsive_helper.dart';
 import 'package:eduphin/services/api_service.dart';
 import 'package:eduphin/student/student_dashboard_model.dart';
 import 'package:eduphin/student/support_ticket/create_tickets.dart';
@@ -6,22 +8,23 @@ import 'package:eduphin/student/support_ticket/my_ticket.dart';
 import 'package:eduphin/student/support_ticket/ticket_details.dart';
 import 'package:eduphin/student/view_virtual_id_card.dart';
 import 'package:eduphin/student/student_profile.dart';
-import 'package:eduphin/student/faculty_remark.dart';
 import 'package:eduphin/student/time_table/custom_schedule.dart';
 import 'package:eduphin/student/time_table/week_schedule.dart';
-import 'package:eduphin/student/attendence/leave_application.dart';
 import 'package:eduphin/student/attendence/view_attendance.dart';
-import 'package:eduphin/student/examinations/admit_card.dart';
-import 'package:eduphin/student/examinations/exam_result.dart';
 import 'package:eduphin/student/examinations/exam_registration.dart';
 import 'package:eduphin/student/fee_details.dart';
 import 'package:eduphin/student/academic/assignments.dart';
 import 'package:eduphin/student/academic/lacture_notes.dart';
+import 'package:eduphin/student/event_management/all_event.dart';
+import 'package:eduphin/login_logout/login.dart';
+import 'package:eduphin/student/faculty_remark.dart';
+import 'package:eduphin/student/attendence/leave_application.dart';
+import 'package:eduphin/student/examinations/admit_card.dart';
+import 'package:eduphin/student/examinations/exam_result.dart';
 import 'package:eduphin/student/library_resources/available_resources.dart';
 import 'package:eduphin/student/library_resources/borrowed_books.dart';
-import 'package:eduphin/student/event_management/all_event.dart';
 import 'package:eduphin/student/event_management/registed_event.dart';
-import 'package:flutter/material.dart';
+import 'package:eduphin/services/common_widgets.dart';
 
 class StudentDashboard extends StatefulWidget {
   const StudentDashboard({super.key});
@@ -34,13 +37,6 @@ class _StudentDashboardState extends State<StudentDashboard> {
   bool isLoading = true;
   StudentDashboardData? dashboardData;
   String? errorMessage;
-
-  // Theme Colors - Professional Dark UI
-  final Color _bg = const Color(0xff0B1220);
-  final Color _card = const Color(0xff1E2746);
-  final Color _primary = const Color(0xff3366FF);
-  final Color _surface = const Color(0xff2A3450);
-  final Color _textSecondary = const Color(0xff8F9BB3);
 
   @override
   void initState() {
@@ -66,32 +62,32 @@ class _StudentDashboardState extends State<StudentDashboard> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = context.theme;
+    final colorScheme = theme.colorScheme;
+
     if (isLoading) {
       return Scaffold(
-        backgroundColor: _bg,
-        body: Center(child: CircularProgressIndicator(color: _primary, strokeWidth: 3)),
+        body: Center(child: CircularProgressIndicator(color: colorScheme.primary, strokeWidth: 3)),
       );
     }
 
     if (errorMessage != null) {
       return Scaffold(
-        backgroundColor: _bg,
         body: Center(
           child: Padding(
-            padding: const EdgeInsets.all(24.0),
+            padding: context.pagePadding,
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                const Icon(Icons.error_outline_rounded, color: Colors.redAccent, size: 64),
-                const SizedBox(height: 20),
-                const Text("Dashboard Unavailable", style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold)),
-                const SizedBox(height: 8),
-                Text(errorMessage!, style: const TextStyle(color: Colors.white70), textAlign: TextAlign.center),
-                const SizedBox(height: 32),
+                Icon(Icons.error_outline_rounded, color: colorScheme.error, size: context.scale(64)),
+                SizedBox(height: context.scale(20)),
+                Text("Dashboard Unavailable", style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold, fontSize: context.font(20))),
+                SizedBox(height: context.scale(8)),
+                Text(errorMessage!, style: theme.textTheme.bodyMedium?.copyWith(color: theme.hintColor, fontSize: context.font(14)), textAlign: TextAlign.center),
+                SizedBox(height: context.scale(32)),
                 ElevatedButton(
-                  style: ElevatedButton.styleFrom(backgroundColor: _primary, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8))),
                   onPressed: _fetchDashboardData,
-                  child: const Text("Retry Connection", style: TextStyle(color: Colors.white)),
+                  child: const Text("Retry Connection"),
                 )
               ],
             ),
@@ -101,67 +97,151 @@ class _StudentDashboardState extends State<StudentDashboard> {
     }
 
     return Scaffold(
-      backgroundColor: _bg,
       appBar: AppBar(
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        title: const Text("EDUPHIN", style: TextStyle(fontWeight: FontWeight.w900, color: Colors.white, letterSpacing: 1.5, fontSize: 18)),
+        title: Text("EDUPHIN", style: TextStyle(fontWeight: FontWeight.w900, letterSpacing: 1.5, fontSize: context.font(20))),
         centerTitle: true,
-        iconTheme: const IconThemeData(color: Colors.white),
         actions: [
           IconButton(
-            icon: const Icon(Icons.notifications_none_rounded, color: Colors.white),
+            icon: const Icon(Icons.notifications_none_rounded),
             onPressed: () {},
           ),
         ],
       ),
-      drawer: _buildDrawer(context),
+      drawer: const AppDrawer(),
       body: RefreshIndicator(
         onRefresh: _fetchDashboardData,
-        color: _primary,
+        color: colorScheme.primary,
         child: SingleChildScrollView(
           physics: const BouncingScrollPhysics(),
-          padding: const EdgeInsets.symmetric(horizontal: 20),
-          child: Column(
-            children: [
-              _buildHeader(context),
-              const SizedBox(height: 32),
-              
-              // Metrics Grid/Stack
-              _buildAttendanceCard(),
-              const SizedBox(height: 16),
-              _buildFeeStatusCard(),
-              const SizedBox(height: 16),
-              _buildSupportCard(),
-              const SizedBox(height: 16),
-              _buildStudyCard(),
-              
-              const SizedBox(height: 32),
-              _buildSectionHeader(Icons.calendar_today_outlined, "Upcoming Events", onTap: () {
-                Navigator.push(context, MaterialPageRoute(builder: (_) => const ManageEventsPage()));
-              }),
-              _buildUpcomingEvents(),
-              
-              const SizedBox(height: 32),
-              _buildSectionHeader(Icons.assignment_outlined, "Available Exams", onTap: () {
-                Navigator.push(context, MaterialPageRoute(builder: (_) => const ExamRegistrationPage()));
-              }),
-              _buildAvailableExams(),
+          child: Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 1100),
+              child: Padding(
+                padding: context.pagePadding,
+                child: Column(
+                  children: [
+                    _buildHeader(context),
+                    SizedBox(height: context.xl),
 
-              const SizedBox(height: 32),
-              _buildSectionHeader(Icons.book_outlined, "Study Materials", onTap: () {
-                Navigator.push(context, MaterialPageRoute(builder: (_) => const NotesPage()));
-              }),
-              _buildStudyMaterials(),
+                    // Metrics Grid for responsiveness
+                    LayoutBuilder(
+                      builder: (context, constraints) {
+                        final crossAxisCount = context.isDesktop ? 4 : (context.isTablet ? 2 : 1);
+                        final childAspectRatio = context.isDesktop ? 1.4 : (context.isTablet ? 2.2 : 2.5);
 
-              const SizedBox(height: 32),
-              _buildSectionHeader(Icons.list_alt_outlined, "Assignments", onTap: () {
-                Navigator.push(context, MaterialPageRoute(builder: (_) => const AssignmentsPage()));
-              }),
-              _buildAssignments(),
-              
-              const SizedBox(height: 50),
-            ],
+                        if (crossAxisCount > 1) {
+                          return GridView(
+                            shrinkWrap: true,
+                            physics: const NeverScrollableScrollPhysics(),
+                            gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                              crossAxisCount: crossAxisCount,
+                              crossAxisSpacing: context.md,
+                              mainAxisSpacing: context.md,
+                              childAspectRatio: childAspectRatio,
+                            ),
+                            children: [
+                              _buildAttendanceCard(),
+                              _buildSupportCard(),
+                              _buildStudyCard(),
+                              _buildFeeStatusCard(),
+                            ],
+                          );
+                        } else {
+                          return Column(
+                            children: [
+                              _buildAttendanceCard(),
+                              SizedBox(height: context.md),
+                              _buildSupportCard(),
+                              SizedBox(height: context.md),
+                              _buildStudyCard(),
+                              SizedBox(height: context.md),
+                              _buildFeeStatusCard(),
+                            ],
+                          );
+                        }
+                      },
+                    ),
+
+                    SizedBox(height: context.xl),
+                    _buildSectionHeader(Icons.bolt, "Quick Actions"),
+                    GridView(
+                      shrinkWrap: true,
+                      physics: const NeverScrollableScrollPhysics(),
+                      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                        crossAxisCount: context.responsive(2, tablet: 4, desktop: 6),
+                        crossAxisSpacing: context.md,
+                        mainAxisSpacing: context.md,
+                        childAspectRatio: 1.1,
+                      ),
+                      children: [
+                        QuickActionItem(
+                          label: "ATTENDANCE",
+                          icon: Icons.calendar_today_rounded,
+                          onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const AttendanceReportPage())),
+                          color: colorScheme.primary,
+                        ),
+                        QuickActionItem(
+                          label: "TIMETABLE",
+                          icon: Icons.schedule_rounded,
+                          onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const TimetablePage())),
+                          color: colorScheme.secondary,
+                        ),
+                        QuickActionItem(
+                          label: "ADMIT CARD",
+                          icon: Icons.vignette_outlined,
+                          onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const AdmitCardPage())),
+                          color: colorScheme.tertiary,
+                        ),
+                        QuickActionItem(
+                          label: "EXAM RESULT",
+                          icon: Icons.assignment_turned_in_rounded,
+                          onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ExamResultPage())),
+                          color: colorScheme.error,
+                        ),
+                        QuickActionItem(
+                          label: "FEES",
+                          icon: Icons.account_balance_wallet_outlined,
+                          onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const StudentFeePage())),
+                          color: colorScheme.primary,
+                        ),
+                        QuickActionItem(
+                          label: "RESOURCES",
+                          icon: Icons.library_books_outlined,
+                          onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const LibraryBooksPage())),
+                          color: colorScheme.secondary,
+                        ),
+                      ],
+                    ),
+
+                    SizedBox(height: context.xl),
+                    _buildSectionHeader(Icons.calendar_today_outlined, "Upcoming Events", onTap: () {
+                      Navigator.push(context, MaterialPageRoute(builder: (_) => const ManageEventsPage()));
+                    }),
+                    _buildUpcomingEvents(),
+
+                    SizedBox(height: context.xl),
+                    _buildSectionHeader(Icons.assignment_outlined, "Available Exams", onTap: () {
+                      Navigator.push(context, MaterialPageRoute(builder: (_) => const ExamRegistrationPage()));
+                    }),
+                    _buildAvailableExams(),
+
+                    SizedBox(height: context.xl),
+                    _buildSectionHeader(Icons.book_outlined, "Study Materials", onTap: () {
+                      Navigator.push(context, MaterialPageRoute(builder: (_) => const NotesPage()));
+                    }),
+                    _buildStudyMaterials(),
+
+                    SizedBox(height: context.xl),
+                    _buildSectionHeader(Icons.list_alt_outlined, "Assignments", onTap: () {
+                      Navigator.push(context, MaterialPageRoute(builder: (_) => const AssignmentsPage()));
+                    }),
+                    _buildAssignments(),
+
+                    SizedBox(height: context.xl * 2),
+                  ],
+                ),
+              ),
+            ),
           ),
         ),
       ),
@@ -169,54 +249,181 @@ class _StudentDashboardState extends State<StudentDashboard> {
   }
 
   Widget _buildHeader(BuildContext context) {
+    final theme = context.theme;
+    final colorScheme = theme.colorScheme;
     String? photoPath = dashboardData?.student?.profileImage;
 
-    return Column(
-      children: [
-        const SizedBox(height: 10),
-        Container(
-          padding: const EdgeInsets.all(4),
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            border: Border.all(color: _primary.withValues(alpha: 0.5), width: 2),
+    return Container(
+      width: double.infinity,
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [
+            colorScheme.primary.withValues(alpha: 0.1),
+            colorScheme.surfaceContainerLow,
+          ],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(context.xl),
+        border: Border.all(color: colorScheme.primary.withValues(alpha: 0.1)),
+      ),
+      child: Stack(
+        children: [
+          // Decorative background element
+          Positioned(
+            right: -context.scale(20),
+            top: -context.scale(20),
+            child: Icon(
+              Icons.school_outlined,
+              size: context.scale(120),
+              color: colorScheme.primary.withValues(alpha: 0.03),
+            ),
           ),
-          child: CircleAvatar(
-            radius: 50,
-            backgroundColor: _card,
-            backgroundImage: const AssetImage('assets/images/girl_image.webp'),
-            foregroundImage: photoPath != null && photoPath.isNotEmpty
-                ? NetworkImage(ApiService.getStorageUrl(photoPath))
-                : null,
+          Padding(
+            padding: EdgeInsets.all(context.lg),
+            child: Responsive(
+              mobile: Column(
+                children: [
+                  Row(
+                    children: [
+                      _buildProfileImage(context, photoPath, radius: 45),
+                      SizedBox(width: context.md),
+                      Expanded(
+                        child: _buildWelcomeText(context, crossAxisAlignment: CrossAxisAlignment.start),
+                      ),
+                    ],
+                  ),
+                  SizedBox(height: context.lg),
+                  _buildVirtualIdButton(context, fullWidth: true),
+                ],
+              ),
+              tablet: Row(
+                children: [
+                  _buildProfileImage(context, photoPath, radius: 55),
+                  SizedBox(width: context.lg),
+                  Expanded(
+                    child: _buildWelcomeText(context, crossAxisAlignment: CrossAxisAlignment.start),
+                  ),
+                  _buildVirtualIdButton(context),
+                ],
+              ),
+              desktop: Row(
+                children: [
+                  _buildProfileImage(context, photoPath, radius: 65),
+                  SizedBox(width: context.xl),
+                  Expanded(
+                    child: _buildWelcomeText(context, crossAxisAlignment: CrossAxisAlignment.start),
+                  ),
+                  _buildVirtualIdButton(context),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildProfileImage(BuildContext context, String? photoPath, {double radius = 50}) {
+    final colorScheme = context.theme.colorScheme;
+    return InkWell(
+      onTap: () => Navigator.push(
+        context,
+        MaterialPageRoute(builder: (_) => const StudentProfilePage()),
+      ).then((_) => _fetchDashboardData()),
+      child: Container(
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          border: Border.all(color: colorScheme.primary, width: 2),
+          boxShadow: [
+            BoxShadow(
+              color: colorScheme.primary.withValues(alpha: 0.1),
+              blurRadius: 10,
+              spreadRadius: 2,
+            )
+          ],
+        ),
+        child: ProfileAvatar(
+          imageUrl: ApiService.getStorageUrl(photoPath),
+          radius: context.scale(radius),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildWelcomeText(BuildContext context, {CrossAxisAlignment crossAxisAlignment = CrossAxisAlignment.center}) {
+    final theme = context.theme;
+    return Column(
+      crossAxisAlignment: crossAxisAlignment,
+      children: [
+        Text(
+          "Welcome Back,",
+          style: theme.textTheme.bodyMedium?.copyWith(
+            color: theme.colorScheme.onSurfaceVariant,
+            fontWeight: FontWeight.w500,
+            fontSize: context.font(14),
+            letterSpacing: 0.5,
           ),
         ),
-        const SizedBox(height: 16),
-        Text("Welcome Back!", style: TextStyle(color: _textSecondary, fontSize: 16, fontWeight: FontWeight.w500)),
-        const SizedBox(height: 8),
+        SizedBox(height: context.xs),
         Text(
           dashboardData?.user?.name ?? "Student",
-          style: const TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.w800),
+          style: theme.textTheme.headlineMedium?.copyWith(
+            fontWeight: FontWeight.w900,
+            fontSize: context.font(26),
+            color: theme.colorScheme.onSurface,
+            letterSpacing: -0.5,
+          ),
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
         ),
-        const SizedBox(height: 24),
-        InkWell(
-          onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ViewVirtualIdCard())),
-          borderRadius: BorderRadius.circular(12),
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+        if (dashboardData?.student?.studentRollNo != null) ...[
+          SizedBox(height: context.xs),
+          Container(
+            padding: EdgeInsets.symmetric(horizontal: context.sm, vertical: 2),
             decoration: BoxDecoration(
-              color: _surface,
-              borderRadius: BorderRadius.circular(12),
+              color: theme.colorScheme.primary.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(context.xs),
             ),
-            child: const Text(
-              "VIEW VIRTUAL ID CARD",
-              style: TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w700, letterSpacing: 1.1),
+            child: Text(
+              "Roll No: ${dashboardData!.student!.studentRollNo}",
+              style: TextStyle(
+                color: theme.colorScheme.primary,
+                fontWeight: FontWeight.bold,
+                fontSize: context.font(11),
+              ),
             ),
           ),
-        ),
+        ],
       ],
     );
   }
 
+  Widget _buildVirtualIdButton(BuildContext context, {bool fullWidth = false}) {
+    final colorScheme = context.theme.colorScheme;
+    return ElevatedButton.icon(
+      onPressed: () => Navigator.push(
+        context,
+        MaterialPageRoute(builder: (_) => const ViewVirtualIdCard()),
+      ).then((_) => _fetchDashboardData()),
+      icon: Icon(Icons.vignette_rounded, size: context.scale(18)),
+      style: ElevatedButton.styleFrom(
+        backgroundColor: colorScheme.primary,
+        foregroundColor: colorScheme.onPrimary,
+        elevation: 0,
+        minimumSize: Size(fullWidth ? double.infinity : context.scale(180), context.scale(48)),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(context.md)),
+      ),
+      label: Text(
+        "VIRTUAL ID CARD",
+        style: TextStyle(fontSize: context.font(12), fontWeight: FontWeight.w800, letterSpacing: 1.1),
+      ),
+    );
+  }
+
   Widget _buildAttendanceCard() {
+    final theme = context.theme;
+    final colorScheme = theme.colorScheme;
     return InkWell(
       onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const AttendanceReportPage())),
       child: _buildMetricCard(
@@ -224,61 +431,75 @@ class _StudentDashboardState extends State<StudentDashboard> {
         value: "${dashboardData?.attendancePercentage.toStringAsFixed(1)}%",
         subtitle: (dashboardData?.attendancePercentage ?? 0) >= 75 ? "Excellent! Meeting target." : "Attendance needs improvement",
         icon: Icons.calendar_today_rounded,
-        iconColor: const Color(0xff00D68F),
+        iconColor: colorScheme.primary,
       ),
     );
   }
 
   Widget _buildFeeStatusCard() {
+    final theme = context.theme;
+    final colorScheme = theme.colorScheme;
     return InkWell(
       onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const StudentFeePage())),
       child: Container(
         width: double.infinity,
-        padding: const EdgeInsets.all(20),
+        padding: EdgeInsets.all(context.md),
         decoration: BoxDecoration(
-          color: _card,
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
+          color: colorScheme.surfaceContainerLow,
+          borderRadius: BorderRadius.circular(context.md),
+          border: Border.all(color: colorScheme.outlineVariant.withValues(alpha: 0.5)),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text("FEE STATUS", style: TextStyle(color: _textSecondary, fontSize: 12, fontWeight: FontWeight.w700, letterSpacing: 1.2)),
-              Icon(Icons.account_balance_wallet_outlined, color: _primary, size: 32),
-            ],
-          ),
-          const SizedBox(height: 8),
-          Text("₹${dashboardData?.due ?? 0}", style: const TextStyle(color: Colors.white, fontSize: 28, fontWeight: FontWeight.w800)),
-          Text("Current Due Amount", style: TextStyle(color: _textSecondary, fontSize: 13)),
-          const SizedBox(height: 24),
-          Row(
-            children: [
-              _buildFeeStat("Total Payable", "₹${dashboardData?.totalPayable ?? 0}"),
-              const SizedBox(width: 40),
-              _buildFeeStat("Total Paid", "₹${dashboardData?.totalPaid ?? 0}"),
-            ],
-          )
-        ],
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Expanded(child: Text("FEE STATUS", style: TextStyle(color: colorScheme.onSurfaceVariant, fontSize: context.font(12), fontWeight: FontWeight.w700, letterSpacing: 1.2), maxLines: 1, overflow: TextOverflow.ellipsis)),
+                    Icon(Icons.account_balance_wallet_outlined, color: colorScheme.primary, size: context.scale(32)),
+                  ],
+                ),
+                SizedBox(height: context.xs),
+                Text("₹${dashboardData?.due ?? 0}", style: theme.textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w800, fontSize: context.font(24))),
+                Text("Current Due Amount", style: TextStyle(color: colorScheme.onSurfaceVariant, fontSize: context.font(13))),
+              ],
+            ),
+            if (context.isMobile) ...[
+              SizedBox(height: context.md),
+              Row(
+                children: [
+                  Expanded(child: _buildFeeStat("Total Payable", "₹${dashboardData?.totalPayable ?? 0}")),
+                  SizedBox(width: context.lg),
+                  Expanded(child: _buildFeeStat("Total Paid", "₹${dashboardData?.totalPaid ?? 0}")),
+                ],
+              ),
+            ]
+          ],
         ),
       ),
     );
   }
 
   Widget _buildFeeStat(String label, String value) {
+    final theme = context.theme;
+    final colorScheme = theme.colorScheme;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(label, style: TextStyle(color: _textSecondary, fontSize: 12)),
-        const SizedBox(height: 4),
-        Text(value, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 16)),
+        Text(label, style: TextStyle(color: colorScheme.onSurfaceVariant, fontSize: context.font(12)), maxLines: 1, overflow: TextOverflow.ellipsis),
+        SizedBox(height: context.scale(4)),
+        Text(value, style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700, fontSize: context.font(16)), maxLines: 1, overflow: TextOverflow.ellipsis),
       ],
     );
   }
 
   Widget _buildSupportCard() {
+    final theme = context.theme;
+    final colorScheme = theme.colorScheme;
     return InkWell(
       onTap: () {
         if (dashboardData!.tickets.isNotEmpty) {
@@ -303,13 +524,15 @@ class _StudentDashboardState extends State<StudentDashboard> {
         value: "${dashboardData?.tickets.length ?? 0}",
         subtitle: "Active Support Tickets",
         icon: Icons.headset_mic_rounded,
-        iconColor: const Color(0xffFF3D71),
-        extraText: dashboardData!.tickets.isNotEmpty ? "Latest: ${dashboardData!.tickets.first.title}" : "No active tickets",
+        iconColor: colorScheme.secondary,
+        extraText: (dashboardData?.tickets ?? []).isNotEmpty ? "Latest: ${dashboardData!.tickets.first.title}" : "No active tickets",
       ),
     );
   }
 
   Widget _buildStudyCard() {
+    final theme = context.theme;
+    final colorScheme = theme.colorScheme;
     return InkWell(
       onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ExamRegistrationPage())),
       child: _buildMetricCard(
@@ -317,7 +540,7 @@ class _StudentDashboardState extends State<StudentDashboard> {
         value: "${dashboardData?.availableExams.length ?? 0}",
         subtitle: "Available Examinations",
         icon: Icons.auto_graph_rounded,
-        iconColor: const Color(0xffFFAA00),
+        iconColor: colorScheme.tertiary,
         extraText: "${dashboardData?.studyMaterials.length ?? 0} Materials • ${dashboardData?.assignments.length ?? 0} Assignments",
       ),
     );
@@ -331,40 +554,44 @@ class _StudentDashboardState extends State<StudentDashboard> {
     Color? iconColor,
     String? extraText,
   }) {
+    final theme = context.theme;
+    final colorScheme = theme.colorScheme;
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(20),
+      padding: EdgeInsets.all(context.md),
       decoration: BoxDecoration(
-        color: _card,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
+        color: colorScheme.surfaceContainerLow,
+        borderRadius: BorderRadius.circular(context.md),
+        border: Border.all(color: colorScheme.outlineVariant.withValues(alpha: 0.5)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(title, style: TextStyle(color: _textSecondary, fontSize: 12, fontWeight: FontWeight.w700, letterSpacing: 1.2)),
-                  const SizedBox(height: 8),
-                  Text(value, style: const TextStyle(color: Colors.white, fontSize: 28, fontWeight: FontWeight.w800)),
-                ],
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(title, style: TextStyle(color: colorScheme.onSurfaceVariant, fontSize: context.font(12), fontWeight: FontWeight.w700, letterSpacing: 1.2)),
+                    SizedBox(height: context.xs),
+                    Text(value, style: theme.textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w800, fontSize: context.font(24))),
+                    Text(subtitle, style: TextStyle(color: colorScheme.onSurfaceVariant, fontSize: context.font(13)), maxLines: 1, overflow: TextOverflow.ellipsis),
+                  ],
+                ),
               ),
-              Icon(icon, color: iconColor ?? _primary, size: 32),
+              Icon(icon, color: iconColor ?? colorScheme.primary, size: context.scale(32)),
             ],
           ),
-          const SizedBox(height: 4),
-          Text(subtitle, style: TextStyle(color: _textSecondary, fontSize: 13)),
-          if (extraText != null) ...[
-            const Padding(
-              padding: EdgeInsets.symmetric(vertical: 16),
-              child: Divider(color: Colors.white10, height: 1),
+          if (extraText != null && context.isMobile) ...[
+            Padding(
+              padding: EdgeInsets.symmetric(vertical: context.sm),
+              child: Divider(color: colorScheme.outlineVariant.withValues(alpha: 0.5), height: 1),
             ),
-            Text(extraText, style: const TextStyle(color: Colors.white70, fontSize: 13, fontWeight: FontWeight.w500)),
+            Text(extraText, style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w500, fontSize: context.font(14)), maxLines: 1, overflow: TextOverflow.ellipsis),
           ],
         ],
       ),
@@ -372,19 +599,31 @@ class _StudentDashboardState extends State<StudentDashboard> {
   }
 
   Widget _buildSectionHeader(IconData icon, String title, {VoidCallback? onTap}) {
+    final theme = context.theme;
     return Padding(
-      padding: const EdgeInsets.only(bottom: 16),
+      padding: EdgeInsets.only(bottom: context.md),
       child: Row(
         children: [
-          Icon(icon, size: 22, color: _primary),
-          const SizedBox(width: 12),
-          Text(title, style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w800)),
-          const Spacer(),
-          if (onTap != null)
+          Icon(icon, size: context.scale(22), color: theme.colorScheme.primary),
+          SizedBox(width: context.sm),
+          Expanded(
+            child: Text(
+              title,
+              style: theme.textTheme.titleMedium?.copyWith(
+                fontWeight: FontWeight.bold,
+                fontSize: context.font(18),
+              ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+          if (onTap != null) ...[
+            SizedBox(width: context.sm),
             TextButton(
               onPressed: onTap,
-              child: Text("See All", style: TextStyle(color: _primary, fontSize: 13, fontWeight: FontWeight.w600)),
+              child: Text("See All", style: TextStyle(color: theme.colorScheme.primary, fontSize: context.font(13), fontWeight: FontWeight.w600)),
             ),
+          ],
         ],
       ),
     );
@@ -394,36 +633,59 @@ class _StudentDashboardState extends State<StudentDashboard> {
     if (dashboardData!.events.isEmpty) {
       return _buildCenteredEmptyState(Icons.event_busy_rounded, "No upcoming events scheduled");
     }
-    return Column(children: dashboardData!.events.take(2).map((e) => _buildEventTile(e)).toList());
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final crossAxisCount = constraints.maxWidth > 700 ? 2 : 1;
+        if (crossAxisCount > 1) {
+          return GridView.builder(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: crossAxisCount,
+              crossAxisSpacing: context.md,
+              mainAxisSpacing: context.md,
+              childAspectRatio: 3.5,
+            ),
+            itemCount: dashboardData!.events.length.clamp(0, 4),
+            itemBuilder: (context, index) => _buildEventTile(dashboardData!.events[index]),
+          );
+        }
+        return Column(children: dashboardData!.events.take(2).map((e) => _buildEventTile(e)).toList());
+      },
+    );
   }
 
   Widget _buildEventTile(Event event) {
+    final theme = context.theme;
+    final colorScheme = theme.colorScheme;
     return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.all(16),
+      margin: EdgeInsets.only(bottom: context.isMobile ? context.sm : 0),
+      padding: EdgeInsets.all(context.md),
       decoration: BoxDecoration(
-        color: _card,
-        borderRadius: BorderRadius.circular(16),
+        color: colorScheme.surfaceContainerLow,
+        borderRadius: BorderRadius.circular(context.md),
+        border: Border.all(color: colorScheme.outlineVariant.withValues(alpha: 0.5)),
       ),
       child: Row(
         children: [
           Container(
-            padding: const EdgeInsets.all(10),
-            decoration: BoxDecoration(color: _primary.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(12)),
-            child: Icon(Icons.event_available_rounded, color: _primary, size: 22),
+            padding: EdgeInsets.all(context.xs),
+            decoration: BoxDecoration(color: colorScheme.primary.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(context.sm)),
+            child: Icon(Icons.event_available_rounded, color: colorScheme.primary, size: context.scale(22)),
           ),
-          const SizedBox(width: 16),
+          SizedBox(width: context.md),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Text(event.title, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 15)),
-                const SizedBox(height: 4),
-                Text(event.eventDate ?? "TBA", style: TextStyle(color: _textSecondary, fontSize: 12)),
+                Text(event.title, style: TextStyle(fontWeight: FontWeight.w700, fontSize: context.font(15)), maxLines: 1, overflow: TextOverflow.ellipsis),
+                SizedBox(height: context.xs),
+                Text(event.eventDate ?? "TBA", style: TextStyle(color: colorScheme.onSurfaceVariant, fontSize: context.font(12))),
               ],
             ),
           ),
-          const Icon(Icons.arrow_forward_ios_rounded, color: Colors.white24, size: 16),
+          Icon(Icons.arrow_forward_ios_rounded, color: colorScheme.onSurfaceVariant.withValues(alpha: 0.3), size: context.scale(16)),
         ],
       ),
     );
@@ -433,49 +695,74 @@ class _StudentDashboardState extends State<StudentDashboard> {
     if (dashboardData!.availableExams.isEmpty) {
       return _buildCenteredEmptyState(Icons.assignment_turned_in_rounded, "No examinations available");
     }
-    return Column(
-      children: dashboardData!.availableExams.take(2).map((exam) {
-        bool isReg = dashboardData!.registeredExamIds.contains(exam.id);
-        return Container(
-          margin: const EdgeInsets.only(bottom: 12),
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: _card,
-            borderRadius: BorderRadius.circular(16),
-          ),
-          child: Row(
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(exam.name, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 15)),
-                    const SizedBox(height: 4),
-                    Text(exam.type ?? "General Exam", style: TextStyle(color: _textSecondary, fontSize: 12)),
-                  ],
-                ),
-              ),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                decoration: BoxDecoration(
-                  color: isReg ? const Color(0xff00D68F).withValues(alpha: 0.1) : _primary.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: isReg ? const Color(0xff00D68F).withValues(alpha: 0.5) : _primary.withValues(alpha: 0.5)),
-                ),
-                child: Text(
-                  isReg ? "REGISTERED" : "AVAILABLE",
-                  style: TextStyle(
-                    color: isReg ? const Color(0xff00D68F) : _primary,
-                    fontWeight: FontWeight.w800,
-                    fontSize: 10,
-                    letterSpacing: 0.5,
-                  ),
-                ),
-              ),
-            ],
-          ),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final crossAxisCount = constraints.maxWidth > 700 ? 2 : 1;
+        if (crossAxisCount > 1) {
+          return GridView.builder(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: crossAxisCount,
+              crossAxisSpacing: context.md,
+              mainAxisSpacing: context.md,
+              childAspectRatio: 3.5,
+            ),
+            itemCount: dashboardData!.availableExams.length.clamp(0, 4),
+            itemBuilder: (context, index) => _buildExamTile(dashboardData!.availableExams[index]),
+          );
+        }
+        return Column(
+          children: dashboardData!.availableExams.take(2).map((exam) => _buildExamTile(exam)).toList(),
         );
-      }).toList(),
+      },
+    );
+  }
+
+  Widget _buildExamTile(Exam exam) {
+    final theme = context.theme;
+    final colorScheme = theme.colorScheme;
+    bool isReg = dashboardData!.registeredExamIds.contains(exam.id);
+    return Container(
+      margin: EdgeInsets.only(bottom: context.isMobile ? context.sm : 0),
+      padding: EdgeInsets.all(context.md),
+      decoration: BoxDecoration(
+        color: colorScheme.surfaceContainerLow,
+        borderRadius: BorderRadius.circular(context.md),
+        border: Border.all(color: colorScheme.outlineVariant.withValues(alpha: 0.5)),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Text(exam.name, style: TextStyle(fontWeight: FontWeight.w700, fontSize: context.font(15)), maxLines: 1, overflow: TextOverflow.ellipsis),
+                SizedBox(height: context.xs),
+                Text(exam.type ?? "General Exam", style: TextStyle(color: colorScheme.onSurfaceVariant, fontSize: context.font(12))),
+              ],
+            ),
+          ),
+          Container(
+            padding: EdgeInsets.symmetric(horizontal: context.sm, vertical: context.xs),
+            decoration: BoxDecoration(
+              color: isReg ? const Color(0xFF10B981).withValues(alpha: 0.1) : colorScheme.primary.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(context.xs),
+              border: Border.all(color: isReg ? const Color(0xFF10B981).withValues(alpha: 0.5) : colorScheme.primary.withValues(alpha: 0.5)),
+            ),
+            child: Text(
+              isReg ? "REGISTERED" : "AVAILABLE",
+              style: TextStyle(
+                color: isReg ? const Color(0xFF10B981) : colorScheme.primary,
+                fontWeight: FontWeight.w800,
+                fontSize: context.font(10),
+                letterSpacing: 0.5,
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -483,41 +770,66 @@ class _StudentDashboardState extends State<StudentDashboard> {
     if (dashboardData!.studyMaterials.isEmpty) {
       return _buildCenteredEmptyState(Icons.menu_book_rounded, "No study materials available");
     }
-    return Column(
-      children: dashboardData!.studyMaterials.take(2).map((item) {
-        return Container(
-          margin: const EdgeInsets.only(bottom: 12),
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: _card,
-            borderRadius: BorderRadius.circular(16),
-          ),
-          child: Row(
-            children: [
-              Container(
-                width: 44, height: 44,
-                decoration: BoxDecoration(color: Colors.redAccent.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(12)),
-                child: const Icon(Icons.picture_as_pdf_rounded, color: Colors.redAccent, size: 24),
-              ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(item.title, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 15), maxLines: 1, overflow: TextOverflow.ellipsis),
-                    const SizedBox(height: 4),
-                    Text("PDF Document", style: TextStyle(color: _textSecondary, fontSize: 12)),
-                  ],
-                ),
-              ),
-              IconButton(
-                icon: const Icon(Icons.download_rounded, color: Colors.white70),
-                onPressed: () {},
-              ),
-            ],
-          ),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final crossAxisCount = constraints.maxWidth > 700 ? 2 : 1;
+        if (crossAxisCount > 1) {
+          return GridView.builder(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: crossAxisCount,
+              crossAxisSpacing: context.md,
+              mainAxisSpacing: context.md,
+              childAspectRatio: 3.5,
+            ),
+            itemCount: dashboardData!.studyMaterials.length.clamp(0, 4),
+            itemBuilder: (context, index) => _buildStudyMaterialTile(dashboardData!.studyMaterials[index]),
+          );
+        }
+        return Column(
+          children: dashboardData!.studyMaterials.take(2).map((item) => _buildStudyMaterialTile(item)).toList(),
         );
-      }).toList(),
+      },
+    );
+  }
+
+  Widget _buildStudyMaterialTile(StudyMaterial item) {
+    final theme = context.theme;
+    final colorScheme = theme.colorScheme;
+    return Container(
+      margin: EdgeInsets.only(bottom: context.isMobile ? context.sm : 0),
+      padding: EdgeInsets.all(context.md),
+      decoration: BoxDecoration(
+        color: colorScheme.surfaceContainerLow,
+        borderRadius: BorderRadius.circular(context.md),
+        border: Border.all(color: colorScheme.outlineVariant.withValues(alpha: 0.5)),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: context.scale(44), height: context.scale(44),
+            decoration: BoxDecoration(color: colorScheme.error.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(context.sm)),
+            child: Icon(Icons.picture_as_pdf_rounded, color: colorScheme.error, size: context.scale(24)),
+          ),
+          SizedBox(width: context.md),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Text(item.title, style: TextStyle(fontWeight: FontWeight.w700, fontSize: context.font(15)), maxLines: 1, overflow: TextOverflow.ellipsis),
+                SizedBox(height: context.xs),
+                Text("PDF Document", style: TextStyle(color: colorScheme.onSurfaceVariant, fontSize: context.font(12))),
+              ],
+            ),
+          ),
+          IconButton(
+            icon: Icon(Icons.download_rounded, color: colorScheme.onSurfaceVariant),
+            onPressed: () {},
+          ),
+        ],
+      ),
     );
   }
 
@@ -525,170 +837,95 @@ class _StudentDashboardState extends State<StudentDashboard> {
     if (dashboardData!.assignments.isEmpty) {
       return _buildCenteredEmptyState(Icons.checklist_rounded, "No assignments pending");
     }
-    return Column(
-      children: dashboardData!.assignments.take(2).map((item) {
-        return Container(
-          margin: const EdgeInsets.only(bottom: 12),
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: _card,
-            borderRadius: BorderRadius.circular(16),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final crossAxisCount = constraints.maxWidth > 700 ? 2 : 1;
+        if (crossAxisCount > 1) {
+          return GridView.builder(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: crossAxisCount,
+              crossAxisSpacing: context.md,
+              mainAxisSpacing: context.md,
+              childAspectRatio: 3.5,
+            ),
+            itemCount: dashboardData!.assignments.length.clamp(0, 4),
+            itemBuilder: (context, index) => _buildAssignmentTile(dashboardData!.assignments[index]),
+          );
+        }
+        return Column(
+          children: dashboardData!.assignments.take(2).map((item) => _buildAssignmentTile(item)).toList(),
+        );
+      },
+    );
+  }
+
+  Widget _buildAssignmentTile(Assignment item) {
+    final theme = context.theme;
+    final colorScheme = theme.colorScheme;
+    return Container(
+      margin: EdgeInsets.only(bottom: context.isMobile ? context.sm : 0),
+      padding: EdgeInsets.all(context.md),
+      decoration: BoxDecoration(
+        color: colorScheme.surfaceContainerLow,
+        borderRadius: BorderRadius.circular(context.md),
+        border: Border.all(color: colorScheme.outlineVariant.withValues(alpha: 0.5)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Row(
             children: [
-              Row(
-                children: [
-                  Expanded(child: Text(item.title, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 15))),
-                  const Icon(Icons.more_vert_rounded, color: Colors.white38, size: 18),
-                ],
+              Expanded(child: Text(item.title, style: TextStyle(fontWeight: FontWeight.w700, fontSize: context.font(15)), maxLines: 1, overflow: TextOverflow.ellipsis)),
+              Icon(Icons.more_vert_rounded, color: colorScheme.onSurfaceVariant.withValues(alpha: 0.3), size: context.scale(18)),
+            ],
+          ),
+          SizedBox(height: context.sm),
+          Row(
+            children: [
+              Icon(Icons.access_time_rounded, color: colorScheme.primary, size: context.scale(14)),
+              SizedBox(width: context.xs),
+              Expanded(
+                child: Text(
+                  "Academic Assignment",
+                  style: TextStyle(color: colorScheme.onSurfaceVariant, fontSize: context.font(12)),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
               ),
-              const SizedBox(height: 12),
-              Row(
-                children: [
-                  Icon(Icons.access_time_rounded, color: _primary, size: 14),
-                  const SizedBox(width: 6),
-                  Text("Academic Assignment", style: TextStyle(color: _textSecondary, fontSize: 12)),
-                  const Spacer(),
-                  const Text("View Details", style: TextStyle(color: Colors.white38, fontSize: 12, decoration: TextDecoration.underline)),
-                ],
+              SizedBox(width: context.sm),
+              Text(
+                "View Details",
+                style: TextStyle(color: colorScheme.onSurfaceVariant, fontSize: context.font(12), decoration: TextDecoration.underline),
               ),
             ],
           ),
-        );
-      }).toList(),
+        ],
+      ),
     );
   }
 
   Widget _buildCenteredEmptyState(IconData icon, String msg) {
+    final theme = context.theme;
+    final colorScheme = theme.colorScheme;
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.symmetric(vertical: 40),
+      padding: EdgeInsets.symmetric(vertical: context.xl),
       decoration: BoxDecoration(
-        color: _card,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.03)),
+        color: colorScheme.surfaceContainerLow,
+        borderRadius: BorderRadius.circular(context.md),
+        border: Border.all(color: colorScheme.outlineVariant.withValues(alpha: 0.5)),
       ),
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(icon, color: Colors.white10, size: 48),
-          const SizedBox(height: 16),
-          Text(msg, style: const TextStyle(color: Colors.white38, fontSize: 14, fontWeight: FontWeight.w500)),
+          Icon(icon, color: colorScheme.onSurfaceVariant.withValues(alpha: 0.2), size: context.scale(48)),
+          SizedBox(height: context.md),
+          Text(msg, style: TextStyle(color: colorScheme.onSurfaceVariant, fontSize: context.font(14), fontWeight: FontWeight.w500)),
         ],
       ),
-    );
-  }
-
-  Widget _buildDrawer(BuildContext context) {
-    return Drawer(
-      backgroundColor: _bg,
-      child: Column(
-        children: [
-          UserAccountsDrawerHeader(
-            decoration: BoxDecoration(color: _surface),
-            currentAccountPicture: CircleAvatar(
-              backgroundColor: _primary,
-              backgroundImage: const AssetImage('assets/images/girl_image.webp'),
-              foregroundImage: (dashboardData?.student?.profileImage != null && dashboardData!.student!.profileImage!.isNotEmpty)
-                  ? NetworkImage(ApiService.getStorageUrl(dashboardData!.student!.profileImage))
-                  : null,
-            ),
-            accountName: Text(dashboardData?.user?.name ?? "Student", style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 16)),
-            accountEmail: Text(dashboardData?.user?.email ?? "", style: const TextStyle(color: Colors.white70)),
-          ),
-          Expanded(
-            child: ListView(
-              padding: EdgeInsets.zero,
-              children: [
-                _buildDrawerItem(context, "Dashboard", Icons.dashboard_rounded, null, isSelected: true),
-                _buildDrawerItem(context, "My Profile", Icons.person_outline_rounded, const StudentProfilePage()),
-                _buildDrawerItem(context, "Virtual ID Card", Icons.badge_rounded, const ViewVirtualIdCard()),
-                const Padding(padding: EdgeInsets.symmetric(horizontal: 16), child: Divider(color: Colors.white10)),
-        _buildExpansionTile(context, "Academic", Icons.school_rounded, [
-                  _buildDrawerSubItem(context, "Weekly Timetable", Icons.calendar_view_week_rounded, const TimetablePage()),
-                  _buildDrawerSubItem(context, "Daily Schedule", Icons.calendar_today_rounded, const ClassSchedulePage()),
-                  _buildDrawerSubItem(context, "Assignments", Icons.checklist_rounded, const AssignmentsPage()),
-                  _buildDrawerSubItem(context, "Study Materials", Icons.menu_book_rounded, const NotesPage()),
-                  _buildDrawerSubItem(context, "Faculty Remarks", Icons.comment_rounded, const RemarksPage()),
-                ]),
-                _buildExpansionTile(context, "Attendance", Icons.fact_check_rounded, [
-                  _buildDrawerSubItem(context, "Attendance Report", Icons.analytics_rounded, const AttendanceReportPage()),
-                  _buildDrawerSubItem(context, "Leave Applications", Icons.email_rounded, const LeaveApplicationPage()),
-                ]),
-                _buildExpansionTile(context, "Examinations", Icons.assignment_rounded, [
-                  _buildDrawerSubItem(context, "Exam Registration", Icons.app_registration_rounded, const ExamRegistrationPage()),
-                  _buildDrawerSubItem(context, "Admit Card", Icons.badge_rounded, const AdmitCardPage()),
-                  _buildDrawerSubItem(context, "Exam Results", Icons.grade_rounded, const ExamResultPage()),
-                ]),
-                _buildExpansionTile(context, "Library", Icons.local_library_rounded, [
-                  _buildDrawerSubItem(context, "Available Books", Icons.library_books_rounded, const LibraryBooksPage()),
-                  _buildDrawerSubItem(context, "My Lending Books", Icons.book_rounded, const MyLendingBooksPage()),
-                ]),
-                _buildExpansionTile(context, "Events", Icons.event_rounded, [
-                  _buildDrawerSubItem(context, "Explore Events", Icons.search_rounded, const ManageEventsPage()),
-                  _buildDrawerSubItem(context, "My Registered Events", Icons.event_available_rounded, const RegisteredEventsPage()),
-                ]),
-                _buildExpansionTile(context, "Support", Icons.headset_mic_rounded, [
-                  _buildDrawerSubItem(context, "My Tickets", Icons.confirmation_number_rounded, const SupportTicketsPage()),
-                  _buildDrawerSubItem(context, "Create Ticket", Icons.add_comment_rounded, const CreateSupportTicketPage()),
-                ]),
-                _buildDrawerItem(context, "Fees", Icons.payments_rounded, const StudentFeePage()),
-                const Padding(padding: EdgeInsets.symmetric(horizontal: 16), child: Divider(color: Colors.white10)),
-                ListTile(
-                  leading: const Icon(Icons.logout_rounded, color: Colors.redAccent),
-                  title: const Text("Sign Out", style: TextStyle(color: Colors.redAccent, fontWeight: FontWeight.bold)),
-                  onTap: () async {
-                    await ApiService.logout();
-                    if (context.mounted) {
-                      Navigator.pushAndRemoveUntil(context, MaterialPageRoute(builder: (_) => const LoginPage()), (r) => false);
-                    }
-                  },
-                ),
-                const SizedBox(height: 30),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildExpansionTile(BuildContext context, String title, IconData icon, List<Widget> children) {
-    return Theme(
-      data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
-      child: ExpansionTile(
-        leading: Icon(icon, color: Colors.white70),
-        title: Text(title, style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w500)),
-        iconColor: _primary,
-        collapsedIconColor: Colors.white38,
-        children: children,
-      ),
-    );
-  }
-
-  Widget _buildDrawerSubItem(BuildContext context, String title, IconData icon, Widget dest) {
-    return ListTile(
-      contentPadding: const EdgeInsets.only(left: 32),
-      leading: Icon(icon, size: 20, color: Colors.white38),
-      title: Text(title, style: const TextStyle(fontSize: 13, color: Colors.white70)),
-      onTap: () {
-        Navigator.pop(context);
-        Navigator.push(context, MaterialPageRoute(builder: (_) => dest));
-      },
-    );
-  }
-
-  Widget _buildDrawerItem(BuildContext context, String title, IconData icon, Widget? dest, {bool isSelected = false}) {
-    return ListTile(
-      selected: isSelected,
-      selectedTileColor: _primary.withValues(alpha: 0.1),
-      leading: Icon(icon, color: isSelected ? _primary : Colors.white70),
-      title: Text(title, style: TextStyle(fontWeight: isSelected ? FontWeight.bold : FontWeight.w500, color: isSelected ? _primary : Colors.white, fontSize: 14)),
-      onTap: () {
-        Navigator.pop(context);
-        if (dest != null) Navigator.push(context, MaterialPageRoute(builder: (_) => dest));
-      },
     );
   }
 }

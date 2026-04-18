@@ -1,3 +1,4 @@
+import 'package:eduphin/services/responsive_helper.dart';
 import 'package:flutter/material.dart';
 import 'package:eduphin/services/api_service.dart';
 import 'package:intl/intl.dart';
@@ -13,13 +14,6 @@ class _NotesPageState extends State<NotesPage> {
   List<dynamic> _notes = [];
   bool _isLoading = true;
   final Map<String, bool> _subjectOpenStates = {};
-
-  // Theme Colors
-  final Color _bg = const Color(0xff0B1220);
-  final Color _card = const Color(0xff1E2746);
-  final Color _primary = const Color(0xff3366FF);
-  final Color _secondary = const Color(0xff3E4764);
-  final Color _surface = const Color(0xff2A3450);
 
   @override
   void initState() {
@@ -45,7 +39,10 @@ class _NotesPageState extends State<NotesPage> {
       setState(() => _isLoading = false);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text("Error fetching notes: $e")),
+          SnackBar(
+            content: Text("Error fetching notes: $e"),
+            backgroundColor: Theme.of(context).colorScheme.error,
+          ),
         );
       }
     }
@@ -53,6 +50,8 @@ class _NotesPageState extends State<NotesPage> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = context.theme;
+    final colorScheme = theme.colorScheme;
     Map<String, List<dynamic>> groupedNotes = {};
     for (var note in _notes) {
       final subjectName = note['subject']?['name'] ?? 'General';
@@ -63,88 +62,102 @@ class _NotesPageState extends State<NotesPage> {
     }
 
     return Scaffold(
-      backgroundColor: _bg,
+      backgroundColor: theme.scaffoldBackgroundColor,
       appBar: AppBar(
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.white),
-          onPressed: () => Navigator.pop(context),
-        ),
-        title: const Text(
-          "Lecture Notes",
-          style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white),
-        ),
+        title: Text("Lecture Notes", style: TextStyle(fontWeight: FontWeight.bold, fontSize: context.font(20))),
       ),
       body: _isLoading
-          ? Center(child: CircularProgressIndicator(color: _primary))
+          ? Center(child: CircularProgressIndicator(color: colorScheme.primary))
           : groupedNotes.isEmpty
-              ? const Center(child: Text("No notes available", style: TextStyle(color: Colors.white70)))
+              ? Center(child: Text("No notes available", style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: context.font(16))))
               : RefreshIndicator(
                   onRefresh: _fetchNotes,
-                  color: _primary,
-                  child: ListView.separated(
-                    padding: const EdgeInsets.all(20),
-                    itemCount: groupedNotes.length,
-                    separatorBuilder: (context, index) => const SizedBox(height: 16),
-                    itemBuilder: (context, index) {
-                      final subjectName = groupedNotes.keys.elementAt(index);
-                      final subjectNotes = groupedNotes[subjectName]!;
-                      final bool isOpen = _subjectOpenStates[subjectName] ?? false;
+                  color: colorScheme.primary,
+                  child: Center(
+                    child: ConstrainedBox(
+                      constraints: const BoxConstraints(maxWidth: 1000),
+                      child: ListView.separated(
+                        padding: context.pagePadding,
+                        itemCount: groupedNotes.length,
+                        separatorBuilder: (context, index) => SizedBox(height: context.md),
+                        itemBuilder: (context, index) {
+                          final subjectName = groupedNotes.keys.elementAt(index);
+                          final subjectNotes = groupedNotes[subjectName]!;
+                          final bool isOpen = _subjectOpenStates[subjectName] ?? false;
 
-                      return Container(
-                        decoration: BoxDecoration(
-                          color: _card,
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(color: Colors.white12),
-                        ),
-                        child: Column(
-                          children: [
-                            ListTile(
-                              title: Text(
-                                subjectName,
-                                style: const TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.bold),
-                              ),
-                              trailing: AnimatedRotation(
-                                duration: const Duration(milliseconds: 200),
-                                turns: isOpen ? 0.5 : 0,
-                                child: const Icon(Icons.expand_more, color: Colors.white70),
-                              ),
-                              onTap: () {
-                                setState(() {
-                                  _subjectOpenStates[subjectName] = !isOpen;
-                                });
-                              },
+                          return Container(
+                            decoration: BoxDecoration(
+                              color: theme.colorScheme.surfaceContainerLow,
+                              borderRadius: BorderRadius.circular(context.md),
+                              border: Border.all(color: theme.colorScheme.outlineVariant.withValues(alpha: 0.5)),
                             ),
-                            if (isOpen)
-                              Padding(
-                                padding: const EdgeInsets.only(bottom: 8),
-                                child: Column(
-                                  children: subjectNotes.map((note) => _noteCard(note)).toList(),
+                            child: Column(
+                              children: [
+                                ListTile(
+                                  title: Text(
+                                    subjectName,
+                                    style: TextStyle(fontSize: context.font(16), fontWeight: FontWeight.bold, color: theme.colorScheme.onSurface),
+                                  ),
+                                  trailing: AnimatedRotation(
+                                    duration: const Duration(milliseconds: 200),
+                                    turns: isOpen ? 0.5 : 0,
+                                    child: Icon(Icons.expand_more, color: theme.colorScheme.onSurfaceVariant, size: context.scale(24)),
+                                  ),
+                                  onTap: () {
+                                    setState(() {
+                                      _subjectOpenStates[subjectName] = !isOpen;
+                                    });
+                                  },
                                 ),
-                              ),
-                          ],
-                        ),
-                      );
-                    },
+                                if (isOpen)
+                                  Padding(
+                                    padding: EdgeInsets.only(bottom: context.sm),
+                                    child: LayoutBuilder(
+                                      builder: (context, constraints) {
+                                        final crossAxisCount = constraints.maxWidth > 600 ? 2 : 1;
+                                        if (crossAxisCount > 1) {
+                                          return GridView.builder(
+                                            shrinkWrap: true,
+                                            physics: const NeverScrollableScrollPhysics(),
+                                            padding: EdgeInsets.symmetric(horizontal: context.sm),
+                                            gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                                              crossAxisCount: crossAxisCount,
+                                              crossAxisSpacing: context.sm,
+                                              mainAxisSpacing: context.sm,
+                                              childAspectRatio: 2.2,
+                                            ),
+                                            itemCount: subjectNotes.length,
+                                            itemBuilder: (context, idx) => _noteCard(subjectNotes[idx]),
+                                          );
+                                        }
+                                        return Column(
+                                          children: subjectNotes.map((note) => _noteCard(note)).toList(),
+                                        );
+                                      },
+                                    ),
+                                  ),
+                              ],
+                            ),
+                          );
+                        },
+                      ),
+                    ),
                   ),
                 ),
     );
   }
 
   Widget _noteCard(dynamic note) {
+    final theme = context.theme;
     final uploadedAt = note['created_at'] != null ? DateTime.tryParse(note['created_at']) : null;
     final dateStr = uploadedAt != null ? DateFormat('dd MMM, yyyy').format(uploadedAt) : (note['created_at'] ?? 'N/A');
 
     return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-      padding: const EdgeInsets.all(16),
+      margin: EdgeInsets.symmetric(horizontal: context.md, vertical: context.xs),
+      padding: EdgeInsets.all(context.md),
       decoration: BoxDecoration(
-        color: _surface,
-        borderRadius: BorderRadius.circular(12),
+        color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
+        borderRadius: BorderRadius.circular(context.md),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -157,62 +170,62 @@ class _NotesPageState extends State<NotesPage> {
                   children: [
                     Text(
                       note['title'] ?? 'N/A',
-                      style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold),
+                      style: TextStyle(fontSize: context.font(16), fontWeight: FontWeight.bold, color: theme.colorScheme.onSurface),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                     ),
-                    const SizedBox(height: 4),
+                    SizedBox(height: context.xs),
                     Row(
                       children: [
-                        const Icon(Icons.calendar_month, color: Colors.white54, size: 14),
-                        const SizedBox(width: 4),
+                        Icon(Icons.calendar_month, color: theme.colorScheme.onSurfaceVariant, size: context.scale(14)),
+                        SizedBox(width: context.xs),
                         Text(
                           "Uploaded: $dateStr",
-                          style: const TextStyle(color: Colors.white54, fontSize: 12),
+                          style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: context.font(12)),
                         )
                       ],
                     ),
                   ],
                 ),
               ),
-              const Icon(Icons.description, color: Colors.white38, size: 24),
+              Icon(Icons.description, color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.3), size: context.scale(24)),
             ],
           ),
-          const SizedBox(height: 12),
+          SizedBox(height: context.md),
           Row(
             children: [
-              const Icon(Icons.person, color: Colors.white54, size: 14),
-              const SizedBox(width: 4),
+              Icon(Icons.person, color: theme.colorScheme.onSurfaceVariant, size: context.scale(14)),
+              SizedBox(width: context.xs),
               Text(
                 "By: ${note['uploaded_by_name'] ?? 'N/A'}",
-                style: const TextStyle(color: Colors.white54, fontSize: 12),
+                style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: context.font(12)),
               )
             ],
           ),
           if (note['description'] != null && note['description'].toString().isNotEmpty) ...[
-            const SizedBox(height: 12),
+            SizedBox(height: context.md),
             Text(
               note['description'] ?? '',
-              style: const TextStyle(color: Colors.white70, fontSize: 13),
-              maxLines: 3,
+              style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: context.font(13)),
+              maxLines: 2,
               overflow: TextOverflow.ellipsis,
             ),
           ],
-          const SizedBox(height: 16),
+          const Spacer(),
+          SizedBox(height: context.md),
           SizedBox(
             width: double.infinity,
-            height: 40,
+            height: context.scale(40),
             child: ElevatedButton.icon(
               onPressed: () {
                 // Handle download using note['file_path']
               },
-              icon: const Icon(Icons.visibility_outlined, size: 18),
-              label: const Text("VIEW / DOWNLOAD", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+              icon: Icon(Icons.visibility_outlined, size: context.scale(18)),
+              label: Text("VIEW / DOWNLOAD", style: TextStyle(fontWeight: FontWeight.bold, fontSize: context.font(13))),
               style: ElevatedButton.styleFrom(
-                backgroundColor: _secondary,
-                foregroundColor: Colors.white,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                backgroundColor: theme.colorScheme.secondary,
+                foregroundColor: theme.colorScheme.onSecondary,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(context.sm)),
                 elevation: 0,
               ),
             ),

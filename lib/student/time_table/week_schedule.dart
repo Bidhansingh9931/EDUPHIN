@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:eduphin/services/responsive_helper.dart';
 import 'package:flutter/material.dart';
 import 'package:eduphin/services/api_service.dart';
 
@@ -10,12 +11,6 @@ class TimetablePage extends StatefulWidget {
 }
 
 class _TimetablePageState extends State<TimetablePage> {
-  // Theme Colors
-  final Color _bg = const Color(0xff0B1220);
-  final Color _card = const Color(0xff1E2746);
-  final Color _primary = const Color(0xff3366FF);
-  final Color _secondary = const Color(0xff3E4764);
-
   bool _isLoading = true;
   List<dynamic> _schedules = [];
   String? _errorMessage;
@@ -44,6 +39,9 @@ class _TimetablePageState extends State<TimetablePage> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = context.theme;
+    final colorScheme = theme.colorScheme;
+
     Map<String, List<dynamic>> groupedSchedules = {
       'Monday': [],
       'Tuesday': [],
@@ -55,12 +53,9 @@ class _TimetablePageState extends State<TimetablePage> {
     };
 
     for (var schedule in _schedules) {
-      // API uses 'weekday', Flutter code was looking for 'day'
       String weekdayRaw = schedule['weekday'] ?? schedule['day'] ?? '';
       if (weekdayRaw.isEmpty) continue;
 
-      // Normalize to Title Case (e.g., "wednesday" -> "Wednesday")
-      // to match the keys in the groupedSchedules map
       String day = weekdayRaw[0].toUpperCase() + weekdayRaw.substring(1).toLowerCase();
 
       if (groupedSchedules.containsKey(day)) {
@@ -69,85 +64,98 @@ class _TimetablePageState extends State<TimetablePage> {
     }
 
     return Scaffold(
-      backgroundColor: _bg,
+      backgroundColor: theme.scaffoldBackgroundColor,
       appBar: AppBar(
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        title: const Text(
-          "Weekly Timetable",
-          style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.white),
-        ),
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.white),
-          onPressed: () => Navigator.pop(context),
-        ),
+        title: const Text("Weekly Timetable"),
         actions: [
           IconButton(
-            icon: const Icon(Icons.refresh, color: Colors.white70),
+            icon: const Icon(Icons.refresh),
             onPressed: _fetchSchedule,
           ),
         ],
       ),
       body: _isLoading
-          ? Center(child: CircularProgressIndicator(color: _primary))
+          ? Center(child: CircularProgressIndicator(color: colorScheme.primary))
           : _errorMessage != null
-              ? Center(child: Text(_errorMessage!, style: const TextStyle(color: Colors.white70)))
+              ? Center(child: Text(_errorMessage!, style: TextStyle(color: colorScheme.onSurfaceVariant)))
               : RefreshIndicator(
                   onRefresh: _fetchSchedule,
-                  color: _primary,
-                  child: ListView(
-                    padding: const EdgeInsets.all(20),
-                    children: groupedSchedules.entries
-                        .where((e) => e.value.isNotEmpty)
-                        .map((entry) {
-                      return _buildDaySection(
-                        day: entry.key,
-                        classes: entry.value,
-                      );
-                    }).toList(),
+                  color: colorScheme.primary,
+                  child: SingleChildScrollView(
+                    physics: const AlwaysScrollableScrollPhysics(),
+                    padding: context.pagePadding,
+                    child: Center(
+                      child: Container(
+                        constraints: const BoxConstraints(maxWidth: 1000),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: groupedSchedules.entries
+                              .where((e) => e.value.isNotEmpty)
+                              .map((entry) {
+                            return _buildDaySection(
+                              day: entry.key,
+                              classes: entry.value,
+                            );
+                          }).toList(),
+                        ),
+                      ),
+                    ),
                   ),
                 ),
     );
   }
 
   Widget _buildDaySection({required String day, required List<dynamic> classes}) {
+    final theme = context.theme;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Padding(
-          padding: const EdgeInsets.only(left: 4, bottom: 12, top: 8),
+          padding: EdgeInsets.only(left: 4, bottom: context.sm, top: context.md),
           child: Text(
             day.toUpperCase(),
             style: TextStyle(
-              color: _primary,
+              color: theme.colorScheme.primary,
               fontSize: 13,
               fontWeight: FontWeight.bold,
               letterSpacing: 1.2,
             ),
           ),
         ),
-        ...classes.map((c) => _buildClassCard(c)),
-        const SizedBox(height: 16),
+        GridView.builder(
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          itemCount: classes.length,
+          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: context.responsive(1, tablet: 2, desktop: 2),
+            crossAxisSpacing: context.md,
+            mainAxisSpacing: context.md,
+            mainAxisExtent: context.scale(100),
+          ),
+          itemBuilder: (context, index) => _buildClassCard(classes[index]),
+        ),
+        SizedBox(height: context.md),
       ],
     );
   }
 
   Widget _buildClassCard(dynamic c) {
+    final theme = context.theme;
+    final colorScheme = theme.colorScheme;
     return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.all(16),
+      padding: EdgeInsets.all(context.md),
       decoration: BoxDecoration(
-        color: _card,
+        color: colorScheme.surfaceContainerLow,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.white12),
+        border: Border.all(color: colorScheme.outlineVariant),
       ),
       child: Row(
         children: [
           Container(
             width: 80,
-            padding: const EdgeInsets.symmetric(vertical: 8),
+            padding: EdgeInsets.symmetric(vertical: context.xs),
             decoration: BoxDecoration(
-              color: _secondary.withValues(alpha: 0.3),
+              color: colorScheme.surfaceContainerHighest,
               borderRadius: BorderRadius.circular(12),
             ),
             child: Column(
@@ -155,42 +163,47 @@ class _TimetablePageState extends State<TimetablePage> {
               children: [
                 Text(
                   c['start_time'] ?? '',
-                  style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold),
+                  style: theme.textTheme.labelMedium?.copyWith(fontWeight: FontWeight.bold),
                 ),
-                const SizedBox(height: 2),
-                const Text("to", style: TextStyle(color: Colors.white38, fontSize: 10)),
-                const SizedBox(height: 2),
+                Text("to", style: TextStyle(color: colorScheme.onSurfaceVariant, fontSize: 10)),
                 Text(
                   c['end_time'] ?? '',
-                  style: const TextStyle(color: Colors.white70, fontSize: 12),
+                  style: theme.textTheme.labelSmall?.copyWith(color: colorScheme.onSurfaceVariant),
                 ),
               ],
             ),
           ),
-          const SizedBox(width: 16),
+          SizedBox(width: context.md),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 Text(
                   c['subject']?['name'] ?? 'N/A',
-                  style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
+                  style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                 ),
-                const SizedBox(height: 4),
+                SizedBox(height: context.xs),
                 Row(
                   children: [
-                    const Icon(Icons.person_outline, size: 14, color: Colors.white38),
+                    Icon(Icons.person_outline, size: 14, color: colorScheme.onSurfaceVariant),
                     const SizedBox(width: 4),
-                    Text(
-                      c['teacher']?['name'] ?? c['teacher_name'] ?? 'N/A',
-                      style: const TextStyle(color: Colors.white54, fontSize: 13),
+                    Expanded(
+                      child: Text(
+                        c['teacher']?['name'] ?? c['teacher_name'] ?? 'N/A',
+                        style: theme.textTheme.bodySmall?.copyWith(color: colorScheme.onSurfaceVariant),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
                     ),
                   ],
                 ),
               ],
             ),
           ),
-          Icon(Icons.chevron_right, color: Colors.white.withValues(alpha: 0.1)),
+          Icon(Icons.chevron_right, color: colorScheme.onSurfaceVariant.withValues(alpha: 0.3)),
         ],
       ),
     );

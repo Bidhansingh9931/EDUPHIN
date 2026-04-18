@@ -28,8 +28,20 @@ class _ExamRegistrationPageState extends State<ExamRegistrationPage> {
       final data = await ApiService.getStudentExams();
 
       setState(() {
-        // Map availableExams from your JSON
-        _exams = data['availableExams'] ?? [];
+        // Map availableExams from your JSON and filter out expired ones
+        final List<dynamic> allExams = data['availableExams'] ?? [];
+        final DateTime now = DateTime.now();
+        
+        _exams = allExams.where((exam) {
+          if (exam['end_date'] == null) return true;
+          try {
+            final DateTime endDate = DateTime.parse(exam['end_date']);
+            // Add a day to end_date to include the full day
+            return endDate.add(const Duration(days: 1)).isAfter(now);
+          } catch (_) {
+            return true;
+          }
+        }).toList();
 
         // Map registered IDs from your JSON [1, 2]
         final rawIds = data['registeredExamIds'] as List?;

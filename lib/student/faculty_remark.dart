@@ -1,6 +1,8 @@
+import 'package:eduphin/services/common_widgets.dart';
 import 'package:flutter/material.dart';
 import 'package:eduphin/services/api_service.dart';
 import 'package:intl/intl.dart';
+import 'package:eduphin/services/responsive_helper.dart';
 
 class RemarksPage extends StatefulWidget {
   const RemarksPage({super.key});
@@ -14,13 +16,6 @@ class _RemarksPageState extends State<RemarksPage> {
   String selectedRemarkType = "All";
   List<Map<String, dynamic>> _allRemarks = [];
   bool _isLoading = true;
-
-  // Theme Colors
-  final Color _bg = const Color(0xff0B1220);
-  final Color _card = const Color(0xff1E2746);
-  final Color _primary = const Color(0xff3366FF);
-  final Color _secondary = const Color(0xff3E4764);
-  final Color _surface = const Color(0xff2A3450);
 
   @override
   void initState() {
@@ -38,18 +33,24 @@ class _RemarksPageState extends State<RemarksPage> {
   }
 
   Future<void> _fetchRemarks() async {
+    if (!mounted) return;
     setState(() => _isLoading = true);
     try {
       final remarks = await ApiService.getStudentRemarks();
-      setState(() {
-        _allRemarks = remarks;
-        _isLoading = false;
-      });
-    } catch (e) {
-      setState(() => _isLoading = false);
       if (mounted) {
+        setState(() {
+          _allRemarks = remarks;
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isLoading = false);
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text("Error: $e")),
+          SnackBar(
+            content: Text("Error: $e"),
+            backgroundColor: Theme.of(context).colorScheme.error,
+          ),
         );
       }
     }
@@ -87,177 +88,224 @@ class _RemarksPageState extends State<RemarksPage> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = context.theme;
+    final isDark = context.isDarkMode;
     final filtered = _filteredRemarks;
 
     return Scaffold(
-      backgroundColor: _bg,
       appBar: AppBar(
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.white),
-          onPressed: () => Navigator.pop(context),
-        ),
-        title: const Text(
+        centerTitle: true,
+        title: Text(
           "Faculty Remarks",
-          style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white),
+          style: TextStyle(fontSize: context.font(18), fontWeight: FontWeight.bold),
         ),
         actions: [
           IconButton(
-            icon: const Icon(Icons.refresh, color: Colors.white70),
+            icon: Icon(Icons.refresh, size: context.scale(24)),
             onPressed: _fetchRemarks,
           ),
         ],
       ),
       body: SafeArea(
         child: _isLoading
-            ? Center(child: CircularProgressIndicator(color: _primary))
+            ? Center(child: CircularProgressIndicator(color: theme.colorScheme.primary))
             : RefreshIndicator(
                 onRefresh: _fetchRemarks,
-                color: _primary,
+                color: theme.colorScheme.primary,
                 child: SingleChildScrollView(
                   physics: const AlwaysScrollableScrollPhysics(),
-                  padding: const EdgeInsets.all(20),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      // ================= FILTER CARD =================
-                      Container(
-                        padding: const EdgeInsets.all(20),
-                        decoration: BoxDecoration(
-                          color: _card,
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(color: Colors.white12),
-                        ),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const Row(
-                              children: [
-                                Icon(Icons.filter_list, color: Colors.white70, size: 20),
-                                SizedBox(width: 8),
-                                Text(
-                                  "Search Remarks",
-                                  style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 20),
-                            
-                            const Text("Search Query", style: TextStyle(color: Colors.white70, fontSize: 14)),
-                            const SizedBox(height: 8),
-                            TextField(
-                              controller: _searchController,
-                              style: const TextStyle(color: Colors.white),
-                              decoration: InputDecoration(
-                                hintText: "Search content or faculty name...",
-                                hintStyle: const TextStyle(color: Colors.white54, fontSize: 14),
-                                prefixIcon: const Icon(Icons.search, color: Colors.white38, size: 20),
-                                filled: true,
-                                fillColor: _secondary,
-                                border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide.none),
-                                contentPadding: const EdgeInsets.symmetric(vertical: 12),
-                              ),
-                            ),
-                            const SizedBox(height: 20),
-                            
-                            const Text("Remark Category", style: TextStyle(color: Colors.white70, fontSize: 14)),
-                            const SizedBox(height: 8),
-                            Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 16),
-                              decoration: BoxDecoration(
-                                color: _secondary,
-                                borderRadius: BorderRadius.circular(8),
-                              ),
-                              child: DropdownButtonHideUnderline(
-                                child: DropdownButton<String>(
-                                  dropdownColor: _card,
-                                  value: selectedRemarkType,
-                                  icon: const Icon(Icons.keyboard_arrow_down, color: Colors.white70),
-                                  isExpanded: true,
-                                  items: ["All", "Academic", "Discipline", "Attendance", "Behavior"]
-                                      .map((e) => DropdownMenuItem(
-                                            value: e,
-                                            child: Text(e, style: const TextStyle(color: Colors.white, fontSize: 14)),
-                                          ))
-                                      .toList(),
-                                  onChanged: (value) {
-                                    if (value != null) {
-                                      setState(() => selectedRemarkType = value);
-                                    }
-                                  },
-                                ),
-                              ),
-                            ),
-                            const SizedBox(height: 24),
-                            SizedBox(
-                              width: double.infinity,
-                              height: 48,
-                              child: ElevatedButton(
-                                onPressed: _resetFilters,
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: _secondary,
-                                  foregroundColor: Colors.white,
-                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                                  elevation: 0,
-                                ),
-                                child: const Text("RESET FILTERS", style: TextStyle(fontWeight: FontWeight.bold)),
-                              ),
-                            )
-                          ],
-                        ),
-                      ),
-                      const SizedBox(height: 32),
-                      
-                      // ================= REMARK HISTORY =================
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  padding: context.pagePadding,
+                  child: Center(
+                    child: Container(
+                      constraints: const BoxConstraints(maxWidth: 1000),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(
-                            "Remark History",
-                            style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white),
-                          ),
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                            decoration: BoxDecoration(
-                              color: _primary.withValues(alpha: 0.1),
-                              borderRadius: BorderRadius.circular(20),
+                          // ================= FILTER CARD =================
+                          Card(
+                            elevation: 0,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(context.scale(16)),
+                              side: BorderSide(color: theme.colorScheme.outlineVariant.withValues(alpha: 0.5)),
                             ),
-                            child: Text(
-                              "${filtered.length} entries",
-                              style: TextStyle(color: _primary, fontSize: 12, fontWeight: FontWeight.bold),
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 16),
-                      
-                      filtered.isEmpty
-                          ? Container(
-                              width: double.infinity,
-                              padding: const EdgeInsets.symmetric(vertical: 60),
-                              decoration: BoxDecoration(
-                                color: _card,
-                                borderRadius: BorderRadius.circular(12),
-                                border: Border.all(color: Colors.white12),
-                              ),
+                            color: theme.colorScheme.surfaceContainerLow,
+                            child: Padding(
+                              padding: EdgeInsets.all(context.scale(24)),
                               child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  Icon(Icons.notes, color: Colors.white10, size: 64),
-                                  const SizedBox(height: 16),
-                                  const Text("No remarks found", style: TextStyle(color: Colors.white38, fontSize: 16)),
+                                  Row(
+                                    children: [
+                                      Icon(Icons.filter_list, color: theme.colorScheme.primary, size: context.scale(22)),
+                                      SizedBox(width: context.scale(12)),
+                                      Text(
+                                        "Search Remarks",
+                                        style: TextStyle(
+                                          color: theme.colorScheme.onSurface,
+                                          fontWeight: FontWeight.bold,
+                                          fontSize: context.font(18),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  SizedBox(height: context.scale(24)),
+
+                                  LayoutBuilder(builder: (context, constraints) {
+                                    final double spacing = context.scale(16);
+                                    final bool isMobile = constraints.maxWidth < 600;
+                                    final double width = isMobile 
+                                      ? constraints.maxWidth 
+                                      : (constraints.maxWidth - spacing) / 2;
+
+                                    return Wrap(
+                                      spacing: spacing,
+                                      runSpacing: spacing,
+                                      children: [
+                                        SizedBox(
+                                          width: width,
+                                          child: Column(
+                                            crossAxisAlignment: CrossAxisAlignment.start,
+                                            children: [
+                                              Text("Search Query", style: TextStyle(fontSize: context.font(12), fontWeight: FontWeight.bold, color: theme.colorScheme.onSurfaceVariant)),
+                                              SizedBox(height: context.scale(8)),
+                                              TextField(
+                                                controller: _searchController,
+                                                style: TextStyle(fontSize: context.font(14)),
+                                                decoration: InputDecoration(
+                                                  hintText: "Search content or faculty...",
+                                                  prefixIcon: Icon(Icons.search, size: context.scale(20)),
+                                                  isDense: true,
+                                                  contentPadding: EdgeInsets.symmetric(horizontal: context.scale(12), vertical: context.scale(12)),
+                                                  filled: true,
+                                                  fillColor: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                        SizedBox(
+                                          width: width,
+                                          child: Column(
+                                            crossAxisAlignment: CrossAxisAlignment.start,
+                                            children: [
+                                              Text("Remark Category", style: TextStyle(fontSize: context.font(12), fontWeight: FontWeight.bold, color: theme.colorScheme.onSurfaceVariant)),
+                                              SizedBox(height: context.scale(8)),
+                                              DropdownButtonFormField<String>(
+                                                value: selectedRemarkType,
+                                                style: TextStyle(fontSize: context.font(14), color: theme.colorScheme.onSurface),
+                                                items: ["All", "Academic", "Discipline", "Attendance", "Behavior"]
+                                                    .map((e) => DropdownMenuItem(
+                                                          value: e,
+                                                          child: Text(e, style: TextStyle(fontSize: context.font(14))),
+                                                        ))
+                                                    .toList(),
+                                                onChanged: (value) {
+                                                  if (value != null) {
+                                                    setState(() => selectedRemarkType = value);
+                                                  }
+                                                },
+                                                decoration: InputDecoration(
+                                                  isDense: true,
+                                                  contentPadding: EdgeInsets.symmetric(horizontal: context.scale(12), vertical: context.scale(12)),
+                                                  filled: true,
+                                                  fillColor: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                      ],
+                                    );
+                                  }),
+                                  SizedBox(height: context.scale(24)),
+                                  Row(
+                                    children: [
+                                      const Spacer(flex: 2),
+                                      Expanded(
+                                        child: ElevatedButton(
+                                          onPressed: _resetFilters,
+                                          style: ElevatedButton.styleFrom(
+                                            backgroundColor: theme.colorScheme.surfaceContainerHighest,
+                                            foregroundColor: theme.colorScheme.onSurface,
+                                            elevation: 0,
+                                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(context.scale(12))),
+                                            padding: EdgeInsets.symmetric(vertical: context.scale(14)),
+                                          ),
+                                          child: Text("RESET", style: TextStyle(fontSize: context.font(14))),
+                                        ),
+                                      ),
+                                    ],
+                                  )
                                 ],
                               ),
-                            )
-                          : ListView.builder(
-                              shrinkWrap: true,
-                              physics: const NeverScrollableScrollPhysics(),
-                              itemCount: filtered.length,
-                              itemBuilder: (context, index) {
-                                return _buildRemarkItem(filtered[index]);
-                              },
-                            )
-                    ],
+                            ),
+                          ),
+                          SizedBox(height: context.scale(32)),
+
+                          // ================= REMARK HISTORY =================
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Text(
+                                "Remark History",
+                                style: TextStyle(
+                                  color: theme.colorScheme.onSurface,
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: context.font(18),
+                                ),
+                              ),
+                              Container(
+                                padding: EdgeInsets.symmetric(horizontal: context.scale(12), vertical: context.scale(6)),
+                                decoration: BoxDecoration(
+                                  color: theme.colorScheme.primary.withValues(alpha: 0.1),
+                                  borderRadius: BorderRadius.circular(context.scale(20)),
+                                ),
+                                child: Text(
+                                  "${filtered.length} entries",
+                                  style: TextStyle(color: theme.colorScheme.primary, fontSize: context.font(12), fontWeight: FontWeight.bold),
+                                ),
+                              ),
+                            ],
+                          ),
+                          SizedBox(height: context.scale(20)),
+
+                          filtered.isEmpty
+                              ? Card(
+                                  elevation: 0,
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(context.scale(16)),
+                                    side: BorderSide(color: theme.colorScheme.outlineVariant.withValues(alpha: 0.5)),
+                                  ),
+                                  color: theme.colorScheme.surfaceContainerLow,
+                                  child: Container(
+                                    width: double.infinity,
+                                    padding: EdgeInsets.symmetric(vertical: context.scale(80)),
+                                    child: Column(
+                                      children: [
+                                        Icon(Icons.notes, size: context.scale(64), color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.5)),
+                                        SizedBox(height: context.scale(16)),
+                                        Text("No remarks found", style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: context.font(16))),
+                                      ],
+                                    ),
+                                  ),
+                                )
+                              : GridView.builder(
+                                  shrinkWrap: true,
+                                  physics: const NeverScrollableScrollPhysics(),
+                                  gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                                    crossAxisCount: context.responsive(1, tablet: 2, desktop: 2),
+                                    crossAxisSpacing: context.scale(16),
+                                    mainAxisSpacing: context.scale(16),
+                                    mainAxisExtent: context.scale(240),
+                                  ),
+                                  itemCount: filtered.length,
+                                  itemBuilder: (context, index) {
+                                    return _buildRemarkItem(filtered[index]);
+                                  },
+                                )
+                        ],
+                      ),
+                    ),
                   ),
                 ),
               ),
@@ -266,74 +314,87 @@ class _RemarksPageState extends State<RemarksPage> {
   }
 
   Widget _buildRemarkItem(Map<String, dynamic> remark) {
+    final theme = context.theme;
     final category = (remark['type'] ?? 'General').toString();
-    
-    return Container(
-      margin: const EdgeInsets.only(bottom: 16),
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: _card,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.white12),
+
+    return Card(
+      elevation: 0,
+      color: theme.colorScheme.surfaceContainerLow,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(context.scale(16)),
+        side: BorderSide(color: theme.colorScheme.outlineVariant.withValues(alpha: 0.5)),
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                decoration: BoxDecoration(
-                  color: _primary.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(4),
-                  border: Border.all(color: _primary.withValues(alpha: 0.5)),
+      child: Padding(
+        padding: EdgeInsets.all(context.scale(20)),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Container(
+                  padding: EdgeInsets.symmetric(horizontal: context.scale(10), vertical: context.scale(5)),
+                  decoration: BoxDecoration(
+                    color: theme.colorScheme.primary.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(context.scale(8)),
+                  ),
+                  child: Text(
+                    category.toUpperCase(),
+                    style: TextStyle(color: theme.colorScheme.primary, fontWeight: FontWeight.bold, fontSize: context.font(10)),
+                  ),
                 ),
-                child: Text(
-                  category.toUpperCase(),
-                  style: TextStyle(color: _primary, fontWeight: FontWeight.bold, fontSize: 10),
+                Text(
+                  _formatDate(remark['created_at']),
+                  style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: context.font(11)),
                 ),
-              ),
-              Text(
-                _formatDate(remark['created_at']),
-                style: const TextStyle(color: Colors.white38, fontSize: 12),
-              ),
-            ],
-          ),
-          const SizedBox(height: 16),
-          Text(
-            remark['remark'] ?? "No content provided",
-            style: const TextStyle(color: Colors.white, fontSize: 15, height: 1.5),
-          ),
-          const SizedBox(height: 20),
-          Divider(color: Colors.white.withValues(alpha: 0.05)),
-          const SizedBox(height: 12),
-          Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: _secondary,
-                  shape: BoxShape.circle,
+              ],
+            ),
+            SizedBox(height: context.scale(16)),
+            Expanded(
+              child: Text(
+                remark['remark'] ?? "No content provided",
+                style: TextStyle(
+                  color: theme.colorScheme.onSurface,
+                  fontSize: context.font(14),
+                  height: 1.5,
                 ),
-                child: const Icon(Icons.person, color: Colors.white70, size: 16),
+                maxLines: 4,
+                overflow: TextOverflow.ellipsis,
               ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text("Faculty Member", style: TextStyle(color: Colors.white38, fontSize: 11)),
-                    Text(
-                      remark['teacher']?['name'] ?? 'Faculty Member',
-                      style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w600),
-                    ),
-                  ],
+            ),
+            SizedBox(height: context.scale(12)),
+            Divider(color: theme.colorScheme.outlineVariant.withValues(alpha: 0.5)),
+            SizedBox(height: context.scale(12)),
+            Row(
+              children: [
+                ProfileAvatar(
+                  imageUrl: ApiService.getStorageUrl(remark['teacher']?['photo']),
+                  radius: context.scale(16),
+                  borderWidth: 0,
                 ),
-              ),
-            ],
-          ),
-        ],
+                SizedBox(width: context.scale(12)),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text("Faculty Member", style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: context.font(10))),
+                      Text(
+                        remark['teacher']?['name'] ?? 'Faculty Member',
+                        style: TextStyle(
+                          color: theme.colorScheme.onSurface,
+                          fontWeight: FontWeight.bold,
+                          fontSize: context.font(13),
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
       ),
     );
   }

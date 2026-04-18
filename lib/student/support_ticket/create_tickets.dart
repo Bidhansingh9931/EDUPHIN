@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:eduphin/services/responsive_helper.dart';
 import 'package:eduphin/services/api_service.dart';
 
 class CreateSupportTicketPage extends StatefulWidget {
@@ -9,13 +10,6 @@ class CreateSupportTicketPage extends StatefulWidget {
 }
 
 class _CreateSupportTicketPageState extends State<CreateSupportTicketPage> {
-  // Theme Colors
-  final Color _bg = const Color(0xff0B1220);
-  final Color _card = const Color(0xff1E2746);
-  final Color _primary = const Color(0xff3366FF);
-  final Color _secondary = const Color(0xff3E4764);
-  final Color _surface = const Color(0xff2A3450);
-
   String priorityValue = "Low";
   bool _isLoading = false;
 
@@ -24,6 +18,7 @@ class _CreateSupportTicketPageState extends State<CreateSupportTicketPage> {
   final TextEditingController categoryController = TextEditingController();
 
   Future<void> _submitTicket() async {
+    final theme = context.theme;
     if (titleController.text.isEmpty || descriptionController.text.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text("Title and Description are required")),
@@ -37,20 +32,26 @@ class _CreateSupportTicketPageState extends State<CreateSupportTicketPage> {
       await ApiService.createStudentTicket(
         titleController.text,
         descriptionController.text,
-        priorityValue,
+        priorityValue.toLowerCase(),
         category: categoryController.text,
       );
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text("Ticket created successfully")),
+          const SnackBar(
+            content: Text("Ticket created successfully"),
+            backgroundColor: Color(0xFF10B981), // Emerald
+          ),
         );
         Navigator.pop(context, true); // Return true to refresh list
       }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text("Error creating ticket: $e")),
+          SnackBar(
+            content: Text("Error creating ticket: $e"),
+            backgroundColor: theme.colorScheme.error,
+          ),
         );
       }
     } finally {
@@ -60,182 +61,179 @@ class _CreateSupportTicketPageState extends State<CreateSupportTicketPage> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = context.theme;
+    final colorScheme = theme.colorScheme;
+
     return Scaffold(
-      backgroundColor: _bg,
+      backgroundColor: colorScheme.surface,
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
+        centerTitle: true,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.white),
+          icon: Icon(Icons.arrow_back, color: colorScheme.onSurface),
           onPressed: () => Navigator.pop(context),
         ),
-        title: const Text(
+        title: Text(
           "Create New Ticket",
-          style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white),
+          style: TextStyle(fontSize: context.font(18), fontWeight: FontWeight.bold, color: colorScheme.onSurface),
         ),
       ),
       body: _isLoading
-          ? Center(child: CircularProgressIndicator(color: _primary))
+          ? Center(child: CircularProgressIndicator(color: colorScheme.primary))
           : SingleChildScrollView(
-              padding: const EdgeInsets.all(20),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(24),
-                    decoration: BoxDecoration(
-                      color: _card,
-                      borderRadius: BorderRadius.circular(16),
-                      border: Border.all(color: Colors.white12),
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Row(
-                          children: [
-                            Icon(Icons.edit_note, color: Colors.white70, size: 20),
-                            SizedBox(width: 8),
-                            Text(
-                              "Ticket Details",
-                              style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
-                            ),
-                          ],
+              padding: context.pagePadding,
+              child: Center(
+                child: Container(
+                  constraints: const BoxConstraints(maxWidth: 800),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Container(
+                        decoration: BoxDecoration(
+                          color: colorScheme.surfaceContainerLow,
+                          borderRadius: BorderRadius.circular(context.scale(16)),
+                          border: Border.all(color: colorScheme.outlineVariant),
                         ),
-                        const SizedBox(height: 24),
-
-                        /// 🔹 Issue Title
-                        _label("Issue Title *"),
-                        const SizedBox(height: 8),
-                        _buildTextField(titleController, hint: "Enter a brief summary of the issue"),
-
-                        const SizedBox(height: 20),
-
-                        /// 🔹 Category
-                        _label("Category (Optional)"),
-                        const SizedBox(height: 8),
-                        _buildTextField(categoryController, hint: "e.g., Fees, Login, Academics"),
-
-                        const SizedBox(height: 20),
-
-                        /// 🔹 Priority Dropdown
-                        _label("Priority *"),
-                        const SizedBox(height: 8),
-                        _buildDropdown(),
-
-                        const SizedBox(height: 20),
-
-                        /// 🔹 Issue Description
-                        _label("Issue Description *"),
-                        const SizedBox(height: 8),
-                        _buildTextField(descriptionController, maxLines: 5, hint: "Describe your issue in detail..."),
-
-                        const SizedBox(height: 32),
-
-                        /// 🔹 Buttons
-                        SizedBox(
-                          width: double.infinity,
-                          height: 52,
-                          child: ElevatedButton(
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: _primary,
-                              foregroundColor: Colors.white,
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                              elevation: 0,
-                            ),
-                            onPressed: _submitTicket,
-                            child: const Text(
-                              "SUBMIT TICKET",
-                              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, letterSpacing: 1),
-                            ),
-                          ),
-                        ),
-                        const SizedBox(height: 12),
-                        SizedBox(
-                          width: double.infinity,
-                          height: 52,
-                          child: TextButton(
-                            style: TextButton.styleFrom(
-                              foregroundColor: Colors.white70,
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(12),
-                                side: const BorderSide(color: Colors.white12),
+                        child: Padding(
+                          padding: EdgeInsets.all(context.scale(context.isMobile ? 20 : 32)),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                children: [
+                                  Icon(Icons.edit_note, color: colorScheme.primary, size: context.scale(24)),
+                                  SizedBox(width: context.scale(12)),
+                                  Text(
+                                    "Ticket Details",
+                                    style: TextStyle(
+                                      color: colorScheme.onSurface,
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: context.font(20),
+                                    ),
+                                  ),
+                                ],
                               ),
-                            ),
-                            onPressed: () => Navigator.pop(context),
-                            child: const Text("CANCEL", style: TextStyle(fontWeight: FontWeight.bold)),
+                              SizedBox(height: context.scale(32)),
+
+                              /// 🔹 Issue Title
+                              _label(context, "Issue Title *"),
+                              SizedBox(height: context.scale(8)),
+                              _buildTextField(context, titleController, hint: "Enter a brief summary of the issue"),
+
+                              SizedBox(height: context.scale(24)),
+
+                              /// 🔹 Category
+                              _label(context, "Category (Optional)"),
+                              SizedBox(height: context.scale(8)),
+                              _buildTextField(context, categoryController, hint: "e.g., Fees, Login, Academics"),
+
+                              SizedBox(height: context.scale(24)),
+
+                              /// 🔹 Priority Dropdown
+                              _label(context, "Priority *"),
+                              SizedBox(height: context.scale(8)),
+                              _buildDropdown(context),
+
+                              SizedBox(height: context.scale(24)),
+
+                              /// 🔹 Issue Description
+                              _label(context, "Issue Description *"),
+                              SizedBox(height: context.scale(8)),
+                              _buildTextField(context, descriptionController, maxLines: 5, hint: "Describe your issue in detail..."),
+
+                              SizedBox(height: context.scale(40)),
+
+                              /// 🔹 Buttons
+                              SizedBox(
+                                width: double.infinity,
+                                height: context.scale(54),
+                                child: ElevatedButton(
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: colorScheme.primary,
+                                    foregroundColor: colorScheme.onPrimary,
+                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(context.scale(12))),
+                                    elevation: 0,
+                                  ),
+                                  onPressed: _submitTicket,
+                                  child: Text(
+                                    "SUBMIT TICKET",
+                                    style: TextStyle(fontSize: context.font(16), fontWeight: FontWeight.bold, letterSpacing: 1),
+                                  ),
+                                ),
+                              ),
+                              SizedBox(height: context.scale(16)),
+                              SizedBox(
+                                width: double.infinity,
+                                height: context.scale(54),
+                                child: ElevatedButton(
+                                  style: ElevatedButton.styleFrom(
+                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(context.scale(12))),
+                                    backgroundColor: colorScheme.surfaceContainerHighest,
+                                    foregroundColor: colorScheme.onSurface,
+                                    elevation: 0,
+                                  ),
+                                  onPressed: () => Navigator.pop(context),
+                                  child: Text("CANCEL", style: TextStyle(fontWeight: FontWeight.bold, fontSize: context.font(16))),
+                                ),
+                              ),
+                            ],
                           ),
                         ),
-                      ],
-                    ),
+                      ),
+                      SizedBox(height: context.scale(40)),
+                    ],
                   ),
-                  const SizedBox(height: 40),
-                ],
+                ),
               ),
             ),
     );
   }
 
-  Widget _label(String text) {
+  Widget _label(BuildContext context, String text) {
     return Text(
       text,
-      style: const TextStyle(color: Colors.white70, fontSize: 14, fontWeight: FontWeight.w500),
+      style: TextStyle(
+        fontSize: context.font(14),
+        fontWeight: FontWeight.w500,
+        color: context.theme.colorScheme.onSurface,
+      ),
     );
   }
 
-  Widget _buildTextField(TextEditingController controller, {int maxLines = 1, String? hint}) {
+  Widget _buildTextField(BuildContext context, TextEditingController controller, {int maxLines = 1, String? hint}) {
+    final colorScheme = context.theme.colorScheme;
     return TextField(
       controller: controller,
       maxLines: maxLines,
-      style: const TextStyle(color: Colors.white),
+      style: TextStyle(fontSize: context.font(14), color: colorScheme.onSurface),
       decoration: InputDecoration(
         hintText: hint,
-        hintStyle: const TextStyle(color: Colors.white30, fontSize: 14),
-        filled: true,
-        fillColor: _secondary,
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide.none,
-        ),
-        enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: const BorderSide(color: Colors.white10),
-        ),
-        focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide(color: _primary.withValues(alpha: 0.5)),
-        ),
-        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        hintStyle: TextStyle(color: colorScheme.onSurfaceVariant),
+        contentPadding: EdgeInsets.symmetric(horizontal: context.scale(16), vertical: context.scale(12)),
       ),
     );
   }
 
-  Widget _buildDropdown() {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16),
-      decoration: BoxDecoration(
-        color: _secondary,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.white10),
-      ),
-      child: DropdownButtonHideUnderline(
-        child: DropdownButton<String>(
-          value: priorityValue,
-          isExpanded: true,
-          dropdownColor: _card,
-          icon: const Icon(Icons.keyboard_arrow_down, color: Colors.white60),
-          style: const TextStyle(color: Colors.white, fontSize: 14),
-          items: ["Low", "Medium", "High"]
-              .map((e) => DropdownMenuItem(
-                    value: e,
-                    child: Text(e),
-                  ))
-              .toList(),
-          onChanged: (val) {
-            setState(() {
-              priorityValue = val!;
-            });
-          },
-        ),
+  Widget _buildDropdown(BuildContext context) {
+    final colorScheme = context.theme.colorScheme;
+    return DropdownButtonFormField<String>(
+      value: priorityValue,
+      dropdownColor: colorScheme.surfaceContainerHighest,
+      isExpanded: true,
+      items: ["Low", "Medium", "High"]
+          .map((e) => DropdownMenuItem(
+                value: e,
+                child: Text(e, style: TextStyle(fontSize: context.font(14), color: colorScheme.onSurface)),
+              ))
+          .toList(),
+      onChanged: (val) {
+        setState(() {
+          priorityValue = val!;
+        });
+      },
+      decoration: InputDecoration(
+        contentPadding: EdgeInsets.symmetric(horizontal: context.scale(16), vertical: context.scale(12)),
       ),
     );
   }

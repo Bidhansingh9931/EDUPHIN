@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'package:file_picker/file_picker.dart';
+import 'package:eduphin/services/responsive_helper.dart';
 import 'package:flutter/material.dart';
 import 'package:eduphin/services/api_service.dart';
 import 'package:eduphin/teacher/dashboard/ticket_details_models.dart';
@@ -16,13 +17,6 @@ class StudentTicketDetailsPage extends StatefulWidget {
 }
 
 class _StudentTicketDetailsPageState extends State<StudentTicketDetailsPage> {
-  // Theme Colors
-  final Color _bg = const Color(0xff0B1220);
-  final Color _card = const Color(0xff1E2746);
-  final Color _primary = const Color(0xff3366FF);
-  final Color _secondary = const Color(0xff3E4764);
-  final Color _surface = const Color(0xff2A3450);
-
   late Future<TicketDetails> _detailsFuture;
   final TextEditingController _replyController = TextEditingController();
   File? _selectedFile;
@@ -69,29 +63,35 @@ class _StudentTicketDetailsPageState extends State<StudentTicketDetailsPage> {
       setState(() => _isSending = false);
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("Failed to send reply: $e")),
+        SnackBar(
+          content: Text("Failed to send reply: $e"),
+          backgroundColor: context.theme.colorScheme.error,
+        ),
       );
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    final theme = context.theme;
+    final colorScheme = theme.colorScheme;
     return Scaffold(
-      backgroundColor: _bg,
+      backgroundColor: colorScheme.surface,
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
+        centerTitle: true,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.white),
+          icon: Icon(Icons.arrow_back, color: colorScheme.onSurface),
           onPressed: () => Navigator.pop(context),
         ),
-        title: const Text(
+        title: Text(
           "Ticket Details",
-          style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white),
+          style: TextStyle(fontSize: context.font(18), fontWeight: FontWeight.bold, color: colorScheme.onSurface),
         ),
         actions: [
           IconButton(
-            icon: const Icon(Icons.refresh, color: Colors.white70, size: 20),
+            icon: Icon(Icons.refresh, size: context.scale(24), color: colorScheme.onSurface),
             onPressed: _refreshDetails,
           ),
         ],
@@ -100,50 +100,69 @@ class _StudentTicketDetailsPageState extends State<StudentTicketDetailsPage> {
         future: _detailsFuture,
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
-            return Center(child: CircularProgressIndicator(color: _primary));
+            return Center(child: CircularProgressIndicator(color: colorScheme.primary));
           } else if (snapshot.hasError) {
             return Center(
                 child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                const Icon(Icons.error_outline, color: Colors.redAccent, size: 48),
-                const SizedBox(height: 16),
-                Text("Error: ${snapshot.error}", style: const TextStyle(color: Colors.white70)),
-                const SizedBox(height: 16),
-                ElevatedButton(onPressed: _refreshDetails, child: const Text("RETRY"))
+                Icon(Icons.error_outline, color: colorScheme.error, size: context.scale(48)),
+                SizedBox(height: context.md),
+                Text("Error: ${snapshot.error}", style: TextStyle(fontSize: context.font(14), color: colorScheme.onSurface)),
+                SizedBox(height: context.md),
+                ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: colorScheme.primary,
+                    foregroundColor: colorScheme.onPrimary,
+                  ),
+                  onPressed: _refreshDetails,
+                  child: Text("RETRY", style: TextStyle(fontSize: context.font(14))),
+                )
               ],
             ));
           } else if (!snapshot.hasData) {
-            return const Center(child: Text("No data found", style: TextStyle(color: Colors.white)));
+            return Center(child: Text("No data found", style: TextStyle(fontSize: context.font(14), color: colorScheme.onSurface)));
           }
 
           final details = snapshot.data!;
-          return Column(
-            children: [
-              Expanded(
-                child: ListView(
-                  padding: const EdgeInsets.all(20),
-                  children: [
-                    _buildTicketInfo(details.ticket),
-                    const SizedBox(height: 32),
-                    Row(
+          return Center(
+            child: Container(
+              constraints: const BoxConstraints(maxWidth: 1000),
+              child: Column(
+                children: [
+                  Expanded(
+                    child: ListView(
+                      padding: context.pagePadding,
                       children: [
-                        const Icon(Icons.forum_outlined, color: Colors.white70, size: 20),
-                        const SizedBox(width: 8),
-                        Text(
-                          "Conversation (${details.replies.length})",
-                          style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
+                        _buildTicketInfo(details.ticket),
+                        SizedBox(height: context.xl),
+                        Padding(
+                          padding: EdgeInsets.symmetric(horizontal: context.xs),
+                          child: Row(
+                            children: [
+                              Icon(Icons.forum_outlined, color: colorScheme.primary, size: context.scale(20)),
+                              SizedBox(width: context.sm),
+                              Text(
+                                "Conversation (${details.replies.length})",
+                                style: TextStyle(
+                                  color: colorScheme.onSurface,
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: context.font(18),
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
+                        SizedBox(height: context.lg),
+                        ...details.replies.map((reply) => _buildReplyBubble(reply)),
+                        SizedBox(height: context.md),
                       ],
                     ),
-                    const SizedBox(height: 16),
-                    ...details.replies.map((reply) => _buildReplyBubble(reply)),
-                    const SizedBox(height: 20),
-                  ],
-                ),
+                  ),
+                  if (details.ticket.status.toLowerCase() != 'closed') _buildInputArea(),
+                ],
               ),
-              if (details.ticket.status.toLowerCase() != 'closed') _buildInputArea(),
-            ],
+            ),
           );
         },
       ),
@@ -152,80 +171,97 @@ class _StudentTicketDetailsPageState extends State<StudentTicketDetailsPage> {
 
   Widget _buildTicketInfo(SupportTicket ticket) {
     final dynamic ticketData = ticket;
+    final theme = context.theme;
+    final colorScheme = theme.colorScheme;
     final priorityColor = _getPriorityColor(ticket.priority);
     final statusColor = _getStatusColor(ticket.status);
 
     return Container(
-      padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
-        color: _card,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.white12),
+        color: colorScheme.surfaceContainerLow,
+        borderRadius: BorderRadius.circular(context.scale(16)),
+        border: Border.all(color: colorScheme.outlineVariant),
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                "ID: #${ticket.id}",
-                style: const TextStyle(color: Colors.white38, fontWeight: FontWeight.bold, fontSize: 12),
+      child: Padding(
+        padding: EdgeInsets.all(context.scale(context.isMobile ? 20 : 32)),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  "ID: #${ticket.id}",
+                  style: TextStyle(
+                    color: colorScheme.primary,
+                    fontWeight: FontWeight.bold,
+                    fontSize: context.font(12),
+                  ),
+                ),
+                Text(
+                  _formatFullDate(ticket.createdAt),
+                  style: TextStyle(color: colorScheme.onSurfaceVariant, fontSize: context.font(12)),
+                ),
+              ],
+            ),
+            SizedBox(height: context.md),
+            Text(
+              ticket.title,
+              style: TextStyle(
+                color: colorScheme.onSurface,
+                fontWeight: FontWeight.bold,
+                fontSize: context.font(20),
               ),
-              Text(
-                _formatFullDate(ticket.createdAt),
-                style: const TextStyle(color: Colors.white38, fontSize: 12),
+            ),
+            SizedBox(height: context.sm),
+            Text(
+              (ticketData.description as String?) ?? "No description provided.",
+              style: TextStyle(
+                color: colorScheme.onSurface,
+                fontSize: context.font(14),
+                height: 1.5,
               ),
-            ],
-          ),
-          const SizedBox(height: 16),
-          Text(
-            ticket.title,
-            style: const TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.bold),
-          ),
-          const SizedBox(height: 12),
-          Text(
-            (ticketData.description as String?) ?? "No description provided.",
-            style: const TextStyle(color: Colors.white70, fontSize: 15, height: 1.5),
-          ),
-          const Padding(
-            padding: EdgeInsets.symmetric(vertical: 20),
-            child: Divider(color: Colors.white12, height: 1),
-          ),
-          Wrap(
-            spacing: 12,
-            runSpacing: 12,
-            children: [
-              _infoChip(Icons.priority_high, "Priority", ticket.priority.toUpperCase(), priorityColor),
-              _infoChip(Icons.category_outlined, "Category", ticket.category ?? "General", _primary),
-              _infoChip(Icons.info_outline, "Status", ticket.status.toUpperCase(), statusColor),
-            ],
-          ),
-        ],
+            ),
+            Padding(
+              padding: EdgeInsets.symmetric(vertical: context.lg),
+              child: Divider(color: colorScheme.outlineVariant, height: 1),
+            ),
+            Wrap(
+              spacing: context.sm,
+              runSpacing: context.sm,
+              children: [
+                _infoChip(Icons.priority_high, "Priority", ticket.priority.toUpperCase(), priorityColor),
+                _infoChip(Icons.category_outlined, "Category", ticket.category ?? "General", colorScheme.primary),
+                _infoChip(Icons.info_outline, "Status", ticket.status.toUpperCase(), statusColor),
+              ],
+            ),
+          ],
+        ),
       ),
     );
   }
 
   Widget _infoChip(IconData icon, String label, String value, Color color) {
+    final colorScheme = context.theme.colorScheme;
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      padding: EdgeInsets.symmetric(horizontal: context.scale(12), vertical: context.scale(8)),
       decoration: BoxDecoration(
-        color: _secondary,
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: color.withValues(alpha: 0.3)),
+        color: color.withValues(alpha: 0.05),
+        borderRadius: BorderRadius.circular(context.scale(8)),
+        border: Border.all(color: color.withValues(alpha: 0.2)),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, size: 14, color: color),
-          const SizedBox(width: 6),
+          Icon(icon, size: context.scale(14), color: color),
+          SizedBox(width: context.sm),
           Text(
             "$label: ",
-            style: const TextStyle(color: Colors.white54, fontSize: 12),
+            style: TextStyle(color: colorScheme.onSurfaceVariant, fontSize: context.font(11)),
           ),
           Text(
             value,
-            style: TextStyle(color: color, fontSize: 12, fontWeight: FontWeight.bold),
+            style: TextStyle(color: color, fontWeight: FontWeight.bold, fontSize: context.font(11)),
           ),
         ],
       ),
@@ -234,24 +270,27 @@ class _StudentTicketDetailsPageState extends State<StudentTicketDetailsPage> {
 
   Widget _buildReplyBubble(TicketReply reply) {
     bool isSupport = reply.userRole?.toLowerCase() != 'student';
+    final theme = context.theme;
+    final colorScheme = theme.colorScheme;
+    final primaryColor = colorScheme.primary;
 
     return Container(
-      margin: const EdgeInsets.only(bottom: 16),
+      margin: EdgeInsets.only(bottom: context.md),
       alignment: isSupport ? Alignment.centerLeft : Alignment.centerRight,
       child: Container(
-        padding: const EdgeInsets.all(16),
-        constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.8),
+        padding: EdgeInsets.all(context.md),
+        constraints: BoxConstraints(maxWidth: context.screenWidth * 0.75),
         decoration: BoxDecoration(
-          color: isSupport ? _surface : _primary,
-          borderRadius: BorderRadius.circular(12).copyWith(
-            bottomLeft: isSupport ? const Radius.circular(0) : const Radius.circular(12),
-            bottomRight: isSupport ? const Radius.circular(12) : const Radius.circular(0),
+          color: isSupport ? colorScheme.surfaceContainerLow : primaryColor,
+          borderRadius: BorderRadius.circular(context.scale(16)).copyWith(
+            bottomLeft: isSupport ? Radius.circular(0) : Radius.circular(context.scale(16)),
+            bottomRight: isSupport ? Radius.circular(context.scale(16)) : Radius.circular(0),
           ),
-          border: isSupport ? Border.all(color: Colors.white10) : null,
+          border: isSupport ? Border.all(color: colorScheme.outlineVariant) : null,
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withValues(alpha: 0.1),
-              blurRadius: 10,
+              color: colorScheme.shadow.withValues(alpha: 0.05),
+              blurRadius: context.scale(10),
               offset: const Offset(0, 4),
             )
           ],
@@ -265,51 +304,55 @@ class _StudentTicketDetailsPageState extends State<StudentTicketDetailsPage> {
                 Text(
                   reply.userName ?? "User",
                   style: TextStyle(
-                    color: isSupport ? _primary.withValues(alpha: 0.8) : Colors.white,
+                    color: isSupport ? primaryColor : colorScheme.onPrimary,
                     fontWeight: FontWeight.bold,
-                    fontSize: 12,
+                    fontSize: context.font(12),
                   ),
                 ),
-                const SizedBox(width: 12),
+                SizedBox(width: context.md),
                 Text(
                   _formatDate(reply.createdAt),
                   style: TextStyle(
-                    color: isSupport ? Colors.white38 : Colors.white70,
-                    fontSize: 10,
+                    color: isSupport ? colorScheme.onSurfaceVariant : colorScheme.onPrimary.withValues(alpha: 0.7),
+                    fontSize: context.font(10),
                   ),
                 ),
               ],
             ),
-            const SizedBox(height: 8),
+            SizedBox(height: context.sm),
             Text(
               reply.message,
-              style: const TextStyle(color: Colors.white, fontSize: 14, height: 1.4),
+              style: TextStyle(
+                color: isSupport ? colorScheme.onSurface : colorScheme.onPrimary,
+                fontSize: context.font(14),
+                height: 1.5,
+              ),
             ),
             if (reply.attachment != null) ...[
-              const SizedBox(height: 12),
+              SizedBox(height: context.md),
               InkWell(
                 onTap: () {
                   // Handle attachment download/view
                 },
                 child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  padding: EdgeInsets.symmetric(horizontal: context.scale(10), vertical: context.scale(6)),
                   decoration: BoxDecoration(
-                    color: Colors.black12,
-                    borderRadius: BorderRadius.circular(6),
-                    border: Border.all(color: Colors.white10),
+                    color: isSupport ? colorScheme.primary.withValues(alpha: 0.1) : Colors.black12,
+                    borderRadius: BorderRadius.circular(context.scale(6)),
+                    border: Border.all(color: isSupport ? colorScheme.primary.withValues(alpha: 0.2) : Colors.white10),
                   ),
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      const Icon(Icons.attach_file, color: Colors.white70, size: 14),
-                      const SizedBox(width: 6),
+                      Icon(Icons.attach_file, color: isSupport ? colorScheme.primary : colorScheme.onPrimary.withValues(alpha: 0.7), size: context.scale(14)),
+                      SizedBox(width: context.sm),
                       Text(
                         "Attachment",
                         style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 11,
+                          color: isSupport ? colorScheme.primary : colorScheme.onPrimary,
+                          fontSize: context.font(11),
                           decoration: TextDecoration.underline,
-                          decorationColor: Colors.white30,
+                          decorationColor: isSupport ? colorScheme.primary.withValues(alpha: 0.3) : colorScheme.onPrimary.withValues(alpha: 0.3),
                         ),
                       ),
                     ],
@@ -324,101 +367,106 @@ class _StudentTicketDetailsPageState extends State<StudentTicketDetailsPage> {
   }
 
   Widget _buildInputArea() {
+    final theme = context.theme;
+    final colorScheme = theme.colorScheme;
+    final primaryColor = colorScheme.primary;
     return Container(
-      padding: EdgeInsets.fromLTRB(16, 12, 16, 12 + MediaQuery.of(context).padding.bottom),
+      padding: EdgeInsets.fromLTRB(context.md, context.md, context.md, context.md + MediaQuery.of(context).padding.bottom),
       decoration: BoxDecoration(
-        color: _card,
-        border: const Border(top: BorderSide(color: Colors.white12)),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.2),
-            blurRadius: 20,
-            offset: const Offset(0, -5),
-          )
-        ],
+        color: colorScheme.surface,
+        border: Border(top: BorderSide(color: colorScheme.outlineVariant)),
       ),
-      child: Column(
-        children: [
-          if (_selectedFile != null)
-            Container(
-              margin: const EdgeInsets.only(bottom: 12),
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-              decoration: BoxDecoration(
-                color: _secondary,
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: _primary.withValues(alpha: 0.3)),
-              ),
-              child: Row(
-                children: [
-                  const Icon(Icons.insert_drive_file, color: Colors.white70, size: 20),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Text(
-                      _selectedFile!.path.split('/').last,
-                      style: const TextStyle(color: Colors.white, fontSize: 13),
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ),
-                  IconButton(
-                    icon: const Icon(Icons.cancel, color: Colors.redAccent, size: 20),
-                    onPressed: () => setState(() => _selectedFile = null),
-                    padding: EdgeInsets.zero,
-                    constraints: const BoxConstraints(),
-                  ),
-                ],
-              ),
-            ),
-          Row(
+      child: Center(
+        child: Container(
+          constraints: const BoxConstraints(maxWidth: 1000),
+          child: Column(
             children: [
-              IconButton(
-                icon: const Icon(Icons.add_circle_outline, color: Colors.white54),
-                onPressed: _pickFile,
-                tooltip: "Attach file",
-              ),
-              Expanded(
-                child: TextField(
-                  controller: _replyController,
-                  style: const TextStyle(color: Colors.white, fontSize: 15),
-                  decoration: InputDecoration(
-                    hintText: "Write a reply...",
-                    hintStyle: const TextStyle(color: Colors.white30),
-                    filled: true,
-                    fillColor: _secondary,
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(24), borderSide: BorderSide.none),
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+              if (_selectedFile != null)
+                Container(
+                  margin: EdgeInsets.only(bottom: context.md),
+                  padding: EdgeInsets.symmetric(horizontal: context.scale(12), vertical: context.scale(10)),
+                  decoration: BoxDecoration(
+                    color: colorScheme.primary.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(context.scale(8)),
+                    border: Border.all(color: primaryColor.withValues(alpha: 0.2)),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(Icons.insert_drive_file, color: primaryColor, size: context.scale(20)),
+                      SizedBox(width: context.md),
+                      Expanded(
+                        child: Text(
+                          _selectedFile!.path.split('/').last,
+                          style: TextStyle(color: colorScheme.onSurface, fontSize: context.font(13)),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                      IconButton(
+                        icon: Icon(Icons.cancel, color: colorScheme.error, size: context.scale(20)),
+                        onPressed: () => setState(() => _selectedFile = null),
+                        padding: EdgeInsets.zero,
+                        constraints: const BoxConstraints(),
+                      ),
+                    ],
                   ),
                 ),
-              ),
-              const SizedBox(width: 8),
-              _isSending
-                  ? SizedBox(width: 48, height: 48, child: Padding(padding: const EdgeInsets.all(12), child: CircularProgressIndicator(color: _primary, strokeWidth: 3)))
-                  : Container(
-                      decoration: BoxDecoration(color: _primary, shape: BoxShape.circle),
-                      child: IconButton(
-                        icon: const Icon(Icons.send_rounded, color: Colors.white, size: 20),
-                        onPressed: _sendReply,
+              Row(
+                children: [
+                  IconButton(
+                    icon: Icon(Icons.add_circle_outline, color: primaryColor, size: context.scale(24)),
+                    onPressed: _pickFile,
+                    tooltip: "Attach file",
+                  ),
+                  SizedBox(width: context.xs),
+                  Expanded(
+                    child: TextField(
+                      controller: _replyController,
+                      style: TextStyle(fontSize: context.font(14), color: colorScheme.onSurface),
+                      decoration: InputDecoration(
+                        hintText: "Write a reply...",
+                        hintStyle: TextStyle(color: colorScheme.onSurfaceVariant),
+                        contentPadding: EdgeInsets.symmetric(horizontal: context.scale(20), vertical: context.scale(12)),
                       ),
                     ),
+                  ),
+                  SizedBox(width: context.md),
+                  _isSending
+                      ? SizedBox(width: context.scale(48), height: context.scale(48), child: Padding(padding: EdgeInsets.all(context.scale(12)), child: CircularProgressIndicator(color: primaryColor, strokeWidth: 3)))
+                      : FloatingActionButton.small(
+                          elevation: 0,
+                          backgroundColor: primaryColor,
+                          foregroundColor: colorScheme.onPrimary,
+                          onPressed: _sendReply,
+                          child: Icon(Icons.send_rounded, size: context.scale(18)),
+                        ),
+                ],
+              ),
             ],
           ),
-        ],
+        ),
       ),
     );
   }
 
   Color _getPriorityColor(String priority) {
     switch (priority.toLowerCase()) {
-      case 'high': return Colors.redAccent;
-      case 'medium': return Colors.orangeAccent;
-      default: return Colors.greenAccent;
+      case 'high':
+        return const Color(0xFFEF4444); // Red
+      case 'medium':
+        return const Color(0xFFF59E0B); // Amber
+      default:
+        return const Color(0xFF10B981); // Emerald
     }
   }
 
   Color _getStatusColor(String status) {
     switch (status.toLowerCase()) {
-      case 'open': return _primary;
-      case 'closed': return Colors.grey;
-      default: return Colors.blueGrey;
+      case 'open':
+        return const Color(0xFF3B82F6); // Blue
+      case 'closed':
+        return const Color(0xFF10B981); // Emerald
+      default:
+        return const Color(0xFF3B82F6); // Blue
     }
   }
 

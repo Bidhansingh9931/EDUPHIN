@@ -1,3 +1,4 @@
+import 'package:eduphin/services/responsive_helper.dart';
 import 'package:flutter/material.dart';
 import 'package:eduphin/services/api_service.dart';
 import 'package:intl/intl.dart';
@@ -10,12 +11,6 @@ class AttendanceReportPage extends StatefulWidget {
 }
 
 class _AttendanceReportPageState extends State<AttendanceReportPage> {
-  // Theme Colors
-  final Color _bg = const Color(0xff0B1220);
-  final Color _card = const Color(0xff1E2746);
-  final Color _primary = const Color(0xff3366FF);
-  final Color _secondary = const Color(0xff3E4764);
-
   bool _isLoading = true;
   Map<String, dynamic>? _attendanceData;
   final Map<int, bool> _subjectOpenStates = {};
@@ -37,8 +32,12 @@ class _AttendanceReportPageState extends State<AttendanceReportPage> {
     } catch (e) {
       setState(() => _isLoading = false);
       if (mounted) {
+        final theme = Theme.of(context);
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text("Error fetching attendance: $e")),
+          SnackBar(
+            content: Text("Error fetching attendance: $e"),
+            backgroundColor: theme.colorScheme.error,
+          ),
         );
       }
     }
@@ -46,62 +45,60 @@ class _AttendanceReportPageState extends State<AttendanceReportPage> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = context.theme;
+    final colorScheme = theme.colorScheme;
+
     return Scaffold(
-      backgroundColor: _bg,
       appBar: AppBar(
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.white),
-          onPressed: () => Navigator.pop(context),
-        ),
-        title: const Text(
-          "Attendance Report",
-          style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white),
-        ),
+        title: const Text("Attendance Report"),
         actions: [
           IconButton(
-            icon: const Icon(Icons.refresh, color: Colors.white70),
+            icon: const Icon(Icons.refresh),
             onPressed: _fetchAttendance,
           ),
         ],
       ),
       body: RefreshIndicator(
         onRefresh: _fetchAttendance,
-        color: _primary,
+        color: colorScheme.primary,
         child: _isLoading
-            ? Center(child: CircularProgressIndicator(color: _primary))
+            ? Center(child: CircularProgressIndicator(color: colorScheme.primary))
             : _attendanceData == null
-                ? const Center(child: Text("No data found", style: TextStyle(color: Colors.white70)))
+                ? Center(child: Text("No data found", style: TextStyle(color: colorScheme.onSurfaceVariant)))
                 : SingleChildScrollView(
                     physics: const AlwaysScrollableScrollPhysics(),
-                    padding: const EdgeInsets.all(20),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        _buildStudentHeader(),
-                        const SizedBox(height: 24),
-                        _buildStatsGrid(),
-                        const SizedBox(height: 32),
-                        const Row(
+                    padding: context.pagePadding,
+                    child: Center(
+                      child: Container(
+                        constraints: const BoxConstraints(maxWidth: 1000),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Icon(Icons.list_alt, color: Colors.white70, size: 20),
-                            SizedBox(width: 8),
-                            Text(
-                              "Subject-wise Records",
-                              style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
+                            _buildStudentHeader(),
+                            SizedBox(height: context.lg),
+                            _buildStatsGrid(),
+                            SizedBox(height: context.xl),
+                            Row(
+                              children: [
+                                Icon(Icons.list_alt, color: colorScheme.primary, size: 22),
+                                SizedBox(width: context.sm),
+                                Text(
+                                  "Subject-wise Records",
+                                  style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
+                                ),
+                              ],
                             ),
+                            SizedBox(height: context.xs),
+                            Text(
+                              "Detailed attendance log, grouped by subject.",
+                              style: theme.textTheme.bodyMedium?.copyWith(color: colorScheme.onSurfaceVariant),
+                            ),
+                            SizedBox(height: context.lg),
+                            _buildSubjectWiseList(),
+                            SizedBox(height: context.xl),
                           ],
                         ),
-                        const SizedBox(height: 4),
-                        const Text(
-                          "Detailed attendance log, grouped by subject.",
-                          style: TextStyle(color: Colors.white38, fontSize: 13),
-                        ),
-                        const SizedBox(height: 20),
-                        _buildSubjectWiseList(),
-                        const SizedBox(height: 40),
-                      ],
+                      ),
                     ),
                   ),
       ),
@@ -109,66 +106,79 @@ class _AttendanceReportPageState extends State<AttendanceReportPage> {
   }
 
   Widget _buildStudentHeader() {
+    final theme = context.theme;
+    final colorScheme = theme.colorScheme;
     final student = _attendanceData!['student'];
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: _card,
+    return Card(
+      elevation: 0,
+      color: colorScheme.surfaceContainerLow,
+      shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.white12),
+        side: BorderSide(color: colorScheme.outlineVariant),
       ),
-      child: Row(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: _primary.withValues(alpha: 0.1),
-              shape: BoxShape.circle,
+      child: Padding(
+        padding: EdgeInsets.all(context.md),
+        child: Row(
+          children: [
+            Container(
+              padding: EdgeInsets.all(context.sm),
+              decoration: BoxDecoration(
+                color: colorScheme.primary.withValues(alpha: 0.1),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(Icons.person, color: colorScheme.primary, size: 28),
             ),
-            child: Icon(Icons.person, color: _primary, size: 24),
-          ),
-          const SizedBox(width: 16),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  student['user']?['name'] ?? "Student",
-                  style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  "Roll No: ${student['roll_no'] ?? 'N/A'} • Class: ${student['class_id'] ?? 'N/A'}",
-                  style: const TextStyle(color: Colors.white54, fontSize: 13),
-                ),
-              ],
+            SizedBox(width: context.md),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    student['user']?['name'] ?? "Student",
+                    style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
+                  ),
+                  SizedBox(height: context.xs),
+                  Text(
+                    "Roll No: ${student['roll_no'] ?? 'N/A'} • Class: ${student['class_id'] ?? 'N/A'}",
+                    style: theme.textTheme.bodyMedium?.copyWith(color: colorScheme.onSurfaceVariant),
+                  ),
+                ],
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
 
   Widget _buildStatsGrid() {
+    final theme = context.theme;
+    final colorScheme = theme.colorScheme;
     final percentage = _attendanceData!['attendance_percentage'];
     final presentCount = _attendanceData!['present_count'];
     final totalCount = _attendanceData!['total_count'];
 
     return Column(
       children: [
-        Row(
-          children: [
-            Expanded(child: _statsCard("Total Days", totalCount.toString(), Icons.calendar_month, Colors.blueAccent)),
-            const SizedBox(width: 16),
-            Expanded(child: _statsCard("Present", presentCount.toString(), Icons.check_circle_outline, Colors.greenAccent)),
-          ],
+        LayoutBuilder(
+          builder: (context, constraints) {
+            final isWide = constraints.maxWidth > 600;
+            return Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(child: _statsCard("Total Days", totalCount.toString(), Icons.calendar_month, const Color(0xFF3B82F6))),
+                SizedBox(width: isWide ? context.md : context.sm),
+                Expanded(child: _statsCard("Present", presentCount.toString(), Icons.check_circle_outline, const Color(0xFF10B981))),
+              ],
+            );
+          },
         ),
-        const SizedBox(height: 16),
+        SizedBox(height: context.md),
         _statsCard(
           "Overall Percentage",
           "$percentage%",
           Icons.analytics_outlined,
-          _primary,
+          colorScheme.primary,
           isWide: true,
           progress: (double.tryParse(percentage.toString()) ?? 0) / 100,
         ),
@@ -177,63 +187,69 @@ class _AttendanceReportPageState extends State<AttendanceReportPage> {
   }
 
   Widget _statsCard(String label, String value, IconData icon, Color color, {bool isWide = false, double? progress}) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: _card,
+    final theme = context.theme;
+    final colorScheme = theme.colorScheme;
+    return Card(
+      elevation: 0,
+      color: colorScheme.surfaceContainerLow,
+      shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.white12),
+        side: BorderSide(color: colorScheme.outlineVariant),
       ),
-      child: Column(
-        crossAxisAlignment: isWide ? CrossAxisAlignment.center : CrossAxisAlignment.start,
-        children: [
-          Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(icon, color: color.withValues(alpha: 0.8), size: 18),
-              const SizedBox(width: 10),
-              Text(label, style: const TextStyle(color: Colors.white54, fontSize: 12, fontWeight: FontWeight.w500)),
-            ],
-          ),
-          const SizedBox(height: 12),
-          Text(
-            value,
-            style: const TextStyle(color: Colors.white, fontSize: 26, fontWeight: FontWeight.w900),
-          ),
-          if (progress != null) ...[
-            const SizedBox(height: 16),
-            Stack(
+      child: Padding(
+        padding: EdgeInsets.all(context.md),
+        child: Column(
+          crossAxisAlignment: isWide ? CrossAxisAlignment.center : CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisSize: MainAxisSize.min,
               children: [
-                Container(
-                  height: 8,
-                  decoration: BoxDecoration(
-                    color: _secondary.withValues(alpha: 0.3),
-                    borderRadius: BorderRadius.circular(4),
-                  ),
-                ),
-                FractionallySizedBox(
-                  widthFactor: progress.clamp(0.0, 1.0),
-                  child: Container(
-                    height: 8,
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(colors: [color, color.withValues(alpha: 0.7)]),
-                      borderRadius: BorderRadius.circular(4),
-                      boxShadow: [
-                        BoxShadow(color: color.withValues(alpha: 0.3), blurRadius: 8, offset: const Offset(0, 2))
-                      ],
-                    ),
-                  ),
-                ),
+                Icon(icon, color: color.withValues(alpha: 0.8), size: 18),
+                SizedBox(width: context.sm),
+                Text(label, style: theme.textTheme.labelMedium?.copyWith(color: colorScheme.onSurfaceVariant, fontWeight: FontWeight.bold)),
               ],
             ),
-          ]
-        ],
+            SizedBox(height: context.sm),
+            Text(
+              value,
+              style: theme.textTheme.headlineMedium?.copyWith(fontWeight: FontWeight.w900, color: colorScheme.onSurface),
+            ),
+            if (progress != null) ...[
+              SizedBox(height: context.md),
+              Stack(
+                children: [
+                  Container(
+                    height: 8,
+                    decoration: BoxDecoration(
+                      color: colorScheme.surfaceContainerHighest,
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                  ),
+                  FractionallySizedBox(
+                    widthFactor: progress.clamp(0.0, 1.0),
+                    child: Container(
+                      height: 8,
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(colors: [color, color.withValues(alpha: 0.7)]),
+                        borderRadius: BorderRadius.circular(4),
+                        boxShadow: [
+                          BoxShadow(color: color.withValues(alpha: 0.2), blurRadius: 4, offset: const Offset(0, 2))
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ]
+          ],
+        ),
       ),
     );
   }
 
   Widget _buildSubjectWiseList() {
+    final theme = context.theme;
+    final colorScheme = theme.colorScheme;
     final subjectWiseData = _attendanceData!['subject_wise_attendance'];
     if (subjectWiseData == null) return const SizedBox();
     
@@ -254,12 +270,13 @@ class _AttendanceReportPageState extends State<AttendanceReportPage> {
         final double sPercent = sTotal > 0 ? (sPresent / sTotal) * 100 : 0;
         final bool isOpen = _subjectOpenStates[subjectId] ?? false;
 
-        return Container(
-          margin: const EdgeInsets.only(bottom: 16),
-          decoration: BoxDecoration(
-            color: _card,
+        return Card(
+          elevation: 0,
+          margin: EdgeInsets.only(bottom: context.md),
+          color: colorScheme.surfaceContainerLow,
+          shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: isOpen ? _primary.withValues(alpha: 0.3) : Colors.white12),
+            side: BorderSide(color: isOpen ? colorScheme.primary.withValues(alpha: 0.3) : colorScheme.outlineVariant),
           ),
           child: Column(
             children: [
@@ -267,56 +284,59 @@ class _AttendanceReportPageState extends State<AttendanceReportPage> {
                 onTap: () => setState(() => _subjectOpenStates[subjectId] = !isOpen),
                 borderRadius: BorderRadius.circular(16),
                 child: Padding(
-                  padding: const EdgeInsets.all(20),
+                  padding: EdgeInsets.all(context.md),
                   child: Row(
                     children: [
                       Container(
-                        width: 52,
-                        height: 52,
+                        width: 50,
+                        height: 50,
                         decoration: BoxDecoration(
-                          color: _primary.withValues(alpha: 0.1),
+                          color: colorScheme.primary.withValues(alpha: 0.1),
                           borderRadius: BorderRadius.circular(12),
                         ),
                         child: Center(
                           child: Text(
                             "${sPercent.toInt()}%",
-                            style: TextStyle(color: _primary, fontWeight: FontWeight.bold, fontSize: 14),
+                            style: TextStyle(color: colorScheme.primary, fontWeight: FontWeight.bold, fontSize: 14),
                           ),
                         ),
                       ),
-                      const SizedBox(width: 16),
+                      SizedBox(width: context.md),
                       Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text(subjectName, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)),
-                            const SizedBox(height: 4),
-                            Text("$sPresent / $sTotal sessions attended", style: const TextStyle(color: Colors.white38, fontSize: 13)),
+                            Text(subjectName, style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
+                            SizedBox(height: context.xs),
+                            Text("$sPresent / $sTotal sessions attended", style: theme.textTheme.bodyMedium?.copyWith(color: colorScheme.onSurfaceVariant)),
                           ],
                         ),
                       ),
-                      Icon(isOpen ? Icons.keyboard_arrow_up : Icons.keyboard_arrow_down, color: Colors.white38),
+                      Icon(isOpen ? Icons.keyboard_arrow_up : Icons.keyboard_arrow_down, color: colorScheme.onSurfaceVariant),
                     ],
                   ),
                 ),
               ),
               if (isOpen) ...[
-                const Padding(
-                  padding: EdgeInsets.symmetric(horizontal: 20),
-                  child: Divider(color: Colors.white10, height: 1),
+                Padding(
+                  padding: EdgeInsets.symmetric(horizontal: context.md),
+                  child: Divider(color: colorScheme.outlineVariant, height: 1),
                 ),
                 if (records.isEmpty)
-                   const Padding(
-                     padding: EdgeInsets.all(20),
-                     child: Text("No records available", style: TextStyle(color: Colors.white24, fontSize: 13)),
+                   Padding(
+                     padding: EdgeInsets.all(context.lg),
+                     child: Text("No records available", style: theme.textTheme.bodyMedium?.copyWith(color: colorScheme.onSurfaceVariant, fontStyle: FontStyle.italic)),
                    )
                 else
                   ListView.separated(
                     shrinkWrap: true,
                     physics: const NeverScrollableScrollPhysics(),
                     itemCount: records.length,
-                    padding: const EdgeInsets.all(20),
-                    separatorBuilder: (context, i) => const SizedBox(height: 16),
+                    padding: EdgeInsets.all(context.md),
+                    separatorBuilder: (context, i) => Padding(
+                      padding: EdgeInsets.symmetric(vertical: context.sm),
+                      child: Divider(color: colorScheme.outlineVariant.withValues(alpha: 0.5), height: 1),
+                    ),
                     itemBuilder: (context, rIndex) {
                       final r = records[rIndex];
                       return _buildAttendanceRecordRow(r, rIndex + 1);
@@ -331,36 +351,38 @@ class _AttendanceReportPageState extends State<AttendanceReportPage> {
   }
 
   Widget _buildAttendanceRecordRow(dynamic r, int index) {
+    final theme = context.theme;
+    final colorScheme = theme.colorScheme;
     final status = (r['status'] ?? "N/A").toString().toLowerCase();
-    Color statusColor = Colors.redAccent;
-    if (status == 'present') statusColor = Colors.greenAccent;
-    if (status == 'leave') statusColor = Colors.orangeAccent;
+    Color statusColor = colorScheme.error;
+    if (status == 'present') statusColor = const Color(0xFF10B981);
+    if (status == 'leave') statusColor = const Color(0xFFF59E0B);
 
     return Row(
       children: [
         Container(
-          width: 28,
-          height: 28,
+          width: 32,
+          height: 32,
           decoration: BoxDecoration(
-            color: _secondary.withValues(alpha: 0.3),
+            color: colorScheme.surfaceContainerHighest,
             shape: BoxShape.circle,
           ),
           child: Center(
-            child: Text(index.toString(), style: const TextStyle(color: Colors.white38, fontSize: 11, fontWeight: FontWeight.bold)),
+            child: Text(index.toString(), style: theme.textTheme.labelSmall?.copyWith(color: colorScheme.onSurfaceVariant, fontWeight: FontWeight.bold)),
           ),
         ),
-        const SizedBox(width: 12),
+        SizedBox(width: context.md),
         Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(_formatDate(r['date']), style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w500)),
-              const SizedBox(height: 2),
-              Text(r['time_slot'] ?? "N/A", style: const TextStyle(color: Colors.white38, fontSize: 12)),
+              Text(_formatDate(r['date']), style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.bold)),
+              SizedBox(height: context.xs),
+              Text(r['time_slot'] ?? "N/A", style: theme.textTheme.bodySmall?.copyWith(color: colorScheme.onSurfaceVariant)),
               if (r['remarks'] != null && r['remarks'].toString().isNotEmpty && r['remarks'] != "-")
                  Padding(
-                   padding: const EdgeInsets.only(top: 4),
-                   child: Text(r['remarks'], style: const TextStyle(color: Colors.white24, fontSize: 11, fontStyle: FontStyle.italic)),
+                   padding: EdgeInsets.only(top: context.xs),
+                   child: Text(r['remarks'], style: theme.textTheme.bodySmall?.copyWith(color: colorScheme.onSurfaceVariant.withValues(alpha: 0.7), fontStyle: FontStyle.italic)),
                  ),
             ],
           ),
@@ -372,11 +394,11 @@ class _AttendanceReportPageState extends State<AttendanceReportPage> {
 
   Widget _statusBadge(String text, Color color) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
       decoration: BoxDecoration(
         color: color.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(6),
-        border: Border.all(color: color.withValues(alpha: 0.4)),
+        border: Border.all(color: color.withValues(alpha: 0.3)),
       ),
       child: Text(
         text,

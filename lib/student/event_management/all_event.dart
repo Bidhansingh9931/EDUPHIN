@@ -1,3 +1,4 @@
+import 'package:eduphin/services/responsive_helper.dart';
 import 'package:flutter/material.dart';
 import 'package:eduphin/services/api_service.dart';
 import 'package:intl/intl.dart';
@@ -14,12 +15,6 @@ class _ManageEventsPageState extends State<ManageEventsPage> {
   String? _type;
   List<dynamic> _events = [];
   bool _isLoading = true;
-
-  final Color _bg = const Color(0xff0B1220);
-  final Color _card = const Color(0xff1E2746);
-  final Color _primary = const Color(0xff3366FF);
-  final Color _secondary = const Color(0xff3E4764);
-  final Color _headerRow = const Color(0xff2A3450);
 
   @override
   void initState() {
@@ -49,10 +44,11 @@ class _ManageEventsPageState extends State<ManageEventsPage> {
     } catch (e) {
       setState(() => _isLoading = false);
       if (mounted) {
+        final theme = context.theme;
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text("Error fetching events: $e"),
-            backgroundColor: Colors.redAccent,
+            backgroundColor: theme.colorScheme.error,
           ),
         );
       }
@@ -61,58 +57,64 @@ class _ManageEventsPageState extends State<ManageEventsPage> {
 
   Future<void> _registerForEvent(dynamic event) async {
     final bool isTicketed = event['is_ticketed'] == 1 || event['is_ticketed'] == true;
+    final theme = context.theme;
+    final colorScheme = theme.colorScheme;
     
     if (isTicketed) {
       final TextEditingController paymentController = TextEditingController();
       final String? paymentId = await showDialog<String>(
         context: context,
         builder: (context) => AlertDialog(
-          backgroundColor: _card,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-          title: const Text("Register for Paid Event", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text("Ticket Price: ₹${event['ticket_price']}", 
-                style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 18)),
-              const SizedBox(height: 8),
-              Text("Please enter your Payment ID / Transaction Ref to proceed.", 
-                style: TextStyle(color: Colors.white.withValues(alpha: 0.6), fontSize: 13)),
-              const SizedBox(height: 20),
-              TextField(
-                controller: paymentController,
-                style: const TextStyle(color: Colors.white),
-                decoration: InputDecoration(
-                  labelText: "Payment ID",
-                  labelStyle: TextStyle(color: Colors.white.withValues(alpha: 0.5)),
-                  filled: true,
-                  fillColor: _bg.withValues(alpha: 0.5),
-                  enabledBorder: OutlineInputBorder(
-                    borderSide: BorderSide(color: Colors.white.withValues(alpha: 0.1)),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  focusedBorder: OutlineInputBorder(
-                    borderSide: BorderSide(color: _primary),
-                    borderRadius: BorderRadius.circular(12),
+          backgroundColor: colorScheme.surfaceContainerLow,
+          surfaceTintColor: colorScheme.surfaceTint,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(context.scale(16))),
+          title: Text("Register for Paid Event", style: TextStyle(color: theme.textTheme.titleLarge?.color, fontWeight: FontWeight.bold, fontSize: context.font(20))),
+          content: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 400),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text("Ticket Price: ₹${event['ticket_price']}", 
+                  style: TextStyle(color: theme.textTheme.headlineSmall?.color, fontWeight: FontWeight.bold, fontSize: context.font(18))),
+                SizedBox(height: context.sm),
+                Text("Please enter your Payment ID / Transaction Ref to proceed.", 
+                  style: TextStyle(color: colorScheme.onSurfaceVariant, fontSize: context.font(13))),
+                SizedBox(height: context.lg),
+                TextField(
+                  controller: paymentController,
+                  style: TextStyle(color: theme.textTheme.bodyLarge?.color, fontSize: context.font(14)),
+                  decoration: InputDecoration(
+                    labelText: "Payment ID",
+                    labelStyle: TextStyle(color: colorScheme.onSurfaceVariant, fontSize: context.font(14)),
+                    filled: true,
+                    fillColor: colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
+                    enabledBorder: OutlineInputBorder(
+                      borderSide: BorderSide(color: colorScheme.outlineVariant),
+                      borderRadius: BorderRadius.circular(context.scale(12)),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderSide: BorderSide(color: colorScheme.primary),
+                      borderRadius: BorderRadius.circular(context.scale(12)),
+                    ),
                   ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(context), 
-              child: Text("CANCEL", style: TextStyle(color: Colors.white.withValues(alpha: 0.5)))
+              child: Text("CANCEL", style: TextStyle(color: colorScheme.onSurfaceVariant, fontSize: context.font(14)))
             ),
             ElevatedButton(
               onPressed: () => Navigator.pop(context, paymentController.text),
               style: ElevatedButton.styleFrom(
-                backgroundColor: _primary,
-                foregroundColor: Colors.white,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                backgroundColor: colorScheme.primary,
+                foregroundColor: colorScheme.onPrimary,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(context.scale(8))),
               ),
-              child: const Text("REGISTER"),
+              child: Text("REGISTER", style: TextStyle(fontSize: context.font(14))),
             ),
           ],
         ),
@@ -127,13 +129,14 @@ class _ManageEventsPageState extends State<ManageEventsPage> {
   }
 
   Future<void> _apiRegister(int eventId, String? paymentId) async {
+    final theme = context.theme;
     try {
       await ApiService.registerForStudentEvent(eventId, paymentId: paymentId);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text("Successfully registered for event!"),
-            backgroundColor: Colors.green,
+            backgroundColor: Color(0xFF10B981), // Emerald
           ),
         );
         _fetchEvents();
@@ -143,7 +146,7 @@ class _ManageEventsPageState extends State<ManageEventsPage> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text("Registration failed: $e"),
-            backgroundColor: Colors.redAccent,
+            backgroundColor: theme.colorScheme.error,
           ),
         );
       }
@@ -152,59 +155,59 @@ class _ManageEventsPageState extends State<ManageEventsPage> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = context.theme;
     return Scaffold(
-      backgroundColor: _bg,
       appBar: AppBar(
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.white),
-          onPressed: () => Navigator.pop(context),
-        ),
-        title: const Text(
-          "Explore Events",
-          style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white),
-        ),
+        title: const Text("Explore Events"),
       ),
       body: RefreshIndicator(
         onRefresh: _fetchEvents,
-        color: _primary,
-        backgroundColor: _card,
+        color: theme.colorScheme.primary,
         child: SingleChildScrollView(
           physics: const AlwaysScrollableScrollPhysics(),
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              _buildFilters(),
-              const SizedBox(height: 24),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          padding: context.pagePadding,
+          child: Center(
+            child: Container(
+              constraints: const BoxConstraints(maxWidth: 1200),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text(
-                    "Available Events",
-                    style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
+                  _buildFilters(),
+                  const SizedBox(height: 32),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        "Available Events",
+                        style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
+                      ),
+                      Text(
+                        "${_events.length} found",
+                        style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+                      ),
+                    ],
                   ),
-                  Text(
-                    "${_events.length} found",
-                    style: TextStyle(color: Colors.white.withValues(alpha: 0.5), fontSize: 13),
-                  ),
+                  const SizedBox(height: 24),
+                  _isLoading 
+                      ? Center(child: Padding(padding: EdgeInsets.all(context.scale(40)), child: CircularProgressIndicator(color: theme.colorScheme.primary)))
+                      : _events.isEmpty 
+                          ? _buildEmptyState()
+                          : GridView.builder(
+                              shrinkWrap: true,
+                              physics: const NeverScrollableScrollPhysics(),
+                              gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                                crossAxisCount: context.responsive(1, tablet: 2, desktop: 3),
+                                crossAxisSpacing: context.scale(20),
+                                mainAxisSpacing: context.scale(20),
+                                mainAxisExtent: context.scale(480),
+                              ),
+                              itemCount: _events.length,
+                              itemBuilder: (context, index) => _buildEventCard(_events[index]),
+                            ),
+                  const SizedBox(height: 40),
                 ],
               ),
-              const SizedBox(height: 16),
-              _isLoading 
-                  ? Center(child: Padding(padding: const EdgeInsets.all(40.0), child: CircularProgressIndicator(color: _primary)))
-                  : _events.isEmpty 
-                      ? _buildEmptyState()
-                      : ListView.separated(
-                          shrinkWrap: true,
-                          physics: const NeverScrollableScrollPhysics(),
-                          itemCount: _events.length,
-                          separatorBuilder: (context, index) => const SizedBox(height: 16),
-                          itemBuilder: (context, index) => _buildEventCard(_events[index]),
-                        ),
-              const SizedBox(height: 32),
-            ],
+            ),
           ),
         ),
       ),
@@ -212,109 +215,120 @@ class _ManageEventsPageState extends State<ManageEventsPage> {
   }
 
   Widget _buildFilters() {
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: _card,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
+    final theme = context.theme;
+    final colorScheme = theme.colorScheme;
+    return Card(
+      elevation: 0,
+      color: colorScheme.surfaceContainerLow,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(context.scale(16)),
+        side: BorderSide(color: colorScheme.outlineVariant.withValues(alpha: 0.5)),
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Icon(Icons.filter_list, color: _primary, size: 20),
-              const SizedBox(width: 10),
-              const Text("Filter Events", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)),
-            ],
-          ),
-          const SizedBox(height: 20),
-          Row(
-            children: [
-              Expanded(
-                child: _buildDropdown(
-                  "Status", 
-                  _status ?? "All Events", 
-                  ["All Events", "Upcoming", "Completed"], 
-                  (val) => setState(() => _status = val == "All Events" ? null : val)
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: _buildDropdown(
-                  "Type", 
-                  _type ?? "All Types", 
-                  ["All Types", "Paid", "Free"], 
-                  (val) => setState(() => _type = val == "All Types" ? null : val)
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 20),
-          Row(
-            children: [
-              Expanded(
-                child: OutlinedButton(
-                  onPressed: () {
-                    setState(() {
-                      _status = null;
-                      _type = null;
-                    });
-                    _fetchEvents();
-                  },
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: Colors.white,
-                    side: BorderSide(color: Colors.white.withValues(alpha: 0.2)),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                    padding: const EdgeInsets.symmetric(vertical: 14),
+      child: Padding(
+        padding: EdgeInsets.all(context.scale(24)),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(Icons.filter_list, color: colorScheme.primary, size: context.scale(24)),
+                SizedBox(width: context.scale(12)),
+                Text("Filter Events", style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold, fontSize: context.font(18))),
+              ],
+            ),
+            SizedBox(height: context.scale(24)),
+            LayoutBuilder(builder: (context, constraints) {
+              final isWide = constraints.maxWidth > 600;
+              return Wrap(
+                spacing: context.scale(20),
+                runSpacing: context.scale(16),
+                children: [
+                  SizedBox(
+                    width: isWide ? (constraints.maxWidth - context.scale(20)) / 2 : double.infinity,
+                    child: _buildDropdown(
+                      "Status", 
+                      _status ?? "All Events", 
+                      ["All Events", "Upcoming", "Completed"], 
+                      (val) => setState(() => _status = val == "All Events" ? null : val)
+                    ),
                   ),
-                  child: const Text("RESET"),
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: ElevatedButton(
-                  onPressed: _fetchEvents,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: _primary,
-                    foregroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                    padding: const EdgeInsets.symmetric(vertical: 14),
-                    elevation: 0,
+                  SizedBox(
+                    width: isWide ? (constraints.maxWidth - context.scale(20)) / 2 : double.infinity,
+                    child: _buildDropdown(
+                      "Type", 
+                      _type ?? "All Types", 
+                      ["All Types", "Paid", "Free"], 
+                      (val) => setState(() => _type = val == "All Types" ? null : val)
+                    ),
                   ),
-                  child: const Text("APPLY", style: TextStyle(fontWeight: FontWeight.bold)),
+                ],
+              );
+            }),
+            SizedBox(height: context.scale(24)),
+            Row(
+              children: [
+                const Spacer(flex: 2),
+                Expanded(
+                  child: OutlinedButton(
+                    onPressed: () {
+                      setState(() {
+                        _status = null;
+                        _type = null;
+                      });
+                      _fetchEvents();
+                    },
+                    style: OutlinedButton.styleFrom(
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(context.scale(12))),
+                      padding: EdgeInsets.symmetric(vertical: context.scale(16)),
+                    ),
+                    child: Text("RESET", style: TextStyle(fontSize: context.font(14))),
+                  ),
                 ),
-              ),
-            ],
-          ),
-        ],
+                SizedBox(width: context.scale(16)),
+                Expanded(
+                  child: ElevatedButton(
+                    onPressed: _fetchEvents,
+                    style: ElevatedButton.styleFrom(
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(context.scale(12))),
+                      padding: EdgeInsets.symmetric(vertical: context.scale(16)),
+                      elevation: 0,
+                    ),
+                    child: Text("APPLY", style: TextStyle(fontWeight: FontWeight.bold, fontSize: context.font(14))),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
       ),
     );
   }
 
   Widget _buildDropdown(String label, String value, List<String> items, Function(String?) onChanged) {
+    final theme = context.theme;
+    final colorScheme = theme.colorScheme;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(label, style: TextStyle(color: Colors.white.withValues(alpha: 0.5), fontSize: 12)),
-        const SizedBox(height: 8),
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 12),
-          decoration: BoxDecoration(
-            color: _bg.withValues(alpha: 0.5),
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
-          ),
-          child: DropdownButtonHideUnderline(
-            child: DropdownButton<String>(
-              value: items.contains(value) ? value : items.first,
-              dropdownColor: _card,
-              icon: const Icon(Icons.keyboard_arrow_down, color: Colors.white70, size: 20),
-              isExpanded: true,
-              style: const TextStyle(color: Colors.white, fontSize: 14),
-              items: items.map((e) => DropdownMenuItem(value: e, child: Text(e))).toList(),
-              onChanged: onChanged,
+        Text(label, style: theme.textTheme.labelSmall?.copyWith(color: colorScheme.onSurfaceVariant, fontWeight: FontWeight.bold, fontSize: context.font(12))),
+        SizedBox(height: context.scale(8)),
+        DropdownButtonFormField<String>(
+          initialValue: items.contains(value) ? value : items.first,
+          onChanged: onChanged,
+          dropdownColor: colorScheme.surfaceContainerLow,
+          items: items.map((e) => DropdownMenuItem(value: e, child: Text(e, style: TextStyle(fontSize: context.font(14))))).toList(),
+          decoration: InputDecoration(
+            isDense: true,
+            filled: true,
+            fillColor: colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
+            contentPadding: EdgeInsets.symmetric(horizontal: context.scale(16), vertical: context.scale(12)),
+            enabledBorder: OutlineInputBorder(
+              borderSide: BorderSide(color: colorScheme.outlineVariant),
+              borderRadius: BorderRadius.circular(context.scale(12)),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderSide: BorderSide(color: colorScheme.primary),
+              borderRadius: BorderRadius.circular(context.scale(12)),
             ),
           ),
         ),
@@ -323,6 +337,8 @@ class _ManageEventsPageState extends State<ManageEventsPage> {
   }
 
   Widget _buildEventCard(dynamic event) {
+    final theme = context.theme;
+    final colorScheme = theme.colorScheme;
     final eventDateStr = event['event_date'];
     String formattedDate = "N/A";
     if (eventDateStr != null) {
@@ -334,106 +350,111 @@ class _ManageEventsPageState extends State<ManageEventsPage> {
 
     final bool isPaid = event['is_ticketed'] == 1 || event['is_ticketed'] == true;
     final String price = isPaid ? "₹${event['ticket_price']}" : "FREE";
+    final primaryColor = colorScheme.primary;
 
-    return Container(
-      decoration: BoxDecoration(
-        color: _card,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
+    return Card(
+      elevation: 0,
+      clipBehavior: Clip.antiAlias,
+      color: colorScheme.surfaceContainerLow,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(context.scale(16)),
+        side: BorderSide(color: colorScheme.outlineVariant.withValues(alpha: 0.5)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Stack(
             children: [
-              ClipRRect(
-                borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
-                child: Container(
-                  height: 160,
-                  width: double.infinity,
-                  color: _headerRow,
-                  child: event['image'] != null
-                      ? Image.network(
-                          "${ApiService.baseUrl}/${event['image']}",
-                          fit: BoxFit.cover,
-                          errorBuilder: (context, error, stackTrace) => Icon(Icons.event_note, color: _primary.withValues(alpha: 0.2), size: 64),
-                        )
-                      : Icon(Icons.event_note, color: _primary.withValues(alpha: 0.2), size: 64),
-                ),
+              Container(
+                height: context.scale(180),
+                width: double.infinity,
+                color: colorScheme.surfaceContainerHighest,
+                child: event['image'] != null
+                    ? Image.network(
+                        "${ApiService.baseUrl}/${event['image']}",
+                        fit: BoxFit.cover,
+                        errorBuilder: (context, error, stackTrace) => Icon(Icons.event_note, color: primaryColor.withValues(alpha: 0.2), size: context.scale(64)),
+                      )
+                    : Icon(Icons.event_note, color: primaryColor.withValues(alpha: 0.2), size: context.scale(64)),
               ),
               Positioned(
-                top: 12,
-                right: 12,
+                top: context.scale(12),
+                right: context.scale(12),
                 child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  padding: EdgeInsets.symmetric(horizontal: context.scale(12), vertical: context.scale(8)),
                   decoration: BoxDecoration(
-                    color: isPaid ? Colors.orangeAccent : Colors.greenAccent,
-                    borderRadius: BorderRadius.circular(8),
+                    color: isPaid ? const Color(0xFFF59E0B) : const Color(0xFF10B981), // Amber : Emerald
+                    borderRadius: BorderRadius.circular(context.scale(8)),
+                    boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.1), blurRadius: context.scale(4))],
                   ),
                   child: Text(
                     price,
-                    style: const TextStyle(color: Colors.black, fontWeight: FontWeight.w900, fontSize: 12),
+                    style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: context.font(12)),
                   ),
                 ),
               ),
             ],
           ),
           Padding(
-            padding: const EdgeInsets.all(20),
+            padding: EdgeInsets.all(context.scale(20)),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
                   event['title'] ?? 'Untitled Event',
-                  style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 18),
+                  style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold, fontSize: context.font(20)),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                 ),
-                const SizedBox(height: 8),
+                SizedBox(height: context.scale(16)),
                 Row(
                   children: [
-                    Icon(Icons.calendar_today, size: 14, color: _primary),
-                    const SizedBox(width: 6),
-                    Text(formattedDate, style: TextStyle(color: Colors.white.withValues(alpha: 0.6), fontSize: 13)),
-                    const SizedBox(width: 16),
-                    Icon(Icons.access_time, size: 14, color: _primary),
-                    const SizedBox(width: 6),
-                    Text(event['start_time'] ?? 'N/A', style: TextStyle(color: Colors.white.withValues(alpha: 0.6), fontSize: 13)),
+                    Icon(Icons.calendar_today, size: context.scale(14), color: primaryColor),
+                    SizedBox(width: context.scale(8)),
+                    Text(formattedDate, style: theme.textTheme.bodySmall?.copyWith(color: colorScheme.onSurfaceVariant, fontSize: context.font(12))),
                   ],
                 ),
-                const SizedBox(height: 12),
+                SizedBox(height: context.scale(8)),
                 Row(
                   children: [
-                    Icon(Icons.location_on_outlined, size: 14, color: _primary),
-                    const SizedBox(width: 6),
+                    Icon(Icons.access_time, size: context.scale(14), color: primaryColor),
+                    SizedBox(width: context.scale(8)),
+                    Text(event['start_time'] ?? 'N/A', style: theme.textTheme.bodySmall?.copyWith(color: colorScheme.onSurfaceVariant, fontSize: context.font(12))),
+                  ],
+                ),
+                SizedBox(height: context.scale(8)),
+                Row(
+                  children: [
+                    Icon(Icons.location_on_outlined, size: context.scale(14), color: primaryColor),
+                    SizedBox(width: context.scale(8)),
                     Expanded(
                       child: Text(
                         event['venue'] ?? 'TBA',
-                        style: TextStyle(color: Colors.white.withValues(alpha: 0.6), fontSize: 13),
+                        style: theme.textTheme.bodySmall?.copyWith(color: colorScheme.onSurfaceVariant, fontSize: context.font(12)),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                       ),
                     ),
                   ],
                 ),
-                const SizedBox(height: 16),
+                SizedBox(height: context.scale(20)),
                 Text(
                   event['description'] ?? '',
-                  maxLines: 2,
+                  maxLines: 3,
                   overflow: TextOverflow.ellipsis,
-                  style: TextStyle(color: Colors.white.withValues(alpha: 0.7), fontSize: 13, height: 1.5),
+                  style: theme.textTheme.bodyMedium?.copyWith(height: 1.5, color: colorScheme.onSurfaceVariant, fontSize: context.font(14)),
                 ),
-                const SizedBox(height: 24),
+                SizedBox(height: context.scale(24)),
                 SizedBox(
                   width: double.infinity,
-                  height: 48,
+                  height: context.scale(48),
                   child: ElevatedButton(
                     onPressed: () => _registerForEvent(event),
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: _primary,
-                      foregroundColor: Colors.white,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(context.scale(12))),
                       elevation: 0,
                     ),
-                    child: const Text("REGISTER NOW", style: TextStyle(fontWeight: FontWeight.bold, letterSpacing: 1)),
+                    child: Text("REGISTER NOW", style: TextStyle(fontWeight: FontWeight.bold, letterSpacing: 1, fontSize: context.font(14))),
                   ),
                 ),
               ],
@@ -445,16 +466,18 @@ class _ManageEventsPageState extends State<ManageEventsPage> {
   }
 
   Widget _buildEmptyState() {
+    final theme = context.theme;
+    final colorScheme = theme.colorScheme;
     return Center(
       child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 64.0),
+        padding: EdgeInsets.symmetric(vertical: context.scale(80)),
         child: Column(
           children: [
-            Icon(Icons.event_busy_outlined, size: 64, color: Colors.white.withValues(alpha: 0.1)),
-            const SizedBox(height: 16),
-            const Text("No events found", style: TextStyle(color: Colors.white70, fontSize: 16)),
-            const SizedBox(height: 8),
-            Text("Try adjusting your filters", style: TextStyle(color: Colors.white.withValues(alpha: 0.4), fontSize: 13)),
+            Icon(Icons.event_busy_outlined, size: context.scale(64), color: colorScheme.outlineVariant),
+            SizedBox(height: context.scale(16)),
+            Text("No events found", style: theme.textTheme.titleMedium?.copyWith(color: colorScheme.onSurfaceVariant, fontSize: context.font(18))),
+            SizedBox(height: context.scale(8)),
+            Text("Try adjusting your filters", style: theme.textTheme.bodySmall?.copyWith(color: colorScheme.onSurfaceVariant.withValues(alpha: 0.5), fontSize: context.font(12))),
           ],
         ),
       ),
