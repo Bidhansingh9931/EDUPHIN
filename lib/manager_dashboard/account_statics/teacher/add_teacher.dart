@@ -1,8 +1,11 @@
 import 'dart:convert';
-import 'dart:io';
+import 'dart:typed_data';
 import 'package:eduphin/manager_dashboard/manager_dashboard.dart';
+import 'package:eduphin/models/new_employee.dart';
+import 'package:eduphin/models/new_student.dart';
 import 'package:eduphin/services/api_service.dart';
 import 'package:file_picker/file_picker.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
@@ -49,10 +52,11 @@ class _AddTeacherPageState extends State<AddTeacherPage> {
   String? _employmentType;
   DateTime? _joiningDate;
   String? _status;
-  File? _profileImage;
-  PlatformFile? _matriculationMarksheet;
-  PlatformFile? _intermediateMarksheet;
-  PlatformFile? _resume;
+  
+  AppFile? _profileImage;
+  AppFile? _matriculationMarksheet;
+  AppFile? _intermediateMarksheet;
+  AppFile? _resume;
 
   @override
   void dispose() {
@@ -86,18 +90,28 @@ class _AddTeacherPageState extends State<AddTeacherPage> {
     final picker = ImagePicker();
     final pickedFile = await picker.pickImage(source: ImageSource.gallery);
     if (pickedFile != null) {
+      final bytes = await pickedFile.readAsBytes();
       setState(() {
-        _profileImage = File(pickedFile.path);
+        _profileImage = AppFile(
+          name: pickedFile.name,
+          bytes: bytes,
+          path: kIsWeb ? null : pickedFile.path,
+        );
       });
     }
   }
 
-  Future<void> _pickFile(Function(PlatformFile) onFilePicked) async {
+  Future<void> _pickFile(Function(AppFile) onFilePicked) async {
     try {
-      FilePickerResult? result = await FilePicker.platform.pickFiles();
+      FilePickerResult? result = await FilePicker.platform.pickFiles(withData: true);
       if (result != null) {
+        final file = result.files.single;
         setState(() {
-          onFilePicked(result.files.single);
+          onFilePicked(AppFile(
+            name: file.name,
+            bytes: file.bytes,
+            path: kIsWeb ? null : file.path,
+          ));
         });
       }
     } catch (e) {
@@ -119,66 +133,48 @@ class _AddTeacherPageState extends State<AddTeacherPage> {
     });
 
     try {
-      final teacherData = {
-        'name': _fullNameController.text,
-        'email': _emailController.text,
-        'password': _newPasswordController.text,
-        'role_id': '5', // Teacher Role ID
-        'institute_id': '1', // This should be dynamic
-        'gender': _gender,
-        'date_of_birth': _dateOfBirth != null ? DateFormat('yyyy-MM-dd').format(_dateOfBirth!) : null,
-        'marital_status': _relationshipStatus,
-        'aadhar_number': _aadharController.text,
-        'phone': _phoneNumberController.text,
-        'alternate_phone': _alternateNumberController.text,
-        'address': _addressController.text,
-        'city': _cityController.text,
-        'state': _stateController.text,
-        'pincode': _pinCodeController.text,
-        'position': _positionController.text,
-        'employment_type': _employmentType,
-        'joining_date': _joiningDate != null ? DateFormat('yyyy-MM-dd').format(_joiningDate!) : null,
-        'experience': _experienceController.text,
-        'status': _status,
-        'reference': _referenceController.text,
-        'qualification': _qualificationController.text,
-        'matric_marks': _matriculationMarksController.text,
-        'inter_marks': _intermediateMarksController.text,
-        'bank_account_number': _bankAccountNumberController.text,
-        'ifsc_code': _ifscCodeController.text,
-        'bank_name': _bankNameController.text,
-        'branch': _branchController.text,
-        'emergency_contact_name': _emergencyContactNameController.text,
-        'emergency_contact_phone': _emergencyContactNumberController.text,
-      };
+      final employee = NewEmployee()
+        ..name = _fullNameController.text
+        ..email = _emailController.text
+        ..password = _newPasswordController.text
+        ..roleId = '5' // Teacher
+        ..gender = _gender
+        ..dob = _dateOfBirth
+        ..relationshipStatus = _relationshipStatus
+        ..aadharNumber = _aadharController.text
+        ..phone = _phoneNumberController.text
+        ..alternatePhone = _alternateNumberController.text
+        ..address = _addressController.text
+        ..city = _cityController.text
+        ..state = _stateController.text
+        ..pincode = _pinCodeController.text
+        ..position = _positionController.text
+        ..employmentType = _employmentType
+        ..joiningDate = _joiningDate
+        ..experience = _experienceController.text
+        ..status = _status
+        ..reference = _referenceController.text
+        ..qualification = _qualificationController.text
+        ..matricMarks = _matriculationMarksController.text
+        ..interMarks = _intermediateMarksController.text
+        ..bankAccountNumber = _bankAccountNumberController.text
+        ..ifscCode = _ifscCodeController.text
+        ..bankName = _bankNameController.text
+        ..branch = _branchController.text
+        ..emergencyContactName = _emergencyContactNameController.text
+        ..emergencyContactNumber = _emergencyContactNumberController.text
+        ..photo = _profileImage
+        ..matriculationMarksheet = _matriculationMarksheet
+        ..intermediateMarksheet = _intermediateMarksheet
+        ..resume = _resume;
 
-      if (_profileImage != null) {
-        final bytes = await _profileImage!.readAsBytes();
-        teacherData['photo'] = base64Encode(bytes);
-      }
-       if (_matriculationMarksheet != null) {
-        teacherData['matriculation_marksheet'] = base64Encode(_matriculationMarksheet!.bytes!);
-      }
-      if (_intermediateMarksheet != null) {
-        teacherData['intermediate_marksheet'] = base64Encode(_intermediateMarksheet!.bytes!);
-      }
-      if (_resume != null) {
-        teacherData['resume'] = base64Encode(_resume!.bytes!);
-      }
-
-      final response = await ApiService.post('manager/users', teacherData);
+      await ApiService.addEmployeeUser(employee);
 
       if (!mounted) return;
-      final responseData = jsonDecode(response.body);
-
-      if (response.statusCode >= 200 && response.statusCode < 300 && responseData['status'] == true) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(responseData['message'] ?? 'Teacher added successfully!')),
-        );
-        Navigator.pop(context, true);
-      } else {
-        throw Exception(responseData['message'] ?? 'Failed to add teacher');
-      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Teacher added successfully!')),
+      );
+      Navigator.pop(context, true);
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -399,7 +395,7 @@ class _AddTeacherPageState extends State<AddTeacherPage> {
     );
   }
 
-  Widget _buildFilePickerTile(String title, PlatformFile? file, VoidCallback onPickFile) {
+  Widget _buildFilePickerTile(String title, AppFile? file, VoidCallback onPickFile) {
     final theme = Theme.of(context);
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 8.0),
@@ -515,7 +511,7 @@ class _AddTeacherPageState extends State<AddTeacherPage> {
 }
 
 class _AddTeacherProfileBox extends StatelessWidget {
-  final File? image;
+  final AppFile? image;
   final VoidCallback onPickImage;
 
   const _AddTeacherProfileBox({this.image, required this.onPickImage});
@@ -530,7 +526,7 @@ class _AddTeacherProfileBox extends StatelessWidget {
           CircleAvatar(
             radius: screenSize.width * 0.15,
             backgroundColor: theme.colorScheme.surface,
-            backgroundImage: image != null ? FileImage(image!) : null,
+            backgroundImage: (image != null && image!.bytes != null) ? MemoryImage(image!.bytes!) : null,
             child: image == null
                 ? Icon(
                     Icons.person_add_alt_1_rounded,

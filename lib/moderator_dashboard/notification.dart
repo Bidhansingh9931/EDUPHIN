@@ -29,7 +29,7 @@ class _NotificationPageState extends State<NotificationPage> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
+    final theme = context.theme;
     final colorScheme = theme.colorScheme;
 
     return Scaffold(
@@ -38,9 +38,9 @@ class _NotificationPageState extends State<NotificationPage> {
         actions: [
           IconButton(
             onPressed: _refreshMessages,
-            icon: const Icon(Icons.refresh_rounded),
+            icon: Icon(Icons.refresh_rounded, size: context.scale(24)),
           ),
-          const SizedBox(width: 8),
+          SizedBox(width: context.scale(8)),
         ],
       ),
       body: RefreshIndicator(
@@ -55,10 +55,10 @@ class _NotificationPageState extends State<NotificationPage> {
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Icon(Icons.error_outline_rounded, size: 48, color: colorScheme.error),
-                    const SizedBox(height: 16),
+                    Icon(Icons.error_outline_rounded, size: context.scale(48), color: colorScheme.error),
+                    SizedBox(height: context.scale(16)),
                     Text('Failed to load messages', style: theme.textTheme.titleMedium),
-                    const SizedBox(height: 24),
+                    SizedBox(height: context.scale(24)),
                     ElevatedButton(onPressed: _refreshMessages, child: const Text("Retry")),
                   ],
                 ),
@@ -89,11 +89,11 @@ class _NotificationPageState extends State<NotificationPage> {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(Icons.mark_email_read_outlined, size: 64, color: theme.hintColor.withOpacity(0.3)),
-          const SizedBox(height: 16),
-          const Text("No messages yet", style: TextStyle(fontWeight: FontWeight.bold)),
-          const SizedBox(height: 8),
-          Text("Incoming messages will appear here", style: TextStyle(color: theme.hintColor)),
+          Icon(Icons.mark_email_read_outlined, size: context.scale(64), color: theme.hintColor.withValues(alpha: 0.3)),
+          SizedBox(height: context.scale(16)),
+          Text("No messages yet", style: TextStyle(fontWeight: FontWeight.bold, fontSize: context.font(16))),
+          SizedBox(height: context.scale(8)),
+          Text("Incoming messages will appear here", style: TextStyle(color: theme.hintColor, fontSize: context.font(14))),
         ],
       ),
     );
@@ -107,57 +107,57 @@ class MessageCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
+    final theme = context.theme;
     final colorScheme = theme.colorScheme;
 
     return Card(
-      margin: const EdgeInsets.only(bottom: 16),
+      margin: EdgeInsets.only(bottom: context.scale(16)),
       child: InkWell(
         onTap: () {},
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(context.scale(16)),
         child: Padding(
-          padding: const EdgeInsets.all(16),
+          padding: EdgeInsets.all(context.scale(16)),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Row(
                 children: [
                   CircleAvatar(
-                    radius: 24,
-                    backgroundColor: colorScheme.primary.withOpacity(0.1),
+                    radius: context.scale(24),
+                    backgroundColor: colorScheme.primary.withValues(alpha: 0.1),
                     child: Text(
                       msg.name.isNotEmpty ? msg.name[0].toUpperCase() : '',
-                      style: TextStyle(color: colorScheme.primary, fontWeight: FontWeight.bold, fontSize: 18),
+                      style: TextStyle(color: colorScheme.primary, fontWeight: FontWeight.bold, fontSize: context.font(18)),
                     ),
                   ),
-                  const SizedBox(width: 16),
+                  SizedBox(width: context.scale(16)),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
                           msg.name,
-                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                          style: TextStyle(fontWeight: FontWeight.bold, fontSize: context.font(16)),
                           overflow: TextOverflow.ellipsis,
                         ),
                         Text(
                           msg.title,
-                          style: TextStyle(color: theme.hintColor, fontSize: 13),
+                          style: TextStyle(color: theme.hintColor, fontSize: context.font(13)),
                           overflow: TextOverflow.ellipsis,
                         ),
                       ],
                     ),
                   ),
-                  const SizedBox(width: 8),
+                  SizedBox(width: context.scale(8)),
                   Text(
                     msg.time,
-                    style: TextStyle(color: theme.hintColor, fontSize: 11),
+                    style: TextStyle(color: theme.hintColor, fontSize: context.font(11)),
                   ),
                 ],
               ),
-              const SizedBox(height: 12),
+              SizedBox(height: context.scale(12)),
               const Divider(height: 1),
-              const SizedBox(height: 12),
+              SizedBox(height: context.scale(12)),
               Text(
                 msg.preview,
                 style: theme.textTheme.bodyMedium?.copyWith(height: 1.4),

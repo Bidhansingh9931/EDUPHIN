@@ -96,15 +96,13 @@ class _EventManagementPageState extends State<EventManagementPage> {
         audienceParam = 'all';
       }
 
-      final queryParams = {
+      final Map<String, String> queryParams = {
         if (statusParam != null) 'status': statusParam,
         if (typeParam != null) 'type': typeParam,
         if (audienceParam != null) 'audience': audienceParam,
       };
 
-      final endpoint = Uri(path: 'manager/events', queryParameters: queryParams.isNotEmpty ? queryParams : null).toString();
-
-      final response = await ApiService.get(endpoint);
+      final response = await ApiService.get('manager/events', queryParams);
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
@@ -119,14 +117,14 @@ class _EventManagementPageState extends State<EventManagementPage> {
 
         final List<Event> allEvents = eventData
             .map((json) {
-              try {
-                return Event.fromJson(json);
-              } catch (e) {
-                // Log the error and skip the invalid event
-                debugPrint("Error parsing event: ${e.toString()}");
-                return null;
-              }
-            })
+          try {
+            return Event.fromJson(json);
+          } catch (e) {
+            // Log the error and skip the invalid event
+            debugPrint("Error parsing event: ${e.toString()}");
+            return null;
+          }
+        })
             .where((event) => event != null)
             .cast<Event>()
             .toList();
@@ -149,7 +147,7 @@ class _EventManagementPageState extends State<EventManagementPage> {
         roles.addAll(roleData
             .map((role) => role['name']?.toString())
             .where((roleName) =>
-                roleName != null && roleName != 'Admin' && roleName != 'Super Admin')
+        roleName != null && roleName != 'Admin' && roleName != 'Super Admin')
             .cast<String>()
             .toList());
 
@@ -196,15 +194,15 @@ class _EventManagementPageState extends State<EventManagementPage> {
       backgroundColor: theme.scaffoldBackgroundColor,
       appBar: AppBar(
           title: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        crossAxisAlignment: CrossAxisAlignment.center,
-        children: [
-          Text("Event Management",
-              style: theme.textTheme.titleLarge
-                  ?.copyWith(color: theme.colorScheme.onSurface)),
-          Icon(Icons.download, color: theme.colorScheme.onSurface),
-        ],
-      )),
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              Text("Event Management",
+                  style: theme.textTheme.titleLarge
+                      ?.copyWith(color: theme.colorScheme.onSurface)),
+              Icon(Icons.download, color: theme.colorScheme.onSurface),
+            ],
+          )),
       body: Padding(
         padding: const EdgeInsets.fromLTRB(16, 16, 16, 50),
         child: Column(
@@ -244,18 +242,18 @@ class _EventManagementPageState extends State<EventManagementPage> {
               child: _isLoading
                   ? const Center(child: CircularProgressIndicator())
                   : _errorMessage.isNotEmpty
-                      ? Center(
-                          child: Text(_errorMessage,
-                              textAlign: TextAlign.center,
-                              style:
-                                  TextStyle(color: theme.colorScheme.error)))
-                      : LayoutBuilder(builder: (context, constraints) {
-                          if (constraints.maxWidth > 600) {
-                            return _buildWideLayout(context);
-                          } else {
-                            return _buildNarrowLayout(context);
-                          }
-                        }),
+                  ? Center(
+                  child: Text(_errorMessage,
+                      textAlign: TextAlign.center,
+                      style:
+                      TextStyle(color: theme.colorScheme.error)))
+                  : LayoutBuilder(builder: (context, constraints) {
+                if (constraints.maxWidth > 600) {
+                  return _buildWideLayout(context);
+                } else {
+                  return _buildNarrowLayout(context);
+                }
+              }),
             ),
           ],
         ),
@@ -270,26 +268,26 @@ class _EventManagementPageState extends State<EventManagementPage> {
       children: [
         _buildDropdown(
             theme, _selectedStatus, ['Status', 'Upcoming', 'Past'],
-            (newValue) {
-          setState(() {
-            _selectedStatus = newValue!;
-          });
-          _fetchEvents();
-        }),
+                (newValue) {
+              setState(() {
+                _selectedStatus = newValue!;
+              });
+              _fetchEvents();
+            }),
         _buildDropdown(theme, _selectedType, ['Type', 'Paid', 'Free'],
-            (newValue) {
-          setState(() {
-            _selectedType = newValue!;
-          });
-          _fetchEvents();
-        }),
+                (newValue) {
+              setState(() {
+                _selectedType = newValue!;
+              });
+              _fetchEvents();
+            }),
         _buildDropdown(theme, _selectedAudience, _audienceOptions,
-            (newValue) {
-          setState(() {
-            _selectedAudience = newValue!;
-          });
-          _fetchEvents();
-        }),
+                (newValue) {
+              setState(() {
+                _selectedAudience = newValue!;
+              });
+              _fetchEvents();
+            }),
       ],
     );
   }
@@ -345,7 +343,7 @@ class _EventManagementPageState extends State<EventManagementPage> {
           child: SingleChildScrollView(
             child: _upcomingEvents.isNotEmpty
                 ? _buildEventSection(
-                    context, "Upcoming Events", _upcomingEvents)
+                context, "Upcoming Events", _upcomingEvents)
                 : const Center(child: Text("No upcoming events.")),
           ),
         ),

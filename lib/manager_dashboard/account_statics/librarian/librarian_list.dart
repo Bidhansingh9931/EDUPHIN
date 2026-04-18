@@ -3,6 +3,7 @@ import 'dart:io';
 
 import 'package:csv/csv.dart';
 import 'package:eduphin/services/api_service.dart';
+import 'package:eduphin/services/common_widgets.dart';
 import 'package:eduphin/services/responsive_helper.dart';
 import 'package:flutter/material.dart';
 import 'package:open_file/open_file.dart';
@@ -14,14 +15,16 @@ class Librarian {
   final int id;
   final String name;
   final String designation;
+  final String? photo;
 
-  Librarian({required this.id, required this.name, required this.designation});
+  Librarian({required this.id, required this.name, required this.designation, this.photo});
 
   factory Librarian.fromJson(Map<String, dynamic> json) {
     return Librarian(
       id: json['id'] ?? 0,
       name: json['name'] ?? 'N/A',
       designation: json['designation'] ?? 'Librarian',
+      photo: json['photo'] ?? json['profile_image'],
     );
   }
 }
@@ -104,6 +107,7 @@ class _LibrarianListPageState extends State<LibrarianListPage> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = context.theme;
     return Scaffold(
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () async {
@@ -113,13 +117,13 @@ class _LibrarianListPageState extends State<LibrarianListPage> {
           );
           if (result == true && mounted) _fetchLibrarians();
         },
-        label: const Text("Add Librarian"),
-        icon: const Icon(Icons.add),
+        label: Text("Add Librarian", style: theme.textTheme.labelLarge?.copyWith(fontSize: context.font(14))),
+        icon: Icon(Icons.add, size: context.scale(20)),
       ),
       appBar: AppBar(
-        title: const Text("Librarian List"),
+        title: Text("Librarian List", style: theme.appBarTheme.titleTextStyle),
         actions: [
-          IconButton(icon: const Icon(Icons.download), onPressed: _downloadLibrarianList),
+          IconButton(icon: Icon(Icons.download, size: context.scale(24)), onPressed: _downloadLibrarianList),
         ],
       ),
       body: SafeArea(
@@ -129,11 +133,11 @@ class _LibrarianListPageState extends State<LibrarianListPage> {
             child: ConstrainedBox(
               constraints: const BoxConstraints(maxWidth: 1200),
               child: _isLoading
-                  ? const Center(child: Padding(padding: EdgeInsets.all(40), child: CircularProgressIndicator()))
+                  ? Center(child: Padding(padding: EdgeInsets.all(context.scale(40)), child: const CircularProgressIndicator()))
                   : _error.isNotEmpty
-                      ? Center(child: Text(_error))
+                      ? Center(child: Text(_error, style: theme.textTheme.bodyMedium?.copyWith(fontSize: context.font(14))))
                       : _librarians.isEmpty
-                          ? const Center(child: Text("No librarians found."))
+                          ? Center(child: Text("No librarians found.", style: theme.textTheme.bodyMedium?.copyWith(fontSize: context.font(14))))
                           : CustomLibrarianListBox(librarians: _librarians),
             ),
           ),
@@ -149,16 +153,20 @@ class CustomLibrarianListBox extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
+    final theme = context.theme;
     
     return Card(
+      elevation: 0,
+      margin: EdgeInsets.zero,
+      color: theme.cardColor,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(context.scale(12))),
       child: Padding(
         padding: EdgeInsets.all(context.spacing),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text("All Librarians", style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold)),
-            const SizedBox(height: 24),
+            Text("All Librarians", style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold, fontSize: context.font(20))),
+            SizedBox(height: context.scale(24)),
             LayoutBuilder(
               builder: (context, constraints) {
                 final crossAxisCount = context.responsive(1, tablet: 2, desktop: 3);
@@ -170,9 +178,9 @@ class CustomLibrarianListBox extends StatelessWidget {
                     itemCount: librarians.length,
                     gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
                       crossAxisCount: crossAxisCount,
-                      crossAxisSpacing: 16,
-                      mainAxisSpacing: 16,
-                      mainAxisExtent: 80,
+                      crossAxisSpacing: context.scale(16),
+                      mainAxisSpacing: context.scale(16),
+                      mainAxisExtent: context.scale(80),
                     ),
                     itemBuilder: (context, index) => _buildLibrarianItem(context, librarians[index]),
                   );
@@ -181,7 +189,7 @@ class CustomLibrarianListBox extends StatelessWidget {
                     shrinkWrap: true,
                     physics: const NeverScrollableScrollPhysics(),
                     itemCount: librarians.length,
-                    separatorBuilder: (context, index) => const SizedBox(height: 12),
+                    separatorBuilder: (context, index) => SizedBox(height: context.scale(12)),
                     itemBuilder: (context, index) => _buildLibrarianItem(context, librarians[index]),
                   );
                 }
@@ -194,35 +202,35 @@ class CustomLibrarianListBox extends StatelessWidget {
   }
 
   Widget _buildLibrarianItem(BuildContext context, Librarian librarian) {
-    final theme = Theme.of(context);
+    final theme = context.theme;
     return Container(
-      padding: const EdgeInsets.all(12),
+      padding: EdgeInsets.all(context.scale(12)),
       decoration: BoxDecoration(
         color: theme.colorScheme.surfaceContainerLow,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: theme.colorScheme.outline.withOpacity(0.05)),
+        borderRadius: BorderRadius.circular(context.scale(12)),
+        border: Border.all(color: theme.colorScheme.outline.withValues(alpha: 0.05)),
       ),
       child: Row(
         children: [
-          CircleAvatar(
-            radius: 24,
-            backgroundColor: theme.colorScheme.primary.withOpacity(0.1),
-            child: Icon(Icons.person, color: theme.colorScheme.primary),
+          ProfileAvatar(
+            radius: context.scale(24),
+            imageUrl: ApiService.getStorageUrl(librarian.photo),
           ),
-          const SizedBox(width: 16),
+          SizedBox(width: context.scale(16)),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Text(librarian.name, style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold), maxLines: 1, overflow: TextOverflow.ellipsis),
-                Text(librarian.designation, style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
+                Text(librarian.name, style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold, fontSize: context.font(16)), maxLines: 1, overflow: TextOverflow.ellipsis),
+                Text(librarian.designation, style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant, fontSize: context.font(12))),
               ],
             ),
           ),
-          Icon(Icons.chevron_right, color: theme.colorScheme.outline),
+          Icon(Icons.chevron_right, color: theme.colorScheme.outline, size: context.scale(20)),
         ],
       ),
     );
   }
 }
+

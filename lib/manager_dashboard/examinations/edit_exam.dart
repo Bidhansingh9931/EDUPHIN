@@ -1,6 +1,7 @@
 import 'dart:convert';
-
 import 'package:eduphin/services/api_service.dart';
+import 'package:eduphin/services/responsive_helper.dart';
+import 'package:eduphin/teacher/dashboard/common_widgets.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
@@ -34,6 +35,8 @@ class _EditExamPageState extends State<EditExamPage> {
   late final TextEditingController _examTypeController;
   late final TextEditingController _examCodeController;
   late final TextEditingController _descriptionController;
+  late final TextEditingController _startDateController;
+  late final TextEditingController _endDateController;
 
   DateTime? _startDate;
   DateTime? _endDate;
@@ -47,6 +50,8 @@ class _EditExamPageState extends State<EditExamPage> {
     _examTypeController = TextEditingController(text: widget.examType);
     _examCodeController = TextEditingController(text: widget.examCode);
     _descriptionController = TextEditingController(text: widget.description);
+    _startDateController = TextEditingController();
+    _endDateController = TextEditingController();
     _isActive = widget.isActive;
 
     final dates = widget.startEndDate.split(' - ');
@@ -54,6 +59,8 @@ class _EditExamPageState extends State<EditExamPage> {
       try {
         _startDate = DateFormat('dd MMM yyyy').parse(dates[0]);
         _endDate = DateFormat('dd MMM yyyy').parse(dates[1]);
+        _startDateController.text = DateFormat('dd-MM-yyyy').format(_startDate!);
+        _endDateController.text = DateFormat('dd-MM-yyyy').format(_endDate!);
       } catch (e) {
         // Handle format exception if parsing fails
       }
@@ -66,31 +73,13 @@ class _EditExamPageState extends State<EditExamPage> {
     _examTypeController.dispose();
     _examCodeController.dispose();
     _descriptionController.dispose();
+    _startDateController.dispose();
+    _endDateController.dispose();
     super.dispose();
   }
 
-  Future<void> _selectDate(BuildContext context, bool isStartDate) async {
-    final DateTime? picked = await showDatePicker(
-      context: context,
-      initialDate: isStartDate ? _startDate ?? DateTime.now() : _endDate ?? DateTime.now(),
-      firstDate: DateTime(2000),
-      lastDate: DateTime(2101),
-    );
-    if (picked != null) {
-      setState(() {
-        if (isStartDate) {
-          _startDate = picked;
-        } else {
-          _endDate = picked;
-        }
-      });
-    }
-  }
-
   Future<void> _updateExam() async {
-    if (!_formKey.currentState!.validate()) {
-      return;
-    }
+    if (!_formKey.currentState!.validate()) return;
 
     setState(() => _isSaving = true);
 
@@ -103,11 +92,14 @@ class _EditExamPageState extends State<EditExamPage> {
         'description': _descriptionController.text,
         'status': _isActive ? 'active' : 'inactive',
       };
-      if (_startDate != null) {
-        fields['start_date'] = DateFormat('yyyy-MM-dd').format(_startDate!);
+      
+      if (_startDateController.text.isNotEmpty) {
+        final date = DateFormat('dd-MM-yyyy').parse(_startDateController.text);
+        fields['start_date'] = DateFormat('yyyy-MM-dd').format(date);
       }
-      if (_endDate != null) {
-        fields['end_date'] = DateFormat('yyyy-MM-dd').format(_endDate!);
+      if (_endDateController.text.isNotEmpty) {
+        final date = DateFormat('dd-MM-yyyy').parse(_endDateController.text);
+        fields['end_date'] = DateFormat('yyyy-MM-dd').format(date);
       }
 
       final response = await ApiService.postMultipart('manager/exams/${widget.examId}', fields);
@@ -116,124 +108,132 @@ class _EditExamPageState extends State<EditExamPage> {
       if (!mounted) return;
 
       final responseData = jsonDecode(responseBody);
-      final theme = Theme.of(context);
-
       if (response.statusCode == 200 && responseData['status'] == true) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-              content: Text(responseData['message'] ?? 'Exam updated successfully!'),
-              backgroundColor: theme.colorScheme.primary),
+          SnackBar(content: Text(responseData['message'] ?? 'Exam updated successfully!')),
         );
         Navigator.pop(context, true);
       } else {
-        if (responseData.containsKey('errors')) {
-          final errors = responseData['errors'] as Map<String, dynamic>;
-          final errorMessages =
-              errors.values.map((e) => (e as List).first).join('\n');
-          throw Exception(errorMessages);
-        }
         throw Exception(responseData['message'] ?? 'Failed to update exam');
       }
     } catch (e) {
       if (mounted) {
-        final theme = Theme.of(context);
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-              content: Text(e.toString().replaceFirst("Exception: ", "")),
-              backgroundColor: theme.colorScheme.error),
+          SnackBar(content: Text(e.toString().replaceFirst("Exception: ", ""))),
         );
       }
     } finally {
-      if (mounted) {
-        setState(() => _isSaving = false);
-      }
+      if (mounted) setState(() => _isSaving = false);
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
+    final theme = context.theme;
     return Scaffold(
-      appBar: AppBar(title: const Text('Edit Exam')),
-      body: Form(
-        key: _formKey,
-        child: ListView(
-          padding: const EdgeInsets.fromLTRB(16, 16, 16, 80),
-          children: [
-            TextFormField(
-              controller: _examNameController,
-              decoration: const InputDecoration(labelText: 'Exam Name'),
-              validator: (value) =>
-                  value!.isEmpty ? 'Please enter an exam name' : null,
-            ),
-            TextFormField(
-              controller: _examTypeController,
-              decoration: const InputDecoration(labelText: 'Exam Type'),
-               validator: (value) =>
-                  value!.isEmpty ? 'Please enter an exam type' : null,
-            ),
-            TextFormField(
-              controller: _examCodeController,
-              decoration: const InputDecoration(labelText: 'Exam Code'),
-              validator: (value) =>
-                  value!.isEmpty ? 'Please enter an exam code' : null,
-            ),
-            TextFormField(
-              controller: _descriptionController,
-              decoration: const InputDecoration(labelText: 'Description'),
-              maxLines: 3,
-            ),
-            SwitchListTile(
-              title: const Text('Is Active'),
-              value: _isActive,
-              onChanged: (value) => setState(() => _isActive = value),
-              activeColor: theme.colorScheme.primary,
-            ),
-            ListTile(
-              title: Text(_startDate == null
-                  ? 'Select Start Date'
-                  : DateFormat('yyyy-MM-dd').format(_startDate!)),
-              trailing: Icon(Icons.calendar_today, color: theme.colorScheme.primary),
-              onTap: () => _selectDate(context, true),
-            ),
-            ListTile(
-              title: Text(_endDate == null
-                  ? 'Select End Date'
-                  : DateFormat('yyyy-MM-dd').format(_endDate!)),
-              trailing: Icon(Icons.calendar_today, color: theme.colorScheme.primary),
-              onTap: () => _selectDate(context, false),
-            ),
-          ],
-        ),
+      backgroundColor: theme.scaffoldBackgroundColor,
+      appBar: AppBar(
+        title: Text('Edit Exam', style: TextStyle(fontSize: context.font(20), fontWeight: FontWeight.bold)),
+        centerTitle: true,
       ),
-      floatingActionButton: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16.0),
-        child: SizedBox(
-          width: double.infinity,
-          child: ElevatedButton(
-            onPressed: _isSaving ? null : _updateExam,
-            style: ElevatedButton.styleFrom(
-              backgroundColor: theme.colorScheme.primary,
-              foregroundColor: theme.colorScheme.onPrimary,
-              padding: const EdgeInsets.symmetric(vertical: 16),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(10),
+      body: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 600),
+          child: SingleChildScrollView(
+            padding: context.pagePadding,
+            child: Form(
+              key: _formKey,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    "Exam Information",
+                    style: theme.textTheme.titleLarge?.copyWith(
+                      fontWeight: FontWeight.bold,
+                      fontSize: context.font(18),
+                    ),
+                  ),
+                  Text(
+                    "Update the exam details and configuration",
+                    style: theme.textTheme.labelSmall?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
+                      fontSize: context.font(11),
+                    ),
+                  ),
+                  SizedBox(height: context.md),
+                  buildFilterCard(
+                    context,
+                    children: [
+                      buildLabel(context, "Exam Name"),
+                      buildTextField(context, _examNameController, "e.g., Final Examination"),
+                      
+                      buildLabel(context, "Exam Type"),
+                      buildTextField(context, _examTypeController, "e.g., Written"),
+
+                      buildLabel(context, "Exam Code"),
+                      buildTextField(context, _examCodeController, "e.g., EXAM001"),
+
+                      buildLabel(context, "Description"),
+                      buildTextField(context, _descriptionController, "Enter description", maxLines: 3),
+
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                buildLabel(context, "Start Date"),
+                                buildDateField(context, _startDateController, "Select Date"),
+                              ],
+                            ),
+                          ),
+                          SizedBox(width: context.md),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                buildLabel(context, "End Date"),
+                                buildDateField(context, _endDateController, "Select Date"),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                      
+                      SizedBox(height: context.md),
+                      SwitchListTile(
+                        contentPadding: EdgeInsets.zero,
+                        title: Text('Is Active', style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600, fontSize: context.font(14))),
+                        value: _isActive,
+                        activeColor: theme.colorScheme.primary,
+                        onChanged: (value) => setState(() => _isActive = value),
+                      ),
+                      SizedBox(height: context.md),
+                    ],
+                  ),
+                  SizedBox(height: context.lg),
+                  if (_isSaving)
+                    const Center(child: CircularProgressIndicator())
+                  else
+                    buildActionButton(
+                      context,
+                      "Update Exam",
+                      _updateExam,
+                    ),
+                  SizedBox(height: context.md),
+                  buildActionButton(
+                    context,
+                    "Cancel",
+                    () => Navigator.pop(context),
+                    isPrimary: false,
+                  ),
+                  SizedBox(height: context.xl),
+                ],
               ),
             ),
-            child: _isSaving
-                ? SizedBox(
-                    height: 20,
-                    width: 20,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2,
-                      color: theme.colorScheme.onPrimary,
-                    ),
-                  )
-                : const Text('Update Exam'),
           ),
         ),
       ),
-      floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
     );
   }
 }

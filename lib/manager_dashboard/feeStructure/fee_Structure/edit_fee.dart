@@ -1,9 +1,9 @@
 import 'dart:convert';
-
 import 'package:eduphin/services/api_service.dart';
+import 'package:eduphin/services/responsive_helper.dart';
+import 'package:eduphin/teacher/dashboard/common_widgets.dart';
 import 'package:flutter/material.dart';
 
-// Model for Class data from API
 class ApiClass {
   final int id;
   final String name;
@@ -25,7 +25,7 @@ class EditFeePage extends StatefulWidget {
   final String description;
   final String applyTo;
   final bool isOptional;
-  final int? classId; // Make classId optional
+  final int? classId;
 
   const EditFeePage({
     super.key,
@@ -63,11 +63,11 @@ class _EditFeePageState extends State<EditFeePage> {
     _feeNameController = TextEditingController(text: widget.feeName);
     _amountController = TextEditingController(text: widget.amount);
     _descriptionController = TextEditingController(text: widget.description);
-    _applyTo = widget.applyTo;
+    _applyTo = widget.applyTo == 'class' ? "Class Specific" : "Entire Institute";
     _isOptional = widget.isOptional ? "Yes" : "No";
     _selectedClassId = widget.classId;
 
-    if (_applyTo == 'class') {
+    if (_applyTo == 'Class Specific') {
       _fetchClasses();
     } else {
       setState(() {
@@ -77,9 +77,7 @@ class _EditFeePageState extends State<EditFeePage> {
   }
 
   Future<void> _fetchClasses() async {
-    setState(() {
-      _isLoadingClasses = true;
-    });
+    setState(() => _isLoadingClasses = true);
     try {
       final response = await ApiService.get('manager/classes');
       if (!mounted) return;
@@ -116,22 +114,18 @@ class _EditFeePageState extends State<EditFeePage> {
   }
 
   Future<void> _updateFee() async {
-    if (!_formKey.currentState!.validate()) {
-      return;
-    }
-    if (_applyTo == 'class' && _selectedClassId == null) {
+    if (!_formKey.currentState!.validate()) return;
+    
+    if (_applyTo == 'Class Specific' && _selectedClassId == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Please select a class.')),
       );
       return;
     }
 
-    setState(() {
-      _isSaving = true;
-    });
+    setState(() => _isSaving = true);
 
     try {
-      // THE FIX: Sanitize the amount to remove any commas or symbols, then parse.
       final String cleanedAmount = _amountController.text.replaceAll(RegExp(r'[₹,]'), '');
       final int amount = (double.tryParse(cleanedAmount) ?? 0).toInt();
 
@@ -140,20 +134,18 @@ class _EditFeePageState extends State<EditFeePage> {
         'amount': amount.toString(),
         'description': _descriptionController.text,
         'is_optional': _isOptional == 'Yes',
-        if (_applyTo == 'class') 'class_id': _selectedClassId!.toString(),
+        if (_applyTo == 'Class Specific') 'class_id': _selectedClassId!.toString(),
       };
 
       final response = await ApiService.put('manager/fees/${widget.feeId}', body);
-
       if (!mounted) return;
 
       final responseData = jsonDecode(response.body);
-
       if (response.statusCode == 200 && responseData['status'] == true) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text(responseData['message'] ?? 'Fee updated successfully!')),
         );
-        Navigator.pop(context, true); // Pop with success
+        Navigator.pop(context, true);
       } else {
         throw Exception(responseData['message'] ?? 'Failed to update fee.');
       }
@@ -163,304 +155,147 @@ class _EditFeePageState extends State<EditFeePage> {
         SnackBar(content: Text(e.toString().replaceFirst('Exception: ', ''))),
       );
     } finally {
-      if (mounted) {
-        setState(() {
-          _isSaving = false;
-        });
-      }
+      if (mounted) setState(() => _isSaving = false);
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final screenSize = MediaQuery.of(context).size;
+    final theme = context.theme;
 
     return Scaffold(
-      floatingActionButton: Padding(
-        padding: EdgeInsets.symmetric(horizontal: screenSize.width * 0.04),
-        child: Row(
-          children: [
-            Expanded(
-              child: ElevatedButton.icon(
-                icon: _isSaving ? const SizedBox.shrink() : const Icon(Icons.check),
-                label: _isSaving
-                    ? const CircularProgressIndicator()
-                    : const Text("Update Fee"),
-                onPressed: _isSaving ? null : _updateFee,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: theme.colorScheme.primary,
-                  foregroundColor: theme.colorScheme.onPrimary,
-                  padding: EdgeInsets.symmetric(vertical: screenSize.height * 0.02),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                ),
-              ),
-            ),
-            SizedBox(width: screenSize.width * 0.04),
-            Expanded(
-              child: OutlinedButton(
-                onPressed: _isSaving ? null : () => Navigator.pop(context),
-                style: OutlinedButton.styleFrom(
-                  padding: EdgeInsets.symmetric(vertical: screenSize.height * 0.02),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  side: BorderSide(color: theme.dividerColor),
-                ),
-                child: Text("Cancel", style: theme.textTheme.labelLarge?.copyWith(color: theme.colorScheme.onSurface)),
-              ),
-            ),
-          ],
-        ),
-      ),
-      floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
       backgroundColor: theme.scaffoldBackgroundColor,
       appBar: AppBar(
-        title: const Text("Edit Fee"),
+        title: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text("Edit Fee", style: theme.textTheme.titleLarge?.copyWith(fontSize: context.font(18), fontWeight: FontWeight.bold)),
+            Text("Update existing fee details", style: theme.textTheme.labelSmall?.copyWith(color: theme.colorScheme.onSurfaceVariant, fontSize: context.font(11))),
+          ],
+        ),
+        centerTitle: false,
       ),
+      bottomNavigationBar: (_isLoadingClasses || _error.isNotEmpty)
+          ? null
+          : SafeArea(
+              child: Container(
+                padding: EdgeInsets.fromLTRB(context.spacing, context.scale(8), context.spacing, context.scale(16)),
+                decoration: BoxDecoration(
+                  color: theme.colorScheme.surface,
+                  border: Border(top: BorderSide(color: theme.colorScheme.outlineVariant.withValues(alpha: 0.5))),
+                ),
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 600),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: buildActionButton(
+                          context,
+                          "Cancel",
+                          () => Navigator.pop(context),
+                          isPrimary: false,
+                        ),
+                      ),
+                      SizedBox(width: context.spacing),
+                      Expanded(
+                        child: _isSaving
+                            ? const Center(child: CircularProgressIndicator())
+                            : buildActionButton(
+                                context,
+                                "Update Fee",
+                                _updateFee,
+                              ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
       body: _isLoadingClasses
           ? const Center(child: CircularProgressIndicator())
           : _error.isNotEmpty
-              ? Center(child: Text(_error, style: TextStyle(color: theme.colorScheme.error)))
-              : Padding(
-                  padding: EdgeInsets.fromLTRB(screenSize.width * 0.04, screenSize.width * 0.04, screenSize.width * 0.04, screenSize.height * 0.1),
-                  child: Form(
-                    key: _formKey,
-                    child: LayoutBuilder(builder: (context, constraints) {
-                      final isWide = constraints.maxWidth > 600;
-                      return SingleChildScrollView(
-                        child: isWide ? _buildWideLayout(theme) : _buildNarrowLayout(theme),
-                      );
-                    }),
+              ? Center(child: Text(_error))
+              : SingleChildScrollView(
+                  padding: context.pagePadding,
+                  child: Center(
+                    child: ConstrainedBox(
+                      constraints: const BoxConstraints(maxWidth: 600),
+                      child: Form(
+                        key: _formKey,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              "Fee Information",
+                              style: theme.textTheme.titleLarge?.copyWith(
+                                fontWeight: FontWeight.bold,
+                                fontSize: context.font(18),
+                              ),
+                            ),
+                            Text(
+                              "Modify the existing fee details below",
+                              style: theme.textTheme.labelSmall?.copyWith(
+                                color: theme.colorScheme.onSurfaceVariant,
+                                fontSize: context.font(11),
+                              ),
+                            ),
+                            SizedBox(height: context.md),
+                            buildFilterCard(
+                              context,
+                              children: [
+                                buildLabel(context, "Fee Name"),
+                                buildTextField(context, _feeNameController, "e.g., Annual Tuition Fee"),
+                                
+                                buildLabel(context, "Apply Fee To"),
+                                buildDropdown(
+                                  context,
+                                  ["Entire Institute", "Class Specific"],
+                                  _applyTo,
+                                  (val) {
+                                    if (val == 'Class Specific' && _classes.isEmpty) {
+                                      _fetchClasses();
+                                    }
+                                    setState(() => _applyTo = val!);
+                                  },
+                                ),
+
+                                if (_applyTo == "Class Specific") ...[
+                                  buildLabel(context, "Select Class"),
+                                  buildDropdown(
+                                    context,
+                                    _classes.map((c) => c.name).toList(),
+                                    _classes.any((c) => c.id == _selectedClassId) ? _classes.firstWhere((c) => c.id == _selectedClassId).name : null,
+                                    (val) {
+                                      if (val == null) return;
+                                      setState(() => _selectedClassId = _classes.firstWhere((c) => c.name == val).id);
+                                    },
+                                    hint: "Select a Class",
+                                  ),
+                                ],
+
+                                buildLabel(context, "Amount"),
+                                buildTextField(context, _amountController, "75,000"),
+
+                                buildLabel(context, "Is Optional?"),
+                                buildDropdown(
+                                  context,
+                                  ["Yes", "No"],
+                                  _isOptional,
+                                  (val) => setState(() => _isOptional = val!),
+                                ),
+
+                                buildLabel(context, "Description"),
+                                buildTextField(context, _descriptionController, "Enter a brief description", maxLines: 3),
+                                SizedBox(height: context.md),
+                              ],
+                            ),
+                            SizedBox(height: context.xl),
+                          ],
+                        ),
+                      ),
+                    ),
                   ),
                 ),
-    );
-  }
-
-  Widget _buildNarrowLayout(ThemeData theme) {
-    final screenSize = MediaQuery.of(context).size;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        _buildApplyToCard(theme),
-        SizedBox(height: screenSize.height * 0.02),
-        _buildFeeDetailsCard(theme),
-        SizedBox(height: screenSize.height * 0.02),
-        _buildIsOptionalCard(theme),
-        SizedBox(height: screenSize.height * 0.1), // Padding for FAB
-      ],
-    );
-  }
-
-  Widget _buildWideLayout(ThemeData theme) {
-    final screenSize = MediaQuery.of(context).size;
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Expanded(
-          flex: 2,
-          child: _buildFeeDetailsCard(theme),
-        ),
-        SizedBox(width: screenSize.width * 0.04),
-        Expanded(
-          flex: 1,
-          child: Column(
-            children: [
-              _buildApplyToCard(theme),
-              SizedBox(height: screenSize.height * 0.02),
-              _buildIsOptionalCard(theme),
-            ],
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildApplyToCard(ThemeData theme) {
-    return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: theme.cardColor,
-        borderRadius: BorderRadius.circular(16),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            "Apply fee to:",
-            style: theme.textTheme.titleMedium?.copyWith(color: theme.colorScheme.onSurface),
-          ),
-          const SizedBox(height: 12),
-          Row(
-            children: [
-              _buildToggleButton(theme, "Entire\nInstitute", "institute", _applyTo == "institute",
-                  () => setState(() => _applyTo = "institute")),
-              const SizedBox(width: 12),
-              _buildToggleButton(theme, "Class\nSpecific", "class", _applyTo == "class",
-                  () {
-                if (_applyTo != 'class') {
-                  _fetchClasses();
-                }
-                setState(() => _applyTo = "class");
-              }),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildFeeDetailsCard(ThemeData theme) {
-    final screenSize = MediaQuery.of(context).size;
-    return Container(
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(10),
-        color: theme.cardColor,
-      ),
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          _buildTextField(theme, "Fee Name", _feeNameController, "e.g., Annual Tuition Fee",
-              (value) => value!.isEmpty ? 'Fee name is required' : null),
-          SizedBox(height: screenSize.height * 0.02),
-           if (_applyTo == 'class') ...[
-            Text(
-              "Select Class",
-              style: theme.textTheme.titleMedium
-                  ?.copyWith(color: theme.colorScheme.onSurface),
-            ),
-            SizedBox(height: screenSize.height * 0.01),
-            DropdownButtonFormField<int>(
-              value: _selectedClassId,
-              items: _classes.map((apiClass) {
-                return DropdownMenuItem<int>(
-                  value: apiClass.id,
-                  child: Text(apiClass.name),
-                );
-              }).toList(),
-              onChanged: (value) {
-                setState(() {
-                  _selectedClassId = value;
-                });
-              },
-              hint: const Text("Select a Class"),
-              decoration: InputDecoration(
-                filled: true,
-                fillColor: theme.colorScheme.surface,
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(10),
-                  borderSide: BorderSide.none,
-                ),
-              ),
-              validator: (value) {
-                if (_applyTo == 'class' && value == null) {
-                  return 'Please select a class';
-                }
-                return null;
-              },
-            ),
-            SizedBox(height: screenSize.height * 0.02),
-          ],
-          _buildTextField(theme, "Amount", _amountController, "75,000",
-              (value) => value!.isEmpty ? 'Amount is required' : null,
-              keyboardType: TextInputType.number),
-          SizedBox(height: screenSize.height * 0.02),
-          _buildTextField(theme, "Description", _descriptionController, "Enter a brief description", null,
-              maxLines: 3),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildIsOptionalCard(ThemeData theme) {
-    return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: theme.cardColor,
-        borderRadius: BorderRadius.circular(16),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            "Is Optional?",
-            style: theme.textTheme.titleMedium?.copyWith(color: theme.colorScheme.onSurface),
-          ),
-          const SizedBox(height: 12),
-          Row(
-            children: [
-              _buildToggleButton(theme, "Yes", "Yes", _isOptional == "Yes",
-                  () => setState(() => _isOptional = "Yes")),
-              const SizedBox(width: 12),
-              _buildToggleButton(
-                  theme, "No", "No", _isOptional == "No", () => setState(() => _isOptional = "No")),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildToggleButton(
-      ThemeData theme, String text, String value, bool isSelected, VoidCallback onTap) {
-    return Expanded(
-      child: GestureDetector(
-        onTap: onTap,
-        child: Container(
-          padding: const EdgeInsets.symmetric(vertical: 14),
-          decoration: BoxDecoration(
-            color: isSelected ? theme.colorScheme.primary : theme.scaffoldBackgroundColor,
-            borderRadius: BorderRadius.circular(14),
-            border: isSelected
-                ? Border.all(color: theme.colorScheme.primaryContainer, width: 2)
-                : Border.all(color: theme.dividerColor, width: 1),
-          ),
-          child: Center(
-            child: Text(
-              text,
-              textAlign: TextAlign.center,
-              style: theme.textTheme.labelLarge?.copyWith(
-                color: isSelected ? theme.colorScheme.onPrimary : theme.colorScheme.onSurface,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildTextField(ThemeData theme, String label, TextEditingController controller, String hintText,
-      String? Function(String?)? validator, {int? maxLines = 1, TextInputType? keyboardType}) {
-    final screenSize = MediaQuery.of(context).size;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          label,
-          style: theme.textTheme.titleMedium?.copyWith(color: theme.colorScheme.onSurface),
-        ),
-        SizedBox(height: screenSize.height * 0.01),
-        TextFormField(
-          controller: controller,
-          validator: validator,
-          maxLines: maxLines,
-          keyboardType: keyboardType,
-          decoration: InputDecoration(
-            hintText: hintText,
-            hintStyle: TextStyle(color: theme.hintColor),
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(10),
-              borderSide: BorderSide.none,
-            ),
-            filled: true,
-            fillColor: theme.colorScheme.surface,
-          ),
-        ),
-      ],
     );
   }
 }

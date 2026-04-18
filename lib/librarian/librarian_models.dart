@@ -91,18 +91,26 @@ class UserDetail {
   });
 
   factory UserDetail.fromJson(Map<String, dynamic> json) {
+    // Robustly find user data which might be nested
+    final userData = json['user'] ?? json['account'] ?? {};
+    
     return UserDetail(
       id: int.tryParse(json['id']?.toString() ?? '0') ?? 0,
-      userId: int.tryParse(json['user_id']?.toString() ?? '0') ?? 0,
-      firstName: json['first_name']?.toString(),
-      lastName: json['last_name']?.toString(),
-      photo: json['photo']?.toString(),
-      employeeId: json['employee_id']?.toString(),
-      email: json['email']?.toString(),
-      phone: json['phone']?.toString(),
+      userId: int.tryParse((json['user_id'] ?? userData['id'])?.toString() ?? '0') ?? 0,
+      firstName: (json['first_name'] ?? json['name'] ?? userData['first_name'] ?? userData['name'])?.toString(),
+      lastName: (json['last_name'] ?? userData['last_name'])?.toString(),
+      photo: (json['photo'] ?? 
+              userData['photo'] ?? 
+              json['profile_image'] ?? 
+              userData['profile_image'] ?? 
+              json['image'] ?? 
+              json['avatar'])?.toString(),
+      employeeId: (json['employee_id'] ?? json['employeeId'] ?? userData['employee_id'])?.toString(),
+      email: (json['email'] ?? userData['email'])?.toString(),
+      phone: (json['phone'] ?? userData['phone'])?.toString(),
       address: json['address']?.toString(),
       gender: json['gender']?.toString(),
-      dob: json['date_of_birth']?.toString(),
+      dob: (json['date_of_birth'] ?? json['dob'])?.toString(),
       city: json['city']?.toString(),
       state: json['state']?.toString(),
       pincode: json['pincode']?.toString(),

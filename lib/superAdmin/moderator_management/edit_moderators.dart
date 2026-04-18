@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'package:eduphin/services/responsive_helper.dart';
+import 'package:eduphin/services/theme_service.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import '../../services/api_service.dart';
@@ -13,6 +14,8 @@ class EditModeratorScreen extends StatefulWidget {
 }
 
 class _EditModeratorScreenState extends State<EditModeratorScreen> {
+  final _formKey = GlobalKey<FormState>();
+
   final _nameController = TextEditingController();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
@@ -86,6 +89,7 @@ class _EditModeratorScreenState extends State<EditModeratorScreen> {
   }
 
   Future<void> _update() async {
+    if (!_formKey.currentState!.validate()) return;
     setState(() => _isSaving = true);
     try {
       final Map<String, String> fields = {
@@ -123,7 +127,10 @@ class _EditModeratorScreenState extends State<EditModeratorScreen> {
       if (_photo != null) files = {'photo': _photo!};
 
       await ApiService.updateModerate(widget.moderator['id'].toString(), fields, files: files);
-      if (mounted) Navigator.pop(context, true);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Moderator updated successfully")));
+        Navigator.pop(context, true);
+      }
     } catch (e) {
       if (mounted) {
         setState(() => _isSaving = false);
@@ -134,9 +141,10 @@ class _EditModeratorScreenState extends State<EditModeratorScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = context.theme;
     return Scaffold(
       appBar: AppBar(
-        title: const Text("Edit Moderator"),
+        title: Text("Edit Moderator", style: TextStyle(fontSize: context.font(20), fontWeight: FontWeight.bold)),
       ),
       body: _isSaving
           ? const Center(child: CircularProgressIndicator())
@@ -145,64 +153,73 @@ class _EditModeratorScreenState extends State<EditModeratorScreen> {
               child: Center(
                 child: ConstrainedBox(
                   constraints: const BoxConstraints(maxWidth: 800),
-                  child: Column(
-                    children: [
-                      _buildSection(
-                        context,
-                        title: "Account Info",
-                        children: [
-                          _buildTextField(context, "Name *", _nameController, Icons.person_outline),
-                          _buildTextField(context, "Email *", _emailController, Icons.email_outlined),
-                          _buildTextField(context, "New Password", _passwordController, Icons.lock_outline, isPassword: true),
-                        ],
-                      ),
-                      _buildSection(
-                        context,
-                        title: "Personal Info",
-                        children: [
-                          _buildResponsiveRow(context, [
-                            _buildDropdown(context, "Gender *", _gender, ["Male", "Female", "Other"], (v) => setState(() => _gender = v!)),
-                            _buildTextField(context, "DOB (YYYY-MM-DD) *", _dobController, Icons.calendar_today),
-                          ]),
-                          _buildResponsiveRow(context, [
-                            _buildTextField(context, "Phone *", _phoneController, Icons.phone_android),
-                            _buildTextField(context, "Aadhar Number *", _aadharNumberController, Icons.fingerprint),
-                          ]),
-                          _buildFilePicker(context, "New Photo"),
-                        ],
-                      ),
-                      _buildSection(
-                        context,
-                        title: "Address",
-                        children: [
-                          _buildTextField(context, "Address *", _addressController, Icons.location_on_outlined, maxLines: 2),
-                          _buildResponsiveRow(context, [
-                            _buildTextField(context, "City *", _cityController, Icons.location_city),
-                            _buildTextField(context, "State *", _stateController, Icons.map_outlined),
-                          ]),
-                          _buildTextField(context, "Pincode *", _pincodeController, Icons.pin_drop_outlined),
-                        ],
-                      ),
-                      const SizedBox(height: 32),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: OutlinedButton(
-                              onPressed: () => Navigator.pop(context),
-                              child: const Text("CANCEL"),
+                  child: Form(
+                    key: _formKey,
+                    child: Column(
+                      children: [
+                        _buildSection(
+                          context,
+                          title: "Account Info",
+                          children: [
+                            _buildTextField(context, "Name *", _nameController, Icons.person_outline),
+                            _buildTextField(context, "Email *", _emailController, Icons.email_outlined),
+                            _buildTextField(context, "New Password", _passwordController, Icons.lock_outline, isPassword: true, required: false),
+                          ],
+                        ),
+                        _buildSection(
+                          context,
+                          title: "Personal Info",
+                          children: [
+                            _buildResponsiveRow(context, [
+                              _buildDropdown(context, "Gender *", _gender, ["Male", "Female", "Other"], (v) => setState(() => _gender = v!)),
+                              _buildTextField(context, "DOB (YYYY-MM-DD) *", _dobController, Icons.calendar_today),
+                            ]),
+                            _buildResponsiveRow(context, [
+                              _buildTextField(context, "Phone *", _phoneController, Icons.phone_android),
+                              _buildTextField(context, "Aadhar Number *", _aadharNumberController, Icons.fingerprint),
+                            ]),
+                            _buildFilePicker(context, "New Photo"),
+                          ],
+                        ),
+                        _buildSection(
+                          context,
+                          title: "Address",
+                          children: [
+                            _buildTextField(context, "Address *", _addressController, Icons.location_on_outlined, maxLines: 2),
+                            _buildResponsiveRow(context, [
+                              _buildTextField(context, "City *", _cityController, Icons.location_city),
+                              _buildTextField(context, "State *", _stateController, Icons.map_outlined),
+                            ]),
+                            _buildTextField(context, "Pincode *", _pincodeController, Icons.pin_drop_outlined),
+                          ],
+                        ),
+                        SizedBox(height: context.scale(32)),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: OutlinedButton(
+                                onPressed: () => Navigator.pop(context),
+                                style: OutlinedButton.styleFrom(
+                                  padding: EdgeInsets.symmetric(vertical: context.scale(12)),
+                                ),
+                                child: Text("CANCEL", style: TextStyle(fontSize: context.font(14))),
+                              ),
                             ),
-                          ),
-                          const SizedBox(width: 16),
-                          Expanded(
-                            child: ElevatedButton(
-                              onPressed: _isSaving ? null : _update,
-                              child: const Text("UPDATE DETAILS"),
+                            SizedBox(width: context.scale(16)),
+                            Expanded(
+                              child: ElevatedButton(
+                                onPressed: _isSaving ? null : _update,
+                                style: ElevatedButton.styleFrom(
+                                  padding: EdgeInsets.symmetric(vertical: context.scale(12)),
+                                ),
+                                child: Text("UPDATE DETAILS", style: TextStyle(fontSize: context.font(14))),
+                              ),
                             ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 40),
-                    ],
+                          ],
+                        ),
+                        SizedBox(height: context.scale(40)),
+                      ],
+                    ),
                   ),
                 ),
               ),
@@ -211,50 +228,58 @@ class _EditModeratorScreenState extends State<EditModeratorScreen> {
   }
 
   Widget _buildSection(BuildContext context, {required String title, required List<Widget> children}) {
-    final theme = Theme.of(context);
+    final theme = context.theme;
     return Card(
-      margin: const EdgeInsets.only(bottom: 24),
+      elevation: 0,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(context.scale(16)),
+        side: BorderSide(color: theme.dividerColor.withValues(alpha: 0.1)),
+      ),
+      margin: EdgeInsets.only(bottom: context.scale(24)),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Container(
             width: double.infinity,
-            padding: const EdgeInsets.all(16),
+            padding: EdgeInsets.all(context.scale(16)),
             decoration: BoxDecoration(
               color: theme.colorScheme.primary.withValues(alpha: 0.05),
-              borderRadius: const BorderRadius.only(topLeft: Radius.circular(16), topRight: Radius.circular(16)),
+              borderRadius: BorderRadius.only(topLeft: Radius.circular(context.scale(16)), topRight: Radius.circular(context.scale(16))),
             ),
-            child: Text(title, style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold, color: theme.colorScheme.primary)),
+            child: Text(title, style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold, color: theme.colorScheme.primary, fontSize: context.font(16))),
           ),
-          Padding(padding: const EdgeInsets.all(16), child: Column(children: children)),
+          Padding(padding: EdgeInsets.all(context.scale(16)), child: Column(children: children)),
         ],
       ),
     );
   }
 
   Widget _buildResponsiveRow(BuildContext context, List<Widget> children) {
-    if (!context.isTablet) return Column(children: children);
+    if (context.isMobile) return Column(children: children);
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
-      children: children.map((c) => Expanded(child: Padding(padding: const EdgeInsets.only(right: 12), child: c))).toList(),
+      children: children.map((c) => Expanded(child: Padding(padding: EdgeInsets.only(right: context.scale(12)), child: c))).toList(),
     );
   }
 
-  Widget _buildTextField(BuildContext context, String label, TextEditingController controller, IconData icon, {int maxLines = 1, bool isPassword = false}) {
-    final theme = Theme.of(context);
+  Widget _buildTextField(BuildContext context, String label, TextEditingController controller, IconData icon, {int maxLines = 1, bool isPassword = false, bool required = true}) {
+    final theme = context.theme;
     return Padding(
-      padding: const EdgeInsets.only(bottom: 16),
+      padding: EdgeInsets.only(bottom: context.scale(16)),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(label, style: theme.textTheme.labelMedium?.copyWith(color: theme.hintColor)),
-          const SizedBox(height: 8),
-          TextField(
+          Text(label, style: theme.textTheme.labelMedium?.copyWith(color: theme.hintColor, fontSize: context.font(12))),
+          SizedBox(height: context.scale(8)),
+          TextFormField(
             controller: controller,
             maxLines: maxLines,
             obscureText: isPassword,
+            style: TextStyle(fontSize: context.font(14)),
+            validator: required ? (v) => v == null || v.isEmpty ? "Required" : null : null,
             decoration: InputDecoration(
-              prefixIcon: Icon(icon, size: 18),
+              prefixIcon: Icon(icon, size: context.scale(18)),
+              contentPadding: EdgeInsets.all(context.scale(12)),
             ),
           ),
         ],
@@ -263,20 +288,24 @@ class _EditModeratorScreenState extends State<EditModeratorScreen> {
   }
 
   Widget _buildDropdown(BuildContext context, String label, String value, List<String> items, ValueChanged<String?> onChanged) {
-    final theme = Theme.of(context);
+    final theme = context.theme;
     return Padding(
-      padding: const EdgeInsets.only(bottom: 16),
+      padding: EdgeInsets.only(bottom: context.scale(16)),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(label, style: theme.textTheme.labelMedium?.copyWith(color: theme.hintColor)),
-          const SizedBox(height: 8),
+          Text(label, style: theme.textTheme.labelMedium?.copyWith(color: theme.hintColor, fontSize: context.font(12))),
+          SizedBox(height: context.scale(8)),
           DropdownButtonFormField<String>(
             isExpanded: true,
             value: value,
-            items: items.map((e) => DropdownMenuItem(value: e, child: Text(e, style: const TextStyle(fontSize: 13)))).toList(),
+            style: TextStyle(fontSize: context.font(14), color: theme.textTheme.bodyMedium?.color),
+            items: items.map((e) => DropdownMenuItem(value: e, child: Text(e.toUpperCase(), style: TextStyle(fontSize: context.font(12))))).toList(),
             onChanged: onChanged,
-            decoration: const InputDecoration(prefixIcon: Icon(Icons.list, size: 18)),
+            decoration: InputDecoration(
+              prefixIcon: Icon(Icons.list, size: context.scale(18)),
+              contentPadding: EdgeInsets.all(context.scale(12)),
+            ),
           ),
         ],
       ),
@@ -284,36 +313,36 @@ class _EditModeratorScreenState extends State<EditModeratorScreen> {
   }
 
   Widget _buildFilePicker(BuildContext context, String label) {
-    final theme = Theme.of(context);
+    final theme = context.theme;
     return Padding(
-      padding: const EdgeInsets.only(bottom: 16),
+      padding: EdgeInsets.only(bottom: context.scale(16)),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(label, style: theme.textTheme.labelMedium?.copyWith(color: theme.hintColor)),
-          const SizedBox(height: 8),
+          Text(label, style: theme.textTheme.labelMedium?.copyWith(color: theme.hintColor, fontSize: context.font(12))),
+          SizedBox(height: context.scale(8)),
           InkWell(
             onTap: _pickImage,
-            borderRadius: BorderRadius.circular(12),
+            borderRadius: BorderRadius.circular(context.scale(12)),
             child: Container(
-              height: 56,
+              height: context.scale(56),
               decoration: BoxDecoration(
                 color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: BorderRadius.circular(context.scale(12)),
                 border: Border.all(color: theme.colorScheme.outline.withValues(alpha: 0.2)),
               ),
               child: Row(
                 children: [
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    padding: EdgeInsets.symmetric(horizontal: context.scale(16)),
                     decoration: BoxDecoration(
                       color: theme.colorScheme.primary.withValues(alpha: 0.1),
-                      borderRadius: const BorderRadius.only(topLeft: Radius.circular(12), bottomLeft: Radius.circular(12)),
+                      borderRadius: BorderRadius.only(topLeft: Radius.circular(context.scale(12)), bottomLeft: Radius.circular(context.scale(12))),
                     ),
                     alignment: Alignment.center,
-                    child: Text("Choose Photo", style: TextStyle(color: theme.colorScheme.primary, fontWeight: FontWeight.bold, fontSize: 13)),
+                    child: Text("Choose Photo", style: TextStyle(color: theme.colorScheme.primary, fontWeight: FontWeight.bold, fontSize: context.font(13))),
                   ),
-                  Expanded(child: Padding(padding: const EdgeInsets.only(left: 12), child: Text(_photo == null ? "No file chosen" : "Photo Selected", style: TextStyle(color: theme.hintColor, fontSize: 13)))),
+                  Expanded(child: Padding(padding: EdgeInsets.only(left: context.scale(12)), child: Text(_photo == null ? "No file chosen" : "Photo Selected", style: TextStyle(color: theme.hintColor, fontSize: context.font(13))))),
                 ],
               ),
             ),

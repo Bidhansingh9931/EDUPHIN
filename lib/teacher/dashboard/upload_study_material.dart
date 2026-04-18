@@ -1,5 +1,11 @@
+import 'dart:convert';
+import 'dart:io';
+import 'package:eduphin/services/api_service.dart';
 import 'package:eduphin/services/responsive_helper.dart';
+import 'package:file_picker/file_picker.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'common_widgets.dart';
 
 class Uploadstudymaterial extends StatefulWidget {
   const Uploadstudymaterial({super.key});
@@ -11,10 +17,118 @@ class Uploadstudymaterial extends StatefulWidget {
 class _UploadAssignmentPageState extends State<Uploadstudymaterial> {
   final _formKey = GlobalKey<FormState>();
 
-  String? selectedSchedule;
+  List<dynamic> schedules = [];
+  dynamic selectedSchedule;
   final titleController = TextEditingController();
   final descController = TextEditingController();
-  final dueDateController = TextEditingController();
+
+  File? selectedFile;
+  Uint8List? selectedFileBytes;
+  String? fileName;
+  bool isLoading = false;
+  bool isFetchingSchedules = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchSchedules();
+  }
+
+  Future<void> _fetchSchedules() async {
+    try {
+      final data = await ApiService.get('teacher/notes');
+      if (data.statusCode == 200) {
+        final Map<String, dynamic> body = jsonDecode(data.body);
+        setState(() {
+          schedules = body['schedules'] ?? [];
+          isFetchingSchedules = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text("Error fetching schedules: $e")),
+        );
+      }
+      setState(() => isFetchingSchedules = false);
+    }
+  }
+
+  Future<void> _pickFile() async {
+    final result = await FilePicker.platform.pickFiles(
+      type: FileType.custom,
+      allowedExtensions: ['pdf', 'doc', 'docx', 'ppt', 'pptx', 'jpg', 'jpeg', 'png', 'mp4', 'avi', 'mkv'],
+    );
+
+    if (result != null) {
+      setState(() {
+        fileName = result.files.single.name;
+        if (kIsWeb) {
+          selectedFileBytes = result.files.single.bytes;
+        } else {
+          selectedFile = File(result.files.single.path!);
+        }
+      });
+    }
+  }
+
+  Future<void> _uploadMaterial() async {
+    if (!_formKey.currentState!.validate()) return;
+    if (selectedSchedule == null) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Please select a schedule")));
+      return;
+    }
+    if (selectedFile == null && selectedFileBytes == null) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Please choose a file")));
+      return;
+    }
+
+    setState(() => isLoading = true);
+    try {
+      final int scheduleId = int.parse(selectedSchedule['id'].toString());
+      final String title = titleController.text.trim();
+      final String? description = descController.text.trim().isEmpty ? null : descController.text.trim();
+
+      if (kIsWeb) {
+        await ApiService.uploadStudyMaterialFromBytes(
+          scheduleId,
+          title,
+          description,
+          selectedFileBytes!,
+          fileName!,
+        );
+      } else {
+        await ApiService.uploadStudyMaterial(
+          scheduleId,
+          title,
+          description,
+          selectedFile!,
+        );
+      }
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("Material Uploaded Successfully")),
+        );
+        Navigator.pop(context, true);
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text("Upload failed: $e"), backgroundColor: Colors.red),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => isLoading = false);
+    }
+  }
+
+  @override
+  void dispose() {
+    titleController.dispose();
+    descController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -24,160 +138,141 @@ class _UploadAssignmentPageState extends State<Uploadstudymaterial> {
     return Scaffold(
       appBar: AppBar(
         title: const Text("Upload Material"),
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () => Navigator.pop(context),
-        ),
       ),
-      body: SingleChildScrollView(
-        padding: context.pagePadding,
-        child: Center(
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 600),
-            child: Card(
-              child: Padding(
-                padding: const EdgeInsets.all(20),
-                child: Form(
-                  key: _formKey,
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text("Select Schedule *",
-                          style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold)),
-                      const SizedBox(height: 10),
-                      DropdownButtonFormField<String>(
-                        value: selectedSchedule,
-                        isExpanded: true,
-                        decoration: const InputDecoration(hintText: "Select Schedule"),
-                        items: [
-                          "Class 10-A",
-                          "Class 10-B",
-                          "Class 11-A",
-                          "Class 12-C"
-                        ].map((String value) {
-                          return DropdownMenuItem<String>(
-                            value: value,
-                            child: Text(value),
-                          );
-                        }).toList(),
-                        onChanged: (value) {
-                          setState(() {
-                            selectedSchedule = value;
-                          });
-                        },
-                        validator: (value) =>
-                        value == null ? "Please select a schedule" : null,
-                      ),
+      body: isFetchingSchedules
+          ? const Center(child: CircularProgressIndicator())
+          : SingleChildScrollView(
+              padding: context.pagePadding,
+              child: Center(
+                child: ConstrainedBox(
+                  constraints: BoxConstraints(maxWidth: context.scale(600)),
+                  child: Card(
+                    elevation: 0,
+                    color: theme.colorScheme.surfaceContainerLow,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(context.scale(16)),
+                      side: BorderSide(color: theme.colorScheme.outlineVariant.withValues(alpha: 0.5)),
+                    ),
+                    child: Padding(
+                      padding: EdgeInsets.all(context.spacing * 1.5),
+                      child: Form(
+                        key: _formKey,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            buildLabel(context, "Select Schedule *"),
+                            buildDropdown(
+                              context,
+                              schedules,
+                              selectedSchedule,
+                              (value) {
+                                setState(() {
+                                  selectedSchedule = value;
+                                });
+                              },
+                              hint: "Select Schedule",
+                              itemBuilder: (item) {
+                                final className = item['class']?['name'] ?? 'N/A';
+                                final sectionName = item['section']?['name'] ?? 'N/A';
+                                final subjectName = item['subject']?['name'] ?? 'N/A';
+                                return "$className $sectionName - $subjectName";
+                              },
+                            ),
 
-                      const SizedBox(height: 24),
+                            SizedBox(height: context.spacing),
 
-                      Text("Title *",
-                          style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold)),
-                      const SizedBox(height: 10),
-                      TextFormField(
-                        controller: titleController,
-                        decoration: const InputDecoration(hintText: "Enter title"),
-                        validator: (value) =>
-                        value == null || value.isEmpty ? "Title required" : null,
-                      ),
+                            buildLabel(context, "Title *"),
+                            buildTextField(context, titleController, "Enter title"),
 
-                      const SizedBox(height: 24),
+                            SizedBox(height: context.spacing),
 
-                      Text("Description",
-                          style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold)),
-                      const SizedBox(height: 10),
-                      TextFormField(
-                        controller: descController,
-                        maxLines: 4,
-                        decoration: const InputDecoration(hintText: "Enter description (optional)"),
-                      ),
-
-                      const SizedBox(height: 24),
-
-                      Text("Upload File *",
-                          style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold)),
-                      const SizedBox(height: 10),
-                      InkWell(
-                        onTap: () {
-                          // Logic to pick file
-                        },
-                        borderRadius: BorderRadius.circular(12),
-                        child: Container(
-                          height: 56,
-                          decoration: BoxDecoration(
-                            color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
-                            borderRadius: BorderRadius.circular(12),
-                            border: Border.all(color: colorScheme.outline.withValues(alpha: 0.2)),
-                          ),
-                          child: Row(
-                            children: [
-                              Container(
-                                width: 120,
-                                decoration: BoxDecoration(
-                                  color: colorScheme.primary.withValues(alpha: 0.1),
-                                  borderRadius: const BorderRadius.only(
-                                    topLeft: Radius.circular(12),
-                                    bottomLeft: Radius.circular(12),
-                                  ),
-                                ),
-                                alignment: Alignment.center,
-                                child: Text("Choose File",
-                                    style: TextStyle(color: colorScheme.primary, fontWeight: FontWeight.bold, fontSize: 13)),
+                            buildLabel(context, "Description"),
+                            TextFormField(
+                              controller: descController,
+                              maxLines: 4,
+                              style: theme.textTheme.bodyMedium,
+                              decoration: InputDecoration(
+                                hintText: "Enter description (optional)",
+                                contentPadding: EdgeInsets.all(context.spacing),
                               ),
-                              const Expanded(
-                                child: Padding(
-                                  padding: EdgeInsets.only(left: 12),
-                                  child: Text("No file chosen",
-                                      style: TextStyle(color: Colors.grey, fontSize: 13)),
+                            ),
+
+                            SizedBox(height: context.spacing),
+
+                            buildLabel(context, "Upload File *"),
+                            InkWell(
+                              onTap: _pickFile,
+                              borderRadius: BorderRadius.circular(context.scale(12)),
+                              child: Container(
+                                height: context.scale(56),
+                                decoration: BoxDecoration(
+                                  color: theme.colorScheme.surface,
+                                  borderRadius: BorderRadius.circular(context.scale(12)),
+                                  border: Border.all(color: colorScheme.outline.withValues(alpha: 0.5)),
                                 ),
-                              )
-                            ],
-                          ),
+                                child: Row(
+                                  children: [
+                                    Container(
+                                      width: context.scale(120),
+                                      decoration: BoxDecoration(
+                                        color: colorScheme.primary.withValues(alpha: 0.1),
+                                        borderRadius: BorderRadius.only(
+                                          topLeft: Radius.circular(context.scale(12)),
+                                          bottomLeft: Radius.circular(context.scale(12)),
+                                        ),
+                                      ),
+                                      alignment: Alignment.center,
+                                      child: Text("Choose File",
+                                          style: TextStyle(
+                                            color: colorScheme.primary,
+                                            fontWeight: FontWeight.bold,
+                                            fontSize: context.font(13)
+                                          )),
+                                    ),
+                                    Expanded(
+                                      child: Padding(
+                                        padding: const EdgeInsets.only(left: 12),
+                                        child: Text(
+                                          fileName ?? "No file chosen",
+                                          style: TextStyle(
+                                            color: fileName != null ? theme.colorScheme.onSurface : Colors.grey,
+                                            fontSize: 13,
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
+                                        ),
+                                      ),
+                                    )
+                                  ],
+                                ),
+                              ),
+                            ),
+                            SizedBox(height: context.scale(8)),
+                            Text(
+                              "Allowed: PDF, Word, PPT, Images. Max: 20 MB.",
+                              style: theme.textTheme.labelSmall?.copyWith(
+                                color: theme.hintColor,
+                                fontSize: context.font(11),
+                              ),
+                            ),
+
+                            SizedBox(height: context.scale(32)),
+
+                            if (isLoading)
+                              const Center(child: CircularProgressIndicator())
+                            else
+                              buildActionButton(
+                                context,
+                                "UPLOAD",
+                                _uploadMaterial,
+                              ),
+                          ],
                         ),
                       ),
-                      const SizedBox(height: 8),
-                      Text(
-                        "Allowed: PDF, Word, PPT, Images. Max: 20 MB.",
-                        style: theme.textTheme.labelSmall?.copyWith(color: theme.hintColor),
-                      ),
-
-                      const SizedBox(height: 32),
-
-                      Row(
-                        children: [
-                          Expanded(
-                            child: ElevatedButton(
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: Colors.green.shade600,
-                                foregroundColor: Colors.white,
-                              ),
-                              onPressed: () {
-                                if (_formKey.currentState!.validate()) {
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    const SnackBar(content: Text("Material Uploaded Successfully")),
-                                  );
-                                }
-                              },
-                              child: const Text("UPLOAD"),
-                            ),
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: OutlinedButton(
-                              onPressed: () => Navigator.pop(context),
-                              child: const Text("CANCEL"),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
+                    ),
                   ),
                 ),
               ),
             ),
-          ),
-        ),
-      ),
     );
   }
 }

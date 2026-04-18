@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../services/api_service.dart';
+import '../../services/responsive_helper.dart';
 
 class CreateSupportTicketPage extends StatefulWidget {
   const CreateSupportTicketPage({super.key});
@@ -58,91 +59,107 @@ class _CreateSupportTicketPageState extends State<CreateSupportTicketPage> {
 
   @override
   Widget build(BuildContext context) {
-    _colorScheme = Theme.of(context).colorScheme;
+    final colorScheme = context.theme.colorScheme;
     return Scaffold(
+      backgroundColor: colorScheme.surface,
       appBar: AppBar(
-        title: const Text("Create Support Ticket"),
+        title: Text("Create Support Ticket", style: TextStyle(fontSize: context.font(20))),
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(20),
-        child: Form(
-          key: _formKey,
-          child: Card(
-            margin: EdgeInsets.zero,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-            child: Padding(
-              padding: const EdgeInsets.all(24),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text("Ticket Details", 
-                    style: GoogleFonts.roboto(
-                      fontSize: 18, 
-                      fontWeight: FontWeight.bold,
-                      color: _colorScheme.onSurface,
-                    ),
-                  ),
-                  const SizedBox(height: 24),
-
-                  /// 🔹 Issue Title
-                  _buildLabel("Issue Title *"),
-                  _buildTextField(titleController, "Enter a short summary", validator: (v) {
-                    if (v == null || v.isEmpty) return "Title is required";
-                    return null;
-                  }),
-                  const SizedBox(height: 20),
-
-                  /// 🔹 Issue Description
-                  _buildLabel("Issue Description *"),
-                  _buildTextField(descriptionController, "Describe your issue in detail", maxLines: 4, validator: (v) {
-                    if (v == null || v.isEmpty) return "Description is required";
-                    return null;
-                  }),
-                  const SizedBox(height: 20),
-
-                  /// 🔹 Priority Dropdown
-                  _buildLabel("Priority *"),
-                  _buildDropdown(),
-                  const SizedBox(height: 20),
-
-                  /// 🔹 Category
-                  _buildLabel("Category (Optional)"),
-                  _buildTextField(categoryController, "e.g., fee, login, issue"),
-                  const SizedBox(height: 32),
-
-                  /// 🔹 Buttons Row
-                  Row(
+      body: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 800),
+          child: SingleChildScrollView(
+            padding: context.pagePadding,
+            child: Form(
+              key: _formKey,
+              child: Card(
+                elevation: 0,
+                margin: EdgeInsets.zero,
+                color: colorScheme.surfaceContainerLow,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(context.scale(20)),
+                  side: BorderSide(color: colorScheme.outlineVariant),
+                ),
+                child: Padding(
+                  padding: EdgeInsets.all(context.scale(24)),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Expanded(
-                        child: SizedBox(
-                          height: 50,
-                          child: FilledButton(
-                            onPressed: _isSubmitting ? null : _submitTicket,
-                            style: FilledButton.styleFrom(
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                            ),
-                            child: _isSubmitting
-                                ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                                : const Text("SUBMIT TICKET", style: TextStyle(fontWeight: FontWeight.bold)),
-                          ),
+                      Text(
+                        "Ticket Details",
+                        style: GoogleFonts.roboto(
+                          fontSize: context.font(18),
+                          fontWeight: FontWeight.bold,
+                          color: colorScheme.onSurface,
                         ),
                       ),
-                      const SizedBox(width: 16),
-                      Expanded(
-                        child: SizedBox(
-                          height: 50,
-                          child: OutlinedButton(
-                            onPressed: () => Navigator.pop(context),
-                            style: OutlinedButton.styleFrom(
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      SizedBox(height: context.scale(24)),
+
+                      /// 🔹 Issue Title
+                      _buildLabel("Issue Title *"),
+                      _buildTextField(titleController, "Enter a short summary", validator: (v) {
+                        if (v == null || v.isEmpty) return "Title is required";
+                        return null;
+                      }),
+                      SizedBox(height: context.scale(20)),
+
+                      /// 🔹 Issue Description
+                      _buildLabel("Issue Description *"),
+                      _buildTextField(descriptionController, "Describe your issue in detail", maxLines: 4, validator: (v) {
+                        if (v == null || v.isEmpty) return "Description is required";
+                        return null;
+                      }),
+                      SizedBox(height: context.scale(20)),
+
+                      /// 🔹 Priority Dropdown
+                      _buildLabel("Priority *"),
+                      _buildDropdown(),
+                      SizedBox(height: context.scale(20)),
+
+                      /// 🔹 Category
+                      _buildLabel("Category (Optional)"),
+                      _buildTextField(categoryController, "e.g., fee, login, issue"),
+                      SizedBox(height: context.scale(32)),
+
+                      /// 🔹 Buttons Row
+                      Row(
+                        children: [
+                          Expanded(
+                            child: SizedBox(
+                              height: context.scale(50),
+                              child: FilledButton(
+                                onPressed: _isSubmitting ? null : _submitTicket,
+                                style: FilledButton.styleFrom(
+                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(context.scale(12))),
+                                ),
+                                child: _isSubmitting
+                                    ? SizedBox(
+                                        height: context.scale(20),
+                                        width: context.scale(20),
+                                        child: CircularProgressIndicator(strokeWidth: 2, color: colorScheme.onPrimary),
+                                      )
+                                    : Text("SUBMIT TICKET", style: TextStyle(fontWeight: FontWeight.bold, fontSize: context.font(14))),
+                              ),
                             ),
-                            child: const Text("BACK", style: TextStyle(fontWeight: FontWeight.bold)),
                           ),
-                        ),
-                      ),
+                          SizedBox(width: context.scale(16)),
+                          Expanded(
+                            child: SizedBox(
+                              height: context.scale(50),
+                              child: OutlinedButton(
+                                onPressed: () => Navigator.pop(context),
+                                style: OutlinedButton.styleFrom(
+                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(context.scale(12))),
+                                ),
+                                child: Text("BACK", style: TextStyle(fontWeight: FontWeight.bold, fontSize: context.font(14))),
+                              ),
+                            ),
+                          ),
+                        ],
+                      )
                     ],
-                  )
-                ],
+                  ),
+                ),
               ),
             ),
           ),
@@ -152,56 +169,59 @@ class _CreateSupportTicketPageState extends State<CreateSupportTicketPage> {
   }
 
   Widget _buildLabel(String label) {
+    final colorScheme = context.theme.colorScheme;
     return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
+      padding: EdgeInsets.only(bottom: context.scale(8)),
       child: Text(
         label,
-        style: TextStyle(color: _colorScheme.onSurfaceVariant, fontSize: 13, fontWeight: FontWeight.w500),
+        style: TextStyle(color: colorScheme.onSurfaceVariant, fontSize: context.font(13), fontWeight: FontWeight.w500),
       ),
     );
   }
 
   Widget _buildTextField(TextEditingController controller, String hint, {int maxLines = 1, String? Function(String?)? validator}) {
+    final colorScheme = context.theme.colorScheme;
     return TextFormField(
       controller: controller,
       maxLines: maxLines,
-      style: TextStyle(color: _colorScheme.onSurface, fontSize: 15),
+      style: TextStyle(color: colorScheme.onSurface, fontSize: context.font(15)),
       validator: validator,
       decoration: InputDecoration(
         hintText: hint,
         filled: true,
-        fillColor: _colorScheme.surfaceContainerLow,
+        fillColor: colorScheme.surface,
         border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide(color: _colorScheme.outlineVariant.withValues(alpha: 0.5)),
+          borderRadius: BorderRadius.circular(context.scale(12)),
+          borderSide: BorderSide(color: colorScheme.outlineVariant),
         ),
         enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide(color: _colorScheme.outlineVariant.withValues(alpha: 0.5)),
+          borderRadius: BorderRadius.circular(context.scale(12)),
+          borderSide: BorderSide(color: colorScheme.outlineVariant),
         ),
         focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide(color: _colorScheme.primary, width: 1.5),
+          borderRadius: BorderRadius.circular(context.scale(12)),
+          borderSide: BorderSide(color: colorScheme.primary, width: 1.5),
         ),
-        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        contentPadding: EdgeInsets.symmetric(horizontal: context.scale(16), vertical: context.scale(14)),
       ),
     );
   }
 
   Widget _buildDropdown() {
+    final colorScheme = context.theme.colorScheme;
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16),
+      padding: EdgeInsets.symmetric(horizontal: context.scale(16)),
       decoration: BoxDecoration(
-        color: _colorScheme.surfaceContainerLow,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: _colorScheme.outlineVariant.withValues(alpha: 0.5)),
+        color: colorScheme.surface,
+        borderRadius: BorderRadius.circular(context.scale(12)),
+        border: Border.all(color: colorScheme.outlineVariant),
       ),
       child: DropdownButtonHideUnderline(
         child: DropdownButton<String>(
           value: priorityValue,
           isExpanded: true,
           icon: const Icon(Icons.keyboard_arrow_down_rounded),
-          style: TextStyle(color: _colorScheme.onSurface, fontSize: 15),
+          style: TextStyle(color: colorScheme.onSurface, fontSize: context.font(15)),
           items: ["Low", "Medium", "High"]
               .map((e) => DropdownMenuItem(
                     value: e,

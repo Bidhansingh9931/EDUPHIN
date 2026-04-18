@@ -45,17 +45,16 @@ class _SupportTicketsPageState extends State<SupportTicketsPage> {
       if (_selectedStatus.isNotEmpty) queryParams['status'] = _selectedStatus.toLowerCase();
 
       final response = await ApiService.get('counselor/tickets', queryParams);
+      if (!mounted) return;
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
-        if (mounted) {
-          setState(() {
-            final List ticketsData = data['data'] ?? data['tickets'] ?? [];
-            _tickets = ticketsData.map((j) => SupportTicket.fromJson(j)).toList();
-            _isLoading = false;
-          });
-        }
+        setState(() {
+          final List ticketsData = data['data'] ?? data['tickets'] ?? [];
+          _tickets = ticketsData.map((j) => SupportTicket.fromJson(j)).toList();
+          _isLoading = false;
+        });
       } else {
-        if (mounted) setState(() => _isLoading = false);
+        setState(() => _isLoading = false);
       }
     } catch (e) {
       if (mounted) setState(() => _isLoading = false);
@@ -64,124 +63,273 @@ class _SupportTicketsPageState extends State<SupportTicketsPage> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
     return Scaffold(
       appBar: AppBar(
         title: const Text("Support Tickets"),
       ),
       body: SafeArea(
-        child: Column(
-          children: [
-            /// FILTER SECTION
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
-              child: Card(
-                child: Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Column(
-                    children: [
-                      TextField(
-                        onChanged: (val) {
-                          _searchQuery = val;
-                          _fetchTickets();
-                        },
-                        decoration: const InputDecoration(
-                          hintText: "Search tickets...",
-                          prefixIcon: Icon(Icons.search),
-                        ),
+        child: Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 1000),
+            child: Column(
+              children: [
+                /// FILTER SECTION
+                Padding(
+                  padding: EdgeInsets.fromLTRB(context.pagePadding.left,
+                      context.spacing, context.pagePadding.right, 0),
+                  child: Card(
+                    elevation: 0,
+                    color: context.theme.colorScheme.surfaceContainerLow,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(context.scale(12)),
+                      side: BorderSide(
+                        color: context.theme.colorScheme.outlineVariant,
+                        width: 1,
                       ),
-                      const SizedBox(height: 12),
-                      Row(
+                    ),
+                    child: Padding(
+                      padding: EdgeInsets.all(context.spacing),
+                      child: Column(
                         children: [
-                          Expanded(
-                            child: _buildDropdown(context, "Priority", ["All Priorities", "Low", "Medium", "High"], 
-                              _selectedPriority.isEmpty ? "All Priorities" : _selectedPriority, (val) {
-                                setState(() {
-                                  _selectedPriority = val == "All Priorities" ? "" : val!;
-                                });
-                                _fetchTickets();
-                              }),
+                          TextField(
+                            onChanged: (val) {
+                              _searchQuery = val;
+                              _fetchTickets();
+                            },
+                            style: TextStyle(fontSize: context.font(14)),
+                            decoration: InputDecoration(
+                              hintText: "Search tickets...",
+                              prefixIcon: Icon(Icons.search, size: context.scale(20)),
+                              contentPadding: EdgeInsets.symmetric(
+                                  horizontal: context.spacing / 2,
+                                  vertical: context.spacing / 4),
+                            ),
                           ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: _buildDropdown(context, "Status", ["All Statuses", "Open", "In Progress", "Resolved", "Closed"], 
-                              _selectedStatus.isEmpty ? "All Statuses" : _selectedStatus, (val) {
-                                setState(() {
-                                  _selectedStatus = val == "All Statuses" ? "" : val!;
-                                });
-                                _fetchTickets();
-                              }),
-                          ),
+                          SizedBox(height: context.spacing / 2),
+                          if (context.isMobile) ...[
+                            _buildDropdown(
+                                context,
+                                "Priority",
+                                ["All Priorities", "Low", "Medium", "High"],
+                                _selectedPriority.isEmpty
+                                    ? "All Priorities"
+                                    : _selectedPriority, (val) {
+                              setState(() {
+                                _selectedPriority = val == "All Priorities" ? "" : val!;
+                              });
+                              _fetchTickets();
+                            }),
+                            SizedBox(height: context.spacing / 2),
+                            _buildDropdown(
+                                context,
+                                "Status",
+                                [
+                                  "All Statuses",
+                                  "Open",
+                                  "In Progress",
+                                  "Resolved",
+                                  "Closed"
+                                ],
+                                _selectedStatus.isEmpty
+                                    ? "All Statuses"
+                                    : _selectedStatus, (val) {
+                              setState(() {
+                                _selectedStatus = val == "All Statuses" ? "" : val!;
+                              });
+                              _fetchTickets();
+                            }),
+                          ] else
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: _buildDropdown(
+                                      context,
+                                      "Priority",
+                                      ["All Priorities", "Low", "Medium", "High"],
+                                      _selectedPriority.isEmpty
+                                          ? "All Priorities"
+                                          : _selectedPriority, (val) {
+                                    setState(() {
+                                      _selectedPriority =
+                                          val == "All Priorities" ? "" : val!;
+                                    });
+                                    _fetchTickets();
+                                  }),
+                                ),
+                                SizedBox(width: context.spacing / 2),
+                                Expanded(
+                                  child: _buildDropdown(
+                                      context,
+                                      "Status",
+                                      [
+                                        "All Statuses",
+                                        "Open",
+                                        "In Progress",
+                                        "Resolved",
+                                        "Closed"
+                                      ],
+                                      _selectedStatus.isEmpty
+                                          ? "All Statuses"
+                                          : _selectedStatus, (val) {
+                                    setState(() {
+                                      _selectedStatus =
+                                          val == "All Statuses" ? "" : val!;
+                                    });
+                                    _fetchTickets();
+                                  }),
+                                ),
+                              ],
+                            ),
                         ],
                       ),
-                    ],
+                    ),
                   ),
                 ),
-              ),
-            ),
 
-            /// TABLE SECTION
-            Expanded(
-              child: Padding(
-                padding: context.pagePadding,
-                child: Card(
-                  child: RefreshIndicator(
-                    onRefresh: _fetchTickets,
-                    child: _isLoading
-                        ? const Center(child: CircularProgressIndicator())
-                        : _tickets.isEmpty
-                            ? Center(child: Text("No tickets found", style: TextStyle(color: theme.hintColor)))
-                            : SingleChildScrollView(
-                                scrollDirection: Axis.horizontal,
-                                child: ConstrainedBox(
-                                  constraints: BoxConstraints(minWidth: MediaQuery.of(context).size.width - (context.isTablet ? 100 : 64)),
-                                  child: DataTable(
-                                    headingRowColor: WidgetStateProperty.all(theme.colorScheme.primary.withValues(alpha: 0.05)),
-                                    columnSpacing: 24,
-                                    columns: const [
-                                      DataColumn(label: Text("#", style: TextStyle(fontWeight: FontWeight.bold))),
-                                      DataColumn(label: Text("Title", style: TextStyle(fontWeight: FontWeight.bold))),
-                                      DataColumn(label: Text("Status", style: TextStyle(fontWeight: FontWeight.bold))),
-                                      DataColumn(label: Text("Created", style: TextStyle(fontWeight: FontWeight.bold))),
-                                      DataColumn(label: Text("Action", style: TextStyle(fontWeight: FontWeight.bold))),
-                                    ],
-                                    rows: _tickets.map((t) => DataRow(cells: [
-                                      DataCell(Text(t.id.toString())),
-                                      DataCell(SizedBox(width: 150, child: Text(t.title, style: const TextStyle(fontWeight: FontWeight.w500)))),
-                                      DataCell(_statusBadge(t.status)),
-                                      DataCell(Text(t.createdAt?.split('T')[0] ?? "-")),
-                                      DataCell(
-                                        TextButton(
-                                          onPressed: () {
-                                            Navigator.push(context, MaterialPageRoute(builder: (_) => TicketDetailsPage(ticket: t))).then((_) => _fetchTickets());
-                                          },
-                                          child: const Text("VIEW", style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
-                                        ),
+                /// TABLE SECTION
+                Expanded(
+                  child: Padding(
+                    padding: context.pagePadding,
+                    child: Card(
+                      elevation: 0,
+                      color: context.theme.colorScheme.surfaceContainerLow,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(context.scale(12)),
+                        side: BorderSide(
+                          color: context.theme.colorScheme.outlineVariant,
+                          width: 1,
+                        ),
+                      ),
+                      child: RefreshIndicator(
+                        onRefresh: _fetchTickets,
+                        child: _isLoading
+                            ? const Center(child: CircularProgressIndicator())
+                            : _tickets.isEmpty
+                                ? Center(
+                                    child: Text("No tickets found",
+                                        style: TextStyle(
+                                            color: context.theme.hintColor,
+                                            fontSize: context.font(14))))
+                                : SingleChildScrollView(
+                                    scrollDirection: Axis.horizontal,
+                                    child: ConstrainedBox(
+                                      constraints: BoxConstraints(
+                                          minWidth: MediaQuery.of(context).size.width -
+                                              (context.isTablet
+                                                  ? context.scale(100)
+                                                  : context.scale(64))),
+                                      child: DataTable(
+                                        headingRowColor: WidgetStateProperty.all(context
+                                            .theme.colorScheme.primary
+                                            .withValues(alpha: 0.05)),
+                                        columnSpacing: context.spacing,
+                                        horizontalMargin: context.spacing / 2,
+                                        headingRowHeight: context.scale(56),
+                                        dataRowMinHeight: context.scale(56),
+                                        dataRowMaxHeight: context.scale(56),
+                                        columns: [
+                                          DataColumn(
+                                              label: Text("#",
+                                                  style: TextStyle(
+                                                      fontWeight: FontWeight.bold,
+                                                      fontSize: context.font(13)))),
+                                          DataColumn(
+                                              label: Text("Title",
+                                                  style: TextStyle(
+                                                      fontWeight: FontWeight.bold,
+                                                      fontSize: context.font(13)))),
+                                          DataColumn(
+                                              label: Text("Status",
+                                                  style: TextStyle(
+                                                      fontWeight: FontWeight.bold,
+                                                      fontSize: context.font(13)))),
+                                          DataColumn(
+                                              label: Text("Created",
+                                                  style: TextStyle(
+                                                      fontWeight: FontWeight.bold,
+                                                      fontSize: context.font(13)))),
+                                          DataColumn(
+                                              label: Text("Action",
+                                                  style: TextStyle(
+                                                      fontWeight: FontWeight.bold,
+                                                      fontSize: context.font(13)))),
+                                        ],
+                                        rows: _tickets
+                                            .map((t) => DataRow(cells: [
+                                                  DataCell(Text(t.id.toString(),
+                                                      style: TextStyle(
+                                                          fontSize: context.font(13)))),
+                                                  DataCell(SizedBox(
+                                                      width: context.scale(150),
+                                                      child: Text(t.title,
+                                                          style: TextStyle(
+                                                              fontWeight: FontWeight.w500,
+                                                              fontSize:
+                                                                  context.font(13)),
+                                                          overflow:
+                                                              TextOverflow.ellipsis))),
+                                                  DataCell(_statusBadge(context, t.status)),
+                                                  DataCell(Text(
+                                                      t.createdAt?.split('T')[0] ?? "-",
+                                                      style: TextStyle(
+                                                          fontSize: context.font(13)))),
+                                                  DataCell(
+                                                    TextButton(
+                                                      onPressed: () {
+                                                        Navigator.push(
+                                                            context,
+                                                            MaterialPageRoute(
+                                                                builder: (_) =>
+                                                                    TicketDetailsPage(
+                                                                        ticket: t))).then(
+                                                            (_) => _fetchTickets());
+                                                      },
+                                                      child: Text("VIEW",
+                                                          style: TextStyle(
+                                                              fontSize: context.font(11),
+                                                              fontWeight:
+                                                                  FontWeight.bold)),
+                                                    ),
+                                                  ),
+                                                ]))
+                                            .toList(),
                                       ),
-                                    ])).toList(),
+                                    ),
                                   ),
-                                ),
-                              ),
+                      ),
+                    ),
                   ),
                 ),
-              ),
-            ),
 
-            /// CREATE BUTTON
-            Padding(
-              padding: const EdgeInsets.all(16),
-              child: SizedBox(
-                width: double.infinity,
-                child: ElevatedButton.icon(
-                  onPressed: () {
-                    Navigator.push(context, MaterialPageRoute(builder: (_) => const CreateSupportTicketPage())).then((_) => _fetchTickets());
-                  },
-                  icon: const Icon(Icons.add),
-                  label: const Text("CREATE NEW TICKET"),
+                /// CREATE BUTTON
+                Padding(
+                  padding: EdgeInsets.all(context.spacing),
+                  child: SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton.icon(
+                      onPressed: () {
+                        Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                    builder: (_) => const CreateSupportTicketPage()))
+                            .then((_) => _fetchTickets());
+                      },
+                      icon: Icon(Icons.add, size: context.scale(20)),
+                      label: Text("CREATE NEW TICKET",
+                          style: TextStyle(
+                              fontSize: context.font(14), fontWeight: FontWeight.bold)),
+                      style: ElevatedButton.styleFrom(
+                        padding:
+                            EdgeInsets.symmetric(vertical: context.scale(16)),
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(context.scale(12))),
+                      ),
+                    ),
+                  ),
                 ),
-              ),
+              ],
             ),
-          ],
+          ),
         ),
       ),
     );
@@ -189,15 +337,19 @@ class _SupportTicketsPageState extends State<SupportTicketsPage> {
 
   Widget _buildDropdown(BuildContext context, String label, List<String> items, String current, Function(String?) onChanged) {
     return DropdownButtonFormField<String>(
-      value: items.contains(current) ? current : items.first,
+      initialValue: items.contains(current) ? current : items.first,
       isExpanded: true,
-      items: items.map((String item) => DropdownMenuItem(value: item, child: Text(item, style: const TextStyle(fontSize: 12)))).toList(),
+      items: items.map((String item) => DropdownMenuItem(value: item, child: Text(item, style: TextStyle(fontSize: context.font(12))))).toList(),
       onChanged: onChanged,
-      decoration: InputDecoration(labelText: label, contentPadding: const EdgeInsets.symmetric(horizontal: 12)),
+      decoration: InputDecoration(
+        labelText: label,
+        labelStyle: TextStyle(fontSize: context.font(14)),
+        contentPadding: EdgeInsets.symmetric(horizontal: context.scale(12), vertical: context.scale(8)),
+      ),
     );
   }
 
-  Widget _statusBadge(String? status) {
+  Widget _statusBadge(BuildContext context, String? status) {
     Color color;
     switch (status?.toLowerCase()) {
       case "open": color = Colors.blue; break;
@@ -207,15 +359,15 @@ class _SupportTicketsPageState extends State<SupportTicketsPage> {
       default: color = Colors.grey;
     }
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      padding: EdgeInsets.symmetric(horizontal: context.scale(8), vertical: context.scale(4)),
       decoration: BoxDecoration(
         color: color.withValues(alpha: 0.1),
-        borderRadius: BorderRadius.circular(6),
-        border: Border.all(color: color.withValues(alpha: 0.5)),
+        borderRadius: BorderRadius.circular(context.scale(6)),
+        border: Border.all(color: color.withValues(alpha: 0.2)),
       ),
       child: Text(
         (status ?? "UNKNOWN").toUpperCase(),
-        style: TextStyle(color: color, fontSize: 9, fontWeight: FontWeight.bold),
+        style: TextStyle(color: color, fontSize: context.font(9), fontWeight: FontWeight.bold),
       ),
     );
   }

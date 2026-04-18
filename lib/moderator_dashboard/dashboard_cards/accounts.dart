@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:eduphin/moderator_dashboard/dashboard_cards/add_account.dart';
 import 'package:eduphin/moderator_dashboard/dashboard_cards/active_institutes/manage/employ_details.dart';
 import 'package:eduphin/services/api_service.dart';
+import 'package:eduphin/services/common_widgets.dart';
 import 'package:eduphin/services/responsive_helper.dart';
 import 'package:flutter/material.dart';
 
@@ -11,11 +12,13 @@ class Account {
   final int id;
   final String name;
   final String email;
+  final String? imageUrl;
 
   Account({
     required this.id,
     required this.name,
     required this.email,
+    this.imageUrl,
   });
 
   factory Account.fromJson(Map<String, dynamic> json) {
@@ -23,6 +26,7 @@ class Account {
       id: json['id'],
       name: json['name'] ?? 'No Name',
       email: json['email'] ?? 'No Email',
+      imageUrl: ApiService.getStorageUrl(json['photo']),
     );
   }
 }
@@ -113,28 +117,34 @@ class _AccountsPageState extends State<AccountsPage> {
   }
 
   Future<String?> _selectRoleDialog() async {
-    final theme = Theme.of(context);
     return showDialog<String>(
       context: context,
       builder: (context) {
+        final theme = context.theme;
         return AlertDialog(
-          title: const Text('Select Role'),
+          backgroundColor: theme.colorScheme.surfaceContainerLow,
+          surfaceTintColor: Colors.transparent,
+          title: Text('Select Role', style: TextStyle(fontSize: context.font(20), fontWeight: FontWeight.bold, color: theme.colorScheme.onSurface)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(context.md),
+            side: BorderSide(color: theme.colorScheme.outlineVariant),
+          ),
           content: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
               ListTile(
-                leading: const Icon(Icons.manage_accounts_rounded),
-                title: const Text('Manager'), 
+                leading: Icon(Icons.manage_accounts_rounded, size: context.scale(24), color: theme.colorScheme.primary),
+                title: Text('Manager', style: TextStyle(fontSize: context.font(16), color: theme.colorScheme.onSurface)),
                 onTap: () => Navigator.of(context).pop('2')
               ),
               ListTile(
-                leading: const Icon(Icons.school_rounded),
-                title: const Text('Teacher'), 
+                leading: Icon(Icons.school_rounded, size: context.scale(24), color: theme.colorScheme.primary),
+                title: Text('Teacher', style: TextStyle(fontSize: context.font(16), color: theme.colorScheme.onSurface)), 
                 onTap: () => Navigator.of(context).pop('3')
               ),
               ListTile(
-                leading: const Icon(Icons.local_library_rounded),
-                title: const Text('Librarian'), 
+                leading: Icon(Icons.local_library_rounded, size: context.scale(24), color: theme.colorScheme.primary),
+                title: Text('Librarian', style: TextStyle(fontSize: context.font(16), color: theme.colorScheme.onSurface)), 
                 onTap: () => Navigator.of(context).pop('4')
               ),
             ],
@@ -162,21 +172,30 @@ class _AccountsPageState extends State<AccountsPage> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
+    final theme = context.theme;
     final colorScheme = theme.colorScheme;
 
     return Scaffold(
+      backgroundColor: theme.scaffoldBackgroundColor,
       appBar: AppBar(
-        title: const Text('Manage Accounts'),
+        title: Text('Manage Accounts', style: TextStyle(fontSize: context.font(20), fontWeight: FontWeight.bold)),
         bottom: PreferredSize(
-          preferredSize: const Size.fromHeight(80),
+          preferredSize: Size.fromHeight(context.scale(70)),
           child: Padding(
-            padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+            padding: EdgeInsets.fromLTRB(context.md, 0, context.md, context.sm),
             child: TextField(
               controller: _searchController,
-              decoration: const InputDecoration(
+              style: TextStyle(fontSize: context.font(14), color: theme.colorScheme.onSurface),
+              decoration: InputDecoration(
                 hintText: 'Search by name or email...',
-                prefixIcon: Icon(Icons.search_rounded),
+                hintStyle: TextStyle(color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.5)),
+                prefixIcon: Icon(Icons.search_rounded, color: theme.colorScheme.primary),
+                filled: true,
+                fillColor: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(context.sm),
+                  borderSide: BorderSide.none,
+                ),
               ),
             ),
           ),
@@ -186,29 +205,40 @@ class _AccountsPageState extends State<AccountsPage> {
         future: _accountsFuture,
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting && _allAccounts.isEmpty) {
-            return const Center(child: CircularProgressIndicator());
+            return Center(child: CircularProgressIndicator(color: theme.colorScheme.primary));
           }
           if (snapshot.hasError && _allAccounts.isEmpty) {
             return Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(Icons.error_outline_rounded, size: 48, color: colorScheme.error),
-                  const SizedBox(height: 16),
-                  Text('Failed to load accounts', style: theme.textTheme.titleMedium),
-                  const SizedBox(height: 24),
-                  ElevatedButton(onPressed: _refreshAccounts, child: const Text("Retry")),
-                ],
+              child: Padding(
+                padding: context.pagePadding,
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(Icons.error_outline_rounded, size: context.scale(48), color: colorScheme.error),
+                    SizedBox(height: context.md),
+                    Text('Failed to load accounts', style: theme.textTheme.titleMedium?.copyWith(fontSize: context.font(18), color: theme.colorScheme.onSurface)),
+                    SizedBox(height: context.lg),
+                    ElevatedButton(
+                      onPressed: _refreshAccounts,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: theme.colorScheme.primary,
+                        foregroundColor: theme.colorScheme.onPrimary,
+                        padding: EdgeInsets.symmetric(horizontal: context.lg, vertical: context.md),
+                      ),
+                      child: Text("Retry", style: TextStyle(fontSize: context.font(16))),
+                    ),
+                  ],
+                ),
               ),
             );
           }
           if (_allAccounts.isEmpty) {
-            return _buildEmptyState(theme, "No accounts found");
+            return _buildEmptyState(context, "No accounts found");
           }
 
           final accounts = _filteredAccounts;
           if(accounts.isEmpty && _searchController.text.isNotEmpty) {
-            return _buildEmptyState(theme, "No results for \"${_searchController.text}\"");
+            return _buildEmptyState(context, "No results for \"${_searchController.text}\"");
           }
 
           return RefreshIndicator(
@@ -218,16 +248,16 @@ class _AccountsPageState extends State<AccountsPage> {
               physics: const AlwaysScrollableScrollPhysics(),
               child: Center(
                 child: ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 1200),
+                  constraints: BoxConstraints(maxWidth: context.scale(1200)),
                   child: GridView.builder(
                     shrinkWrap: true,
                     physics: const NeverScrollableScrollPhysics(),
                     itemCount: accounts.length,
                     gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
                       crossAxisCount: context.responsive(1, tablet: 2, desktop: 3),
-                      crossAxisSpacing: 16,
-                      mainAxisSpacing: 16,
-                      mainAxisExtent: 90,
+                      crossAxisSpacing: context.md,
+                      mainAxisSpacing: context.md,
+                      mainAxisExtent: context.scale(100),
                     ),
                     itemBuilder: (context, index) {
                       return AccountCard(account: accounts[index]);
@@ -241,20 +271,23 @@ class _AccountsPageState extends State<AccountsPage> {
       ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: _navigateToAddAccount,
-        icon: const Icon(Icons.person_add_rounded),
-        label: const Text("Add Account"),
+        backgroundColor: theme.colorScheme.primary,
+        foregroundColor: theme.colorScheme.onPrimary,
+        icon: Icon(Icons.person_add_rounded, size: context.scale(24)),
+        label: Text("Add Account", style: TextStyle(fontSize: context.font(14), fontWeight: FontWeight.bold)),
       ),
     );
   }
 
-  Widget _buildEmptyState(ThemeData theme, String message) {
+  Widget _buildEmptyState(BuildContext context, String message) {
+    final theme = context.theme;
     return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(Icons.person_search_rounded, size: 64, color: theme.hintColor.withOpacity(0.3)),
-          const SizedBox(height: 16),
-          Text(message, style: const TextStyle(fontWeight: FontWeight.bold)),
+          Icon(Icons.person_search_rounded, size: context.scale(64), color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.3)),
+          SizedBox(height: context.md),
+          Text(message, style: TextStyle(fontWeight: FontWeight.bold, fontSize: context.font(16), color: theme.colorScheme.onSurfaceVariant)),
         ],
       ),
     );
@@ -271,30 +304,35 @@ class AccountCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
+    final theme = context.theme;
     final colorScheme = theme.colorScheme;
 
     return Card(
+      color: theme.colorScheme.surfaceContainerLow,
+      elevation: 0,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(context.md),
+        side: BorderSide(color: theme.colorScheme.outlineVariant),
+      ),
       child: ListTile(
-        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-        leading: CircleAvatar(
-          backgroundColor: colorScheme.primary.withOpacity(0.1),
-          child: Text(
-            account.name.isNotEmpty ? account.name[0].toUpperCase() : '?',
-            style: TextStyle(color: colorScheme.primary, fontWeight: FontWeight.bold),
-          ),
+        contentPadding: EdgeInsets.symmetric(horizontal: context.md, vertical: context.sm),
+        leading: ProfileAvatar(
+          imageUrl: account.imageUrl,
+          radius: context.scale(20),
         ),
         title: Text(
           account.name,
-          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+          style: TextStyle(fontWeight: FontWeight.bold, fontSize: context.font(15), color: theme.colorScheme.onSurface),
+          maxLines: 1,
           overflow: TextOverflow.ellipsis,
         ),
         subtitle: Text(
           account.email,
-          style: TextStyle(color: theme.hintColor, fontSize: 13),
+          style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: context.font(13)),
+          maxLines: 1,
           overflow: TextOverflow.ellipsis,
         ),
-        trailing: const Icon(Icons.chevron_right_rounded, size: 20),
+        trailing: Icon(Icons.chevron_right_rounded, size: context.scale(24), color: theme.colorScheme.onSurfaceVariant),
         onTap: () {
           Navigator.push(
             context,

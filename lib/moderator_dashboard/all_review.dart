@@ -1,3 +1,4 @@
+import 'package:eduphin/services/common_widgets.dart';
 import 'package:eduphin/services/responsive_helper.dart';
 import 'package:flutter/material.dart';
 
@@ -31,7 +32,7 @@ class _AllReviewsPageState extends State<AllReviewsPage> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
+    final theme = context.theme;
     final colorScheme = theme.colorScheme;
 
     return Scaffold(
@@ -44,10 +45,10 @@ class _AllReviewsPageState extends State<AllReviewsPage> {
               MaterialPageRoute(builder: (context) => const ModeratorDashboardPage()),
               (route) => false,
             ),
-            icon: const Icon(Icons.dashboard_rounded),
+            icon: Icon(Icons.dashboard_rounded, size: context.scale(24)),
             tooltip: "Dashboard",
           ),
-          const SizedBox(width: 8),
+          SizedBox(width: context.spacing / 2),
         ],
       ),
       body: RefreshIndicator(
@@ -62,10 +63,10 @@ class _AllReviewsPageState extends State<AllReviewsPage> {
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Icon(Icons.error_outline_rounded, size: 48, color: colorScheme.error),
-                    const SizedBox(height: 16),
+                    Icon(Icons.error_outline_rounded, size: context.scale(48), color: colorScheme.error),
+                    SizedBox(height: context.spacing),
                     Text('Error loading reviews', style: theme.textTheme.titleMedium),
-                    const SizedBox(height: 24),
+                    SizedBox(height: context.spacing),
                     ElevatedButton(onPressed: _refreshReviews, child: const Text("Retry")),
                   ],
                 ),
@@ -81,16 +82,16 @@ class _AllReviewsPageState extends State<AllReviewsPage> {
               physics: const AlwaysScrollableScrollPhysics(),
               child: Center(
                 child: ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 1000),
+                  constraints: BoxConstraints(maxWidth: context.scale(1000)),
                   child: GridView.builder(
                     shrinkWrap: true,
                     physics: const NeverScrollableScrollPhysics(),
                     itemCount: reviews.length,
                     gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
                       crossAxisCount: context.responsive(1, tablet: 2, desktop: 2),
-                      crossAxisSpacing: 16,
-                      mainAxisSpacing: 16,
-                      mainAxisExtent: 220,
+                      crossAxisSpacing: context.spacing,
+                      mainAxisSpacing: context.spacing,
+                      mainAxisExtent: context.scale(220),
                     ),
                     itemBuilder: (context, index) {
                       return _buildReviewCard(context, reviews[index]);
@@ -110,30 +111,27 @@ class _AllReviewsPageState extends State<AllReviewsPage> {
           );
         },
         label: const Text('Write Review'),
-        icon: const Icon(Icons.rate_review_rounded),
+        icon: Icon(Icons.rate_review_rounded, size: context.scale(24)),
       ),
     );
   }
 
   Widget _buildReviewCard(BuildContext context, ReviewDetail review) {
-    final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
+    final theme = context.theme;
 
     return Card(
       child: Padding(
-        padding: const EdgeInsets.all(20.0),
+        padding: EdgeInsets.all(context.spacing),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(
               children: [
-                CircleAvatar(
-                  radius: 24,
-                  backgroundColor: colorScheme.primary.withOpacity(0.1),
-                  backgroundImage: review.avatarAsset.isNotEmpty ? AssetImage(review.avatarAsset) : null,
-                  child: review.avatarAsset.isEmpty ? const Icon(Icons.person) : null,
+                ProfileAvatar(
+                  imageUrl: review.imageUrl,
+                  radius: context.scale(24),
                 ),
-                const SizedBox(width: 16),
+                SizedBox(width: context.spacing),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -151,13 +149,13 @@ class _AllReviewsPageState extends State<AllReviewsPage> {
                     ],
                   ),
                 ),
-                const Icon(Icons.star_rounded, color: Colors.amber, size: 20),
-                const Text(" 5.0", style: TextStyle(fontWeight: FontWeight.bold)),
+                Icon(Icons.star_rounded, color: Colors.amber, size: context.scale(20)),
+                Text(" 5.0", style: TextStyle(fontWeight: FontWeight.bold, fontSize: context.font(14))),
               ],
             ),
-            const SizedBox(height: 16),
+            SizedBox(height: context.spacing),
             const Divider(),
-            const SizedBox(height: 12),
+            SizedBox(height: context.spacing / 2),
             Expanded(
               child: Text(
                 review.reviewText,
@@ -177,11 +175,11 @@ class _AllReviewsPageState extends State<AllReviewsPage> {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(Icons.rate_review_outlined, size: 64, color: theme.hintColor.withOpacity(0.3)),
-          const SizedBox(height: 16),
-          const Text("No reviews yet", style: TextStyle(fontWeight: FontWeight.bold)),
-          const SizedBox(height: 8),
-          Text("Be the first to share your experience", style: TextStyle(color: theme.hintColor)),
+          Icon(Icons.rate_review_outlined, size: context.scale(64), color: theme.hintColor.withValues(alpha: 0.3)),
+          SizedBox(height: context.spacing),
+          Text("No reviews yet", style: TextStyle(fontWeight: FontWeight.bold, fontSize: context.font(16))),
+          SizedBox(height: context.spacing / 2),
+          Text("Be the first to share your experience", style: TextStyle(color: theme.hintColor, fontSize: context.font(14))),
         ],
       ),
     );

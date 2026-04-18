@@ -5,12 +5,21 @@ class SalaryPageData {
   SalaryPageData({required this.account, required this.salaries});
 
   factory SalaryPageData.fromJson(Map<String, dynamic> json) {
+    final accountJson = json['account'] ?? (json['data'] is Map ? json['data']['account'] : null) ?? {};
+    final salariesRaw = json['salaries'] ?? (json['data'] is Map ? json['data']['salaries'] : (json['data'] is List ? json['data'] : [])) ?? [];
+    
+    final List<SalaryRecord> salariesList = [];
+    if (salariesRaw is List) {
+      for (var item in salariesRaw) {
+        if (item is Map<String, dynamic>) {
+          salariesList.add(SalaryRecord.fromJson(item));
+        }
+      }
+    }
+
     return SalaryPageData(
-      account: BankAccount.fromJson(json['account'] is Map ? json['account'] : {}),
-      salaries: (json['salaries'] is List ? json['salaries'] as List : [])
-          .where((s) => s != null && s is Map)
-          .map((s) => SalaryRecord.fromJson(s as Map<String, dynamic>))
-          .toList(),
+      account: BankAccount.fromJson(accountJson is Map<String, dynamic> ? accountJson : {}),
+      salaries: salariesList,
     );
   }
 }
@@ -21,6 +30,7 @@ class BankAccount {
   final String? ifscCode;
   final String? bankName;
   final String? branch;
+  final String? basicSalary;
 
   BankAccount({
     required this.accountHolderName,
@@ -28,15 +38,17 @@ class BankAccount {
     this.ifscCode,
     this.bankName,
     this.branch,
+    this.basicSalary,
   });
 
   factory BankAccount.fromJson(Map<String, dynamic> json) {
     return BankAccount(
-      accountHolderName: json['name'] ?? 'N/A', 
+      accountHolderName: json['name']?.toString() ?? 'N/A',
       accountNumber: json['bank_account_number']?.toString(),
       ifscCode: json['ifsc_code']?.toString(),
       bankName: json['bank_name']?.toString(),
-      branch: json['branch_name']?.toString(), 
+      branch: json['branch_name']?.toString(),
+      basicSalary: (json['basic_salary'] ?? json['salary'])?.toString(),
     );
   }
 }
@@ -62,9 +74,9 @@ class SalaryRecord {
     return SalaryRecord(
       id: json['id'] ?? 0,
       paymentDate: json['payment_date'],
-      baseSalary: json['basic_salary']?.toString() ?? '0',
+      baseSalary: (json['basic_salary'] ?? json['salary'] ?? '0').toString(),
       deduction: json['deductions']?.toString() ?? '0', 
-      netSalary: json['net_salary']?.toString() ?? '0',
+      netSalary: (json['net_salary'] ?? json['amount'] ?? '0').toString(),
       status: json['status'] ?? 'Paid',
     );
   }

@@ -1,3 +1,4 @@
+import 'package:eduphin/services/responsive_helper.dart';
 import 'package:flutter/material.dart';
 import 'package:eduphin/services/api_service.dart';
 import 'package:eduphin/teacher/dashboard/exam_models.dart';
@@ -22,40 +23,52 @@ class _ExamInformationPageState extends State<ExamInformationPage> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
+    final theme = context.theme;
 
     return Scaffold(
       appBar: AppBar(
         title: const Text("Exam Information"),
       ),
-      body: FutureBuilder<ExamPageData>(
-        future: _examsFuture,
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
-          } else if (snapshot.hasError) {
-            return Center(child: Text("Error: ${snapshot.error}"));
-          } else if (!snapshot.hasData || snapshot.data!.exams.isEmpty) {
-            return const Center(child: Text("No exams found."));
-          }
+      body: Center(
+        child: ConstrainedBox(
+          constraints: BoxConstraints(maxWidth: context.responsive(800.0, tablet: 1000.0, desktop: 1200.0)),
+          child: FutureBuilder<ExamPageData>(
+            future: _examsFuture,
+            builder: (context, snapshot) {
+              if (snapshot.connectionState == ConnectionState.waiting) {
+                return const Center(child: CircularProgressIndicator());
+              } else if (snapshot.hasError) {
+                return Center(child: Text("Error: ${snapshot.error}", style: TextStyle(fontSize: context.font(14))));
+              } else if (!snapshot.hasData || snapshot.data!.exams.isEmpty) {
+                return Center(child: Text("No exams found.", style: TextStyle(fontSize: context.font(14))));
+              }
 
-          final exams = snapshot.data!.exams;
-          return ListView.builder(
-            padding: const EdgeInsets.all(16),
-            itemCount: exams.length,
-            itemBuilder: (context, index) => _buildExamCard(exams[index]),
-          );
-        },
+              final exams = snapshot.data!.exams;
+              return ListView.builder(
+                padding: context.pagePadding,
+                itemCount: exams.length,
+                itemBuilder: (context, index) => _buildExamCard(exams[index]),
+              );
+            },
+          ),
+        ),
       ),
     );
   }
 
   Widget _buildExamCard(TeacherExam exam) {
-    final theme = Theme.of(context);
+    final theme = context.theme;
+    final colorScheme = theme.colorScheme;
     return Card(
-      margin: const EdgeInsets.only(bottom: 20),
+      elevation: 0,
+      margin: EdgeInsets.only(bottom: context.scale(20)),
+      color: colorScheme.surfaceContainerLow,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(context.scale(20)),
+        side: BorderSide(color: colorScheme.outlineVariant, width: 1),
+      ),
       child: Padding(
-        padding: const EdgeInsets.all(20.0),
+        padding: EdgeInsets.all(context.scale(20.0)),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -64,34 +77,45 @@ class _ExamInformationPageState extends State<ExamInformationPage> {
               children: [
                 Expanded(
                   child: Text(exam.name, 
-                    style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: context.font(16),
+                      color: colorScheme.onSurface,
+                    )
                   )
                 ),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  padding: EdgeInsets.symmetric(horizontal: context.scale(10), vertical: context.scale(4)),
                   decoration: BoxDecoration(
-                    color: theme.colorScheme.primary.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(4)
+                    color: colorScheme.primaryContainer,
+                    borderRadius: BorderRadius.circular(context.scale(8))
                   ),
                   child: Text(exam.code, 
-                    style: TextStyle(color: theme.colorScheme.primary, fontSize: 10, fontWeight: FontWeight.bold)
+                    style: TextStyle(
+                      color: colorScheme.primary, 
+                      fontSize: context.font(10), 
+                      fontWeight: FontWeight.bold
+                    )
                   ),
                 )
               ],
             ),
-            const SizedBox(height: 12),
+            SizedBox(height: context.scale(12)),
             Text(exam.description ?? "General examination information and instructions.", 
-              style: theme.textTheme.bodySmall?.copyWith(color: theme.hintColor)
+              style: TextStyle(
+                fontSize: context.font(12),
+                color: colorScheme.onSurfaceVariant,
+              )
             ),
-            const Divider(height: 32),
+            Divider(height: context.scale(32), color: colorScheme.outlineVariant),
             Row(
               children: [
                 _infoTile(Icons.calendar_today, "Starts", exam.startDate),
-                const SizedBox(width: 24),
+                SizedBox(width: context.scale(24)),
                 _infoTile(Icons.event_available, "Ends", exam.endDate),
               ],
             ),
-            const SizedBox(height: 24),
+            SizedBox(height: context.scale(24)),
             buildActionButton(
               context, 
               "VIEW FULL SCHEDULE", 
@@ -104,20 +128,28 @@ class _ExamInformationPageState extends State<ExamInformationPage> {
   }
 
   Widget _infoTile(IconData icon, String label, String date) {
-    final theme = Theme.of(context);
+    final colorScheme = Theme.of(context).colorScheme;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Row(
           children: [
-            Icon(icon, size: 14, color: theme.colorScheme.primary),
-            const SizedBox(width: 6),
-            Text(label, style: theme.textTheme.labelSmall?.copyWith(fontWeight: FontWeight.bold)),
+            Icon(icon, size: context.scale(14), color: colorScheme.primary),
+            SizedBox(width: context.scale(6)),
+            Text(label, style: TextStyle(
+              fontWeight: FontWeight.bold,
+              fontSize: context.font(11),
+              color: colorScheme.onSurfaceVariant,
+            )),
           ],
         ),
-        const SizedBox(height: 4),
-        Text(date, style: theme.textTheme.bodySmall),
+        SizedBox(height: context.scale(4)),
+        Text(date, style: TextStyle(
+          fontSize: context.font(12),
+          color: colorScheme.onSurface,
+        )),
       ],
     );
   }
 }
+

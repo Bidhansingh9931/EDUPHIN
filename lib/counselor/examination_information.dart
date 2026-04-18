@@ -43,7 +43,7 @@ class _ExamListPageState extends State<ExamListPage> {
       } else {
         if (mounted) {
           setState(() {
-            _errorMessage = "Failed to load exams";
+            _errorMessage = ApiService.errorMessage(response, "Failed to load exams");
             _isLoading = false;
           });
         }
@@ -51,7 +51,7 @@ class _ExamListPageState extends State<ExamListPage> {
     } catch (e) {
       if (mounted) {
         setState(() {
-          _errorMessage = "Error: $e";
+          _errorMessage = e.toString().replaceFirst("Exception: ", "");
           _isLoading = false;
         });
       }
@@ -60,19 +60,29 @@ class _ExamListPageState extends State<ExamListPage> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
+    final theme = context.theme;
     return Scaffold(
       appBar: AppBar(
-        title: const Text("Examination List"),
+        title: Text("Examination List", style: TextStyle(fontSize: context.font(20))),
       ),
       body: RefreshIndicator(
         onRefresh: _fetchExams,
         child: _isLoading
             ? const Center(child: CircularProgressIndicator())
             : _errorMessage != null
-                ? Center(child: Padding(
-                    padding: const EdgeInsets.all(24.0),
-                    child: Text(_errorMessage!, textAlign: TextAlign.center, style: TextStyle(color: theme.colorScheme.error)),
+                ? Center(
+                    child: Padding(
+                    padding: EdgeInsets.all(context.scale(24.0)),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(Icons.error_outline, color: theme.colorScheme.error, size: context.scale(48)),
+                        SizedBox(height: context.md),
+                        Text(_errorMessage!, textAlign: TextAlign.center, style: TextStyle(color: theme.colorScheme.error, fontSize: context.font(14))),
+                        SizedBox(height: context.lg),
+                        FilledButton.icon(onPressed: _fetchExams, icon: const Icon(Icons.refresh), label: const Text("RETRY")),
+                      ],
+                    ),
                   ))
                 : SingleChildScrollView(
                     physics: const AlwaysScrollableScrollPhysics(),
@@ -85,75 +95,78 @@ class _ExamListPageState extends State<ExamListPage> {
                           children: [
                             Card(
                               child: Padding(
-                                padding: const EdgeInsets.all(20),
+                                padding: EdgeInsets.all(context.scale(20)),
                                 child: Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
-                                    Text("Search Active Exams", style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
-                                    const SizedBox(height: 16),
+                                    Text("Search Active Exams", style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold, fontSize: context.font(16))),
+                                    SizedBox(height: context.scale(16)),
                                     TextField(
-                                      decoration: const InputDecoration(
+                                      style: TextStyle(fontSize: context.font(14)),
+                                      decoration: InputDecoration(
                                         hintText: "Search by exam name or code...",
-                                        prefixIcon: Icon(Icons.search),
+                                        prefixIcon: Icon(Icons.search, size: context.scale(20)),
+                                        hintStyle: TextStyle(fontSize: context.font(14)),
                                       ),
                                     ),
                                   ],
                                 ),
                               ),
                             ),
-                            const SizedBox(height: 24),
+                            SizedBox(height: context.scale(24)),
                             Card(
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   Padding(
-                                    padding: const EdgeInsets.all(20),
-                                    child: Text("Exams Collection", style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
+                                    padding: EdgeInsets.all(context.scale(20)),
+                                    child: Text("Exams Collection", style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold, fontSize: context.font(16))),
                                   ),
                                   const Divider(height: 1),
                                   if (_exams.isEmpty)
-                                    const Padding(
-                                      padding: EdgeInsets.all(40.0),
-                                      child: Center(child: Text("No active exams found")),
+                                    Padding(
+                                      padding: EdgeInsets.all(context.scale(40.0)),
+                                      child: Center(child: Text("No active exams found", style: TextStyle(fontSize: context.font(14)))),
                                     )
                                   else
                                     SingleChildScrollView(
                                       scrollDirection: Axis.horizontal,
                                       child: DataTable(
                                         headingRowColor: WidgetStateProperty.all(theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.3)),
-                                        columns: const [
-                                          DataColumn(label: Text("#", style: TextStyle(fontWeight: FontWeight.bold))),
-                                          DataColumn(label: Text("Exam Name", style: TextStyle(fontWeight: FontWeight.bold))),
-                                          DataColumn(label: Text("Type", style: TextStyle(fontWeight: FontWeight.bold))),
-                                          DataColumn(label: Text("Code", style: TextStyle(fontWeight: FontWeight.bold))),
-                                          DataColumn(label: Text("Schedule", style: TextStyle(fontWeight: FontWeight.bold))),
-                                          DataColumn(label: Text("Actions", style: TextStyle(fontWeight: FontWeight.bold))),
+                                        columnSpacing: context.scale(20),
+                                        columns: [
+                                          DataColumn(label: Text("#", style: TextStyle(fontWeight: FontWeight.bold, fontSize: context.font(12)))),
+                                          DataColumn(label: Text("Exam Name", style: TextStyle(fontWeight: FontWeight.bold, fontSize: context.font(12)))),
+                                          DataColumn(label: Text("Type", style: TextStyle(fontWeight: FontWeight.bold, fontSize: context.font(12)))),
+                                          DataColumn(label: Text("Code", style: TextStyle(fontWeight: FontWeight.bold, fontSize: context.font(12)))),
+                                          DataColumn(label: Text("Schedule", style: TextStyle(fontWeight: FontWeight.bold, fontSize: context.font(12)))),
+                                          DataColumn(label: Text("Actions", style: TextStyle(fontWeight: FontWeight.bold, fontSize: context.font(12)))),
                                         ],
                                         rows: _exams.asMap().entries.map((entry) {
                                           int idx = entry.key;
                                           ExamType exam = entry.value;
                                           return DataRow(cells: [
-                                            DataCell(Text("${idx + 1}")),
-                                            DataCell(SizedBox(width: 180, child: Text(exam.name, style: const TextStyle(fontWeight: FontWeight.w500)))),
+                                            DataCell(Text("${idx + 1}", style: TextStyle(fontSize: context.font(12)))),
+                                            DataCell(SizedBox(width: context.scale(180), child: Text(exam.name, style: TextStyle(fontWeight: FontWeight.w500, fontSize: context.font(12))))),
                                             DataCell(Container(
-                                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                              padding: EdgeInsets.symmetric(horizontal: context.scale(10), vertical: context.scale(4)),
                                               decoration: BoxDecoration(
                                                 color: theme.colorScheme.secondaryContainer.withValues(alpha: 0.5),
-                                                borderRadius: BorderRadius.circular(6),
+                                                borderRadius: BorderRadius.circular(context.scale(6)),
                                               ),
                                               child: Text(
                                                 (exam.type ?? "WRITTEN").toUpperCase(),
-                                                style: TextStyle(color: theme.colorScheme.onSecondaryContainer, fontSize: 11, fontWeight: FontWeight.bold),
+                                                style: TextStyle(color: theme.colorScheme.onSecondaryContainer, fontSize: context.font(11), fontWeight: FontWeight.bold),
                                               ),
                                             )),
-                                            DataCell(Text(exam.code ?? "-")),
-                                            DataCell(Text("${exam.startDate ?? ''} - ${exam.endDate ?? ''}", style: const TextStyle(fontSize: 11))),
+                                            DataCell(Text(exam.code ?? "-", style: TextStyle(fontSize: context.font(12)))),
+                                            DataCell(Text("${exam.startDate ?? ''} - ${exam.endDate ?? ''}", style: TextStyle(fontSize: context.font(11)))),
                                             DataCell(
                                               TextButton(
                                                 onPressed: () {
                                                   Navigator.push(context, MaterialPageRoute(builder: (_) => ExamSchedulePage(exam: exam)));
                                                 },
-                                                child: const Text("VIEW", style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+                                                child: Text("VIEW", style: TextStyle(fontSize: context.font(11), fontWeight: FontWeight.bold)),
                                               ),
                                             ),
                                           ]);

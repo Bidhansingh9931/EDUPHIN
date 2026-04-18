@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:eduphin/manager_dashboard/studyMaterial/add_assignment.dart';
 import 'package:eduphin/manager_dashboard/studyMaterial/edit_assignment.dart';
 import 'package:eduphin/services/api_service.dart';
+import 'package:eduphin/services/responsive_helper.dart';
 import 'package:intl/intl.dart';
 import 'package:eduphin/manager_dashboard/studyMaterial/submission_assignment.dart';
 import 'package:flutter/material.dart';
@@ -219,7 +220,7 @@ class _AssignmentsPageState extends State<AssignmentsPage> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
+    final theme = context.theme;
     return Scaffold(
       backgroundColor: theme.scaffoldBackgroundColor,
       appBar: AppBar(
@@ -228,7 +229,7 @@ class _AssignmentsPageState extends State<AssignmentsPage> {
       ),
       floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
       floatingActionButton: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16.0),
+        padding: context.pagePadding.copyWith(top: 0),
         child: SizedBox(
           width: double.infinity,
           child: FloatingActionButton.extended(
@@ -250,11 +251,11 @@ class _AssignmentsPageState extends State<AssignmentsPage> {
       body: isLoading
           ? const Center(child: CircularProgressIndicator())
           : Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16.0),
+              padding: context.pagePadding.copyWith(bottom: 0),
               child: Column(
                 children: [
                   _buildFilterSection(theme),
-                  const SizedBox(height: 16),
+                  SizedBox(height: context.md),
                   Expanded(
                     child: filteredAssignments.isNotEmpty
                         ? _buildAssignmentsList()
@@ -272,57 +273,26 @@ class _AssignmentsPageState extends State<AssignmentsPage> {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: theme.colorScheme.surface,
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: [
-          BoxShadow(
-            color: theme.shadowColor.withAlpha(25),
-            spreadRadius: 1,
-            blurRadius: 3,
-            offset: const Offset(0, 1),
-          ),
-        ],
+        color: theme.colorScheme.surfaceContainerLow,
+        borderRadius: BorderRadius.circular(context.scale(20)),
+        border: Border.all(color: theme.colorScheme.outlineVariant),
       ),
-      child: LayoutBuilder(
-        builder: (context, constraints) {
-          if (constraints.maxWidth > 400) {
-            return Row(
-              children: [
-                Expanded(child: _buildDropdown(theme, "Select Class *", selectedClass, classes.map((c) => c.name).toList(), (v) {
-                  if (v != null) {
-                    setState(() => selectedClass = v);
-                    _filterAssignments();
-                  }
-                })),
-                const SizedBox(width: 16),
-                Expanded(child: _buildDropdown(theme, "Select Section *", selectedSection, sections.map((s) => s.name).toList(), (v) {
-                  if (v != null) {
-                    setState(() => selectedSection = v);
-                    _filterAssignments();
-                  }
-                })),
-              ],
-            );
-          } else {
-            return Column(
-              children: [
-                _buildDropdown(theme, "Select Class *", selectedClass, classes.map((c) => c.name).toList(), (v) {
-                  if (v != null) {
-                    setState(() => selectedClass = v);
-                    _filterAssignments();
-                  }
-                }),
-                const SizedBox(height: 16),
-                _buildDropdown(theme, "Select Section *", selectedSection, sections.map((s) => s.name).toList(), (v) {
-                  if (v != null) {
-                    setState(() => selectedSection = v);
-                    _filterAssignments();
-                  }
-                }),
-              ],
-            );
-          }
-        },
+      child: Row(
+        children: [
+          Expanded(child: _buildDropdown(theme, "Select Class *", selectedClass, classes.map((c) => c.name).toList(), (v) {
+            if (v != null) {
+              setState(() => selectedClass = v);
+              _filterAssignments();
+            }
+          })),
+          SizedBox(width: context.md),
+          Expanded(child: _buildDropdown(theme, "Select Section *", selectedSection, sections.map((s) => s.name).toList(), (v) {
+            if (v != null) {
+              setState(() => selectedSection = v);
+              _filterAssignments();
+            }
+          })),
+        ],
       ),
     );
   }
@@ -340,14 +310,18 @@ class _AssignmentsPageState extends State<AssignmentsPage> {
         DropdownButtonFormField<String>(
           isExpanded: true,
           value: dropdownValue,
-          dropdownColor: theme.cardColor,
+          dropdownColor: theme.colorScheme.surfaceContainerLow,
           style: theme.textTheme.bodyLarge,
           decoration: InputDecoration(
             filled: true,
             fillColor: theme.scaffoldBackgroundColor,
             border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-              borderSide: BorderSide.none,
+              borderRadius: BorderRadius.circular(context.scale(12)),
+              borderSide: BorderSide(color: theme.colorScheme.outlineVariant),
+            ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(context.scale(12)),
+              borderSide: BorderSide(color: theme.colorScheme.outlineVariant),
             ),
             contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
           ),
@@ -360,9 +334,10 @@ class _AssignmentsPageState extends State<AssignmentsPage> {
 
   Widget _buildAssignmentsList() {
     final subjects = filteredAssignments.keys.toList();
-    return ListView.builder(
+    return ListView.separated(
       padding: const EdgeInsets.only(bottom: 80), // Adjusted for FAB
       itemCount: subjects.length,
+      separatorBuilder: (context, index) => SizedBox(height: context.md),
       itemBuilder: (context, index) {
         final subject = subjects[index];
         final assignments = filteredAssignments[subject]!;
@@ -370,21 +345,37 @@ class _AssignmentsPageState extends State<AssignmentsPage> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Padding(
-              padding: const EdgeInsets.only(top: 16, bottom: 10),
+              padding: const EdgeInsets.only(bottom: 10),
               child: Text(
                 subject, // Subject Name
-                style: Theme.of(context)
-                    .textTheme
-                    .titleLarge
-                    ?.copyWith(fontWeight: FontWeight.w700),
+                style: context.theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700),
               ),
             ),
-            ...assignments.map((a) => _AssignmentCard(assignment: a, onDelete: () => _deleteAssignment(a.id), onEdit: () async {
+            context.responsive(
+              Column(children: assignments.map((a) => _AssignmentCard(assignment: a, onDelete: () => _deleteAssignment(a.id), onEdit: () async {
                  final result = await Navigator.push(context, MaterialPageRoute(builder: (context) => EditAssignmentPage(assignment: a)));
                  if(result == true) {
                     _fetchData();
                  }
-            })),
+              })).toList()),
+              tablet: GridView.builder(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                gridDelegate: SliverGridDelegateWithMaxCrossAxisExtent(
+                  maxCrossAxisExtent: 500,
+                  mainAxisSpacing: context.sm,
+                  crossAxisSpacing: context.sm,
+                  childAspectRatio: 1.6,
+                ),
+                itemCount: assignments.length,
+                itemBuilder: (context, index) => _AssignmentCard(assignment: assignments[index], onDelete: () => _deleteAssignment(assignments[index].id), onEdit: () async {
+                  final result = await Navigator.push(context, MaterialPageRoute(builder: (context) => EditAssignmentPage(assignment: assignments[index])));
+                  if(result == true) {
+                      _fetchData();
+                  }
+                }),
+              ),
+            ),
           ],
         );
       },
@@ -401,81 +392,83 @@ class _AssignmentCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return Card(
-      elevation: 2,
+    final theme = context.theme;
+    return Container(
       margin: const EdgeInsets.only(bottom: 12),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Flexible(
-                  child: Text(
-                    assignment.title,
-                    style: theme.textTheme.titleMedium?.copyWith(
-                    color: theme.colorScheme.primary,
-                    fontWeight: FontWeight.w700,
-                  ),
-                  ),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surfaceContainerLow,
+        borderRadius: BorderRadius.circular(context.scale(18)),
+        border: Border.all(color: theme.colorScheme.outlineVariant),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Flexible(
+                child: Text(
+                  assignment.title,
+                  style: theme.textTheme.titleMedium?.copyWith(
+                  color: theme.colorScheme.primary,
+                  fontWeight: FontWeight.w700,
                 ),
-                 Row(
-                  children: [
-                    IconButton(icon: Icon(Icons.edit, size: 20, color: theme.colorScheme.secondary), onPressed: onEdit, constraints: const BoxConstraints()),
-                    IconButton(icon: Icon(Icons.delete, size: 20, color: theme.colorScheme.error), onPressed: onDelete, constraints: const BoxConstraints()),
-                  ],
                 ),
-              ],
-            ),
-            const SizedBox(height: 10),
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Expanded(
-                  child: _buildInfoColumn(
-                      theme, "Uploaded by", assignment.uploadedBy),
-                ),
-                Expanded(
-                  child: _buildInfoColumn(
-                      theme, "Uploaded Date", assignment.uploadedDate),
-                ),
-              ],
-            ),
-            _buildInfoColumn(theme, "Due Date", assignment.dueDate),
-            const SizedBox(height: 12),
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton(
-                onPressed: () {
-                  Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                          builder: (context) =>
-                              AssignmentSubmissionsScreen(assignmentId: assignment.id)));
-                },
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: theme.colorScheme.primary,
-                  foregroundColor: theme.colorScheme.onPrimary,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  padding: const EdgeInsets.symmetric(vertical: 12),
-                ),
-                child: const Text("View Submission"),
               ),
-            )
-          ],
-        ),
+               Row(
+                children: [
+                  IconButton(icon: Icon(Icons.edit, size: 20, color: theme.colorScheme.secondary), onPressed: onEdit, constraints: const BoxConstraints()),
+                  IconButton(icon: Icon(Icons.delete, size: 20, color: theme.colorScheme.error), onPressed: onDelete, constraints: const BoxConstraints()),
+                ],
+              ),
+            ],
+          ),
+          SizedBox(height: context.xs),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: _buildInfoColumn(
+                    context, "Uploaded by", assignment.uploadedBy),
+              ),
+              Expanded(
+                child: _buildInfoColumn(
+                    context, "Uploaded Date", assignment.uploadedDate),
+              ),
+            ],
+          ),
+          _buildInfoColumn(context, "Due Date", assignment.dueDate),
+          SizedBox(height: context.sm),
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton(
+              onPressed: () {
+                Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                        builder: (context) =>
+                            AssignmentSubmissionsScreen(assignmentId: assignment.id)));
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: theme.colorScheme.primary,
+                foregroundColor: theme.colorScheme.onPrimary,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(context.scale(10)),
+                ),
+                padding: const EdgeInsets.symmetric(vertical: 12),
+              ),
+              child: const Text("View Submission"),
+            ),
+          )
+        ],
       ),
     );
   }
 
-  Widget _buildInfoColumn(ThemeData theme, String label, String value) {
+  Widget _buildInfoColumn(BuildContext context, String label, String value) {
+    final theme = context.theme;
     return Padding(
       padding: const EdgeInsets.only(bottom: 6),
       child: Column(

@@ -1,3 +1,4 @@
+import 'package:eduphin/services/responsive_helper.dart';
 import 'package:flutter/material.dart';
 import 'package:eduphin/services/api_service.dart';
 import 'package:eduphin/teacher/dashboard/schedule_models.dart';
@@ -43,7 +44,7 @@ class _ScheduleClassPageState extends State<ScheduleClassPage> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
+    final theme = context.theme;
 
     return Scaffold(
       backgroundColor: theme.scaffoldBackgroundColor,
@@ -51,45 +52,57 @@ class _ScheduleClassPageState extends State<ScheduleClassPage> {
         title: const Text("My Schedule"),
         actions: [
           IconButton(
-            icon: const Icon(Icons.calendar_today),
+            icon: Icon(Icons.calendar_today, size: context.scale(20)),
             onPressed: () => _selectDate(context),
           ),
         ],
       ),
-      body: Column(
-        children: [
-          _buildDateHeader(),
-          Expanded(
-            child: FutureBuilder<List<TeacherScheduleItem>>(
-                future: _scheduleFuture,
-                builder: (context, snapshot) {
-                  if (snapshot.connectionState == ConnectionState.waiting) {
-                    return const Center(child: CircularProgressIndicator());
-                  } else if (snapshot.hasError) {
-                    return Center(child: Text('Error: ${snapshot.error}'));
-                  } else if (snapshot.hasData && snapshot.data!.isNotEmpty) {
-                    return _buildScheduleList(snapshot.data!);
-                  } else {
-                    return const Center(
-                        child: Text("No classes scheduled for this day."));
-                  }
-                }),
+      body: Center(
+        child: ConstrainedBox(
+          constraints: BoxConstraints(maxWidth: context.scale(800)),
+          child: Column(
+            children: [
+              _buildDateHeader(),
+              Expanded(
+                child: FutureBuilder<List<TeacherScheduleItem>>(
+                    future: _scheduleFuture,
+                    builder: (context, snapshot) {
+                      if (snapshot.connectionState == ConnectionState.waiting) {
+                        return const Center(child: CircularProgressIndicator());
+                      } else if (snapshot.hasError) {
+                        return Center(child: Padding(
+                          padding: EdgeInsets.all(context.spacing),
+                          child: Text('Error: ${snapshot.error}', style: TextStyle(fontSize: context.font(14))),
+                        ));
+                      } else if (snapshot.hasData && snapshot.data!.isNotEmpty) {
+                        return _buildScheduleList(snapshot.data!);
+                      } else {
+                        return Center(
+                            child: Text("No classes scheduled for this day.", style: TextStyle(fontSize: context.font(14), color: theme.hintColor)));
+                      }
+                    }),
+              ),
+            ],
           ),
-        ],
+        ),
       ),
     );
   }
 
   Widget _buildDateHeader() {
+    final theme = context.theme;
     return Container(
-      padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
-      color: Theme.of(context).colorScheme.surfaceVariant.withAlpha(100),
+      width: double.infinity,
+      padding: EdgeInsets.symmetric(vertical: context.scale(12), horizontal: context.spacing),
+      color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.4),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
+          Icon(Icons.today, size: context.scale(18), color: theme.colorScheme.primary),
+          SizedBox(width: context.scale(8)),
           Text(
             DateFormat.yMMMMd().format(_selectedDate),
-            style: Theme.of(context).textTheme.titleLarge,
+            style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold, fontSize: context.font(16)),
           ),
         ],
       ),
@@ -98,7 +111,7 @@ class _ScheduleClassPageState extends State<ScheduleClassPage> {
 
   Widget _buildScheduleList(List<TeacherScheduleItem> schedules) {
     return ListView.builder(
-      padding: const EdgeInsets.all(16),
+      padding: context.pagePadding,
       itemCount: schedules.length,
       itemBuilder: (context, index) {
         final item = schedules[index];
@@ -116,49 +129,66 @@ class ScheduleCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
+    final theme = context.theme;
 
     return Card(
-      margin: const EdgeInsets.only(bottom: 16),
+      elevation: 0,
+      margin: EdgeInsets.only(bottom: context.spacing),
+      color: theme.colorScheme.surfaceContainerLow,
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-        side: scheduleItem.isOverride
-            ? BorderSide(color: Colors.orange.shade700, width: 2)
-            : BorderSide.none,
+        borderRadius: BorderRadius.circular(context.scale(12)),
+        side: BorderSide(
+          color: scheduleItem.isOverride
+              ? const Color(0xFFF59E0B).withValues(alpha: 0.5) // Amber
+              : theme.colorScheme.outlineVariant.withValues(alpha: 0.5),
+          width: scheduleItem.isOverride ? 2 : 1,
+        ),
       ),
       child: Padding(
-        padding: const EdgeInsets.all(16.0),
+        padding: EdgeInsets.all(context.spacing),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text(
-                  scheduleItem.subject?['name'] ?? 'N/A',
-                  style: theme.textTheme.titleLarge,
+                Expanded(
+                  child: Text(
+                    scheduleItem.subject?['name'] ?? 'N/A',
+                    style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold, fontSize: context.font(16)),
+                  ),
                 ),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  padding: EdgeInsets.symmetric(horizontal: context.scale(8), vertical: context.scale(4)),
                   decoration: BoxDecoration(
                     color: theme.colorScheme.primaryContainer,
-                    borderRadius: BorderRadius.circular(6),
+                    borderRadius: BorderRadius.circular(context.scale(6)),
                   ),
                   child: Text(
                     '${scheduleItem.startTime} - ${scheduleItem.endTime}',
-                    style: TextStyle(color: theme.colorScheme.onPrimaryContainer, fontWeight: FontWeight.bold),
+                    style: TextStyle(
+                      color: theme.colorScheme.onPrimaryContainer,
+                      fontWeight: FontWeight.bold,
+                      fontSize: context.font(12),
+                    ),
                   ),
                 ),
               ],
             ),
-            const SizedBox(height: 8),
-            Text(
-              '${scheduleItem.classInfo?['name'] ?? 'N/A'} - ${scheduleItem.section?['name'] ?? 'N/A'}',
-              style: theme.textTheme.bodyMedium,
+            SizedBox(height: context.scale(8)),
+            Row(
+              children: [
+                Icon(Icons.class_outlined, size: context.scale(14), color: theme.colorScheme.onSurfaceVariant),
+                SizedBox(width: context.scale(4)),
+                Text(
+                  '${scheduleItem.classInfo?['name'] ?? 'N/A'} - ${scheduleItem.section?['name'] ?? 'N/A'}',
+                  style: theme.textTheme.bodyMedium?.copyWith(fontSize: context.font(14), color: theme.colorScheme.onSurfaceVariant),
+                ),
+              ],
             ),
             if (scheduleItem.isOverride) ...[
-              const Divider(height: 20),
-              _buildOverrideInfo(),
+              Divider(height: context.scale(24), color: const Color(0xFFF59E0B).withValues(alpha: 0.3)), // Amber
+              _buildOverrideInfo(context),
             ]
           ],
         ),
@@ -166,33 +196,35 @@ class ScheduleCard extends StatelessWidget {
     );
   }
 
-  Widget _buildOverrideInfo() {
+  Widget _buildOverrideInfo(BuildContext context) {
+    final theme = context.theme;
     final newTeacherName = scheduleItem.newTeacher?['user']?['name'];
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Row(
           children: [
-            Icon(Icons.warning_amber_rounded, color: Colors.orange.shade600, size: 20),
-            const SizedBox(width: 8),
+            Icon(Icons.warning_amber_rounded, color: const Color(0xFFF59E0B), size: context.scale(18)), // Amber
+            SizedBox(width: context.scale(8)),
             Text(
               'Class ${scheduleItem.overrideType}',
               style: TextStyle(
-                  color: Colors.orange.shade600, fontWeight: FontWeight.bold),
+                  color: const Color(0xFFF59E0B), fontWeight: FontWeight.bold, fontSize: context.font(13)), // Amber
             ),
           ],
         ),
         if (newTeacherName != null)
           Padding(
-            padding: const EdgeInsets.only(top: 4.0),
-            child: Text('Taken by: $newTeacherName'),
+            padding: EdgeInsets.only(top: context.scale(4.0)),
+            child: Text('Taken by: $newTeacherName', style: TextStyle(fontSize: context.font(12))),
           ),
         if (scheduleItem.note != null)
           Padding(
-            padding: const EdgeInsets.only(top: 4.0),
-            child: Text('Note: ${scheduleItem.note}'),
+            padding: EdgeInsets.only(top: context.scale(4.0)),
+            child: Text('Note: ${scheduleItem.note}', style: TextStyle(fontSize: context.font(12), fontStyle: FontStyle.italic)),
           ),
       ],
     );
   }
 }
+

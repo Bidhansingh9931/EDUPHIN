@@ -31,62 +31,105 @@ class _LendingBooksPageState extends State<LendingBooksPage> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
+    final theme = context.theme;
 
     return Scaffold(
       appBar: AppBar(
-        title: const Row(
+        title: Row(
           children: [
-            Icon(Icons.book_outlined, size: 20),
-            SizedBox(width: 12),
-            Text("My Lending Books"),
+            Icon(Icons.book_outlined, size: context.scale(20)),
+            SizedBox(width: context.scale(12)),
+            const Text("My Lending Books"),
           ],
         ),
       ),
       body: SingleChildScrollView(
-        child: Column(
-          children: [
-            _buildFilterSection(),
-            _buildLendingTable(),
-            const SizedBox(height: 32),
-          ],
+        child: Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 1000),
+            child: Column(
+              children: [
+                _buildFilterSection(),
+                _buildLendingTable(),
+                SizedBox(height: context.scale(32)),
+              ],
+            ),
+          ),
         ),
       ),
     );
   }
 
   Widget _buildFilterSection() {
+    final theme = context.theme;
     return buildFilterCard(
       context,
       children: [
         Row(
           children: [
-            const Icon(Icons.filter_alt_outlined, size: 18),
-            const SizedBox(width: 8),
-            Text("Filter Books", style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold)),
+            Icon(Icons.filter_alt_outlined, size: context.scale(18), color: theme.colorScheme.primary),
+            SizedBox(width: context.scale(8)),
+            Text(
+              "Filter Books",
+              style: theme.textTheme.titleMedium?.copyWith(
+                fontWeight: FontWeight.bold,
+                fontSize: context.font(16),
+              ),
+            ),
           ],
         ),
-        const SizedBox(height: 16),
-        _fieldLabel("Book Title"),
-        buildTextField(context, _titleController, "e.g. Math, Physics"),
-        _fieldLabel("Due Date From"),
-        buildDateField(context, _fromDateController, "dd-mm-yyyy"),
-        _fieldLabel("Due Date To"),
-        buildDateField(context, _toDateController, "dd-mm-yyyy"),
-
-        const SizedBox(height: 20),
-        buildActionButton(context, "FILTER", () => setState(() => _listKey = UniqueKey())),
-        const SizedBox(height: 10),
-        buildActionButton(
-          context, 
-          "RESET", 
-          () => setState(() {
-            _titleController.clear();
-            _fromDateController.clear();
-            _toDateController.clear();
-            _listKey = UniqueKey();
-          }),
-          isPrimary: false
+        SizedBox(height: context.spacing),
+        buildResponsiveRow(context, [
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _fieldLabel("Book Title"),
+              buildTextField(context, _titleController, "e.g. Math, Physics"),
+            ],
+          ),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _fieldLabel("Due Date From"),
+              buildDateField(context, _fromDateController, "dd-mm-yyyy"),
+            ],
+          ),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _fieldLabel("Due Date To"),
+              buildDateField(context, _toDateController, "dd-mm-yyyy"),
+            ],
+          ),
+        ]),
+        SizedBox(height: context.scale(24)),
+        Row(
+          children: [
+            const Spacer(),
+            SizedBox(
+              width: context.scale(120),
+              child: buildActionButton(
+                context,
+                "RESET",
+                () => setState(() {
+                  _titleController.clear();
+                  _fromDateController.clear();
+                  _toDateController.clear();
+                  _listKey = UniqueKey();
+                }),
+                isPrimary: false,
+              ),
+            ),
+            SizedBox(width: context.scale(12)),
+            SizedBox(
+              width: context.scale(120),
+              child: buildActionButton(
+                context,
+                "FILTER",
+                () => setState(() => _listKey = UniqueKey()),
+              ),
+            ),
+          ],
         ),
       ],
     );
@@ -94,66 +137,71 @@ class _LendingBooksPageState extends State<LendingBooksPage> {
 
   Widget _fieldLabel(String text) {
     return Padding(
-      padding: const EdgeInsets.only(top: 12, bottom: 4),
-      child: Text(text, style: Theme.of(context).textTheme.labelSmall?.copyWith(fontWeight: FontWeight.bold)),
+      padding: EdgeInsets.only(top: context.spacing / 2, bottom: context.spacing / 4),
+      child: Text(
+        text,
+        style: context.theme.textTheme.labelSmall?.copyWith(
+          fontWeight: FontWeight.bold,
+          fontSize: context.font(12),
+        ),
+      ),
     );
   }
 
   Widget _buildLendingTable() {
-    final theme = Theme.of(context);
+    final theme = context.theme;
     return Card(
-      margin: const EdgeInsets.all(16),
+      elevation: 0,
+      margin: context.pagePadding,
+      color: theme.colorScheme.surfaceContainerLow,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(context.scale(16)),
+        side: BorderSide(color: theme.colorScheme.outlineVariant.withValues(alpha: 0.5)),
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Padding(
-            padding: const EdgeInsets.all(16.0),
-            child: Row(
-              children: [
-                Text("Show Entries", style: theme.textTheme.labelMedium),
-                const SizedBox(width: 8),
-                const Icon(Icons.keyboard_arrow_down, size: 14),
-                const Spacer(),
-                Container(
-                  width: 120,
-                  height: 32,
-                  child: buildTextField(context, TextEditingController(), "search"),
-                )
-              ],
+            padding: EdgeInsets.all(context.spacing),
+            child: buildResponsiveRow(context, [
+              Row(
+                children: [
+                  Text("Show Entries", style: theme.textTheme.labelMedium?.copyWith(fontSize: context.font(12), color: theme.colorScheme.onSurfaceVariant)),
+                  SizedBox(width: context.scale(8)),
+                  Icon(Icons.keyboard_arrow_down, size: context.scale(14), color: theme.colorScheme.onSurfaceVariant),
+                ],
+              ),
+              buildTextField(context, TextEditingController(), "Search...", prefixIcon: Icons.search),
+            ]),
+          ),
+          Divider(height: 1, color: theme.colorScheme.outlineVariant.withValues(alpha: 0.5)),
+          Theme(
+            data: theme.copyWith(dividerColor: Colors.transparent),
+            child: SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: DataTable(
+                columnSpacing: context.scale(24),
+                headingRowHeight: context.scale(56),
+                dataRowMinHeight: context.scale(56),
+                dataRowMaxHeight: context.scale(56),
+                headingRowColor: WidgetStateProperty.all(theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.3)),
+                columns: [
+                  DataColumn(label: Text("#", style: TextStyle(fontWeight: FontWeight.bold, fontSize: context.font(13), color: theme.colorScheme.onSurfaceVariant))),
+                  DataColumn(label: Text("Issue No.", style: TextStyle(fontWeight: FontWeight.bold, fontSize: context.font(13), color: theme.colorScheme.onSurfaceVariant))),
+                  DataColumn(label: Text("Book ID", style: TextStyle(fontWeight: FontWeight.bold, fontSize: context.font(13), color: theme.colorScheme.onSurfaceVariant))),
+                  DataColumn(label: Text("Book Title", style: TextStyle(fontWeight: FontWeight.bold, fontSize: context.font(13), color: theme.colorScheme.onSurfaceVariant))),
+                ],
+                rows: [
+                  DataRow(cells: [
+                    DataCell(Text("1", style: TextStyle(fontWeight: FontWeight.bold, fontSize: context.font(13)))),
+                    DataCell(Text("2", style: TextStyle(fontSize: context.font(13)))),
+                    DataCell(Text("4", style: TextStyle(fontSize: context.font(13)))),
+                    DataCell(Text("Advanced Taxation Concepts", style: TextStyle(fontWeight: FontWeight.w500, fontSize: context.font(13)))),
+                  ]),
+                ],
+              ),
             ),
           ),
-          const Divider(height: 1),
-          _buildTableHeader(),
-          const Divider(height: 1),
-          _buildLendingRow(1, "2", "4", "Advanced Taxation Concepts"),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildTableHeader() {
-    return const Padding(
-      padding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-      child: Row(
-        children: [
-          SizedBox(width: 30, child: Text("#", style: TextStyle(fontWeight: FontWeight.bold))),
-          Expanded(child: Text("Issue No.", style: TextStyle(fontWeight: FontWeight.bold), textAlign: TextAlign.center)),
-          Expanded(child: Text("Book ID", style: TextStyle(fontWeight: FontWeight.bold), textAlign: TextAlign.center)),
-          Expanded(flex: 2, child: Text("Book Title", style: TextStyle(fontWeight: FontWeight.bold), textAlign: TextAlign.center)),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildLendingRow(int id, String issueNo, String bookId, String title) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-      child: Row(
-        children: [
-          SizedBox(width: 30, child: Text("$id")),
-          Expanded(child: Text(issueNo, textAlign: TextAlign.center)),
-          Expanded(child: Text(bookId, textAlign: TextAlign.center)),
-          Expanded(flex: 2, child: Text(title, textAlign: TextAlign.center)),
         ],
       ),
     );

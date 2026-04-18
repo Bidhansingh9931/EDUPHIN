@@ -27,8 +27,8 @@ class AppTheme {
       primary: primaryColor,
       surface: isDark ? darkSurface : lightSurface,
       onSurface: isDark ? darkText : lightText,
-      // Using withOpacity for better compatibility across Flutter versions
-      surfaceContainerHighest: isDark ? Colors.white.withOpacity(0.05) : Colors.black.withOpacity(0.03),
+      // Using withValues for Flutter 3.22+ compatibility
+      surfaceContainerHighest: isDark ? Colors.white.withValues(alpha: 0.05) : Colors.black.withValues(alpha: 0.03),
       outline: isDark ? Colors.white10 : Colors.black12,
     );
 
@@ -75,7 +75,7 @@ class AppTheme {
       ),
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
-        fillColor: isDark ? Colors.white.withOpacity(0.05) : Colors.black.withOpacity(0.03),
+        fillColor: isDark ? Colors.white.withValues(alpha: 0.05) : Colors.black.withValues(alpha: 0.03),
         contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),

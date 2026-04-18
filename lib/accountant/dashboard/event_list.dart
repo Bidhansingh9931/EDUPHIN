@@ -2,6 +2,7 @@ import 'package:eduphin/services/responsive_helper.dart';
 import 'package:flutter/material.dart';
 import 'package:eduphin/services/api_service.dart';
 import 'accountant_dashboard_model.dart';
+import 'package:eduphin/teacher/dashboard/common_widgets.dart';
 
 class EventListPage extends StatefulWidget {
   final bool showRegisteredOnly;
@@ -111,7 +112,7 @@ class _EventListPageState extends State<EventListPage> with SingleTickerProvider
           TextButton(onPressed: () => Navigator.pop(context, false), child: const Text("GO BACK")),
           ElevatedButton(
             onPressed: () => Navigator.pop(context, true), 
-            style: ElevatedButton.styleFrom(backgroundColor: Theme.of(context).colorScheme.error),
+            style: ElevatedButton.styleFrom(backgroundColor: context.theme.colorScheme.error),
             child: const Text("CANCEL SPOT", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
           ),
         ],
@@ -184,177 +185,220 @@ class _EventListPageState extends State<EventListPage> with SingleTickerProvider
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text("Event Management"),
+        title: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text("Event Management", style: context.theme.appBarTheme.titleTextStyle?.copyWith(fontSize: context.font(18))),
+            Text("Explore and register for upcoming events", style: context.theme.textTheme.labelSmall?.copyWith(color: context.theme.hintColor, fontSize: context.font(11))),
+          ],
+        ),
         bottom: TabBar(
           controller: _tabController,
+          indicatorSize: TabBarIndicatorSize.tab,
           tabs: const [
-            Tab(text: "Explore"),
+            Tab(text: "Explore Events"),
             Tab(text: "My Participation"),
           ],
         ),
       ),
-      body: Column(
-        children: [
-          _buildFilterBar(),
-          Expanded(
-            child: _isLoading
-                ? const Center(child: CircularProgressIndicator())
-                : TabBarView(
+      body: _isLoading && (_availableEvents.isEmpty && _registeredEvents.isEmpty)
+          ? const Center(child: CircularProgressIndicator())
+          : Column(
+              children: [
+                _buildFilterBar(),
+                Expanded(
+                  child: TabBarView(
                     controller: _tabController,
                     children: [
                       _buildEventList(),
                       _buildRegisteredList(),
                     ],
                   ),
-          ),
-        ],
-      ),
+                ),
+              ],
+            ),
     );
   }
 
   Widget _buildFilterBar() {
     bool isExplore = _tabController.index == 0;
-    return Padding(
-      padding: const EdgeInsets.all(16.0),
-      child: Row(
-        children: [
-          Expanded(child: _buildSmallDropdown(
-            isExplore ? _exploreStatus : _registeredStatus, 
-            isExplore ? _exploreStatusOptions : _registeredStatusOptions, 
-            (val) {
-              setState(() {
-                if (isExplore) {
-                  _exploreStatus = val!;
-                } else {
-                  _registeredStatus = val!;
+    return buildFilterCard(
+      context,
+      children: [
+        buildResponsiveRow(context, [
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              buildLabel(context, "Event Status"),
+              buildDropdown(
+                context, 
+                isExplore ? _exploreStatusOptions : _registeredStatusOptions, 
+                isExplore ? _exploreStatus : _registeredStatus, 
+                (val) {
+                  setState(() {
+                    if (isExplore) {
+                      _exploreStatus = val!;
+                    } else {
+                      _registeredStatus = val!;
+                    }
+                  });
+                  _fetchData();
                 }
-              });
-              _fetchData();
-            }
-          )),
-          const SizedBox(width: 12),
-          Expanded(child: _buildSmallDropdown(
-            isExplore ? _exploreType : _registeredType, 
-            _typeOptions, 
-            (val) {
-              setState(() {
-                if (isExplore) {
-                  _exploreType = val!;
-                } else {
-                  _registeredType = val!;
+              ),
+            ],
+          ),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              buildLabel(context, "Event Type"),
+              buildDropdown(
+                context, 
+                _typeOptions, 
+                isExplore ? _exploreType : _registeredType, 
+                (val) {
+                  setState(() {
+                    if (isExplore) {
+                      _exploreType = val!;
+                    } else {
+                      _registeredType = val!;
+                    }
+                  });
+                  _fetchData();
                 }
-              });
-              _fetchData();
-            }
-          )),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildSmallDropdown(String value, List<String> items, ValueChanged<String?> onChanged) {
-    return DropdownButtonFormField<String>(
-      value: value,
-      isExpanded: true,
-      items: items.map((e) => DropdownMenuItem(value: e, child: Text(e, style: const TextStyle(fontSize: 13)))).toList(),
-      onChanged: onChanged,
-      decoration: const InputDecoration(contentPadding: EdgeInsets.symmetric(horizontal: 12)),
+              ),
+            ],
+          ),
+        ]),
+      ],
     );
   }
 
   Widget _buildEventList() {
     if (_availableEvents.isEmpty) {
-      return _buildEmptyState("No events found");
+      return _buildEmptyState("No upcoming events found");
     }
-    return GridView.builder(
-      padding: context.pagePadding,
-      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: context.isTablet ? 2 : 1,
-        mainAxisExtent: 320,
-        crossAxisSpacing: 16,
-        mainAxisSpacing: 16,
+    return Center(
+      child: ConstrainedBox(
+        constraints: BoxConstraints(maxWidth: context.scale(1200)),
+        child: GridView.builder(
+          padding: context.pagePadding,
+          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: context.isDesktop ? 3 : (context.isTablet ? 2 : 1),
+            mainAxisExtent: context.scale(360),
+            crossAxisSpacing: context.spacing,
+            mainAxisSpacing: context.spacing,
+          ),
+          itemCount: _availableEvents.length,
+          itemBuilder: (context, index) => _buildEventItem(_availableEvents[index]),
+        ),
       ),
-      itemCount: _availableEvents.length,
-      itemBuilder: (context, index) => _buildEventItem(_availableEvents[index]),
     );
   }
 
   Widget _buildRegisteredList() {
     if (_registeredEvents.isEmpty) {
-      return _buildEmptyState("No registrations found");
+      return _buildEmptyState("You haven't registered for any events yet");
     }
-    return ListView.builder(
-      padding: context.pagePadding,
-      itemCount: _registeredEvents.length,
-      itemBuilder: (context, index) => _buildRegisteredItem(_registeredEvents[index]),
+    return Center(
+      child: ConstrainedBox(
+        constraints: BoxConstraints(maxWidth: context.scale(800)),
+        child: ListView.builder(
+          padding: context.pagePadding,
+          itemCount: _registeredEvents.length,
+          itemBuilder: (context, index) => _buildRegisteredItem(_registeredEvents[index]),
+        ),
+      ),
     );
   }
 
   Widget _buildEmptyState(String message) {
+    final theme = context.theme;
     return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(Icons.event_note_outlined, color: Theme.of(context).hintColor.withValues(alpha: 0.3), size: 64),
-          const SizedBox(height: 16),
-          Text(message, style: TextStyle(color: Theme.of(context).hintColor)),
-        ],
+      child: Padding(
+        padding: EdgeInsets.all(context.scale(40)),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.event_note_outlined, color: theme.hintColor.withValues(alpha: 0.3), size: context.scale(64)),
+            SizedBox(height: context.scale(16)),
+            Text(message, style: TextStyle(color: theme.hintColor, fontSize: context.font(14)), textAlign: TextAlign.center),
+          ],
+        ),
       ),
     );
   }
 
   Widget _buildEventItem(Event event) {
-    final theme = Theme.of(context);
+    final theme = context.theme;
     return Card(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(
-            height: 120,
-            width: double.infinity,
-            decoration: BoxDecoration(
-              borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
-              color: theme.colorScheme.surfaceContainerHighest,
-              image: event.image != null ? DecorationImage(image: NetworkImage("${ApiService.baseUrl}/storage/${event.image}"), fit: BoxFit.cover) : null,
+      elevation: 0,
+      color: theme.colorScheme.surfaceContainerLow,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(context.scale(16)),
+        side: BorderSide(color: theme.colorScheme.outlineVariant, width: 0.5),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: () => _register(event),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Container(
+              height: context.scale(150),
+              width: double.infinity,
+              decoration: BoxDecoration(
+                color: theme.colorScheme.surfaceContainerHighest,
+                image: event.image != null ? DecorationImage(image: NetworkImage("${ApiService.baseUrl}/storage/${event.image}"), fit: BoxFit.cover) : null,
+              ),
+              child: event.image == null ? Icon(Icons.image_outlined, color: theme.hintColor.withValues(alpha: 0.3), size: context.scale(40)) : null,
             ),
-            child: event.image == null ? Icon(Icons.image_outlined, color: theme.hintColor.withValues(alpha: 0.3), size: 40) : null,
-          ),
-          Padding(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(event.title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16), maxLines: 1, overflow: TextOverflow.ellipsis),
-                const SizedBox(height: 8),
-                Row(
-                  children: [
-                    Icon(Icons.calendar_today, color: theme.colorScheme.primary, size: 14),
-                    const SizedBox(width: 8),
-                    Text(event.date, style: theme.textTheme.bodySmall),
-                  ],
-                ),
-                const SizedBox(height: 8),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: (event.isTicketed ? Colors.orange : Colors.green).withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(6),
+            Padding(
+              padding: EdgeInsets.all(context.spacing),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(event.title, style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold, fontSize: context.font(16)), maxLines: 1, overflow: TextOverflow.ellipsis),
+                  SizedBox(height: context.scale(8)),
+                  Row(
+                    children: [
+                      Icon(Icons.calendar_today_rounded, color: theme.colorScheme.primary, size: context.scale(14)),
+                      SizedBox(width: context.scale(8)),
+                      Text(event.date, style: theme.textTheme.bodySmall?.copyWith(fontSize: context.font(12))),
+                    ],
                   ),
-                  child: Text(event.isTicketed ? "PAID: ₹${event.ticketPrice}" : "FREE", 
-                    style: TextStyle(color: event.isTicketed ? Colors.orange : Colors.green, fontSize: 10, fontWeight: FontWeight.bold)),
-                ),
-                const SizedBox(height: 16),
-                SizedBox(
-                  width: double.infinity,
-                  child: ElevatedButton(
-                    onPressed: () => _register(event),
-                    child: const Text("REGISTER"),
+                  SizedBox(height: context.scale(12)),
+                  Container(
+                    padding: EdgeInsets.symmetric(horizontal: context.scale(10), vertical: context.scale(4)),
+                    decoration: BoxDecoration(
+                      color: (event.isTicketed ? Colors.orange : Colors.green).withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(context.scale(8)),
+                    ),
+                    child: Text(
+                      event.isTicketed ? "PAID EVENT: ₹${event.ticketPrice}" : "FREE EVENT", 
+                      style: TextStyle(
+                        color: event.isTicketed ? Colors.orange : Colors.green, 
+                        fontSize: context.font(10), 
+                        fontWeight: FontWeight.bold
+                      )
+                    ),
                   ),
-                ),
-              ],
+                  SizedBox(height: context.spacing),
+                  SizedBox(
+                    width: double.infinity,
+                    child: FilledButton(
+                      onPressed: () => _register(event),
+                      style: FilledButton.styleFrom(
+                        padding: EdgeInsets.symmetric(vertical: context.scale(12)),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(context.scale(12))),
+                      ),
+                      child: Text("REGISTER NOW", style: TextStyle(fontSize: context.font(13), fontWeight: FontWeight.bold)),
+                    ),
+                  ),
+                ],
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -362,42 +406,70 @@ class _EventListPageState extends State<EventListPage> with SingleTickerProvider
   Widget _buildRegisteredItem(EventRegistration registration) {
     final event = registration.event;
     final bool isCancelled = registration.status.toLowerCase() == 'cancelled';
-    final theme = Theme.of(context);
+    final theme = context.theme;
 
     return Card(
-      margin: const EdgeInsets.only(bottom: 12),
-      child: ListTile(
-        contentPadding: const EdgeInsets.all(16),
-        leading: CircleAvatar(
-          backgroundColor: theme.colorScheme.primary.withValues(alpha: 0.1),
-          child: Icon(Icons.event_available, color: theme.colorScheme.primary),
-        ),
-        title: Text(event.title, style: const TextStyle(fontWeight: FontWeight.bold)),
-        subtitle: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+      margin: EdgeInsets.only(bottom: context.spacing),
+      elevation: 0,
+      color: theme.colorScheme.surfaceContainerLow,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(context.scale(16)),
+        side: BorderSide(color: theme.colorScheme.outlineVariant, width: 0.5),
+      ),
+      child: Padding(
+        padding: EdgeInsets.all(context.spacing),
+        child: Row(
           children: [
-            const SizedBox(height: 4),
-            Text(event.date, style: theme.textTheme.bodySmall),
-            const SizedBox(height: 8),
-            Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                  decoration: BoxDecoration(
-                    color: (isCancelled ? Colors.red : Colors.green).withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(4),
-                  ),
-                  child: Text(registration.status.toUpperCase(), 
-                    style: TextStyle(color: isCancelled ? Colors.red : Colors.green, fontSize: 10, fontWeight: FontWeight.bold)),
-                ),
-                if (!isCancelled) ...[
-                  const SizedBox(width: 12),
-                  InkWell(
-                    onTap: () => _cancelRegistration(registration),
-                    child: const Text("Cancel Registration", style: TextStyle(color: Colors.red, fontSize: 12, fontWeight: FontWeight.bold, decoration: TextDecoration.underline)),
+            Container(
+              padding: EdgeInsets.all(context.scale(12)),
+              decoration: BoxDecoration(
+                color: theme.colorScheme.primaryContainer,
+                shape: BoxShape.circle,
+              ),
+              child: Icon(Icons.event_available_rounded, color: theme.colorScheme.onPrimaryContainer, size: context.scale(24)),
+            ),
+            SizedBox(width: context.spacing),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(event.title, style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
+                  Text(event.date, style: theme.textTheme.bodySmall),
+                  SizedBox(height: context.scale(8)),
+                  Row(
+                    children: [
+                      Container(
+                        padding: EdgeInsets.symmetric(horizontal: context.scale(8), vertical: context.scale(2)),
+                        decoration: BoxDecoration(
+                          color: (isCancelled ? Colors.red : Colors.green).withValues(alpha: 0.1),
+                          borderRadius: BorderRadius.circular(context.scale(6)),
+                        ),
+                        child: Text(
+                          registration.status.toUpperCase(), 
+                          style: TextStyle(
+                            color: isCancelled ? Colors.red : Colors.green, 
+                            fontSize: context.font(10), 
+                            fontWeight: FontWeight.bold
+                          )
+                        ),
+                      ),
+                      if (!isCancelled) ...[
+                        SizedBox(width: context.spacing),
+                        TextButton(
+                          onPressed: () => _cancelRegistration(registration),
+                          style: TextButton.styleFrom(
+                            foregroundColor: theme.colorScheme.error,
+                            padding: EdgeInsets.zero,
+                            minimumSize: Size.zero,
+                            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                          ),
+                          child: const Text("Cancel Spot"),
+                        ),
+                      ],
+                    ],
                   ),
                 ],
-              ],
+              ),
             ),
           ],
         ),

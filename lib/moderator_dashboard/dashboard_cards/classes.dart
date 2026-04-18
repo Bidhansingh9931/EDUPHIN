@@ -80,44 +80,56 @@ class _ClassesPageState extends State<ClassesPage> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
+    final theme = context.theme;
     final colorScheme = theme.colorScheme;
 
     return Scaffold(
+      backgroundColor: theme.scaffoldBackgroundColor,
       appBar: AppBar(
-        title: const Text('Institute Classes'),
+        title: Text('Institute Classes', style: TextStyle(fontSize: context.font(20), fontWeight: FontWeight.bold)),
         actions: [
           IconButton(
             onPressed: _refreshClasses,
-            icon: const Icon(Icons.refresh_rounded),
+            icon: Icon(Icons.refresh_rounded, size: context.scale(24)),
           ),
-          const SizedBox(width: 8),
+          SizedBox(width: context.md),
         ],
       ),
       body: RefreshIndicator(
         onRefresh: _refreshClasses,
+        color: theme.colorScheme.primary,
         child: FutureBuilder<List<ClassInfo>>(
           future: _classesFuture,
           builder: (context, snapshot) {
             if (snapshot.connectionState == ConnectionState.waiting) {
-              return const Center(child: CircularProgressIndicator());
+              return Center(child: CircularProgressIndicator(color: theme.colorScheme.primary));
             }
             if (snapshot.hasError) {
               return Center(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(Icons.error_outline_rounded, size: 48, color: colorScheme.error),
-                    const SizedBox(height: 16),
-                    Text('Error: ${snapshot.error}', textAlign: TextAlign.center),
-                    const SizedBox(height: 24),
-                    ElevatedButton(onPressed: _refreshClasses, child: const Text("Retry")),
-                  ],
+                child: Padding(
+                  padding: context.pagePadding,
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.error_outline_rounded, size: context.scale(48), color: colorScheme.error),
+                      SizedBox(height: context.md),
+                      Text('Error: ${snapshot.error}', textAlign: TextAlign.center, style: TextStyle(fontSize: context.font(14), color: theme.colorScheme.onSurface)),
+                      SizedBox(height: context.lg),
+                      ElevatedButton(
+                        onPressed: _refreshClasses,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: theme.colorScheme.primary,
+                          foregroundColor: theme.colorScheme.onPrimary,
+                        ),
+                        child: Text("Retry", style: TextStyle(fontSize: context.font(16))),
+                      ),
+                    ],
+                  ),
                 ),
               );
             }
             if (!snapshot.hasData || snapshot.data!.isEmpty) {
-              return _buildEmptyState(theme);
+              return _buildEmptyState(context);
             }
 
             final classes = snapshot.data!;
@@ -127,16 +139,16 @@ class _ClassesPageState extends State<ClassesPage> {
               physics: const AlwaysScrollableScrollPhysics(),
               child: Center(
                 child: ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 1200),
+                  constraints: BoxConstraints(maxWidth: context.scale(1200)),
                   child: GridView.builder(
                     shrinkWrap: true,
                     physics: const NeverScrollableScrollPhysics(),
                     itemCount: classes.length,
                     gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
                       crossAxisCount: context.responsive(1, tablet: 2, desktop: 3),
-                      crossAxisSpacing: 16,
-                      mainAxisSpacing: 16,
-                      mainAxisExtent: 100,
+                      crossAxisSpacing: context.md,
+                      mainAxisSpacing: context.md,
+                      mainAxisExtent: context.scale(100),
                     ),
                     itemBuilder: (context, index) {
                       return _buildClassCard(context, classes[index]);
@@ -152,44 +164,51 @@ class _ClassesPageState extends State<ClassesPage> {
   }
 
   Widget _buildClassCard(BuildContext context, ClassInfo classInfo) {
-    final theme = Theme.of(context);
+    final theme = context.theme;
     final colorScheme = theme.colorScheme;
 
     return Card(
+      color: theme.colorScheme.surfaceContainerLow,
+      elevation: 0,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(context.md),
+        side: BorderSide(color: theme.colorScheme.outlineVariant),
+      ),
       child: ListTile(
-        contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+        contentPadding: EdgeInsets.symmetric(horizontal: context.md, vertical: context.sm),
         leading: Container(
-          padding: const EdgeInsets.all(10),
+          padding: EdgeInsets.all(context.sm),
           decoration: BoxDecoration(
-            color: colorScheme.primary.withOpacity(0.1),
-            borderRadius: BorderRadius.circular(12),
+            color: colorScheme.primary.withValues(alpha: 0.1),
+            borderRadius: BorderRadius.circular(context.sm),
           ),
-          child: Icon(Icons.class_rounded, color: colorScheme.primary),
+          child: Icon(Icons.class_rounded, color: colorScheme.primary, size: context.scale(24)),
         ),
         title: Text(
           classInfo.name,
-          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+          style: TextStyle(fontWeight: FontWeight.bold, fontSize: context.font(16), color: theme.colorScheme.onSurface),
         ),
         subtitle: Text(
           "Section: ${classInfo.section}",
-          style: TextStyle(color: theme.hintColor),
+          style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: context.font(14)),
         ),
-        trailing: const Icon(Icons.arrow_forward_ios_rounded, size: 16),
+        trailing: Icon(Icons.arrow_forward_ios_rounded, size: context.scale(16), color: theme.colorScheme.onSurfaceVariant),
         onTap: () {},
       ),
     );
   }
 
-  Widget _buildEmptyState(ThemeData theme) {
+  Widget _buildEmptyState(BuildContext context) {
+    final theme = context.theme;
     return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(Icons.class_outlined, size: 64, color: theme.hintColor.withOpacity(0.3)),
-          const SizedBox(height: 16),
-          const Text("No classes found", style: TextStyle(fontWeight: FontWeight.bold)),
-          const SizedBox(height: 8),
-          Text("There are no classes recorded for this institute.", style: TextStyle(color: theme.hintColor)),
+          Icon(Icons.class_outlined, size: context.scale(64), color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.3)),
+          SizedBox(height: context.md),
+          Text("No classes found", style: TextStyle(fontWeight: FontWeight.bold, fontSize: context.font(16), color: theme.colorScheme.onSurfaceVariant)),
+          SizedBox(height: context.sm),
+          Text("There are no classes recorded for this institute.", textAlign: TextAlign.center, style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: context.font(14))),
         ],
       ),
     );

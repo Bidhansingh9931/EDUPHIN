@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:eduphin/services/api_service.dart';
+import 'package:eduphin/services/responsive_helper.dart';
 import 'common_widgets.dart';
 
 class CreateTicketPage extends StatefulWidget {
@@ -44,7 +45,7 @@ class _CreateTicketPageState extends State<CreateTicketPage> {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
               content: Text('Ticket created successfully!'),
-              backgroundColor: Colors.green),
+              backgroundColor: Color(0xFF10B981)),
         );
         Navigator.of(context).pop(true); // Pop and indicate success
       } catch (e) {
@@ -52,7 +53,7 @@ class _CreateTicketPageState extends State<CreateTicketPage> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
               content: Text('Failed to create ticket: $e'),
-              backgroundColor: Colors.red),
+              backgroundColor: Color(0xFFEF4444)),
         );
       } finally {
         if (mounted) {
@@ -66,51 +67,84 @@ class _CreateTicketPageState extends State<CreateTicketPage> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
+    final theme = context.theme;
     return Scaffold(
-      backgroundColor: theme.scaffoldBackgroundColor,
       appBar: AppBar(
         title: const Text('Create New Ticket'),
       ),
       body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16.0),
-        child: Form(
-          key: _formKey,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              buildLabel(context, 'Title'),
-              buildTextField(context, _titleController, 'Enter a title'),
-              const SizedBox(height: 16),
-              buildLabel(context, 'Description'),
-              buildTextField(context, _descriptionController, 'Enter a description'),
-              const SizedBox(height: 16),
-              buildLabel(context, 'Category (Optional)'),
-              buildTextField(context, _categoryController, 'Enter a category'),
-              const SizedBox(height: 16),
-              buildLabel(context, 'Priority'),
-              buildDropdown(context, ['low', 'medium', 'high'], _priority, (newValue) {
-                  setState(() {
-                    _priority = newValue!;
-                  });
-                },),
-              const SizedBox(height: 24),
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton(
-                  onPressed: _isLoading ? null : _submitTicket,
-                  style: ElevatedButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(vertical: 16),
-                    backgroundColor: theme.colorScheme.primary,
-                    foregroundColor: theme.colorScheme.onPrimary,
+        padding: context.pagePadding,
+        child: Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 800),
+            child: Card(
+              elevation: 0,
+              color: theme.colorScheme.surfaceContainerLow,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(context.scale(16)),
+                side: BorderSide(color: theme.colorScheme.outlineVariant.withValues(alpha: 0.5)),
+              ),
+              child: Padding(
+                padding: EdgeInsets.all(context.spacing),
+                child: Form(
+                  key: _formKey,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      buildLabel(context, 'Title'),
+                      buildTextField(context, _titleController, 'Enter a title'),
+                      SizedBox(height: context.spacing),
+                      buildLabel(context, 'Description'),
+                      buildTextField(context, _descriptionController, 'Enter a description', maxLines: 4),
+                      SizedBox(height: context.spacing),
+                      buildLabel(context, 'Category (Optional)'),
+                      buildTextField(context, _categoryController, 'Enter a category'),
+                      SizedBox(height: context.spacing),
+                      buildLabel(context, 'Priority'),
+                      buildDropdown(
+                        context,
+                        ['low', 'medium', 'high'],
+                        _priority,
+                        (newValue) {
+                          setState(() {
+                            _priority = newValue!;
+                          });
+                        },
+                      ),
+                      SizedBox(height: context.scale(32)),
+                      SizedBox(
+                        width: double.infinity,
+                        child: ElevatedButton(
+                          onPressed: _isLoading ? null : _submitTicket,
+                          style: ElevatedButton.styleFrom(
+                            padding: EdgeInsets.symmetric(vertical: context.scale(16)),
+                            backgroundColor: theme.colorScheme.primary,
+                            foregroundColor: theme.colorScheme.onPrimary,
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(context.scale(12))),
+                          ),
+                          child: _isLoading
+                              ? SizedBox(
+                                  height: context.scale(20),
+                                  width: context.scale(20),
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    color: theme.colorScheme.onPrimary,
+                                  ),
+                                )
+                              : Text(
+                                  'Submit Ticket',
+                                  style: TextStyle(
+                                    fontSize: context.font(16),
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                        ),
+                      ),
+                    ],
                   ),
-                  child: _isLoading
-                      ? const CircularProgressIndicator(color: Colors.white)
-                      : const Text('Submit Ticket'),
                 ),
               ),
-            ],
+            ),
           ),
         ),
       ),

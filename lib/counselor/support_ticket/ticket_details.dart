@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import '../../services/api_service.dart';
+import '../../services/responsive_helper.dart';
 import '../counselor_models.dart';
 
 class TicketDetailsPage extends StatefulWidget {
@@ -93,12 +94,14 @@ class _TicketDetailsPageState extends State<TicketDetailsPage> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
+    final theme = context.theme;
+    final colorScheme = theme.colorScheme;
     final isClosed = _currentStatus == 'closed';
 
     return Scaffold(
+      backgroundColor: colorScheme.surface,
       appBar: AppBar(
-        title: const Text("Ticket Conversation"),
+        title: Text("Ticket Conversation", style: TextStyle(fontSize: context.font(20))),
         actions: [
           PopupMenuButton<String>(
             onSelected: _updateStatus,
@@ -108,60 +111,96 @@ class _TicketDetailsPageState extends State<TicketDetailsPage> {
               const PopupMenuItem(value: 'resolved', child: Text("Resolved")),
               const PopupMenuItem(value: 'closed', child: Text("Closed")),
             ],
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: Center(child: Text(_currentStatus.toUpperCase(), style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12))),
+            child: Container(
+              padding: EdgeInsets.symmetric(horizontal: context.scale(16), vertical: context.scale(8)),
+              child: Center(
+                child: Container(
+                  padding: EdgeInsets.symmetric(horizontal: context.scale(8), vertical: context.scale(4)),
+                  decoration: BoxDecoration(
+                    color: colorScheme.primaryContainer,
+                    borderRadius: BorderRadius.circular(context.scale(4)),
+                  ),
+                  child: Text(
+                    _currentStatus.toUpperCase(),
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: context.font(12),
+                      color: colorScheme.onPrimaryContainer,
+                    ),
+                  ),
+                ),
+              ),
             ),
           ),
         ],
       ),
-      body: Column(
-        children: [
-          _buildTicketInfo(),
-          Expanded(
-            child: _isLoading
-                ? const Center(child: CircularProgressIndicator())
-                : ListView.builder(
-                    padding: const EdgeInsets.all(16),
-                    itemCount: _replies.length,
-                    itemBuilder: (context, index) {
-                      final reply = _replies[index];
-                      return _buildReplyBubble(reply);
-                    },
-                  ),
+      body: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 800),
+          child: Column(
+            children: [
+              _buildTicketInfo(),
+              Expanded(
+                child: _isLoading
+                    ? const Center(child: CircularProgressIndicator())
+                    : ListView.builder(
+                        padding: context.pagePadding,
+                        itemCount: _replies.length,
+                        itemBuilder: (context, index) {
+                          final reply = _replies[index];
+                          return _buildReplyBubble(reply);
+                        },
+                      ),
+              ),
+              if (!isClosed)
+                _buildReplyInput()
+              else
+                Container(
+                  padding: EdgeInsets.all(context.spacing),
+                  color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
+                  width: double.infinity,
+                  child: const Center(child: Text("This ticket is closed and cannot be replied to.")),
+                ),
+            ],
           ),
-          if (!isClosed) _buildReplyInput() else Container(
-            padding: const EdgeInsets.all(16),
-            color: Colors.grey.shade200,
-            child: const Center(child: Text("This ticket is closed and cannot be replied to.")),
-          ),
-        ],
+        ),
       ),
     );
   }
 
   Widget _buildTicketInfo() {
+    final colorScheme = context.theme.colorScheme;
     return Container(
-      padding: const EdgeInsets.all(16),
-      color: Theme.of(context).colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
+      width: double.infinity,
+      padding: EdgeInsets.all(context.spacing),
+      decoration: BoxDecoration(
+        color: colorScheme.surfaceContainerLow,
+        border: Border(bottom: BorderSide(color: colorScheme.outlineVariant)),
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(widget.ticket.title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
-          const SizedBox(height: 8),
-          Text(widget.ticket.description ?? "No description", style: TextStyle(color: Colors.grey.shade700)),
+          Text(widget.ticket.title,
+              style: TextStyle(fontWeight: FontWeight.bold, fontSize: context.font(18))),
+          SizedBox(height: context.scale(8)),
+          Text(widget.ticket.description ?? "No description",
+              style: TextStyle(color: colorScheme.onSurfaceVariant, fontSize: context.font(14))),
         ],
       ),
     );
   }
 
   Widget _buildReplyBubble(TicketReply reply) {
+    final colorScheme = context.theme.colorScheme;
+    final isUser = reply.userName != null; // Ideally check against current user ID
+
     return Container(
-      margin: const EdgeInsets.only(bottom: 16),
-      padding: const EdgeInsets.all(12),
+      margin: EdgeInsets.only(bottom: context.spacing),
+      padding: EdgeInsets.all(context.scale(12)),
       decoration: BoxDecoration(
-        color: Colors.blue.shade50,
-        borderRadius: BorderRadius.circular(12),
+        color: colorScheme.surfaceContainerHigh,
+        borderRadius: BorderRadius.circular(context.scale(12)),
+        border: Border.all(color: colorScheme.outlineVariant),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -169,19 +208,31 @@ class _TicketDetailsPageState extends State<TicketDetailsPage> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(reply.userName ?? "User", style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
-              Text(reply.createdAt?.split('T')[0] ?? "", style: const TextStyle(fontSize: 10, color: Colors.grey)),
+              Text(reply.userName ?? "User",
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: context.font(12), color: colorScheme.primary)),
+              Text(reply.createdAt?.split('T')[0] ?? "",
+                  style: TextStyle(fontSize: context.font(10), color: colorScheme.onSurfaceVariant)),
             ],
           ),
-          const SizedBox(height: 8),
-          Text(reply.message),
+          SizedBox(height: context.scale(8)),
+          Text(reply.message, style: TextStyle(fontSize: context.font(14))),
           if (reply.attachment != null) ...[
-            const SizedBox(height: 8),
+            SizedBox(height: context.scale(8)),
             InkWell(
               onTap: () {}, // View attachment logic
               child: ClipRRect(
-                borderRadius: BorderRadius.circular(8),
-                child: Image.network("${ApiService.baseImageUrl}/${reply.attachment}", height: 100, fit: BoxFit.cover),
+                borderRadius: BorderRadius.circular(context.scale(8)),
+                child: Image.network(
+                  "${ApiService.baseImageUrl}/${reply.attachment}",
+                  height: context.scale(150),
+                  width: double.infinity,
+                  fit: BoxFit.cover,
+                  errorBuilder: (context, error, stackTrace) => Container(
+                    height: context.scale(100),
+                    color: colorScheme.surfaceContainerHighest,
+                    child: const Icon(Icons.broken_image),
+                  ),
+                ),
               ),
             ),
           ]
@@ -191,25 +242,44 @@ class _TicketDetailsPageState extends State<TicketDetailsPage> {
   }
 
   Widget _buildReplyInput() {
+    final colorScheme = context.theme.colorScheme;
     return Container(
-      padding: const EdgeInsets.all(8),
+      padding: EdgeInsets.all(context.scale(8)),
       decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surface,
+        color: colorScheme.surface,
         boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 10)],
+        border: Border(top: BorderSide(color: colorScheme.outlineVariant)),
       ),
-      child: Row(
-        children: [
-          IconButton(onPressed: _pickAttachment, icon: Icon(Icons.attach_file, color: _attachment != null ? Colors.green : null)),
-          Expanded(
-            child: TextField(
-              controller: _replyController,
-              decoration: const InputDecoration(hintText: "Type your message...", border: InputBorder.none),
+      child: SafeArea(
+        child: Row(
+          children: [
+            IconButton(
+              onPressed: _pickAttachment,
+              icon: Icon(Icons.attach_file, color: _attachment != null ? colorScheme.primary : colorScheme.onSurfaceVariant),
             ),
-          ),
-          _isSending
-              ? const CircularProgressIndicator()
-              : IconButton(onPressed: _sendReply, icon: const Icon(Icons.send, color: Colors.blue)),
-        ],
+            Expanded(
+              child: TextField(
+                controller: _replyController,
+                style: TextStyle(fontSize: context.font(14)),
+                decoration: InputDecoration(
+                  hintText: "Type your message...",
+                  border: InputBorder.none,
+                  contentPadding: EdgeInsets.symmetric(horizontal: context.scale(12)),
+                ),
+              ),
+            ),
+            _isSending
+                ? SizedBox(
+                    width: context.scale(24),
+                    height: context.scale(24),
+                    child: const CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : IconButton(
+                    onPressed: _sendReply,
+                    icon: Icon(Icons.send, color: colorScheme.primary),
+                  ),
+          ],
+        ),
       ),
     );
   }

@@ -1,7 +1,10 @@
+import 'dart:math';
+import 'package:eduphin/services/common_widgets.dart';
+import 'package:eduphin/services/pdf_service.dart';
 import 'package:eduphin/services/api_service.dart';
 import 'package:eduphin/student/student_virtual_id_model.dart';
 import 'package:flutter/material.dart';
-
+import 'package:eduphin/services/responsive_helper.dart';
 
 class ViewVirtualIdCard extends StatelessWidget {
   const ViewVirtualIdCard({super.key});
@@ -31,49 +34,66 @@ class _StudentCardPageState extends State<StudentCardPage> {
   }
 
   Future<void> _fetchIdCardData() async {
+    setState(() => isLoading = true);
     try {
       final data = await ApiService.getStudentVirtualIdCard();
-      setState(() {
-        idData = data;
-        isLoading = false;
-      });
+      if (mounted) {
+        setState(() {
+          idData = data;
+          isLoading = false;
+        });
+      }
     } catch (e) {
-      setState(() {
-        errorMessage = e.toString();
-        isLoading = false;
-      });
+      if (mounted) {
+        setState(() {
+          errorMessage = e.toString();
+          isLoading = false;
+        });
+      }
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    final theme = context.theme;
     if (isLoading) {
-      return const Scaffold(
-        backgroundColor: Color(0xFF071233),
-        body: Center(child: CircularProgressIndicator(color: Colors.white)),
+      return Scaffold(
+        body: Center(child: CircularProgressIndicator(color: theme.primaryColor)),
       );
     }
 
     if (errorMessage != null) {
       return Scaffold(
-        backgroundColor: const Color(0xFF071233),
         body: Center(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Text(errorMessage!, style: const TextStyle(color: Colors.white)),
-              const SizedBox(height: 20),
-              ElevatedButton(
-                onPressed: () {
-                  setState(() {
-                    isLoading = true;
-                    errorMessage = null;
-                  });
-                  _fetchIdCardData();
-                },
-                child: const Text("Retry"),
-              )
-            ],
+          child: Padding(
+            padding: EdgeInsets.all(context.scale(24.0)),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(Icons.error_outline, size: context.scale(64), color: theme.colorScheme.error),
+                SizedBox(height: context.md),
+                Text(
+                  errorMessage!,
+                  textAlign: TextAlign.center,
+                  style: TextStyle(fontSize: context.font(16)),
+                ),
+                SizedBox(height: context.lg),
+                ElevatedButton.icon(
+                  onPressed: () {
+                    setState(() {
+                      isLoading = true;
+                      errorMessage = null;
+                    });
+                    _fetchIdCardData();
+                  },
+                  style: ElevatedButton.styleFrom(
+                    padding: EdgeInsets.symmetric(horizontal: context.scale(24), vertical: context.scale(12)),
+                  ),
+                  icon: Icon(Icons.refresh, size: context.scale(18)),
+                  label: Text("Retry", style: TextStyle(fontSize: context.font(14))),
+                )
+              ],
+            ),
           ),
         ),
       );
@@ -82,233 +102,238 @@ class _StudentCardPageState extends State<StudentCardPage> {
     final student = idData?.student;
 
     return Scaffold(
-      backgroundColor: const Color(0xFF071233),
       appBar: AppBar(
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.white),
-          onPressed: () => Navigator.pop(context),
+        centerTitle: true,
+        title: Text(
+          "Virtual ID Card",
+          style: TextStyle(fontSize: context.font(18), fontWeight: FontWeight.bold),
         ),
       ),
       body: SingleChildScrollView(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-        child: Column(
-          children: [
-
-            /// TOP CARD
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(28),
-              decoration: BoxDecoration(
-                color: const Color(0xFF3F476B),
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
-              ),
-              child: Column(
-                children: [
-
-                  const Icon(Icons.school, size: 52, color: Colors.white70),
-                  const SizedBox(height: 10),
-
-                  const Text(
-                    "Indian Institute of Applied Sciences (IIAS)",
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                        fontSize: 22,
-                        fontWeight: FontWeight.w600,
-                        color: Colors.white),
+        padding: context.pagePadding,
+        child: Center(
+          child: Container(
+            constraints: const BoxConstraints(maxWidth: 800),
+            child: Column(
+              children: [
+                /// TOP CARD (The actual ID Card look)
+                Card(
+                  elevation: 0,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(context.scale(20)),
+                    side: BorderSide(color: theme.colorScheme.outlineVariant.withValues(alpha: 0.5)),
                   ),
-
-                  const SizedBox(height: 6),
-                  const Text("Est. 2025",
-                      style: TextStyle(color: Colors.white70)),
-
-                  const SizedBox(height: 4),
-                  const Text("9876543210",
-                      style: TextStyle(color: Colors.white70)),
-
-                  const SizedBox(height: 4),
-                  const Text(
-                    "Plot No. 88, Knowledge Park, Mock Industrial Estate, Delhi, New Delhi 102030",
-                    textAlign: TextAlign.center,
-                    style: TextStyle(color: Colors.white70),
-                  ),
-
-                  const SizedBox(height: 10),
-
-                  Text(
-                    "Academic Year: ${student?.academicYear ?? "2025"}",
-                    style: const TextStyle(
-                        fontWeight: FontWeight.w600,
-                        fontSize: 17,
-                        color: Colors.white),
-                  ),
-
-                  const SizedBox(height: 22),
-                  Divider(color: Colors.white.withValues(alpha: 0.2)),
-                  const SizedBox(height: 22),
-
-                  /// Photo
-                  Container(
-                    width: 120,
-                    height: 120,
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFCFD3DA),
-                      borderRadius: BorderRadius.circular(14),
-                      image: const DecorationImage(
-                        image: AssetImage('assets/images/girl_image.webp'),
-                        fit: BoxFit.cover,
-                      ),
-                    ),
-                    child: student?.profileImage != null && student!.profileImage!.isNotEmpty
-                        ? ClipRRect(
-                            borderRadius: BorderRadius.circular(14),
-                            child: Image.network(
-                              ApiService.getStorageUrl(student.profileImage),
-                              fit: BoxFit.cover,
-                              errorBuilder: (context, error, stackTrace) => const SizedBox.shrink(),
-                            ),
-                          )
-                        : null,
-                  ),
-
-                  const SizedBox(height: 20),
-
-                  /// Student Details
-                  buildDetail("Name:", "${student?.firstName ?? ""} ${student?.lastName ?? ""}"),
-                  buildDetail("Roll No:", student?.studentRollNo ?? "N/A"),
-                  buildDetail("DOB:", student?.dob ?? "N/A"),
-                  buildDetail("Contact:", student?.mobile ?? "N/A"),
-                ],
-              ),
-            ),
-
-            const SizedBox(height: 22),
-
-            /// STUDENT INFO SECTION
-            Container(
-              width: double.infinity,
-              decoration: BoxDecoration(
-                color: const Color(0xFF3F476B),
-                borderRadius: BorderRadius.circular(16),
-              ),
-              child: Column(
-                children: [
-
-                  Container(
+                  color: theme.colorScheme.surfaceContainerLow,
+                  child: Container(
                     width: double.infinity,
-                    padding: const EdgeInsets.all(14),
-                    decoration: const BoxDecoration(
-                      color: Color(0xFF606C77),
-                      borderRadius:
-                      BorderRadius.vertical(top: Radius.circular(16)),
+                    padding: EdgeInsets.all(context.scale(28)),
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(context.scale(20)),
                     ),
-                    child: const Center(
-                      child: Text(
-                        "Student Information",
-                        style: TextStyle(
-                            fontSize: 20,
-                            fontWeight: FontWeight.w600,
-                            color: Colors.white),
-                      ),
-                    ),
-                  ),
-
-                  Padding(
-                    padding: const EdgeInsets.all(22),
                     child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-
-                        sectionTitle("Address"),
-                        Text(
-                          "${student?.addressLine1 ?? ""}\n${student?.city ?? ""}, ${student?.state ?? ""} - ${student?.pincode ?? ""}\n${student?.country ?? ""}",
-                          style: const TextStyle(color: Colors.white70),
+                        /// Institute Header
+                        InstituteLogo(
+                          logoUrl: idData?.instituteLogo,
+                          size: context.scale(52),
                         ),
+                        SizedBox(height: context.md),
+                        Text(
+                          idData?.instituteName ?? "Indian Institute of Applied Sciences (IIAS)",
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            color: theme.colorScheme.primary,
+                            fontSize: context.font(20),
+                          ),
+                        ),
+                        SizedBox(height: context.xs),
+                        Text("Est. 2025", style: TextStyle(fontSize: context.font(11), color: theme.colorScheme.onSurfaceVariant)),
+                        Text(idData?.institutePhone ?? "9876543210", style: TextStyle(fontSize: context.font(11), color: theme.colorScheme.onSurfaceVariant)),
+                        SizedBox(height: context.xs),
+                        Text(
+                          idData?.instituteAddress ?? "Plot No. 88, Knowledge Park, Mock Industrial Estate, Delhi, New Delhi 102030",
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            color: theme.colorScheme.onSurfaceVariant,
+                            fontSize: context.font(11),
+                          ),
+                        ),
+                        SizedBox(height: context.md),
+                        Container(
+                          padding: EdgeInsets.symmetric(horizontal: context.scale(16), vertical: context.scale(6)),
+                          decoration: BoxDecoration(
+                            color: theme.colorScheme.primary.withValues(alpha: 0.1),
+                            borderRadius: BorderRadius.circular(context.scale(20)),
+                          ),
+                          child: Text(
+                            "Academic Year: ${student?.academicYear ?? "2025"}",
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              color: theme.colorScheme.primary,
+                              fontSize: context.font(12),
+                            ),
+                          ),
+                        ),
+                        SizedBox(height: context.lg),
+                        Divider(color: theme.colorScheme.outlineVariant.withValues(alpha: 0.5)),
+                        SizedBox(height: context.lg),
 
-                        const SizedBox(height: 18),
+                        /// Photo
+                        ProfileAvatar(
+                          imageUrl: ApiService.getStorageUrl(student?.profileImage),
+                          radius: context.scale(60),
+                        ),
+                        SizedBox(height: context.lg),
 
-                        sectionTitle("Guardian Details"),
-                        Text("Guardian Name: ${student?.guardianFirstName ?? "N/A"}",
-                            style: const TextStyle(color: Colors.white70)),
-                        Text("Guardian Mobile: ${student?.guardianMobile ?? "N/A"}",
-                            style: const TextStyle(color: Colors.white70)),
-
-                        const SizedBox(height: 18),
-
-                        sectionTitle("Institute Information"),
-                        const Text("Institute Code: IIAS-MOCK-001",
-                            style: TextStyle(color: Colors.white70)),
-                        const Text(
-                            "Affiliation: Board of Technical Education — AFF (FICT); Affiliation no.: AFF-FIC-2025",
-                            style: TextStyle(color: Colors.white70)),
-                        const Text("Website: https://iias-example.edu",
-                            style: TextStyle(color: Colors.white70)),
-                        const Text("Email: contact@iias.com",
-                            style: TextStyle(color: Colors.white70)),
+                        /// Student Details
+                        _buildDetail(context, "Name:", "${student?.firstName ?? ""} ${student?.lastName ?? ""}"),
+                        _buildDetail(context, "Roll No:", student?.studentRollNo ?? "N/A"),
+                        _buildDetail(context, "DOB:", student?.dob ?? "N/A"),
+                        _buildDetail(context, "Contact:", student?.mobile ?? "N/A"),
                       ],
                     ),
-                  )
-                ],
+                  ),
+                ),
+
+                SizedBox(height: context.lg),
+
+                /// STUDENT INFO SECTION
+                Card(
+                  elevation: 0,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(context.scale(20)),
+                    side: BorderSide(color: theme.colorScheme.outlineVariant.withValues(alpha: 0.5)),
+                  ),
+                  color: theme.colorScheme.surfaceContainerLow,
+                  child: Column(
+                    children: [
+                      Container(
+                        width: double.infinity,
+                        padding: EdgeInsets.all(context.scale(16)),
+                        decoration: BoxDecoration(
+                          color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
+                          borderRadius: BorderRadius.vertical(top: Radius.circular(context.scale(20))),
+                        ),
+                        child: Center(
+                          child: Text(
+                            "Student Information",
+                            style: TextStyle(fontWeight: FontWeight.bold, fontSize: context.font(16)),
+                          ),
+                        ),
+                      ),
+                      Padding(
+                        padding: EdgeInsets.all(context.scale(24)),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            _sectionTitle(context, "Address"),
+                            Text(
+                              "${student?.addressLine1 ?? ""}\n${student?.city ?? ""}, ${student?.state ?? ""} - ${student?.pincode ?? ""}\n${student?.country ?? ""}",
+                              style: TextStyle(fontSize: context.font(14)),
+                            ),
+                            SizedBox(height: context.lg),
+                            _sectionTitle(context, "Guardian Details"),
+                            _infoRow(context, "Guardian Name", student?.guardianFirstName ?? "N/A"),
+                            _infoRow(context, "Guardian Mobile", student?.guardianMobile ?? "N/A"),
+                            SizedBox(height: context.lg),
+                            _sectionTitle(context, "Institute Information"),
+                            _infoRow(context, "Institute Code", idData?.institutePhone != null ? "IIAS-${idData!.institutePhone!.substring(0, min(4, idData!.institutePhone!.length))}" : "IIAS-MOCK-001"),
+                            _infoRow(context, "Website", idData?.instituteWebsite ?? "https://eduphin.com"),
+                            _infoRow(context, "Email", idData?.instituteEmail ?? "contact@eduphin.com"),
+                          ],
+                        ),
+                      )
+                    ],
+                  ),
+                ),
+
+                SizedBox(height: context.xl),
+
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton.icon(
+                    style: ElevatedButton.styleFrom(
+                      padding: EdgeInsets.symmetric(vertical: context.scale(16)),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(context.scale(12))),
+                    ),
+                    onPressed: () {
+                      if (idData != null) {
+                        PdfService.generateAndPrintIdCard(idData);
+                      }
+                    },
+                    icon: Icon(Icons.download, size: context.scale(20)),
+                    label: Text("DOWNLOAD PDF", style: TextStyle(fontWeight: FontWeight.bold, fontSize: context.font(14))),
+                  ),
+                ),
+                SizedBox(height: context.xl),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDetail(BuildContext context, String label, String value) {
+    final theme = context.theme;
+    return Padding(
+      padding: EdgeInsets.symmetric(vertical: context.scale(8)),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            width: context.scale(100),
+            child: Text(
+              label,
+              style: TextStyle(
+                fontWeight: FontWeight.bold,
+                color: theme.colorScheme.onSurfaceVariant,
+                fontSize: context.font(14),
               ),
             ),
-
-            const SizedBox(height: 30),
-
-            ElevatedButton(
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF6C7782),
-                padding:
-                const EdgeInsets.symmetric(horizontal: 45, vertical: 15),
-                shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(10)),
-              ),
-              onPressed: () {},
-              child: const Text(
-                "DOWNLOAD PDF",
-                style: TextStyle(
-                    fontWeight: FontWeight.w600, color: Colors.white),
-              ),
+          ),
+          Expanded(
+            child: Text(
+              value,
+              style: TextStyle(fontWeight: FontWeight.w600, fontSize: context.font(14)),
             ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _infoRow(BuildContext context, String label, String value) {
+    return Padding(
+      padding: EdgeInsets.only(bottom: context.scale(8)),
+      child: RichText(
+        text: TextSpan(
+          style: TextStyle(fontSize: context.font(14), color: context.theme.colorScheme.onSurface),
+          children: [
+            TextSpan(text: "$label: ", style: const TextStyle(fontWeight: FontWeight.bold)),
+            TextSpan(text: value),
           ],
         ),
       ),
     );
   }
 
-  Widget buildDetail(String label, String value) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8),
-      child: Row(
-        children: [
-          SizedBox(
-            width: 110,
-            child: Text(label,
-                style: const TextStyle(
-                    fontWeight: FontWeight.w600, color: Colors.white)),
+  Widget _sectionTitle(BuildContext context, String title) {
+    final theme = context.theme;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          title,
+          style: TextStyle(
+            fontWeight: FontWeight.bold,
+            color: theme.colorScheme.primary,
+            fontSize: context.font(14),
           ),
-          Expanded(
-            child: Text(value,
-                style: const TextStyle(color: Colors.white)),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget sectionTitle(String title) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 6),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(title,
-              style: const TextStyle(
-                  fontWeight: FontWeight.w600, color: Colors.white)),
-          Divider(color: Colors.white.withValues(alpha: 0.25))
-        ],
-      ),
+        ),
+        Divider(height: context.scale(20), color: theme.colorScheme.outlineVariant.withValues(alpha: 0.5)),
+      ],
     );
   }
 }

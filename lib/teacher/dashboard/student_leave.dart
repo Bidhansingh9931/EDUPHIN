@@ -79,7 +79,7 @@ class _StudentLeaveScreenState extends State<StudentLeaveScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
+    final theme = context.theme;
 
     return Scaffold(
       appBar: AppBar(
@@ -87,71 +87,112 @@ class _StudentLeaveScreenState extends State<StudentLeaveScreen> {
       ),
       body: RefreshIndicator(
         onRefresh: _handleRefresh,
-        child: Column(
-          children: [
-            _buildFilterCard(),
-            Expanded(
-              child: FutureBuilder<List<StudentLeave>>(
-                future: _leaveFuture,
-                builder: (context, snapshot) {
-                  if (snapshot.connectionState == ConnectionState.waiting && _allLeaves.isEmpty) {
-                    return const Center(child: CircularProgressIndicator());
-                  } else if (snapshot.hasError) {
-                    return Center(child: Text('Error: ${snapshot.error}'));
-                  } else if (_filteredLeaves.isEmpty) {
-                    return const Center(child: Text("No leave applications found."));
-                  }
-                  return _buildLeaveList();
-                },
-              ),
+        child: Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 1000),
+            child: Column(
+              children: [
+                _buildFilterCard(),
+                Expanded(
+                  child: FutureBuilder<List<StudentLeave>>(
+                    future: _leaveFuture,
+                    builder: (context, snapshot) {
+                      if (snapshot.connectionState == ConnectionState.waiting && _allLeaves.isEmpty) {
+                        return const Center(child: CircularProgressIndicator());
+                      } else if (snapshot.hasError) {
+                        return Center(child: Text('Error: ${snapshot.error}', style: TextStyle(color: theme.colorScheme.error)));
+                      } else if (_filteredLeaves.isEmpty) {
+                        return Center(
+                          child: Text(
+                            "No leave applications found.",
+                            style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: context.font(14)),
+                          ),
+                        );
+                      }
+                      return _buildLeaveList();
+                    },
+                  ),
+                ),
+              ],
             ),
-          ],
+          ),
         ),
       ),
     );
   }
 
   Widget _buildFilterCard() {
+    final theme = context.theme;
     return Card(
-      margin: const EdgeInsets.all(16),
+      elevation: 0,
+      margin: context.pagePadding,
+      color: theme.colorScheme.surfaceContainerLow,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(context.scale(16)),
+        side: BorderSide(color: theme.colorScheme.outlineVariant.withValues(alpha: 0.5)),
+      ),
       child: Padding(
-        padding: const EdgeInsets.all(16.0),
+        padding: EdgeInsets.all(context.spacing),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            buildLabel(context, "Search"),
-            buildTextField(context, _searchController, "Student Roll no."),
-            const SizedBox(height: 12),
-            buildLabel(context, "Applied Date"),
-            buildDateField(context, _dateController, "dd-mm-yyyy"),
-            const SizedBox(height: 12),
-            buildLabel(context, "Status"),
-            buildDropdown(
-              context, 
-              ['pending', 'approved', 'rejected'], 
-              _selectedStatus, 
-              (val) {
-                setState(() => _selectedStatus = val);
-                _filterLeaves();
-              },
-              hint: "Select Status"
-            ),
-            const SizedBox(height: 20),
+            buildResponsiveRow(context, [
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  buildLabel(context, "Search"),
+                  buildTextField(context, _searchController, "Student Roll no."),
+                ],
+              ),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  buildLabel(context, "Applied Date"),
+                  buildDateField(context, _dateController, "dd-mm-yyyy"),
+                ],
+              ),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  buildLabel(context, "Status"),
+                  buildDropdown(
+                    context,
+                    ['pending', 'approved', 'rejected'],
+                    _selectedStatus,
+                    (val) {
+                      setState(() => _selectedStatus = val);
+                      _filterLeaves();
+                    },
+                    hint: "Select Status",
+                  ),
+                ],
+              ),
+            ]),
+            SizedBox(height: context.spacing),
             Row(
               children: [
-                Expanded(
-                  child: ElevatedButton.icon(
-                    onPressed: _filterLeaves,
-                    icon: const Icon(Icons.search),
-                    label: const Text("APPLY"),
+                const Spacer(),
+                SizedBox(
+                  width: context.scale(120),
+                  child: OutlinedButton.icon(
+                    onPressed: _resetFilters,
+                    icon: Icon(Icons.refresh, size: context.scale(18)),
+                    label: const Text("RESET"),
+                    style: OutlinedButton.styleFrom(
+                      padding: EdgeInsets.symmetric(vertical: context.scale(12)),
+                    ),
                   ),
                 ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: OutlinedButton.icon(
-                     onPressed: _resetFilters,
-                    icon: const Icon(Icons.refresh),
-                    label: const Text("RESET"),
+                SizedBox(width: context.scale(12)),
+                SizedBox(
+                  width: context.scale(120),
+                  child: ElevatedButton.icon(
+                    onPressed: _filterLeaves,
+                    icon: Icon(Icons.search, size: context.scale(18)),
+                    label: const Text("APPLY"),
+                    style: ElevatedButton.styleFrom(
+                      padding: EdgeInsets.symmetric(vertical: context.scale(12)),
+                    ),
                   ),
                 ),
               ],
@@ -163,45 +204,60 @@ class _StudentLeaveScreenState extends State<StudentLeaveScreen> {
   }
   
   Widget _buildLeaveList() {
+    final theme = context.theme;
     return SingleChildScrollView(
       padding: context.pagePadding,
       child: Card(
+        elevation: 0,
+        color: theme.colorScheme.surfaceContainerLow,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(context.scale(12)),
+          side: BorderSide(color: theme.colorScheme.outlineVariant.withValues(alpha: 0.5)),
+        ),
         child: SingleChildScrollView(
           scrollDirection: Axis.horizontal,
           child: DataTable(
-            columnSpacing: 24,
-            columns: const [
-              DataColumn(label: Text("#")),
-              DataColumn(label: Text("Student")),
-              DataColumn(label: Text("Class")),
-              DataColumn(label: Text("Duration")),
-              DataColumn(label: Text("Status")),
-              DataColumn(label: Text("Action")),
+            headingRowColor: WidgetStateProperty.all(theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.3)),
+            dataRowMaxHeight: context.scale(60),
+            columnSpacing: context.scale(24),
+            columns: [
+              DataColumn(label: Text("#", style: TextStyle(fontWeight: FontWeight.bold, fontSize: context.font(14), color: theme.colorScheme.onSurfaceVariant))),
+              DataColumn(label: Text("Student", style: TextStyle(fontWeight: FontWeight.bold, fontSize: context.font(14), color: theme.colorScheme.onSurfaceVariant))),
+              DataColumn(label: Text("Class", style: TextStyle(fontWeight: FontWeight.bold, fontSize: context.font(14), color: theme.colorScheme.onSurfaceVariant))),
+              DataColumn(label: Text("Duration", style: TextStyle(fontWeight: FontWeight.bold, fontSize: context.font(14), color: theme.colorScheme.onSurfaceVariant))),
+              DataColumn(label: Text("Status", style: TextStyle(fontWeight: FontWeight.bold, fontSize: context.font(14), color: theme.colorScheme.onSurfaceVariant))),
+              DataColumn(label: Text("Action", style: TextStyle(fontWeight: FontWeight.bold, fontSize: context.font(14), color: theme.colorScheme.onSurfaceVariant))),
             ],
             rows: _filteredLeaves.map((leave) {
               final fromDate = leave.fromDate.isNotEmpty ? DateFormat('dd MMM').format(DateTime.parse(leave.fromDate)) : '';
               final toDate = leave.toDate.isNotEmpty ? DateFormat('dd MMM').format(DateTime.parse(leave.toDate)) : '';
-              
+
               return DataRow(cells: [
-                DataCell(Text(leave.id.toString())),
+                DataCell(Text(leave.id.toString(), style: TextStyle(fontSize: context.font(13)))),
                 DataCell(Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Text(leave.studentName, style: const TextStyle(fontWeight: FontWeight.bold)),
-                    Text(leave.rollNo, style: const TextStyle(fontSize: 11, color: Colors.grey)),
+                    Text(leave.studentName, style: TextStyle(fontWeight: FontWeight.bold, fontSize: context.font(13))),
+                    Text(leave.rollNo, style: TextStyle(fontSize: context.font(11), color: theme.colorScheme.onSurfaceVariant)),
                   ],
                 )),
-                DataCell(Text('${leave.className} - ${leave.sectionName}')),
-                DataCell(Text('$fromDate - $toDate')),
-                DataCell(Chip(
-                  label: Text(leave.status.toUpperCase(), style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.white)),
-                  backgroundColor: _getStatusColor(leave.status),
-                  side: BorderSide.none,
-                  padding: EdgeInsets.zero,
+                DataCell(Text('${leave.className} - ${leave.sectionName}', style: TextStyle(fontSize: context.font(13)))),
+                DataCell(Text('$fromDate - $toDate', style: TextStyle(fontSize: context.font(13)))),
+                DataCell(Container(
+                  padding: EdgeInsets.symmetric(horizontal: context.scale(8), vertical: context.scale(4)),
+                  decoration: BoxDecoration(
+                    color: _getStatusColor(context, leave.status).withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(context.scale(4)),
+                    border: Border.all(color: _getStatusColor(context, leave.status).withValues(alpha: 0.5)),
+                  ),
+                  child: Text(
+                    leave.status.toUpperCase(),
+                    style: TextStyle(fontSize: context.font(10), fontWeight: FontWeight.bold, color: _getStatusColor(context, leave.status)),
+                  ),
                 )),
                 DataCell(IconButton(
-                  icon: const Icon(Icons.edit_note),
+                  icon: Icon(Icons.edit_note, size: context.scale(22), color: theme.colorScheme.primary),
                   onPressed: () => _showUpdateStatusDialog(leave),
                 )),
               ]);
@@ -212,54 +268,86 @@ class _StudentLeaveScreenState extends State<StudentLeaveScreen> {
     );
   }
 
-  Color _getStatusColor(String status) {
+  Color _getStatusColor(BuildContext context, String status) {
+    final theme = context.theme;
     switch (status.toLowerCase()) {
-      case 'pending': return Colors.orange;
-      case 'approved': return Colors.green;
-      case 'rejected': return Colors.red;
-      default: return Colors.grey;
+      case 'pending':
+        return const Color(0xFFF59E0B); // Amber
+      case 'approved':
+        return const Color(0xFF10B981); // Emerald
+      case 'rejected':
+        return const Color(0xFFEF4444); // Red
+      default:
+        return theme.colorScheme.outline;
     }
   }
 
   void _showUpdateStatusDialog(StudentLeave leave) {
-    String currentStatus = ['pending', 'approved', 'rejected'].contains(leave.status.toLowerCase()) 
-        ? leave.status.toLowerCase() 
-        : 'pending';
-        
+    String currentStatus = ['pending', 'approved', 'rejected'].contains(leave.status.toLowerCase()) ? leave.status.toLowerCase() : 'pending';
+
     showDialog(
       context: context,
       builder: (context) {
         String tempStatus = currentStatus;
-        return StatefulBuilder(
-          builder: (context, setDialogState) {
-            return AlertDialog(
-              title: const Text('Update Status'),
-              content: DropdownButtonFormField<String>(
-                value: tempStatus,
-                items: ['pending', 'approved', 'rejected'].map((status) {
-                  return DropdownMenuItem(value: status, child: Text(status.toUpperCase()));
-                }).toList(),
-                onChanged: (val) => setDialogState(() => tempStatus = val ?? tempStatus),
-              ),
-              actions: [
-                TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
-                ElevatedButton(
-                  onPressed: () async {
-                    try {
-                      await ApiService.updateStudentLeaveStatus(leave.id, tempStatus);
-                      if (!mounted) return;
-                      _fetchLeaves();
-                      Navigator.pop(context);
-                    } catch (e) {
-                      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
-                    }
-                  },
-                  child: const Text('Update'),
+        final theme = context.theme;
+        return StatefulBuilder(builder: (context, setDialogState) {
+          return AlertDialog(
+            backgroundColor: theme.colorScheme.surface,
+            surfaceTintColor: Colors.transparent,
+            title: Text('Update Status', style: TextStyle(fontSize: context.font(18), fontWeight: FontWeight.bold, color: theme.colorScheme.onSurface)),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(context.scale(20))),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                buildLabel(context, "Select Status"),
+                buildDropdown(
+                  context,
+                  ['pending', 'approved', 'rejected'],
+                  tempStatus,
+                  (val) => setDialogState(() => tempStatus = val ?? tempStatus),
                 ),
               ],
-            );
-          }
-        );
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: Text('Cancel', style: TextStyle(color: theme.colorScheme.secondary, fontSize: context.font(14))),
+              ),
+              ElevatedButton(
+                onPressed: () async {
+                  try {
+                    await ApiService.updateStudentLeaveStatus(leave.id, tempStatus);
+                    if (!mounted) return;
+                    _fetchLeaves();
+                    Navigator.pop(context);
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('Status updated successfully'),
+                        backgroundColor: Color(0xFF10B981), // Emerald
+                      ),
+                    );
+                  } catch (e) {
+                    if (mounted)
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text('Error: $e'),
+                          backgroundColor: const Color(0xFFEF4444), // Red
+                        ),
+                      );
+                  }
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: theme.colorScheme.primary,
+                  foregroundColor: theme.colorScheme.onPrimary,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(context.scale(12))),
+                  padding: EdgeInsets.symmetric(horizontal: context.scale(20), vertical: context.scale(12)),
+                ),
+                child: Text('Update', style: TextStyle(fontSize: context.font(14), fontWeight: FontWeight.bold)),
+              ),
+            ],
+          );
+        });
       },
     );
   }

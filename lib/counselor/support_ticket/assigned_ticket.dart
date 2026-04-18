@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../services/api_service.dart';
+import '../../services/responsive_helper.dart';
 import '../counselor_models.dart';
 import 'ticket_details.dart';
 
@@ -52,58 +53,75 @@ class _AssignedTicketsPageState extends State<AssignedTicketsPage> {
 
   @override
   Widget build(BuildContext context) {
-    _colorScheme = Theme.of(context).colorScheme;
+    final colorScheme = context.theme.colorScheme;
     return Scaffold(
+      backgroundColor: colorScheme.surface,
       appBar: AppBar(
-        title: const Text("Assigned Tickets"),
+        title: Text("Assigned Tickets", style: TextStyle(fontSize: context.font(20))),
       ),
       body: RefreshIndicator(
         onRefresh: _fetchTickets,
         child: _isLoading
-            ? Center(child: CircularProgressIndicator(color: _colorScheme.primary))
+            ? Center(child: CircularProgressIndicator(color: colorScheme.primary))
             : _errorMessage != null
-                ? Center(child: Text(_errorMessage!, style: TextStyle(color: _colorScheme.error)))
+                ? Center(child: Text(_errorMessage!, style: TextStyle(color: colorScheme.error)))
                 : _tickets.isEmpty
                     ? _buildEmptyState()
-                    : _buildTicketList(),
+                    : Center(
+                        child: ConstrainedBox(
+                          constraints: const BoxConstraints(maxWidth: 1200),
+                          child: _buildTicketList(),
+                        ),
+                      ),
       ),
     );
   }
 
   Widget _buildEmptyState() {
+    final colorScheme = context.theme.colorScheme;
     return SingleChildScrollView(
       physics: const AlwaysScrollableScrollPhysics(),
       child: Padding(
-        padding: const EdgeInsets.all(24),
-        child: Card(
-          margin: EdgeInsets.zero,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(vertical: 60, horizontal: 24),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(Icons.folder_open_rounded, size: 80, color: _colorScheme.onSurfaceVariant.withValues(alpha: 0.2)),
-                const SizedBox(height: 24),
-                Text(
-                  "No tickets currently assigned to you.",
-                  textAlign: TextAlign.center,
-                  style: GoogleFonts.roboto(
-                    fontSize: 20,
-                    fontWeight: FontWeight.bold,
-                    color: _colorScheme.onSurface,
-                  ),
+        padding: context.pagePadding,
+        child: Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 600),
+            child: Card(
+              elevation: 0,
+              margin: EdgeInsets.zero,
+              color: colorScheme.surfaceContainerLow,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(context.scale(24)),
+                side: BorderSide(color: colorScheme.outlineVariant),
+              ),
+              child: Padding(
+                padding: EdgeInsets.symmetric(vertical: context.scale(60), horizontal: context.scale(24)),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.folder_open_rounded, size: context.scale(80), color: colorScheme.onSurfaceVariant.withValues(alpha: 0.2)),
+                    SizedBox(height: context.scale(24)),
+                    Text(
+                      "No tickets currently assigned to you.",
+                      textAlign: TextAlign.center,
+                      style: GoogleFonts.roboto(
+                        fontSize: context.font(20),
+                        fontWeight: FontWeight.bold,
+                        color: colorScheme.onSurface,
+                      ),
+                    ),
+                    SizedBox(height: context.scale(12)),
+                    Text(
+                      "Once tickets are assigned, they will appear here for your review and action.",
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        fontSize: context.font(14),
+                        color: colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ],
                 ),
-                const SizedBox(height: 12),
-                Text(
-                  "Once tickets are assigned, they will appear here for your review and action.",
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    fontSize: 14,
-                    color: _colorScheme.onSurfaceVariant,
-                  ),
-                ),
-              ],
+              ),
             ),
           ),
         ),
@@ -112,16 +130,28 @@ class _AssignedTicketsPageState extends State<AssignedTicketsPage> {
   }
 
   Widget _buildTicketList() {
-    return ListView.builder(
-      padding: const EdgeInsets.all(20),
+    final colorScheme = context.theme.colorScheme;
+    return GridView.builder(
+      padding: context.pagePadding,
+      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: context.responsive(1, tablet: 2, desktop: 3),
+        crossAxisSpacing: context.spacing,
+        mainAxisSpacing: context.spacing,
+        mainAxisExtent: context.scale(280),
+      ),
       itemCount: _tickets.length,
       itemBuilder: (context, index) {
         final t = _tickets[index];
         return Card(
-          margin: const EdgeInsets.only(bottom: 16),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          elevation: 0,
+          margin: EdgeInsets.zero,
+          color: colorScheme.surfaceContainerLow,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(context.scale(20)),
+            side: BorderSide(color: colorScheme.outlineVariant),
+          ),
           child: Padding(
-            padding: const EdgeInsets.all(20),
+            padding: EdgeInsets.all(context.scale(20)),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -130,46 +160,50 @@ class _AssignedTicketsPageState extends State<AssignedTicketsPage> {
                   children: [
                     Text(
                       "ID: #${t.id}",
-                      style: TextStyle(color: _colorScheme.onSurfaceVariant, fontWeight: FontWeight.bold, fontSize: 13),
+                      style: TextStyle(color: colorScheme.onSurfaceVariant, fontWeight: FontWeight.bold, fontSize: context.font(13)),
                     ),
                     _buildBadge(t.status?.toUpperCase() ?? "OPEN", _getStatusColor(t.status ?? "")),
                   ],
                 ),
-                const SizedBox(height: 16),
-                Text(
-                  t.title,
-                  style: GoogleFonts.roboto(color: _colorScheme.onSurface, fontSize: 18, fontWeight: FontWeight.bold),
+                SizedBox(height: context.scale(16)),
+                Expanded(
+                  child: Text(
+                    t.title,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: GoogleFonts.roboto(color: colorScheme.onSurface, fontSize: context.font(18), fontWeight: FontWeight.bold),
+                  ),
                 ),
-                const SizedBox(height: 12),
+                SizedBox(height: context.scale(12)),
                 Row(
                   children: [
-                    Icon(Icons.priority_high_rounded, size: 14, color: _colorScheme.onSurfaceVariant),
-                    const SizedBox(width: 6),
+                    Icon(Icons.priority_high_rounded, size: context.scale(14), color: colorScheme.onSurfaceVariant),
+                    SizedBox(width: context.scale(6)),
                     Text(
                       "Priority: ${t.priority?.toUpperCase() ?? 'LOW'}",
-                      style: TextStyle(color: _colorScheme.onSurfaceVariant, fontSize: 12),
+                      style: TextStyle(color: colorScheme.onSurfaceVariant, fontSize: context.font(12)),
                     ),
                     const Spacer(),
-                    Icon(Icons.calendar_today_rounded, size: 14, color: _colorScheme.onSurfaceVariant),
-                    const SizedBox(width: 6),
+                    Icon(Icons.calendar_today_rounded, size: context.scale(14), color: colorScheme.onSurfaceVariant),
+                    SizedBox(width: context.scale(6)),
                     Text(
                       t.createdAt?.split('T')[0] ?? "-",
-                      style: TextStyle(color: _colorScheme.onSurfaceVariant, fontSize: 12),
+                      style: TextStyle(color: colorScheme.onSurfaceVariant, fontSize: context.font(12)),
                     ),
                   ],
                 ),
-                const SizedBox(height: 24),
+                SizedBox(height: context.scale(24)),
                 SizedBox(
                   width: double.infinity,
-                  height: 48,
+                  height: context.scale(48),
                   child: FilledButton(
                     onPressed: () {
                       Navigator.push(context, MaterialPageRoute(builder: (_) => TicketDetailsPage(ticket: t))).then((_) => _fetchTickets());
                     },
                     style: FilledButton.styleFrom(
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(context.scale(12))),
                     ),
-                    child: const Text("TAKE ACTION", style: TextStyle(fontWeight: FontWeight.bold)),
+                    child: Text("TAKE ACTION", style: TextStyle(fontWeight: FontWeight.bold, fontSize: context.font(14))),
                   ),
                 ),
               ],
@@ -182,15 +216,15 @@ class _AssignedTicketsPageState extends State<AssignedTicketsPage> {
 
   Widget _buildBadge(String text, Color color) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      padding: EdgeInsets.symmetric(horizontal: context.scale(10), vertical: context.scale(4)),
       decoration: BoxDecoration(
         color: color.withValues(alpha: 0.1),
-        borderRadius: BorderRadius.circular(6),
+        borderRadius: BorderRadius.circular(context.scale(6)),
         border: Border.all(color: color.withValues(alpha: 0.5)),
       ),
       child: Text(
         text,
-        style: TextStyle(color: color, fontSize: 10, fontWeight: FontWeight.bold),
+        style: TextStyle(color: color, fontSize: context.font(10), fontWeight: FontWeight.bold),
       ),
     );
   }

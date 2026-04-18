@@ -4,16 +4,17 @@ import 'package:eduphin/teacher/dashboard/salary_bank_details.dart';
 import 'package:eduphin/teacher/dashboard/virtual_id_page.dart';
 import 'package:eduphin/teacher/dashboard/your_support_ticket.dart';
 import 'package:eduphin/teacher/dashboard/create_new_support_ticket.dart';
-import 'package:eduphin/staff/staff_dashboard/fee_structure.dart';
 import 'package:eduphin/staff/staff_dashboard/student_fee_detail.dart';
 import 'package:flutter/material.dart';
 import 'package:eduphin/services/api_service.dart';
+import 'package:eduphin/services/responsive_helper.dart';
 import 'package:eduphin/teacher/dashboard/teacher_dashboard_model.dart';
 import 'exam_information_page.dart';
 import 'explore_events.dart';
 import 'library_book_page.dart';
 import 'lending_books_page.dart';
 import 'my_registered_event.dart';
+import 'package:eduphin/services/common_widgets.dart';
 
 class TeacherDashboardPage extends StatefulWidget {
   const TeacherDashboardPage({super.key});
@@ -33,29 +34,56 @@ class _TeacherDashboardPageState extends State<TeacherDashboardPage> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    
+    final theme = context.theme;
+    final colorScheme = theme.colorScheme;
+
     return Scaffold(
       backgroundColor: theme.scaffoldBackgroundColor,
       drawer: const AppDrawer(),
       appBar: AppBar(
+        backgroundColor: Colors.transparent,
+        elevation: 0,
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text("Teacher Dashboard", style: theme.appBarTheme.titleTextStyle),
-            Text("Overview & Management", style: theme.textTheme.labelSmall?.copyWith(color: theme.hintColor)),
+            Text(
+              "Teacher Dashboard",
+              style: TextStyle(
+                fontWeight: FontWeight.bold,
+                fontSize: context.font(20),
+                color: colorScheme.onSurface,
+              ),
+            ),
+            Text(
+              "Overview & Management",
+              style: TextStyle(
+                fontSize: context.font(11),
+                color: colorScheme.onSurfaceVariant,
+              ),
+            ),
           ],
         ),
         actions: [
-          IconButton(
-            onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ProfilePage())),
-            icon: CircleAvatar(
-              radius: 16,
-              backgroundColor: theme.colorScheme.primary.withValues(alpha: 0.1),
-              child: Icon(Icons.person_outline, size: 20, color: theme.colorScheme.primary),
-            ),
+          FutureBuilder<TeacherDashboardData>(
+            future: _dashboardDataFuture,
+            builder: (context, snapshot) {
+              return IconButton(
+                onPressed: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const ProfilePage()),
+                ).then((_) {
+                  setState(() {
+                    _dashboardDataFuture = ApiService.getTeacherDashboard();
+                  });
+                }),
+                icon: ProfileAvatar(
+                  imageUrl: ApiService.getStorageUrl(snapshot.data?.userDetail.photo),
+                  radius: context.scale(16),
+                ),
+              );
+            },
           ),
-          const SizedBox(width: 8),
+          SizedBox(width: context.scale(8)),
         ],
       ),
       body: FutureBuilder<TeacherDashboardData>(
@@ -75,20 +103,43 @@ class _TeacherDashboardPageState extends State<TeacherDashboardPage> {
   }
 
   Widget _buildErrorWidget(String error) {
+    final theme = context.theme;
+    final colorScheme = theme.colorScheme;
     return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(Icons.error_outline, size: 48, color: Theme.of(context).colorScheme.error),
-          const SizedBox(height: 16),
-          Text("Failed to load dashboard", style: Theme.of(context).textTheme.titleMedium),
-          Text(error, style: Theme.of(context).textTheme.bodySmall, textAlign: TextAlign.center),
-          const SizedBox(height: 24),
-          ElevatedButton(
-            onPressed: () => setState(() { _dashboardDataFuture = ApiService.getTeacherDashboard(); }),
-            child: const Text("Retry"),
-          )
-        ],
+      child: Padding(
+        padding: EdgeInsets.all(context.scale(24.0)),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.error_outline, size: context.scale(48), color: colorScheme.error),
+            SizedBox(height: context.scale(16)),
+            Text(
+              "Failed to load dashboard",
+              style: TextStyle(
+                fontWeight: FontWeight.bold,
+                fontSize: context.font(16),
+                color: colorScheme.onSurface,
+              ),
+            ),
+            SizedBox(height: context.scale(8)),
+            Text(
+              error,
+              style: TextStyle(fontSize: context.font(12), color: colorScheme.onSurface.withValues(alpha: 0.6)),
+              textAlign: TextAlign.center,
+            ),
+            SizedBox(height: context.scale(24)),
+            FilledButton(
+              onPressed: () => setState(() {
+                _dashboardDataFuture = ApiService.getTeacherDashboard();
+              }),
+              style: FilledButton.styleFrom(
+                backgroundColor: colorScheme.primary,
+                foregroundColor: colorScheme.onPrimary,
+              ),
+              child: Text("Retry", style: TextStyle(fontSize: context.font(14))),
+            )
+          ],
+        ),
       ),
     );
   }
@@ -96,113 +147,214 @@ class _TeacherDashboardPageState extends State<TeacherDashboardPage> {
   Widget _buildDashboardContent(BuildContext context, TeacherDashboardData data) {
     return RefreshIndicator(
       onRefresh: () async {
-        setState(() { _dashboardDataFuture = ApiService.getTeacherDashboard(); });
+        setState(() {
+          _dashboardDataFuture = ApiService.getTeacherDashboard();
+        });
       },
-      child: ListView(
-        padding: const EdgeInsets.all(16),
-        children: [
-          // Profile Overview Section
-          _buildProfileOverview(data.userDetail),
-          const SizedBox(height: 20),
-
-          // Quick Actions
-          _buildSectionHeader("Quick Actions", Icons.bolt),
-          const SizedBox(height: 12),
-          _buildQuickActions(),
-          const SizedBox(height: 24),
-
-          // Salary Section
-          _buildSectionHeader("My Salary", Icons.payments_outlined),
-          const SizedBox(height: 12),
-          _buildSalaryCard(data),
-          const SizedBox(height: 24),
-
-          // Library Section
-          _buildSectionHeader("Library", Icons.local_library_outlined),
-          const SizedBox(height: 12),
-          _buildMenuCard([
-            _buildMenuItem("Available Books", Icons.book_outlined, () => Navigator.push(context, MaterialPageRoute(builder: (_) => const LibraryBookPage()))),
-            _buildMenuItem("Lending Books", Icons.assignment_return_outlined, () => Navigator.push(context, MaterialPageRoute(builder: (_) => const LendingBooksPage()))),
-          ]),
-          const SizedBox(height: 24),
-
-          // Examinations Section
-          _buildSectionHeader("Examinations", Icons.assignment_outlined),
-          const SizedBox(height: 12),
-          _buildMenuCard([
-            _buildMenuItem("Examination Information", Icons.info_outline, () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ExamInformationPage()))),
-          ]),
-          const SizedBox(height: 24),
-
-          // Event Management Section
-          _buildSectionHeader("Event Management", Icons.event_note_outlined),
-          const SizedBox(height: 12),
-          _buildMenuCard([
-            _buildMenuItem("Explore Events", Icons.search, () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ExploreEventsPage()))),
-            _buildMenuItem("My Registered Events", Icons.how_to_reg_outlined, () => Navigator.push(context, MaterialPageRoute(builder: (_) => const MyRegisteredEventPage()))),
-          ]),
-          const SizedBox(height: 24),
-
-          // Support Ticket Section
-          _buildSectionHeader("Support Ticket", Icons.support_agent_outlined),
-          const SizedBox(height: 12),
-          _buildMenuCard([
-            _buildMenuItem("My Tickets", Icons.confirmation_number_outlined, () => Navigator.push(context, MaterialPageRoute(builder: (_) => const YourSupportTicketPage()))),
-            _buildMenuItem("Assigned Tickets", Icons.assignment_ind_outlined, () => Navigator.push(context, MaterialPageRoute(builder: (_) => const YourSupportTicketPage()))),
-          ]),
-          const SizedBox(height: 40),
-        ],
+      child: SingleChildScrollView(
+        padding: context.pagePadding,
+        physics: const AlwaysScrollableScrollPhysics(),
+        child: Center(
+          child: ConstrainedBox(
+            constraints: BoxConstraints(maxWidth: context.responsive(800.0, tablet: 1100.0, desktop: 1400.0)),
+            child: context.responsive(
+              _buildMobileLayout(data),
+              tablet: _buildDesktopLayout(data),
+            ),
+          ),
+        ),
       ),
     );
   }
 
+  Widget _buildMobileLayout(TeacherDashboardData data) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _buildProfileOverview(data.userDetail),
+        SizedBox(height: context.scale(24)),
+        _buildSectionHeader("Quick Actions", Icons.bolt),
+        SizedBox(height: context.scale(12)),
+        _buildQuickActions(),
+        SizedBox(height: context.scale(24)),
+        _buildSectionHeader("My Salary", Icons.payments_outlined),
+        SizedBox(height: context.scale(12)),
+        _buildSalaryCard(data),
+        SizedBox(height: context.scale(24)),
+        _buildSectionHeader("Academic & Library", Icons.school_outlined),
+        SizedBox(height: context.scale(12)),
+        _buildMenuCard([
+          _buildMenuItem("Examination Info", Icons.info_outline, () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ExamInformationPage()))),
+          _buildMenuItem("Available Books", Icons.book_outlined, () => Navigator.push(context, MaterialPageRoute(builder: (_) => const LibraryBookPage()))),
+          _buildMenuItem("Lending Books", Icons.assignment_return_outlined, () => Navigator.push(context, MaterialPageRoute(builder: (_) => const LendingBooksPage()))),
+        ]),
+        SizedBox(height: context.scale(24)),
+        _buildSectionHeader("Events & Support", Icons.event_note_outlined),
+        SizedBox(height: context.scale(12)),
+        _buildMenuCard([
+          _buildMenuItem("Explore Events", Icons.search, () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ExploreEventsPage()))),
+          _buildMenuItem("My Registered Events", Icons.how_to_reg_outlined, () => Navigator.push(context, MaterialPageRoute(builder: (_) => const MyRegisteredEventPage()))),
+          _buildMenuItem("My Support Tickets", Icons.confirmation_number_outlined, () => Navigator.push(context, MaterialPageRoute(builder: (_) => const YourSupportTicketPage()))),
+        ]),
+        SizedBox(height: context.scale(40)),
+      ],
+    );
+  }
+
+  Widget _buildDesktopLayout(TeacherDashboardData data) {
+    final bool isNarrowDesktop = MediaQuery.of(context).size.width < 1100;
+
+    return Column(
+      children: [
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(
+              flex: 1,
+              child: _buildProfileOverview(data.userDetail),
+            ),
+            SizedBox(width: context.scale(24)),
+            Expanded(
+              flex: 2,
+              child: Column(
+                children: [
+                  _buildSectionHeader("Quick Actions", Icons.bolt),
+                  SizedBox(height: context.scale(12)),
+                  _buildQuickActions(),
+                  SizedBox(height: context.scale(24)),
+                  if (isNarrowDesktop) ...[
+                    _buildSectionHeader("My Salary", Icons.payments_outlined),
+                    SizedBox(height: context.scale(12)),
+                    _buildSalaryCard(data),
+                    SizedBox(height: context.scale(24)),
+                    _buildSectionHeader("Academic & Library", Icons.school_outlined),
+                    SizedBox(height: context.scale(12)),
+                    _buildMenuCard([
+                      _buildMenuItem("Examination Info", Icons.info_outline, () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ExamInformationPage()))),
+                      _buildMenuItem("Available Books", Icons.book_outlined, () => Navigator.push(context, MaterialPageRoute(builder: (_) => const LibraryBookPage()))),
+                      _buildMenuItem("Lending Books", Icons.assignment_return_outlined, () => Navigator.push(context, MaterialPageRoute(builder: (_) => const LendingBooksPage()))),
+                    ]),
+                  ] else
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Expanded(
+                          child: Column(
+                            children: [
+                              _buildSectionHeader("My Salary", Icons.payments_outlined),
+                              SizedBox(height: context.scale(12)),
+                              _buildSalaryCard(data),
+                            ],
+                          ),
+                        ),
+                        SizedBox(width: context.scale(24)),
+                        Expanded(
+                          child: Column(
+                            children: [
+                              _buildSectionHeader("Academic & Library", Icons.school_outlined),
+                              SizedBox(height: context.scale(12)),
+                              _buildMenuCard([
+                                _buildMenuItem("Examination Info", Icons.info_outline, () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ExamInformationPage()))),
+                                _buildMenuItem("Available Books", Icons.book_outlined, () => Navigator.push(context, MaterialPageRoute(builder: (_) => const LibraryBookPage()))),
+                                _buildMenuItem("Lending Books", Icons.assignment_return_outlined, () => Navigator.push(context, MaterialPageRoute(builder: (_) => const LendingBooksPage()))),
+                              ]),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                ],
+              ),
+            ),
+          ],
+        ),
+        SizedBox(height: context.scale(24)),
+        _buildSectionHeader("Events & Support", Icons.event_note_outlined),
+        SizedBox(height: context.scale(12)),
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(
+              child: _buildMenuCard([
+                _buildMenuItem("Explore Events", Icons.search, () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ExploreEventsPage()))),
+                _buildMenuItem("My Registered Events", Icons.how_to_reg_outlined, () => Navigator.push(context, MaterialPageRoute(builder: (_) => const MyRegisteredEventPage()))),
+              ]),
+            ),
+            SizedBox(width: context.scale(24)),
+            Expanded(
+              child: _buildMenuCard([
+                _buildMenuItem("My Support Tickets", Icons.confirmation_number_outlined, () => Navigator.push(context, MaterialPageRoute(builder: (_) => const YourSupportTicketPage()))),
+                _buildMenuItem("Create New Ticket", Icons.add_circle_outline, () => Navigator.push(context, MaterialPageRoute(builder: (_) => const CreateSupportTicketPage()))),
+              ]),
+            ),
+          ],
+        ),
+        SizedBox(height: context.scale(40)),
+      ],
+    );
+  }
+
   Widget _buildProfileOverview(UserDetail user) {
-    final theme = Theme.of(context);
-    final photoUrl = user.photo != null ? ApiService.getStorageUrl(user.photo) : null;
+    final theme = context.theme;
+    final colorScheme = theme.colorScheme;
 
     return Card(
+      elevation: 0,
+      color: colorScheme.surfaceContainerLow,
+      surfaceTintColor: Colors.transparent,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(context.scale(20)),
+        side: BorderSide(color: colorScheme.outlineVariant.withValues(alpha: 0.5), width: 0.5),
+      ),
       child: Padding(
-        padding: const EdgeInsets.all(20.0),
+        padding: EdgeInsets.all(context.scale(20.0)),
         child: Column(
           children: [
-            Stack(
-              alignment: Alignment.bottomRight,
-              children: [
-                CircleAvatar(
-                  radius: 40,
-                  backgroundColor: theme.colorScheme.primary.withValues(alpha: 0.1),
-                  backgroundImage: const AssetImage('assets/images/girl_image.webp'),
-                  foregroundImage: photoUrl != null && photoUrl.isNotEmpty ? NetworkImage(photoUrl) : null,
-                ),
-                Container(
-                  padding: const EdgeInsets.all(4),
-                  decoration: BoxDecoration(color: Colors.green, shape: BoxShape.circle, border: Border.all(color: theme.colorScheme.surface, width: 2)),
-                  child: const Icon(Icons.check, size: 12, color: Colors.white),
-                )
-              ],
+            ProfileAvatar(
+              imageUrl: ApiService.getStorageUrl(user.photo),
+              radius: context.scale(44),
             ),
-            const SizedBox(height: 16),
-            Text(user.name, style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold)),
-            Text(user.roleName ?? "Teacher", style: theme.textTheme.bodyMedium?.copyWith(color: theme.hintColor)),
-            const SizedBox(height: 20),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceAround,
+            SizedBox(height: context.scale(16)),
+            Text(
+              user.name,
+              style: TextStyle(
+                fontWeight: FontWeight.bold,
+                fontSize: context.font(20),
+                color: colorScheme.onSurface,
+              ),
+              textAlign: TextAlign.center,
+            ),
+            Text(
+              user.roleName ?? "Teacher",
+              style: TextStyle(
+                fontSize: context.font(14),
+                color: colorScheme.onSurfaceVariant,
+              ),
+            ),
+            SizedBox(height: context.scale(24)),
+            Wrap(
+              spacing: context.scale(16),
+              runSpacing: context.scale(12),
+              alignment: WrapAlignment.center,
               children: [
                 _buildProfileInfoItem(Icons.badge_outlined, user.employeeId ?? "N/A"),
                 _buildProfileInfoItem(Icons.phone_outlined, user.phone ?? "N/A"),
                 _buildProfileInfoItem(Icons.location_on_outlined, "Campus Main"),
               ],
             ),
-            const SizedBox(height: 20),
-            ElevatedButton.icon(
-              onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const VirtualIdPage())),
-              icon: const Icon(Icons.vignette_outlined, size: 18),
-              label: const Text("GENERATE VIRTUAL ID CARD"),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: theme.colorScheme.surfaceContainerHighest,
-                foregroundColor: theme.colorScheme.onSurface,
-                minimumSize: const Size(double.infinity, 44),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+            SizedBox(height: context.scale(24)),
+            SizedBox(
+              width: double.infinity,
+              child: FilledButton.tonalIcon(
+                onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const VirtualIdPage())),
+                icon: Icon(Icons.vignette_outlined, size: context.scale(18)),
+                label: Text("GENERATE VIRTUAL ID CARD", style: TextStyle(fontSize: context.font(12), fontWeight: FontWeight.bold)),
+                style: FilledButton.styleFrom(
+                  backgroundColor: colorScheme.primary.withValues(alpha: 0.1),
+                  foregroundColor: colorScheme.primary,
+                  padding: EdgeInsets.symmetric(vertical: context.scale(12)),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(context.scale(12))),
+                ),
               ),
             )
           ],
@@ -212,102 +364,189 @@ class _TeacherDashboardPageState extends State<TeacherDashboardPage> {
   }
 
   Widget _buildProfileInfoItem(IconData icon, String value) {
-    final theme = Theme.of(context);
+    final theme = context.theme;
+    final colorScheme = theme.colorScheme;
     return Column(
+      mainAxisSize: MainAxisSize.min,
       children: [
-        Icon(icon, size: 20, color: theme.colorScheme.primary.withValues(alpha: 0.7)),
-        const SizedBox(height: 4),
-        Text(value, style: theme.textTheme.labelSmall?.copyWith(fontWeight: FontWeight.w600)),
+        Container(
+          padding: EdgeInsets.all(context.scale(8)),
+          decoration: BoxDecoration(
+            color: colorScheme.primary.withValues(alpha: 0.1),
+            shape: BoxShape.circle,
+          ),
+          child: Icon(icon, size: context.scale(20), color: colorScheme.primary),
+        ),
+        SizedBox(height: context.scale(6)),
+        Text(
+          value,
+          style: TextStyle(
+            fontWeight: FontWeight.w600,
+            fontSize: context.font(11),
+            color: colorScheme.onSurface,
+          ),
+        ),
       ],
     );
   }
 
   Widget _buildSectionHeader(String title, IconData icon) {
-    final theme = Theme.of(context);
+    final theme = context.theme;
+    final colorScheme = theme.colorScheme;
     return Row(
       children: [
-        Icon(icon, size: 20, color: theme.colorScheme.primary),
-        const SizedBox(width: 10),
-        Text(title, style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
+        Icon(icon, size: context.scale(20), color: colorScheme.primary),
+        SizedBox(width: context.scale(8)),
+        Expanded(
+          child: Text(
+            title,
+            style: theme.textTheme.titleMedium?.copyWith(
+              fontWeight: FontWeight.bold,
+              fontSize: context.font(16),
+              color: colorScheme.onSurface,
+            ),
+            overflow: TextOverflow.ellipsis,
+          ),
+        ),
       ],
     );
   }
 
   Widget _buildQuickActions() {
-    return Row(
+    return Wrap(
+      spacing: context.scale(12),
+      runSpacing: context.scale(12),
       children: [
-        Expanded(child: _quickActionButton("FEE STRUCTURE", Icons.account_balance_wallet_outlined, () {
-          Navigator.push(context, MaterialPageRoute(builder: (_) => const StaffFeeStructurePage()));
-        })),
-        const SizedBox(width: 12),
-        Expanded(child: _quickActionButton("STUDENT FEES", Icons.payments_outlined, () {
-          Navigator.push(context, MaterialPageRoute(builder: (_) => const StaffStudentFeeDetailPage()));
-        })),
-        const SizedBox(width: 12),
-        Expanded(child: _quickActionButton("CREATE TICKET", Icons.add_circle_outline, () {
-          Navigator.push(context, MaterialPageRoute(builder: (_) => const CreateSupportTicketPage()));
-        })),
+        _buildResponsiveQuickAction(
+          label: "FEE STRUCTURE",
+          icon: Icons.account_balance_wallet_outlined,
+          onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const SalaryBankDetailsPage())),
+        ),
+        _buildResponsiveQuickAction(
+          label: "STUDENT FEES",
+          icon: Icons.payments_outlined,
+          onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const StaffStudentFeeDetailPage())),
+        ),
+        _buildResponsiveQuickAction(
+          label: "CREATE TICKET",
+          icon: Icons.add_circle_outline,
+          onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const CreateSupportTicketPage())),
+        ),
       ],
     );
   }
 
-  Widget _quickActionButton(String label, IconData icon, VoidCallback onTap) {
-    final theme = Theme.of(context);
-    return InkWell(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 12),
-        decoration: BoxDecoration(
-          color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
-          borderRadius: BorderRadius.circular(8),
-          border: Border.all(color: theme.colorScheme.outline),
-        ),
-        child: Column(
-          children: [
-            Icon(icon, size: 20),
-            const SizedBox(height: 8),
-            Text(label, style: theme.textTheme.labelSmall?.copyWith(fontSize: 9, fontWeight: FontWeight.bold), textAlign: TextAlign.center),
-          ],
-        ),
-      ),
+  Widget _buildResponsiveQuickAction({
+    required String label,
+    required IconData icon,
+    required VoidCallback onTap,
+  }) {
+    // Calculate width to fit 3 items per row minus spacing
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final double width = (constraints.maxWidth - (context.scale(12) * 2)) / 3;
+        return QuickActionItem(
+          label: label,
+          icon: icon,
+          width: width,
+          onTap: onTap,
+        );
+      },
     );
   }
 
   Widget _buildSalaryCard(TeacherDashboardData data) {
-    final theme = Theme.of(context);
+    final theme = context.theme;
+    final colorScheme = theme.colorScheme;
     final salary = data.lastSalary;
 
     if (salary == null) {
       return Card(
+        elevation: 0,
+        color: colorScheme.surfaceContainerLow,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(context.scale(20)),
+          side: BorderSide(color: colorScheme.outlineVariant, width: 1),
+        ),
         child: Padding(
-          padding: const EdgeInsets.all(20.0),
+          padding: EdgeInsets.all(context.scale(24.0)),
           child: Column(
             children: [
-              Text("No Salary Data", style: theme.textTheme.titleMedium?.copyWith(color: theme.hintColor)),
-              const SizedBox(height: 8),
-              const Text("Your salary details will appear here once processed."),
+              Icon(Icons.money_off, size: context.scale(40), color: colorScheme.onSurfaceVariant.withValues(alpha: 0.5)),
+              SizedBox(height: context.scale(8)),
+              Text(
+                "No Salary Data",
+                style: TextStyle(
+                  color: colorScheme.onSurfaceVariant,
+                  fontWeight: FontWeight.bold,
+                  fontSize: context.font(16),
+                ),
+              ),
             ],
           ),
         ),
       );
     }
 
+    final isPaid = salary.status.toLowerCase() == 'paid';
+
     return Card(
+      elevation: 0,
+      color: colorScheme.surfaceContainerLow,
+      surfaceTintColor: Colors.transparent,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(context.scale(20)),
+        side: BorderSide(color: colorScheme.outlineVariant.withValues(alpha: 0.5), width: 0.5),
+      ),
       child: InkWell(
         onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const SalaryBankDetailsPage())),
+        borderRadius: BorderRadius.circular(context.scale(20)),
         child: Padding(
-          padding: const EdgeInsets.all(20.0),
+          padding: EdgeInsets.all(context.scale(20.0)),
           child: Column(
             children: [
-              Text("₹${salary.amount.toStringAsFixed(2)}", style: theme.textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold, color: theme.colorScheme.primary)),
-              Text("Last processed payment", style: theme.textTheme.bodySmall?.copyWith(color: theme.hintColor)),
-              const Divider(height: 32),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  _buildSalaryInfoRow("Status", salary.status, salary.status.toLowerCase() == 'paid' ? Colors.green : Colors.orange),
-                  _buildSalaryInfoRow("Payment Date", salary.paymentDate ?? "Pending", theme.colorScheme.onSurface),
-                ],
+              Text(
+                "₹${salary.amount.toStringAsFixed(2)}",
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  color: colorScheme.primary,
+                  fontSize: context.font(24),
+                ),
+              ),
+              Text(
+                "Last processed payment",
+                style: TextStyle(
+                  color: colorScheme.onSurfaceVariant,
+                  fontSize: context.font(12),
+                ),
+              ),
+              Padding(
+                padding: EdgeInsets.symmetric(vertical: context.scale(16)),
+                child: Divider(height: 1, thickness: 0.5, color: colorScheme.outlineVariant.withValues(alpha: 0.5)),
+              ),
+              LayoutBuilder(
+                builder: (context, constraints) {
+                  return Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Flexible(
+                        child: _buildSalaryInfoRow(
+                          "Status",
+                          salary.status,
+                          isPaid ? const Color(0xFF10B981) : const Color(0xFFF59E0B),
+                        ),
+                      ),
+                      SizedBox(width: context.scale(8)),
+                      Flexible(
+                        child: _buildSalaryInfoRow(
+                          "Payment Date",
+                          salary.paymentDate ?? "Pending",
+                          colorScheme.onSurface,
+                        ),
+                      ),
+                    ],
+                  );
+                },
               )
             ],
           ),
@@ -317,18 +556,41 @@ class _TeacherDashboardPageState extends State<TeacherDashboardPage> {
   }
 
   Widget _buildSalaryInfoRow(String label, String value, Color valueColor) {
+    final colorScheme = Theme.of(context).colorScheme;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(label, style: Theme.of(context).textTheme.labelSmall?.copyWith(color: Theme.of(context).hintColor)),
-        const SizedBox(height: 4),
-        Text(value, style: Theme.of(context).textTheme.bodySmall?.copyWith(fontWeight: FontWeight.bold, color: valueColor)),
+        Text(
+          label,
+          style: TextStyle(
+            color: colorScheme.onSurfaceVariant,
+            fontSize: context.font(11),
+          ),
+        ),
+        SizedBox(height: context.scale(4)),
+        Text(
+          value,
+          style: TextStyle(
+            fontWeight: FontWeight.bold,
+            color: valueColor,
+            fontSize: context.font(12),
+          ),
+        ),
       ],
     );
   }
 
   Widget _buildMenuCard(List<Widget> children) {
+    final theme = context.theme;
+    final colorScheme = theme.colorScheme;
     return Card(
+      elevation: 0,
+      color: colorScheme.surfaceContainerLow,
+      surfaceTintColor: Colors.transparent,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(context.scale(20)),
+        side: BorderSide(color: colorScheme.outlineVariant.withValues(alpha: 0.5), width: 0.5),
+      ),
       child: Column(
         children: children.asMap().entries.map((entry) {
           int idx = entry.key;
@@ -336,7 +598,14 @@ class _TeacherDashboardPageState extends State<TeacherDashboardPage> {
           return Column(
             children: [
               child,
-              if (idx != children.length - 1) const Divider(height: 1, indent: 16, endIndent: 16),
+              if (idx != children.length - 1)
+                Divider(
+                  height: 1,
+                  thickness: 0.5,
+                  indent: context.scale(16),
+                  endIndent: context.scale(16),
+                  color: colorScheme.outlineVariant.withValues(alpha: 0.5),
+                ),
             ],
           );
         }).toList(),
@@ -345,10 +614,26 @@ class _TeacherDashboardPageState extends State<TeacherDashboardPage> {
   }
 
   Widget _buildMenuItem(String title, IconData icon, VoidCallback onTap) {
+    final theme = context.theme;
+    final colorScheme = theme.colorScheme;
     return ListTile(
-      leading: Icon(icon, size: 20, color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.7)),
-      title: Text(title, style: Theme.of(context).textTheme.bodyMedium),
-      trailing: const Icon(Icons.chevron_right, size: 18),
+      leading: Container(
+        padding: EdgeInsets.all(context.scale(8)),
+        decoration: BoxDecoration(
+          color: colorScheme.primaryContainer,
+          borderRadius: BorderRadius.circular(context.scale(8)),
+        ),
+        child: Icon(icon, size: context.scale(20), color: colorScheme.primary),
+      ),
+      title: Text(
+        title,
+        style: TextStyle(
+          fontSize: context.font(14),
+          fontWeight: FontWeight.w500,
+          color: colorScheme.onSurface,
+        ),
+      ),
+      trailing: Icon(Icons.chevron_right, size: context.scale(18), color: colorScheme.onSurfaceVariant),
       onTap: onTap,
     );
   }

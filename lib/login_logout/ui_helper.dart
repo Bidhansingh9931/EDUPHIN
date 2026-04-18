@@ -1,3 +1,4 @@
+import 'package:eduphin/services/responsive_helper.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
@@ -11,20 +12,23 @@ class UiHelper {
     IconData? suffixIcon,
     VoidCallback? onSuffixPressed,
   }) {
-    final theme = Theme.of(context);
+    final theme = context.theme;
     
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8.0),
+      padding: EdgeInsets.symmetric(vertical: context.scale(8.0)),
       child: TextField(
         controller: controller,
         obscureText: isObscure,
-        style: GoogleFonts.inter(fontSize: 15, fontWeight: FontWeight.w500),
+        style: theme.textTheme.bodyMedium?.copyWith(
+          fontSize: context.font(15),
+          fontWeight: FontWeight.w500,
+        ),
         decoration: InputDecoration(
-          prefixIcon: Icon(prefixIcon, size: 20),
+          prefixIcon: Icon(prefixIcon, size: context.scale(20)),
           hintText: hintText,
           suffixIcon: suffixIcon != null
               ? IconButton(
-                  icon: Icon(suffixIcon, size: 20),
+                  icon: Icon(suffixIcon, size: context.scale(20)),
                   onPressed: onSuffixPressed,
                 )
               : null,
@@ -39,20 +43,28 @@ class UiHelper {
     String text, {
     bool isLoading = false,
   }) {
-    final theme = Theme.of(context);
-    
-    return ElevatedButton(
-      onPressed: isLoading ? null : onPressed,
-      child: isLoading
-          ? const SizedBox(
-              height: 20,
-              width: 20,
-              child: CircularProgressIndicator(
-                strokeWidth: 2,
-                valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+    return SizedBox(
+      width: double.infinity,
+      height: context.scale(54),
+      child: ElevatedButton(
+        onPressed: isLoading ? null : onPressed,
+        child: isLoading
+            ? SizedBox(
+                height: context.scale(20),
+                width: context.scale(20),
+                child: const CircularProgressIndicator(
+                  strokeWidth: 2,
+                  valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                ),
+              )
+            : Text(
+                text,
+                style: TextStyle(
+                  fontSize: context.font(16),
+                  fontWeight: FontWeight.bold,
+                ),
               ),
-            )
-          : Text(text),
+      ),
     );
   }
 

@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:csv/csv.dart';
 import 'package:eduphin/manager_dashboard/account_statics/teacher/add_teacher.dart';
 import 'package:eduphin/services/api_service.dart';
+import 'package:eduphin/services/common_widgets.dart';
 import 'package:eduphin/services/responsive_helper.dart';
 import 'package:flutter/material.dart';
 import 'package:open_file/open_file.dart';
@@ -23,14 +24,16 @@ class Teacher {
   final int id;
   final String name;
   final String designation;
+  final String? photo;
 
-  Teacher({required this.id, required this.name, required this.designation});
+  Teacher({required this.id, required this.name, required this.designation, this.photo});
 
   factory Teacher.fromJson(Map<String, dynamic> json) {
     return Teacher(
       id: json['id'] ?? 0,
       name: json['name'] ?? 'N/A',
       designation: json['designation'] ?? 'Teacher',
+      photo: json['photo'] ?? json['profile_image'],
     );
   }
 }
@@ -150,19 +153,18 @@ class _TeacherListPageState extends State<TeacherListPage> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
+    final theme = context.theme;
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text("Teacher Directory"),
+        title: Text("Teacher Directory", style: theme.appBarTheme.titleTextStyle),
         actions: [
           IconButton(
-            icon: const Icon(Icons.file_download_outlined),
+            icon: Icon(Icons.file_download_outlined, size: context.scale(24)),
             onPressed: _downloadTeacherList,
             tooltip: "Download CSV",
           ),
-          const SizedBox(width: 8),
+          SizedBox(width: context.scale(8)),
         ],
       ),
       floatingActionButton: FloatingActionButton.extended(
@@ -173,8 +175,8 @@ class _TeacherListPageState extends State<TeacherListPage> {
           );
           if (result == true && mounted) _fetchTeachersForRole(_selectedRoleId!);
         },
-        icon: const Icon(Icons.person_add_rounded),
-        label: const Text("Add Teacher"),
+        icon: Icon(Icons.person_add_rounded, size: context.scale(20)),
+        label: Text("Add Teacher", style: theme.textTheme.labelLarge?.copyWith(fontSize: context.font(14))),
       ),
       body: _isLoading 
         ? const Center(child: CircularProgressIndicator())
@@ -185,32 +187,32 @@ class _TeacherListPageState extends State<TeacherListPage> {
               physics: const AlwaysScrollableScrollPhysics(),
               child: Center(
                 child: ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 1000),
+                  constraints: const BoxConstraints(maxWidth: 1200),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       _buildFilterCard(context),
-                      const SizedBox(height: 24),
+                      SizedBox(height: context.scale(24)),
                       Text(
                         "Showing ${_teachers.length} results",
-                        style: theme.textTheme.bodySmall?.copyWith(color: theme.hintColor, fontWeight: FontWeight.bold),
+                        style: theme.textTheme.bodySmall?.copyWith(color: theme.hintColor, fontWeight: FontWeight.bold, fontSize: context.font(12)),
                       ),
-                      const SizedBox(height: 12),
+                      SizedBox(height: context.scale(12)),
                       _teachers.isEmpty
-                        ? _buildEmptyState(theme)
+                        ? _buildEmptyState(context)
                         : GridView.builder(
                             shrinkWrap: true,
                             physics: const NeverScrollableScrollPhysics(),
                             itemCount: _teachers.length,
                             gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
                               crossAxisCount: context.responsive(1, tablet: 2, desktop: 3),
-                              crossAxisSpacing: 16,
-                              mainAxisSpacing: 16,
-                              mainAxisExtent: 80,
+                              crossAxisSpacing: context.scale(16),
+                              mainAxisSpacing: context.scale(16),
+                              mainAxisExtent: context.scale(80),
                             ),
                             itemBuilder: (context, index) => _buildTeacherCard(context, _teachers[index]),
                           ),
-                      const SizedBox(height: 100),
+                      SizedBox(height: context.scale(100)),
                     ],
                   ),
                 ),
@@ -221,18 +223,22 @@ class _TeacherListPageState extends State<TeacherListPage> {
   }
 
   Widget _buildFilterCard(BuildContext context) {
-    final theme = Theme.of(context);
+    final theme = context.theme;
     final colorScheme = theme.colorScheme;
 
     return Card(
+      elevation: 0,
+      color: theme.cardColor,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(context.scale(12))),
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        padding: EdgeInsets.symmetric(horizontal: context.scale(16), vertical: context.scale(8)),
         child: DropdownButtonHideUnderline(
           child: DropdownButton<int>(
             value: _selectedRoleId,
             isExpanded: true,
-            icon: const Icon(Icons.filter_list_rounded),
-            hint: const Text("Select Role"),
+            icon: Icon(Icons.filter_list_rounded, size: context.scale(24)),
+            hint: Text("Select Role", style: theme.textTheme.bodyMedium?.copyWith(fontSize: context.font(14))),
+            dropdownColor: theme.cardColor,
             onChanged: (int? newValue) {
               if (newValue != null) {
                 setState(() => _selectedRoleId = newValue);
@@ -244,9 +250,9 @@ class _TeacherListPageState extends State<TeacherListPage> {
                 value: role.id,
                 child: Row(
                   children: [
-                    Icon(Icons.school_outlined, size: 20, color: colorScheme.primary),
-                    const SizedBox(width: 12),
-                    Text(role.name, style: const TextStyle(fontWeight: FontWeight.bold)),
+                    Icon(Icons.school_outlined, size: context.scale(20), color: colorScheme.primary),
+                    SizedBox(width: context.scale(12)),
+                    Text(role.name, style: theme.textTheme.bodyLarge?.copyWith(fontWeight: FontWeight.bold, fontSize: context.font(16))),
                   ],
                 ),
               );
@@ -258,44 +264,46 @@ class _TeacherListPageState extends State<TeacherListPage> {
   }
 
   Widget _buildTeacherCard(BuildContext context, Teacher teacher) {
-    final theme = Theme.of(context);
+    final theme = context.theme;
     final colorScheme = theme.colorScheme;
 
     return Card(
       elevation: 0,
-      color: theme.colorScheme.surfaceContainerHighest.withOpacity(0.3),
+      color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
-        side: BorderSide(color: colorScheme.outline.withOpacity(0.1)),
+        borderRadius: BorderRadius.circular(context.scale(16)),
+        side: BorderSide(color: colorScheme.outline.withValues(alpha: 0.1)),
       ),
       child: ListTile(
-        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-        leading: CircleAvatar(
-          backgroundColor: colorScheme.primary.withOpacity(0.1),
-          child: Text(teacher.name[0], style: TextStyle(color: colorScheme.primary, fontWeight: FontWeight.bold)),
+        contentPadding: EdgeInsets.symmetric(horizontal: context.scale(16), vertical: context.scale(4)),
+        leading: ProfileAvatar(
+          radius: context.scale(20),
+          imageUrl: ApiService.getStorageUrl(teacher.photo),
         ),
-        title: Text(teacher.name, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
-        subtitle: Text(teacher.designation, style: TextStyle(color: theme.hintColor, fontSize: 12)),
+        title: Text(teacher.name, style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold, fontSize: context.font(14))),
+        subtitle: Text(teacher.designation, style: theme.textTheme.bodySmall?.copyWith(color: theme.hintColor, fontSize: context.font(12))),
         trailing: IconButton(
-          icon: const Icon(Icons.more_vert_rounded, size: 20),
+          icon: Icon(Icons.more_vert_rounded, size: context.scale(20)),
           onPressed: () {},
         ),
       ),
     );
   }
 
-  Widget _buildEmptyState(ThemeData theme) {
+  Widget _buildEmptyState(BuildContext context) {
+    final theme = context.theme;
     return Center(
       child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 60),
+        padding: EdgeInsets.symmetric(vertical: context.scale(60)),
         child: Column(
           children: [
-            Icon(Icons.person_search_rounded, size: 64, color: theme.hintColor.withOpacity(0.3)),
-            const SizedBox(height: 16),
-            Text("No teachers found", style: TextStyle(color: theme.hintColor, fontWeight: FontWeight.bold)),
+            Icon(Icons.person_search_rounded, size: context.scale(64), color: theme.hintColor.withValues(alpha: 0.3)),
+            SizedBox(height: context.scale(16)),
+            Text("No teachers found", style: theme.textTheme.titleMedium?.copyWith(color: theme.hintColor, fontWeight: FontWeight.bold, fontSize: context.font(16))),
           ],
         ),
       ),
     );
   }
 }
+

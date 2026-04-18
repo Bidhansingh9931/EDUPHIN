@@ -1,6 +1,8 @@
 import 'dart:convert';
 
 import 'package:eduphin/services/api_service.dart';
+import 'package:eduphin/services/responsive_helper.dart';
+import 'package:eduphin/teacher/dashboard/common_widgets.dart';
 import 'package:flutter/material.dart';
 
 class LendingBooksScreen extends StatefulWidget {
@@ -12,7 +14,7 @@ class LendingBooksScreen extends StatefulWidget {
 
 class _LendingBooksScreenState extends State<LendingBooksScreen> {
   List<LendingBook> lendingBooks = [];
-  bool isLoading = true; // To show a loader while fetching data
+  bool _isLoading = true; // To show a loader while fetching data
 
   @override
   void initState() {
@@ -22,7 +24,7 @@ class _LendingBooksScreenState extends State<LendingBooksScreen> {
 
   Future<void> _fetchLendingBooks() async {
     setState(() {
-      isLoading = true;
+      _isLoading = true;
     });
     try {
       final response = await ApiService.get('manager/lending');
@@ -38,7 +40,7 @@ class _LendingBooksScreenState extends State<LendingBooksScreen> {
             setState(() {
               lendingBooks =
                   data.map((json) => LendingBook.fromJson(json)).toList();
-              isLoading = false;
+              _isLoading = false;
             });
           }
         } else {
@@ -51,7 +53,7 @@ class _LendingBooksScreenState extends State<LendingBooksScreen> {
     } catch (e) {
       if (mounted) {
         setState(() {
-          isLoading = false;
+          _isLoading = false;
         });
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Error: ${e.toString()}')),
@@ -62,61 +64,70 @@ class _LendingBooksScreenState extends State<LendingBooksScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
+    final theme = context.theme;
     return Scaffold(
       backgroundColor: theme.scaffoldBackgroundColor,
       appBar: AppBar(
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        leading: BackButton(color: theme.colorScheme.onSurface),
-        title: Text(
-          "Lending Books",
-          style: TextStyle(color: theme.colorScheme.onSurface),
+        title: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text("Lending Books", style: theme.appBarTheme.titleTextStyle?.copyWith(fontSize: context.font(18))),
+            Text("Track issued books and overdue status", style: theme.textTheme.labelSmall?.copyWith(color: theme.hintColor, fontSize: context.font(11))),
+          ],
         ),
+        centerTitle: false,
       ),
-      body: isLoading
-          ? const Center(child: CircularProgressIndicator())
+      body: _isLoading
+          ? Center(child: CircularProgressIndicator(color: theme.colorScheme.primary))
           : lendingBooks.isEmpty
-              ? const Center(child: Text("No lending records found."))
-              : LayoutBuilder(
-                  builder: (context, constraints) {
-                    if (constraints.maxWidth > 600) {
-                      return _buildGridView(lendingBooks);
-                    } else {
-                      return _buildListView(lendingBooks);
-                    }
-                  },
+              ? Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.library_books_outlined, size: context.scale(64), color: theme.colorScheme.outlineVariant.withValues(alpha: 0.5)),
+                      SizedBox(height: context.scale(16)),
+                      Text("No lending records found.", style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: context.font(16))),
+                    ],
+                  ),
+                )
+              : Center(
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 1200),
+                    child: context.responsive(
+                      _buildListView(lendingBooks),
+                      tablet: _buildGridView(lendingBooks, crossAxisCount: 2),
+                      desktop: _buildGridView(lendingBooks, crossAxisCount: 3),
+                    ),
+                  ),
                 ),
     );
   }
 
   Widget _buildListView(List<LendingBook> books) {
     return ListView.builder(
-      padding: const EdgeInsets.fromLTRB(16, 16, 16, 50),
+      padding: context.pagePadding,
       itemCount: books.length,
       itemBuilder: (context, index) {
-        final book = books[index];
         return Padding(
-          padding: const EdgeInsets.only(bottom: 16.0),
-          child: _LendingBookCard(book: book, index: index),
+          padding: EdgeInsets.only(bottom: context.md),
+          child: _LendingBookCard(book: books[index], index: index),
         );
       },
     );
   }
 
-  Widget _buildGridView(List<LendingBook> books) {
+  Widget _buildGridView(List<LendingBook> books, {required int crossAxisCount}) {
     return GridView.builder(
-      padding: const EdgeInsets.fromLTRB(16, 16, 16, 50),
+      padding: context.pagePadding,
       itemCount: books.length,
-      gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
-        maxCrossAxisExtent: 500, // Adjust as needed
-        mainAxisSpacing: 16,
-        crossAxisSpacing: 16,
-        childAspectRatio: 2.2, // Adjust for content
+      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: crossAxisCount,
+        mainAxisSpacing: context.md,
+        crossAxisSpacing: context.md,
+        childAspectRatio: 1.6,
       ),
       itemBuilder: (context, index) {
-        final book = books[index];
-        return _LendingBookCard(book: book, index: index);
+        return _LendingBookCard(book: books[index], index: index);
       },
     );
   }
@@ -129,7 +140,7 @@ class _LendingBookCard extends StatelessWidget {
   const _LendingBookCard({required this.book, required this.index});
 
   Color _getStatusColor(BuildContext context, String status) {
-    final theme = Theme.of(context);
+    final theme = context.theme;
     switch (status) {
       case "Pending":
         return theme.colorScheme.secondary;
@@ -144,43 +155,73 @@ class _LendingBookCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
+    final theme = context.theme;
+    final statusColor = _getStatusColor(context, book.status);
     return Container(
-      padding: const EdgeInsets.all(18),
+      padding: EdgeInsets.all(context.spacing),
       decoration: BoxDecoration(
-        color: theme.cardColor,
-        borderRadius: BorderRadius.circular(18),
+        color: theme.colorScheme.surfaceContainerLow,
+        borderRadius: BorderRadius.circular(context.scale(16)),
+        border: Border.all(color: theme.colorScheme.outlineVariant.withValues(alpha: 0.5)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisAlignment: MainAxisAlignment.center, // For GridView
         children: [
-          // Title Row
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Expanded(
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Container(
+                      padding: EdgeInsets.symmetric(horizontal: context.scale(8), vertical: context.scale(4)),
+                      decoration: BoxDecoration(
+                        color: theme.colorScheme.primaryContainer,
+                        borderRadius: BorderRadius.circular(context.scale(6)),
+                      ),
+                      child: Text(
+                        (index + 1).toString(),
+                        style: TextStyle(color: theme.colorScheme.onPrimaryContainer, fontWeight: FontWeight.bold, fontSize: context.font(12)),
+                      ),
+                    ),
+                    SizedBox(width: context.scale(12)),
+                    Expanded(
+                      child: Text(
+                        book.title,
+                        style: TextStyle(
+                          color: theme.colorScheme.onSurface,
+                          fontWeight: FontWeight.bold,
+                          fontSize: context.font(15),
+                        ),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 8),
+              Container(
+                padding: EdgeInsets.symmetric(horizontal: context.scale(10), vertical: context.scale(4)),
+                decoration: BoxDecoration(
+                  color: statusColor.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(context.scale(8)),
+                ),
                 child: Text(
-                  "${index + 1}.  ${book.title}",
-                  style: theme.textTheme.titleMedium?.copyWith(
-                    color: theme.colorScheme.onSurface,
+                  book.status.toUpperCase(),
+                  style: TextStyle(
+                    color: statusColor,
                     fontWeight: FontWeight.bold,
+                    fontSize: context.font(10),
+                    letterSpacing: 0.5,
                   ),
                 ),
               ),
-              const SizedBox(width: 16),
-              Text(
-                book.status,
-                style: theme.textTheme.labelMedium?.copyWith(
-                  color: _getStatusColor(context, book.status),
-                  fontWeight: FontWeight.bold,
-                ),
-              )
             ],
           ),
-          const SizedBox(height: 14),
-          // Details Row
+          SizedBox(height: context.md),
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -188,21 +229,19 @@ class _LendingBookCard extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    _buildInfoField(theme, "Book Issue Number", book.issueNo),
-                    const SizedBox(height: 10),
-                    _buildInfoField(theme, "Due Date", book.dueDate),
+                    _buildInfoField(context, "Issue Number", book.issueNo),
+                    _buildInfoField(context, "Due Date", book.dueDate),
                   ],
                 ),
               ),
-              const SizedBox(width: 16),
+              SizedBox(width: context.scale(16)),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    _buildInfoField(theme, "Issued At", book.issuedAt),
-                    const SizedBox(height: 10),
+                    _buildInfoField(context, "Issued At", book.issuedAt),
                     _buildInfoField(
-                      theme,
+                      context,
                       "Days Overdue",
                       book.overdueDays.toString(),
                       highlight: book.overdueDays > 0,
@@ -217,26 +256,35 @@ class _LendingBookCard extends StatelessWidget {
     );
   }
 
-  Widget _buildInfoField(ThemeData theme, String label, String value,
+  Widget _buildInfoField(BuildContext context, String label, String value,
       {bool highlight = false}) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          label,
-          style: theme.textTheme.bodySmall?.copyWith(color: theme.hintColor),
-        ),
-        const SizedBox(height: 2),
-        Text(
-          value,
-          style: theme.textTheme.bodyMedium?.copyWith(
-            color: highlight
-                ? theme.colorScheme.error
-                : theme.colorScheme.onSurface,
-            fontWeight: FontWeight.w500,
+    final theme = context.theme;
+    return Padding(
+      padding: EdgeInsets.only(bottom: context.scale(8)),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            label.toUpperCase(),
+            style: theme.textTheme.labelSmall?.copyWith(
+              color: theme.colorScheme.secondary,
+              fontSize: context.font(9),
+              fontWeight: FontWeight.bold,
+              letterSpacing: 0.5,
+            ),
           ),
-        ),
-      ],
+          Text(
+            value,
+            style: TextStyle(
+              color: highlight ? theme.colorScheme.error : theme.colorScheme.onSurface,
+              fontSize: context.font(13),
+              fontWeight: highlight ? FontWeight.bold : FontWeight.w500,
+            ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+        ],
+      ),
     );
   }
 }

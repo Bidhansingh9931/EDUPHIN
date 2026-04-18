@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'package:eduphin/services/api_service.dart';
+import 'package:eduphin/services/responsive_helper.dart';
 import 'package:flutter/material.dart';
 
 class AddNewFine extends StatefulWidget {
@@ -52,7 +53,7 @@ class _AddNewFineState extends State<AddNewFine> {
       final response = await ApiService.post('manager/fees/fine', body);
 
       if (!mounted) return;
-      final theme = Theme.of(context);
+      final theme = context.theme;
 
       final responseData = jsonDecode(response.body);
 
@@ -71,7 +72,7 @@ class _AddNewFineState extends State<AddNewFine> {
       }
     } catch (e) {
       if (mounted) {
-        final theme = Theme.of(context);
+        final theme = context.theme;
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text(e.toString().replaceFirst("Exception: ", "")), backgroundColor: theme.colorScheme.error),
         );
@@ -85,62 +86,80 @@ class _AddNewFineState extends State<AddNewFine> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
+    final theme = context.theme;
     return Scaffold(
+      backgroundColor: theme.colorScheme.surface,
       appBar: AppBar(
-        title: const Text("Add New Fine"),
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        leading: IconButton(
+          icon: Icon(Icons.arrow_back, color: theme.colorScheme.onSurface),
+          onPressed: () => Navigator.pop(context),
+        ),
+        title: Text(
+          "Add New Fine",
+          style: TextStyle(
+            fontWeight: FontWeight.bold,
+            color: theme.colorScheme.onSurface,
+            fontSize: context.font(20),
+          ),
+        ),
         centerTitle: true,
       ),
-      backgroundColor: theme.scaffoldBackgroundColor,
-      floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
-      floatingActionButton: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16.0),
-        child: Row(
-          children: [
-            Expanded(
-              child: OutlinedButton(
-                onPressed: () => Navigator.pop(context),
-                style: OutlinedButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
+      bottomNavigationBar: SafeArea(
+        child: Padding(
+          padding: context.pagePadding,
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Expanded(
+                child: OutlinedButton(
+                  onPressed: () => Navigator.pop(context),
+                  style: OutlinedButton.styleFrom(
+                    padding: EdgeInsets.symmetric(vertical: context.scale(16)),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(context.scale(12)),
+                    ),
+                    side: BorderSide(color: theme.colorScheme.outlineVariant),
                   ),
-                  side: BorderSide(color: theme.dividerColor),
+                  child: Text("Cancel", style: TextStyle(color: theme.colorScheme.onSurface, fontSize: context.font(16), fontWeight: FontWeight.w600)),
                 ),
-                child: Text("Cancel", style: theme.textTheme.labelLarge?.copyWith(color: theme.colorScheme.onSurface)),
               ),
-            ),
-            const SizedBox(width: 16),
-            Expanded(
-              child: ElevatedButton(
-                onPressed: _isSaving ? null : _saveFine,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: theme.colorScheme.primary,
-                  foregroundColor: theme.colorScheme.onPrimary,
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
+              SizedBox(width: context.scale(16)),
+              Expanded(
+                child: ElevatedButton(
+                  onPressed: _isSaving ? null : _saveFine,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: theme.colorScheme.primary,
+                    foregroundColor: theme.colorScheme.onPrimary,
+                    padding: EdgeInsets.symmetric(vertical: context.scale(16)),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(context.scale(12)),
+                    ),
+                    elevation: 0,
                   ),
+                  child: _isSaving
+                      ? SizedBox(height: context.scale(24), width: context.scale(24), child: CircularProgressIndicator(strokeWidth: 3, color: theme.colorScheme.onPrimary))
+                      : Text("Save", style: TextStyle(fontSize: context.font(16), fontWeight: FontWeight.bold)),
                 ),
-                child: _isSaving
-                    ? const SizedBox(height: 24, width: 24, child: CircularProgressIndicator(strokeWidth: 3))
-                    : Text("Save", style: theme.textTheme.labelLarge?.copyWith(color: theme.colorScheme.onPrimary)),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
-      body: Padding(
-        padding: const EdgeInsets.fromLTRB(16.0, 16.0, 16.0, 50.0),
+      body: SingleChildScrollView(
+        padding: context.pagePadding,
         child: Form(
           key: _formKey,
-          child: SingleChildScrollView(
+          child: Center(
             child: Container(
+              constraints: BoxConstraints(maxWidth: context.responsive(double.infinity, tablet: 600, desktop: 800)),
               decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(10),
-                color: theme.primaryColor,
+                borderRadius: BorderRadius.circular(context.scale(16)),
+                color: theme.colorScheme.surfaceContainerLow,
+                border: Border.all(color: theme.colorScheme.outlineVariant),
               ),
-              padding: const EdgeInsets.all(16),
+              padding: EdgeInsets.all(context.scale(20)),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -151,7 +170,7 @@ class _AddNewFineState extends State<AddNewFine> {
                     hint: "e.g., Late Fee Payment",
                     validator: (value) => value!.isEmpty ? "Reason cannot be empty" : null,
                   ),
-                  const SizedBox(height: 16),
+                  SizedBox(height: context.scale(20)),
                   _buildTextField(
                     theme: theme,
                     label: "Amount",
@@ -160,15 +179,14 @@ class _AddNewFineState extends State<AddNewFine> {
                     keyboardType: TextInputType.number,
                     validator: (value) => value!.isEmpty ? "Amount cannot be empty" : null,
                   ),
-                  const SizedBox(height: 16),
+                  SizedBox(height: context.scale(20)),
                   _buildTextField(
                     theme: theme,
                     label: "Remarks",
                     controller: _remarksController,
                     hint: "Add any additional remarks",
-                    maxLines: 3,
+                    maxLines: 4,
                   ),
-                   const SizedBox(height: 80), // Padding for FAB
                 ],
               ),
             ),
@@ -192,39 +210,41 @@ class _AddNewFineState extends State<AddNewFine> {
       children: [
         Text(
           label,
-          style: theme.textTheme.titleMedium?.copyWith(color: theme.colorScheme.onPrimary),
+          style: TextStyle(color: theme.colorScheme.onSurface, fontWeight: FontWeight.bold, fontSize: context.font(14)),
         ),
-        const SizedBox(height: 8),
+        SizedBox(height: context.scale(8)),
         TextFormField(
           controller: controller,
           validator: validator,
           maxLines: maxLines,
           keyboardType: keyboardType,
-          style: theme.textTheme.bodyLarge?.copyWith(color: theme.colorScheme.onSurface),
+          style: TextStyle(color: theme.colorScheme.onSurface, fontSize: context.font(14)),
           decoration: InputDecoration(
             hintText: hint,
-            hintStyle: TextStyle(color: theme.hintColor),
+            hintStyle: TextStyle(color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.5), fontSize: context.font(14)),
             filled: true,
-            fillColor: theme.scaffoldBackgroundColor,
+            fillColor: theme.colorScheme.surface,
+            isDense: true,
+            contentPadding: EdgeInsets.all(context.scale(14)),
             border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(10),
-              borderSide: BorderSide.none,
+              borderRadius: BorderRadius.circular(context.scale(10)),
+              borderSide: BorderSide(color: theme.colorScheme.outlineVariant),
             ),
             enabledBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(10),
-              borderSide: BorderSide.none,
+              borderRadius: BorderRadius.circular(context.scale(10)),
+              borderSide: BorderSide(color: theme.colorScheme.outlineVariant),
             ),
             focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(10),
-              borderSide: BorderSide(color: theme.colorScheme.primary, width: 2),
+              borderRadius: BorderRadius.circular(context.scale(10)),
+              borderSide: BorderSide(color: theme.colorScheme.primary, width: 1.5),
             ),
             errorBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(10),
+              borderRadius: BorderRadius.circular(context.scale(10)),
               borderSide: BorderSide(color: theme.colorScheme.error, width: 1),
             ),
             focusedErrorBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(10),
-              borderSide: BorderSide(color: theme.colorScheme.error, width: 2),
+              borderRadius: BorderRadius.circular(context.scale(10)),
+              borderSide: BorderSide(color: theme.colorScheme.error, width: 1.5),
             ),
           ),
         ),
@@ -232,3 +252,4 @@ class _AddNewFineState extends State<AddNewFine> {
     );
   }
 }
+

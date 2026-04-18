@@ -1,3 +1,6 @@
+import 'package:eduphin/services/responsive_helper.dart';
+import 'package:flutter/material.dart';
+import 'package:eduphin/services/api_service.dart';
 import 'package:eduphin/accountant/dashboard/accountant_dashbard.dart';
 import 'package:eduphin/counselor/counselor_dashboard.dart';
 import 'package:eduphin/librarian/librarian_dashboard.dart';
@@ -8,8 +11,6 @@ import 'package:eduphin/student/student_dashboard.dart';
 import 'package:eduphin/teacher/dashboard/teacher_dashboard.dart';
 import 'package:eduphin/staff/staff_dashboard/staff_dashboard.dart';
 import 'package:eduphin/superAdmin/super_admin_dashboard.dart';
-import 'package:flutter/material.dart';
-import 'package:eduphin/services/api_service.dart';
 
 class Roles {
   static const int superAdmin = 1;
@@ -112,148 +113,147 @@ class _LoginPageState extends State<LoginPage> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
+    final theme = context.theme;
     return Scaffold(
       body: Container(
         width: double.infinity,
         height: double.infinity,
-        decoration: const BoxDecoration(
+        decoration: BoxDecoration(
           image: DecorationImage(
-              image: AssetImage('assets/images/eduphin_theme.jpg'),
-              fit: BoxFit.cover),
+              image: const AssetImage('assets/images/eduphin_theme.jpg'),
+              fit: BoxFit.cover,
+              colorFilter: context.isDarkMode 
+                  ? ColorFilter.mode(Colors.black.withValues(alpha: 0.6), BlendMode.darken)
+                  : null,
+          ),
         ),
         child: Center(
           child: SingleChildScrollView(
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(25, 20, 25, 80),
-              child: LayoutBuilder(
-                builder: (context, constraints) {
-                  return Container(
-                    width:
-                    constraints.maxWidth > 500 ? 500 : constraints.maxWidth,
-                    decoration: BoxDecoration(
-                      color: theme.cardColor,
-                      borderRadius: BorderRadius.circular(20),
-                    ),
-                    child: Padding(padding: const EdgeInsets.all(25.0),
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        crossAxisAlignment: CrossAxisAlignment.center,
+            padding: EdgeInsets.symmetric(
+              horizontal: context.responsive(20.0, tablet: 40.0, desktop: 60.0),
+              vertical: 20.0,
+            ),
+            child: ConstrainedBox(
+              constraints: BoxConstraints(
+                maxWidth: context.responsive(450.0, tablet: 500.0, desktop: 550.0),
+              ),
+              child: Card(
+                elevation: 8,
+                shadowColor: Colors.black.withValues(alpha: 0.2),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+                child: Padding(
+                  padding: EdgeInsets.all(context.responsive(24.0, tablet: 32.0)),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Image.asset(
+                        'assets/images/eduphin_logo_bg.png',
+                        height: context.scale(80),
+                        width: context.scale(80),
+                      ),
+                      SizedBox(height: context.scale(16)),
+                      Text(
+                        "Welcome Back!",
+                        style: theme.textTheme.headlineSmall?.copyWith(
+                          fontWeight: FontWeight.bold,
+                          color: theme.colorScheme.onSurface,
+                          fontSize: context.font(24),
+                        ),
+                      ),
+                      SizedBox(height: context.scale(8)),
+                      Text(
+                        "Sign in to your EDUPHIN account.",
+                        style: theme.textTheme.bodyMedium?.copyWith(
+                          color: theme.hintColor,
+                          fontSize: context.font(14),
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                      SizedBox(height: context.scale(32)),
+                      UiHelper.customTextField(
+                        context,
+                        emailController,
+                        "your.email@example.com",
+                        Icons.mail_outline,
+                        false,
+                      ),
+                      UiHelper.customTextField(
+                        context,
+                        passwordController,
+                        "Password",
+                        Icons.lock_outline,
+                        _isObscure,
+                        suffixIcon: _isObscure
+                            ? Icons.visibility_off_outlined
+                            : Icons.visibility_outlined,
+                        onSuffixPressed: () {
+                          setState(() {
+                            _isObscure = !_isObscure;
+                          });
+                        },
+                      ),
+                      if (_error.isNotEmpty) ...[
+                        SizedBox(height: context.scale(12)),
+                        Text(
+                          _error,
+                          style: TextStyle(
+                            color: theme.colorScheme.error,
+                            fontSize: context.font(12),
+                          ),
+                        ),
+                      ],
+                      SizedBox(height: context.scale(12)),
+                      Row(
                         children: [
-                          Image.asset('assets/images/eduphin_logo_bg.png',
-                              height: 100, width: 100),
-                          const SizedBox(height: 10),
-                          Text(
-                            "Welcome Back!",
-                            style: theme.textTheme.headlineSmall?.copyWith(
-                              fontWeight: FontWeight.bold,
-                              color: theme.colorScheme.onSurface,
-                            ),
-                          ),
-                          const SizedBox(height: 8),
-                          Text(
-                            "Sign in to your EDUPHIN account.",
-                            style: theme.textTheme.bodyMedium
-                                ?.copyWith(color: theme.hintColor),
-                            textAlign: TextAlign.center,
-                          ),
-                          const SizedBox(height: 30),
-                          UiHelper.customTextField(
-                            context,
-                            emailController,
-                            "your.email@example.com",
-                            Icons.mail_outline,
-                            false,
-                          ),
-                          UiHelper.customTextField(
-                            context,
-                            passwordController,
-                            "Password",
-                            Icons.lock_outline,
-                            _isObscure,
-                            suffixIcon: _isObscure
-                                ? Icons.visibility_off_outlined
-                                : Icons.visibility_outlined,
-                            onSuffixPressed: () {
-                              setState(() {
-                                _isObscure = !_isObscure;
-                              });
-                            },
-                          ),
-                          if (_error.isNotEmpty) ...[
-                            const SizedBox(height: 10),
-                            Text(
-                              _error,
-                              style: TextStyle(
-                                  color: theme.colorScheme.error,
-                                  fontSize: 12),
-                            ),
-                          ],
-                          const SizedBox(height: 10),
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              Row(
-                                children: [
-                                  Checkbox(
-                                    value: isChecked,
-                                    onChanged: (bool? newValue) {
-                                      setState(() {
-                                        isChecked = newValue!;
-                                      });
-                                    },
-                                    activeColor: theme.colorScheme.primary,
-                                  ),
-                                  Text(
-                                    "Remember me",
-                                    style: theme.textTheme.bodyMedium?.copyWith(
-                                        color: theme.colorScheme.onSurface),
-                                  ),
-                                ],
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 20),
                           SizedBox(
-                            width: double.infinity,
-                            height: 50,
-                            child: ElevatedButton(
-                              onPressed: _isLoading ? null : _login,
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: theme.colorScheme.primary,
-                                foregroundColor: theme.colorScheme.onPrimary,
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(15),
-                                ),
-                                disabledBackgroundColor:
-                                theme.colorScheme.primary,
-                              ),
-                              child: _isLoading
-                                  ? const SizedBox(
-                                height: 24,
-                                width: 24,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 3,
-                                  valueColor:
-                                  AlwaysStoppedAnimation<Color>(
-                                      Colors.white),
-                                ),
-                              )
-                                  : Text(
-                                "LOGIN",
-                                style: theme.textTheme.titleMedium
-                                    ?.copyWith(
-                                    color:
-                                    theme.colorScheme.onPrimary,
-                                    fontWeight: FontWeight.bold),
-                              ),
+                            height: 24,
+                            width: 24,
+                            child: Checkbox(
+                              value: isChecked,
+                              onChanged: (bool? newValue) {
+                                setState(() {
+                                  isChecked = newValue!;
+                                });
+                              },
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Text(
+                            "Remember me",
+                            style: theme.textTheme.bodyMedium?.copyWith(
+                              fontSize: context.font(14),
                             ),
                           ),
                         ],
                       ),
-                    ),
-                  );
-                },
+                      SizedBox(height: context.scale(24)),
+                      SizedBox(
+                        width: double.infinity,
+                        height: context.scale(54),
+                        child: ElevatedButton(
+                          onPressed: _isLoading ? null : _login,
+                          child: _isLoading
+                              ? const SizedBox(
+                                  height: 24,
+                                  width: 24,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 3,
+                                    valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                                  ),
+                                )
+                              : Text(
+                                  "LOGIN",
+                                  style: TextStyle(
+                                    fontSize: context.font(16),
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
               ),
             ),
           ),

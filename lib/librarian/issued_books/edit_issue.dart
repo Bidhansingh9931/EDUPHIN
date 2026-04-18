@@ -102,11 +102,12 @@ class _EditIssuePageState extends State<EditIssuePage> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
+    final theme = context.theme;
 
     return Scaffold(
+      backgroundColor: theme.colorScheme.surface,
       appBar: AppBar(
-        title: Text("Edit Issue (ID: ${widget.issuedBook.id})"),
+        title: Text("Edit Issue #${widget.issuedBook.id}"),
       ),
       body: _isInitialLoading 
         ? const Center(child: CircularProgressIndicator())
@@ -115,70 +116,104 @@ class _EditIssuePageState extends State<EditIssuePage> {
             child: Center(
               child: ConstrainedBox(
                 constraints: const BoxConstraints(maxWidth: 800),
-                child: Card(
-                  child: Padding(
-                    padding: const EdgeInsets.all(24.0),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Center(
-                          child: Column(
-                            children: [
-                              Icon(Icons.edit_calendar_outlined, size: 48, color: theme.colorScheme.primary),
-                              const SizedBox(height: 16),
-                              Text("Update Issue Details", style: theme.textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold)),
-                              const SizedBox(height: 8),
-                              Text("Modify dates or reassignment notes below.", style: TextStyle(color: theme.hintColor)),
-                            ],
-                          ),
-                        ),
-                        const SizedBox(height: 32),
-                        
-                        _buildResponsiveRow(context, [
-                          _buildDropdownField(
-                            context,
-                            "Select Book",
-                            selectedBookId, 
-                            _books.map((b) => DropdownMenuItem<String>(
-                              value: b['id'].toString(),
-                              child: Text(b['title'] ?? "N/A"),
-                            )).toList(), 
-                            (val) => setState(() => selectedBookId = val)
-                          ),
-                          _buildDropdownField(
-                            context,
-                            "Issue To (User)",
-                            selectedUserId, 
-                            _users.map((u) => DropdownMenuItem<String>(
-                              value: u['id'].toString(),
-                              child: Text(u['name'] ?? "N/A"),
-                            )).toList(), 
-                            (val) => setState(() => selectedUserId = val)
-                          ),
-                        ]),
+                child: Column(
+                  children: [
+                    Card(
+                      elevation: 0,
+                      color: theme.colorScheme.surfaceContainerLow,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(context.md),
+                        side: BorderSide(color: theme.colorScheme.outlineVariant, width: 0.5),
+                      ),
+                      child: Padding(
+                        padding: EdgeInsets.all(context.lg),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            Center(
+                              child: Column(
+                                children: [
+                                  Container(
+                                    padding: EdgeInsets.all(context.md),
+                                    decoration: BoxDecoration(
+                                      color: theme.colorScheme.primaryContainer,
+                                      shape: BoxShape.circle,
+                                    ),
+                                    child: Icon(Icons.edit_calendar_rounded, size: context.scale(40), color: theme.colorScheme.onPrimaryContainer),
+                                  ),
+                                  SizedBox(height: context.md),
+                                  Text(
+                                    "Update Issue Details",
+                                    style: theme.textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold, fontSize: context.font(24)),
+                                  ),
+                                  SizedBox(height: context.sm),
+                                  Text(
+                                    "Modify dates or reassignment notes below.",
+                                    textAlign: TextAlign.center,
+                                    style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.outline, fontSize: context.font(14)),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            SizedBox(height: context.xl),
+                            
+                            _buildResponsiveRow(context, [
+                              _buildDropdownField(
+                                context,
+                                "Select Book",
+                                selectedBookId, 
+                                _books.map((b) => DropdownMenuItem<String>(
+                                  value: b['id'].toString(),
+                                  child: Text(b['title'] ?? "N/A"),
+                                )).toList(), 
+                                (val) => setState(() => selectedBookId = val)
+                              ),
+                              _buildDropdownField(
+                                context,
+                                "Issue To (User)",
+                                selectedUserId, 
+                                _users.map((u) => DropdownMenuItem<String>(
+                                  value: u['id'].toString(),
+                                  child: Text(u['name'] ?? "N/A"),
+                                )).toList(), 
+                                (val) => setState(() => selectedUserId = val)
+                              ),
+                            ]),
 
-                        _buildResponsiveRow(context, [
-                          _buildDateField(context, "Issued Date", _issuedDateController),
-                          _buildDateField(context, "Due Date", _dueDateController),
-                        ]),
-                        
-                        _buildInputField(context, "Notes / Remarks", "e.g. extension requested", _notesController, maxLines: 3),
-                        
-                        const SizedBox(height: 32),
-                        ElevatedButton(
-                          onPressed: _isLoading ? null : _updateIssue,
-                          child: _isLoading 
-                            ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
-                            : const Text("UPDATE"),
+                            _buildResponsiveRow(context, [
+                              _buildDateField(context, "Issued Date", _issuedDateController),
+                              _buildDateField(context, "Due Date", _dueDateController),
+                            ]),
+                            
+                            _buildInputField(context, "Notes / Remarks", "e.g. extension requested", _notesController, maxLines: 3),
+                            
+                            SizedBox(height: context.md),
+                            FilledButton.icon(
+                              onPressed: _isLoading ? null : _updateIssue,
+                              icon: _isLoading 
+                                ? SizedBox(width: context.md, height: context.md, child: CircularProgressIndicator(color: theme.colorScheme.onPrimary, strokeWidth: 2))
+                                : const Icon(Icons.update_rounded),
+                              label: const Text("UPDATE CHANGES"),
+                              style: FilledButton.styleFrom(
+                                minimumSize: Size(double.infinity, context.scale(56)),
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(context.sm)),
+                              ),
+                            ),
+                            SizedBox(height: context.md),
+                            FilledButton.tonal(
+                              onPressed: () => Navigator.pop(context),
+                              style: FilledButton.styleFrom(
+                                minimumSize: Size(double.infinity, context.scale(56)),
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(context.sm)),
+                              ),
+                              child: const Text("CANCEL"),
+                            ),
+                          ],
                         ),
-                        const SizedBox(height: 12),
-                        OutlinedButton(
-                          onPressed: () => Navigator.pop(context),
-                          child: const Text("CANCEL"),
-                        ),
-                      ],
+                      ),
                     ),
-                  ),
+                    SizedBox(height: context.xl),
+                  ],
                 ),
               ),
             ),
@@ -187,26 +222,61 @@ class _EditIssuePageState extends State<EditIssuePage> {
   }
 
   Widget _buildResponsiveRow(BuildContext context, List<Widget> children) {
-    if (!context.isTablet) return Column(children: children);
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: children.map((c) => Expanded(child: Padding(padding: const EdgeInsets.only(right: 12), child: c))).toList(),
+    if (!context.isTablet && !context.isDesktop) return Column(children: children);
+    return Padding(
+      padding: EdgeInsets.only(bottom: context.sm),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: children
+            .asMap()
+            .entries
+            .map((entry) => Expanded(
+                  child: Padding(
+                    padding: EdgeInsets.only(
+                      right: entry.key != children.length - 1 ? context.md : 0,
+                    ),
+                    child: entry.value,
+                  ),
+                ))
+            .toList(),
+      ),
     );
   }
 
   Widget _buildDropdownField(BuildContext context, String label, String? value, List<DropdownMenuItem<String>> items, Function(String?) onChanged) {
-    final theme = Theme.of(context);
+    final theme = context.theme;
     return Padding(
-      padding: const EdgeInsets.only(bottom: 20),
+      padding: EdgeInsets.only(bottom: context.md),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(label, style: theme.textTheme.labelMedium?.copyWith(color: theme.hintColor)),
-          const SizedBox(height: 8),
+          Text(
+            label,
+            style: theme.textTheme.labelMedium?.copyWith(
+              color: theme.colorScheme.outline,
+              fontWeight: FontWeight.bold,
+              fontSize: context.font(12),
+            ),
+          ),
+          SizedBox(height: context.xs),
           DropdownButtonFormField<String>(
-            value: value,
+            initialValue: value,
             isExpanded: true,
             hint: const Text("Select option"),
+            style: theme.textTheme.bodyMedium?.copyWith(fontSize: context.font(14)),
+            decoration: InputDecoration(
+              filled: true,
+              fillColor: theme.colorScheme.surface,
+              contentPadding: EdgeInsets.symmetric(horizontal: context.sm, vertical: context.sm),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(context.sm),
+                borderSide: BorderSide(color: theme.colorScheme.outlineVariant),
+              ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(context.sm),
+                borderSide: BorderSide(color: theme.colorScheme.outlineVariant),
+              ),
+            ),
             items: items,
             onChanged: onChanged,
           ),
@@ -216,23 +286,44 @@ class _EditIssuePageState extends State<EditIssuePage> {
   }
 
   Widget _buildDateField(BuildContext context, String label, TextEditingController controller) {
-    final theme = Theme.of(context);
+    final theme = context.theme;
     return Padding(
-      padding: const EdgeInsets.only(bottom: 20),
+      padding: EdgeInsets.only(bottom: context.md),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(label, style: theme.textTheme.labelMedium?.copyWith(color: theme.hintColor)),
-          const SizedBox(height: 8),
+          Text(
+            label,
+            style: theme.textTheme.labelMedium?.copyWith(
+              color: theme.colorScheme.outline,
+              fontWeight: FontWeight.bold,
+              fontSize: context.font(12),
+            ),
+          ),
+          SizedBox(height: context.xs),
           InkWell(
             onTap: () => _selectDate(context, controller),
-            child: IgnorePointer(
-              child: TextField(
-                controller: controller,
-                decoration: const InputDecoration(
-                  hintText: "yyyy-mm-dd",
-                  suffixIcon: Icon(Icons.calendar_month, size: 20),
-                ),
+            borderRadius: BorderRadius.circular(context.sm),
+            child: Container(
+              padding: EdgeInsets.symmetric(horizontal: context.sm, vertical: context.md),
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(context.sm),
+                color: theme.colorScheme.surface,
+                border: Border.all(color: theme.colorScheme.outlineVariant),
+              ),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      controller.text.isEmpty ? "yyyy-mm-dd" : controller.text,
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        color: controller.text.isEmpty ? theme.colorScheme.outline : null,
+                        fontSize: context.font(14),
+                      ),
+                    ),
+                  ),
+                  Icon(Icons.calendar_today_rounded, size: context.scale(18), color: theme.colorScheme.primary),
+                ],
               ),
             ),
           ),
@@ -242,20 +333,38 @@ class _EditIssuePageState extends State<EditIssuePage> {
   }
 
   Widget _buildInputField(BuildContext context, String label, String hint, TextEditingController controller, {int maxLines = 1}) {
-    final theme = Theme.of(context);
+    final theme = context.theme;
     return Padding(
-      padding: const EdgeInsets.only(bottom: 20),
+      padding: EdgeInsets.only(bottom: context.md),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(label, style: theme.textTheme.labelMedium?.copyWith(color: theme.hintColor)),
-          const SizedBox(height: 8),
+          Text(
+            label,
+            style: theme.textTheme.labelMedium?.copyWith(
+              color: theme.colorScheme.outline,
+              fontWeight: FontWeight.bold,
+              fontSize: context.font(12),
+            ),
+          ),
+          SizedBox(height: context.xs),
           TextField(
             controller: controller,
             maxLines: maxLines,
+            style: theme.textTheme.bodyMedium?.copyWith(fontSize: context.font(14)),
             decoration: InputDecoration(
+              filled: true,
+              fillColor: theme.colorScheme.surface,
               hintText: hint,
-              contentPadding: const EdgeInsets.all(12),
+              contentPadding: EdgeInsets.all(context.sm),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(context.sm),
+                borderSide: BorderSide(color: theme.colorScheme.outlineVariant),
+              ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(context.sm),
+                borderSide: BorderSide(color: theme.colorScheme.outlineVariant),
+              ),
             ),
           ),
         ],

@@ -22,7 +22,7 @@ class _MidTermExamPageState extends State<MidTermExamPage> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
+    final theme = context.theme;
 
     return Scaffold(
       appBar: AppBar(
@@ -37,25 +37,30 @@ class _MidTermExamPageState extends State<MidTermExamPage> {
             final error = snapshot.error.toString();
             return Center(
               child: Padding(
-                padding: const EdgeInsets.all(24.0),
-                child: Text('Error: $error', textAlign: TextAlign.center, style: TextStyle(color: theme.colorScheme.error)),
+                padding: context.pagePadding,
+                child: Text('Error: $error', textAlign: TextAlign.center, style: TextStyle(color: theme.colorScheme.error, fontSize: context.font(14))),
               ),
             );
           } else if (snapshot.hasData && snapshot.data!.exams.isNotEmpty) {
             final midTermExams = snapshot.data!.exams.where((exam) => exam.type.toLowerCase().contains('mid')).toList();
             if (midTermExams.isEmpty) {
-              return const Center(child: Text('No mid-term exams found.'));
+              return Center(child: Text('No mid-term exams found.', style: TextStyle(fontSize: context.font(14), color: theme.colorScheme.onSurfaceVariant)));
             }
-            return ListView.builder(
-              padding: context.pagePadding,
-              itemCount: midTermExams.length,
-              itemBuilder: (context, index) {
-                final exam = midTermExams[index];
-                return _buildExamCard(context, exam);
-              },
+            return Center(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 800),
+                child: ListView.builder(
+                  padding: context.pagePadding,
+                  itemCount: midTermExams.length,
+                  itemBuilder: (context, index) {
+                    final exam = midTermExams[index];
+                    return _buildExamCard(context, exam);
+                  },
+                ),
+              ),
             );
           } else {
-            return const Center(child: Text('No exams found.'));
+            return Center(child: Text('No exams found.', style: TextStyle(fontSize: context.font(14), color: theme.colorScheme.onSurfaceVariant)));
           }
         },
       ),
@@ -63,35 +68,76 @@ class _MidTermExamPageState extends State<MidTermExamPage> {
   }
 
   Widget _buildExamCard(BuildContext context, TeacherExam exam) {
-    final theme = Theme.of(context);
+    final theme = context.theme;
     return Card(
-      margin: const EdgeInsets.only(bottom: 16),
+      margin: EdgeInsets.only(bottom: context.spacing),
+      elevation: 0,
+      color: theme.colorScheme.surfaceContainerLow,
+      surfaceTintColor: Colors.transparent,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(context.scale(20)),
+        side: BorderSide(color: theme.colorScheme.outlineVariant.withValues(alpha: 0.5), width: 0.5),
+      ),
       child: Padding(
-        padding: const EdgeInsets.all(20.0),
+        padding: EdgeInsets.all(context.spacing),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              exam.name,
-              style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
+            Row(
+              children: [
+                Container(
+                  padding: EdgeInsets.all(context.scale(8)),
+                  decoration: BoxDecoration(
+                    color: theme.colorScheme.primary.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(context.scale(10)),
+                  ),
+                  child: Icon(Icons.assignment_outlined, color: theme.colorScheme.primary, size: context.scale(22)),
+                ),
+                SizedBox(width: context.scale(12)),
+                Expanded(
+                  child: Text(
+                    exam.name,
+                    style: theme.textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.bold,
+                      fontSize: context.font(16),
+                      color: theme.colorScheme.onSurface,
+                    ),
+                  ),
+                ),
+              ],
             ),
-            const SizedBox(height: 8),
-            if (exam.description != null)
+            if (exam.description != null) ...[
+              SizedBox(height: context.scale(12)),
               Text(
                 exam.description!,
-                style: TextStyle(color: theme.hintColor),
+                style: TextStyle(
+                  color: theme.colorScheme.onSurfaceVariant,
+                  fontSize: context.font(14),
+                  height: 1.4,
+                ),
               ),
-            const SizedBox(height: 20),
-            ElevatedButton(
-              onPressed: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => ExamSchedulePage(examId: exam.id),
-                  ),
-                );
-              },
-              child: const Text('VIEW SCHEDULE'),
+            ],
+            SizedBox(height: context.spacing),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                onPressed: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => ExamSchedulePage(examId: exam.id),
+                    ),
+                  );
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: theme.colorScheme.primary,
+                  foregroundColor: theme.colorScheme.onPrimary,
+                  padding: EdgeInsets.symmetric(vertical: context.scale(16)),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(context.scale(12))),
+                  elevation: 0,
+                ),
+                child: Text('VIEW SCHEDULE', style: TextStyle(fontSize: context.font(14), fontWeight: FontWeight.bold, letterSpacing: 1.1)),
+              ),
             ),
           ],
         ),

@@ -31,16 +31,13 @@ class _SubjectManagementPageState extends State<SubjectManagementPage> {
     try {
       final response = await ApiService.get('counselor/subjects');
       if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
+        final jsonResponse = jsonDecode(response.body);
         if (mounted) {
           setState(() {
-            dynamic subjectsData = data['subject'] ?? data['data'] ?? [];
-            List rawList = [];
-            if (subjectsData is List) {
-              rawList = subjectsData;
-            } else if (subjectsData is Map && subjectsData['data'] is List) {
-              rawList = subjectsData['data'];
-            }
+            final dataMap = jsonResponse['data'] is Map ? jsonResponse['data'] : jsonResponse;
+            final List rawList = dataMap['subjects'] is List 
+                ? dataMap['subjects'] 
+                : (dataMap['subject'] is List ? dataMap['subject'] : []);
             
             _subjects = rawList.map((s) => Subject.fromJson(s)).toList();
             _isLoading = false;
@@ -66,7 +63,6 @@ class _SubjectManagementPageState extends State<SubjectManagementPage> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
     return Scaffold(
       appBar: AppBar(
         title: const Text("Subject Management"),
@@ -74,10 +70,14 @@ class _SubjectManagementPageState extends State<SubjectManagementPage> {
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
           : _errorMessage != null
-              ? Center(child: Padding(
-                  padding: const EdgeInsets.all(24.0),
-                  child: Text(_errorMessage!, textAlign: TextAlign.center, style: TextStyle(color: theme.colorScheme.error)),
-                ))
+              ? Center(
+                  child: Padding(
+                    padding: context.pagePadding,
+                    child: Text(_errorMessage!,
+                        textAlign: TextAlign.center,
+                        style: TextStyle(color: context.theme.colorScheme.error)),
+                  ),
+                )
               : RefreshIndicator(
                   onRefresh: _fetchSubjects,
                   child: SingleChildScrollView(
@@ -87,54 +87,101 @@ class _SubjectManagementPageState extends State<SubjectManagementPage> {
                       child: ConstrainedBox(
                         constraints: const BoxConstraints(maxWidth: 1000),
                         child: Card(
+                          elevation: 0,
+                          color: context.theme.colorScheme.surfaceContainerLow,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(context.scale(12)),
+                            side: BorderSide(
+                              color: context.theme.colorScheme.outlineVariant,
+                              width: 1,
+                            ),
+                          ),
                           child: Padding(
-                            padding: const EdgeInsets.all(20),
+                            padding: context.pagePadding,
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Text("Available Subjects", style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
-                                const SizedBox(height: 16),
+                                Text("Available Subjects",
+                                    style: context.theme.textTheme.titleMedium?.copyWith(
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: context.font(18))),
+                                SizedBox(height: context.md),
                                 TextField(
-                                  decoration: const InputDecoration(
+                                  decoration: InputDecoration(
                                     hintText: "Search subjects...",
-                                    prefixIcon: Icon(Icons.search),
+                                    hintStyle: TextStyle(fontSize: context.font(14)),
+                                    prefixIcon:
+                                        Icon(Icons.search, size: context.scale(20)),
                                   ),
                                 ),
-                                const SizedBox(height: 24),
+                                SizedBox(height: context.lg),
                                 SingleChildScrollView(
                                   scrollDirection: Axis.horizontal,
                                   child: DataTable(
-                                    columnSpacing: 24,
-                                    headingRowColor: WidgetStateProperty.all(theme.colorScheme.primary.withValues(alpha: 0.05)),
-                                    columns: const [
-                                      DataColumn(label: Text("#", style: TextStyle(fontWeight: FontWeight.bold))),
-                                      DataColumn(label: Text("Subject Name", style: TextStyle(fontWeight: FontWeight.bold))),
-                                      DataColumn(label: Text("Code", style: TextStyle(fontWeight: FontWeight.bold))),
-                                      DataColumn(label: Text("Actions", style: TextStyle(fontWeight: FontWeight.bold))),
+                                    columnSpacing: context.lg,
+                                    headingRowColor: WidgetStateProperty.all(context
+                                        .theme.colorScheme.primary
+                                        .withValues(alpha: 0.05)),
+                                    columns: [
+                                      DataColumn(
+                                          label: Text("#",
+                                              style: TextStyle(
+                                                  fontWeight: FontWeight.bold,
+                                                  fontSize: context.font(14)))),
+                                      DataColumn(
+                                          label: Text("Subject Name",
+                                              style: TextStyle(
+                                                  fontWeight: FontWeight.bold,
+                                                  fontSize: context.font(14)))),
+                                      DataColumn(
+                                          label: Text("Code",
+                                              style: TextStyle(
+                                                  fontWeight: FontWeight.bold,
+                                                  fontSize: context.font(14)))),
+                                      DataColumn(
+                                          label: Text("Actions",
+                                              style: TextStyle(
+                                                  fontWeight: FontWeight.bold,
+                                                  fontSize: context.font(14)))),
                                     ],
                                     rows: _subjects.asMap().entries.map((entry) {
                                       int idx = entry.key;
                                       Subject s = entry.value;
                                       return DataRow(
                                         cells: [
-                                          DataCell(Text("${idx + 1}")),
-                                          DataCell(Text(s.name, style: const TextStyle(fontWeight: FontWeight.w500))),
+                                          DataCell(Text("${idx + 1}",
+                                              style:
+                                                  TextStyle(fontSize: context.font(14)))),
+                                          DataCell(Text(s.name,
+                                              style: TextStyle(
+                                                  fontWeight: FontWeight.w500,
+                                                  fontSize: context.font(14)))),
                                           DataCell(
                                             Container(
-                                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                              padding: EdgeInsets.symmetric(
+                                                  horizontal: context.xs,
+                                                  vertical: context.xs / 2),
                                               decoration: BoxDecoration(
-                                                color: theme.colorScheme.primary.withValues(alpha: 0.1),
-                                                borderRadius: BorderRadius.circular(6),
+                                                color: context.theme.colorScheme.primary
+                                                    .withValues(alpha: 0.1),
+                                                borderRadius: BorderRadius.circular(
+                                                    context.scale(6)),
                                               ),
                                               child: Text(
                                                 s.code ?? "-",
-                                                style: TextStyle(color: theme.colorScheme.primary, fontWeight: FontWeight.bold, fontSize: 11),
+                                                style: TextStyle(
+                                                    color:
+                                                        context.theme.colorScheme.primary,
+                                                    fontWeight: FontWeight.bold,
+                                                    fontSize: context.font(11)),
                                               ),
                                             ),
                                           ),
                                           DataCell(
                                             IconButton(
-                                              icon: Icon(Icons.info_outline, color: theme.colorScheme.primary, size: 20),
+                                              icon: Icon(Icons.info_outline,
+                                                  color: context.theme.colorScheme.primary,
+                                                  size: context.scale(20)),
                                               onPressed: () {},
                                             ),
                                           ),
@@ -144,9 +191,10 @@ class _SubjectManagementPageState extends State<SubjectManagementPage> {
                                   ),
                                 ),
                                 if (_subjects.isEmpty)
-                                  const Padding(
-                                    padding: EdgeInsets.symmetric(vertical: 40),
-                                    child: Center(child: Text("No subjects available")),
+                                  Padding(
+                                    padding:
+                                        EdgeInsets.symmetric(vertical: context.scale(40)),
+                                    child: const Center(child: Text("No subjects available")),
                                   ),
                               ],
                             ),

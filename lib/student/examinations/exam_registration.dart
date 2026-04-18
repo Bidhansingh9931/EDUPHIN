@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:eduphin/services/api_service.dart';
-import 'package:intl/intl.dart';
+import 'package:eduphin/services/responsive_helper.dart';
 
 class ExamRegistrationPage extends StatefulWidget {
   const ExamRegistrationPage({super.key});
@@ -12,15 +12,8 @@ class ExamRegistrationPage extends StatefulWidget {
 class _ExamRegistrationPageState extends State<ExamRegistrationPage> {
   List<dynamic> _exams = [];
   List<dynamic> _registeredExamIds = [];
-  Map<int, String> _registrationHashes = {};
   bool _isLoading = true;
   final Map<int, bool> _expandedExams = {};
-
-  final Color _bg = const Color(0xff0B1220);
-  final Color _card = const Color(0xff1E2746);
-  final Color _primary = const Color(0xff3366FF);
-  final Color _secondary = const Color(0xff3E4764);
-  final Color _headerRow = const Color(0xff2A3450);
 
   @override
   void initState() {
@@ -29,74 +22,59 @@ class _ExamRegistrationPageState extends State<ExamRegistrationPage> {
   }
 
   Future<void> _fetchExams() async {
+    if (!mounted) return;
     setState(() => _isLoading = true);
     try {
       final data = await ApiService.getStudentExams();
-      
-      List<dynamic> admitCards = [];
-      try {
-        admitCards = await ApiService.getAdmitCards();
-      } catch (e) {
-        debugPrint("Error fetching admit cards: $e");
-      }
 
       setState(() {
+        // Map availableExams from your JSON
         _exams = data['availableExams'] ?? [];
-        
+
+        // Map registered IDs from your JSON [1, 2]
         final rawIds = data['registeredExamIds'] as List?;
         _registeredExamIds = rawIds?.map((e) => int.tryParse(e.toString()) ?? 0).toList() ?? [];
-        
-        _registrationHashes = {
-          for (var reg in admitCards)
-            if (reg['exam_id'] != null)
-              (reg['exam_id'] as num).toInt(): reg['id']?.toString() ?? reg['id_hash'].toString()
-        };
 
         _isLoading = false;
-        
+
         if (_exams.isNotEmpty && _expandedExams.isEmpty) {
           _expandedExams[_exams[0]['id']] = true;
         }
       });
     } catch (e) {
+      if (!mounted) return;
       setState(() => _isLoading = false);
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text("Error fetching exams: $e"),
-            backgroundColor: Colors.redAccent,
-          ),
-        );
-      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text("Error: $e"),
+          backgroundColor: context.theme.colorScheme.error,
+        ),
+      );
     }
   }
 
   Future<void> _registerExam(dynamic exam) async {
     try {
-      // Use plain ID as the backend no longer expects encrypted hashes
+      // Sending plain ID as string to backend
       final String examId = exam['id'].toString();
-      
+
       await ApiService.registerForExam(examId);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text("Successfully registered for exam!"),
-            backgroundColor: Colors.green,
+          SnackBar(
+            content: const Text("Successfully registered for exam!"),
+            backgroundColor: Colors.green.shade600,
           ),
         );
-        _fetchExams(); 
+        _fetchExams();
       }
     } catch (e) {
       if (mounted) {
-        String errorMessage = e.toString();
-        if (errorMessage.startsWith("Exception: ")) {
-          errorMessage = errorMessage.replaceFirst("Exception: ", "");
-        }
+        String errorMessage = e.toString().replaceFirst("Exception: ", "");
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(errorMessage),
-            backgroundColor: Colors.redAccent,
-            duration: const Duration(seconds: 4),
+            backgroundColor: context.theme.colorScheme.error,
           ),
         );
       }
@@ -105,278 +83,203 @@ class _ExamRegistrationPageState extends State<ExamRegistrationPage> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = context.theme;
+    final colorScheme = theme.colorScheme;
     return Scaffold(
-      backgroundColor: _bg,
+      backgroundColor: colorScheme.surface,
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
+        centerTitle: true,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.white),
+          icon: Icon(Icons.arrow_back, color: colorScheme.onSurface),
           onPressed: () => Navigator.pop(context),
         ),
-        title: const Text(
-          "Exam List & Schedule",
-          style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white),
+        title: Text(
+          "EXAM REGISTRATION",
+          style: TextStyle(
+            fontWeight: FontWeight.w900,
+            color: colorScheme.onSurface,
+            letterSpacing: 1.2,
+            fontSize: context.font(18),
+          ),
         ),
       ),
       body: _isLoading
-          ? Center(child: CircularProgressIndicator(color: _primary))
-          : _exams.isEmpty
-              ? Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(Icons.assignment_outlined, size: 64, color: Colors.white.withValues(alpha: 0.2)),
-                      const SizedBox(height: 16),
-                      const Text("No exams available", style: TextStyle(color: Colors.white70, fontSize: 16)),
-                    ],
-                  ),
-                )
-              : RefreshIndicator(
-                  onRefresh: _fetchExams,
-                  color: _primary,
-                  backgroundColor: _card,
-                  child: SingleChildScrollView(
-                    physics: const AlwaysScrollableScrollPhysics(),
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                    child: Column(
-                      children: _exams.map((exam) {
-                        final bool isRegistered = _registeredExamIds.contains(exam['id']);
-                        final bool isOpen = _expandedExams[exam['id']] ?? false;
-                        
-                        return Padding(
-                          padding: const EdgeInsets.only(bottom: 16),
-                          child: _buildExamCard(
-                            exam,
-                            isRegistered,
-                            isOpen,
-                            () {
-                              setState(() {
-                                _expandedExams[exam['id']] = !isOpen;
-                              });
-                            },
-                          ),
-                        );
-                      }).toList(),
-                    ),
-                  ),
+          ? Center(child: CircularProgressIndicator(color: colorScheme.primary))
+          : RefreshIndicator(
+              onRefresh: _fetchExams,
+              color: colorScheme.primary,
+              backgroundColor: colorScheme.surface,
+              child: Center(
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 1200),
+                  child: _exams.isEmpty ? _buildEmptyState() : _buildExamGrid(),
                 ),
+              ),
+            ),
     );
   }
 
-  Widget _buildExamCard(dynamic exam, bool registered, bool open, VoidCallback onTap) {
-    final startDateStr = exam['start_date'];
-    final endDateStr = exam['end_date'];
-    
-    String formattedRange = "N/A";
-    if (startDateStr != null && endDateStr != null) {
-      try {
-        DateTime start = DateTime.parse(startDateStr);
-        DateTime end = DateTime.parse(endDateStr);
-        formattedRange = "${DateFormat('dd MMM').format(start)} - ${DateFormat('dd MMM yyyy').format(end)}";
-      } catch (_) {}
-    }
+  Widget _buildEmptyState() {
+    final colorScheme = context.theme.colorScheme;
+    return ListView(
+      physics: const AlwaysScrollableScrollPhysics(),
+      children: [
+        SizedBox(height: context.screenHeight * 0.3),
+        Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(Icons.assignment_outlined, size: context.scale(64), color: colorScheme.outlineVariant),
+              SizedBox(height: context.md),
+              Text(
+                "No exams available",
+                style: TextStyle(
+                  color: colorScheme.onSurfaceVariant,
+                  fontSize: context.font(16),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
 
+  Widget _buildExamGrid() {
+    return GridView.builder(
+      padding: context.pagePadding,
+      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: context.responsive(1, tablet: 2, desktop: 3),
+        crossAxisSpacing: context.spacing,
+        mainAxisSpacing: context.spacing,
+        mainAxisExtent: context.responsive(null, tablet: context.scale(380), desktop: context.scale(400)),
+      ),
+      itemCount: _exams.length,
+      itemBuilder: (context, index) {
+        final exam = _exams[index];
+        final bool isRegistered = _registeredExamIds.contains(exam['id']);
+        final bool isOpen = _expandedExams[exam['id']] ?? false;
+        return _buildExamCard(exam, isRegistered, isOpen);
+      },
+    );
+  }
+
+  Widget _buildExamCard(dynamic exam, bool registered, bool open) {
+    final theme = context.theme;
+    final colorScheme = theme.colorScheme;
     final List<dynamic> papers = exam['papers'] ?? [];
 
-    return AnimatedContainer(
-      duration: const Duration(milliseconds: 300),
+    return Container(
       decoration: BoxDecoration(
-        color: _card,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: open ? _primary.withValues(alpha: 0.5) : Colors.white.withValues(alpha: 0.05)),
+        color: colorScheme.surfaceContainerLow,
+        borderRadius: BorderRadius.circular(context.scale(16)),
+        border: Border.all(
+          color: open ? colorScheme.primary : colorScheme.outlineVariant,
+          width: open ? 2 : 1,
+        ),
         boxShadow: [
-          if (open) BoxShadow(color: _primary.withValues(alpha: 0.1), blurRadius: 10, offset: const Offset(0, 4)),
+          BoxShadow(
+            color: colorScheme.shadow.withValues(alpha: 0.05),
+            blurRadius: context.scale(10),
+            offset: const Offset(0, 4),
+          ),
         ],
       ),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
         children: [
-          /// HEADER
-          InkWell(
-            onTap: onTap,
-            borderRadius: BorderRadius.circular(16),
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          exam['name'] ?? 'Exam Name',
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontWeight: FontWeight.bold,
-                            fontSize: 16,
-                          ),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          exam['type'] ?? "Written Examination",
-                          style: TextStyle(
-                            color: Colors.white.withValues(alpha: 0.6),
-                            fontSize: 13,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.end,
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                        decoration: BoxDecoration(
-                          color: _secondary,
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: Text(
-                          formattedRange,
-                          textAlign: TextAlign.center,
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 10,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      Icon(
-                        open ? Icons.keyboard_arrow_up : Icons.keyboard_arrow_down,
-                        color: Colors.white70,
-                        size: 20,
-                      ),
-                    ],
-                  ),
-                ],
+          ListTile(
+            contentPadding: EdgeInsets.symmetric(horizontal: context.md, vertical: context.xs),
+            onTap: () => setState(() => _expandedExams[exam['id']] = !open),
+            title: Text(
+              exam['name'] ?? 'Exam Name',
+              style: TextStyle(
+                color: colorScheme.onSurface,
+                fontWeight: FontWeight.bold,
+                fontSize: context.font(16),
               ),
             ),
+            subtitle: Text(
+              exam['type'] ?? "Written",
+              style: TextStyle(color: colorScheme.onSurfaceVariant, fontSize: context.font(12)),
+            ),
+            trailing: Icon(
+              open ? Icons.keyboard_arrow_up : Icons.keyboard_arrow_down,
+              color: open ? colorScheme.primary : colorScheme.onSurfaceVariant,
+              size: context.scale(24),
+            ),
           ),
-
           if (open)
-            Padding(
-              padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Divider(color: Colors.white12, height: 1),
-                  const SizedBox(height: 16),
-                  
-                  _buildInfoRow("Description", exam['description'] ?? 'No description available.'),
-                  
-                  const SizedBox(height: 24),
-
-                  /// PAPER SCHEDULE
-                  Row(
-                    children: [
-                      Icon(Icons.calendar_month_rounded, color: _primary, size: 20),
-                      const SizedBox(width: 10),
-                      const Text(
-                        "Paper Schedule",
-                        style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14),
-                      )
-                    ],
-                  ),
-                  const SizedBox(height: 16),
-
-                  /// TABLE
-                  Container(
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
-                    ),
-                    clipBehavior: Clip.antiAlias,
-                    child: Column(
-                      children: [
-                        /// TABLE HEADER
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-                          color: _headerRow,
-                          child: const Row(
-                            children: [
-                              Expanded(flex: 2, child: Text("Subject", style: TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold))),
-                              Expanded(flex: 2, child: Text("Date", textAlign: TextAlign.center, style: TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold))),
-                              Expanded(flex: 2, child: Text("Time", textAlign: TextAlign.center, style: TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold))),
-                              Expanded(flex: 1, child: Text("Venue", textAlign: TextAlign.right, style: TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold))),
-                            ],
-                          ),
-                        ),
-
-                        /// TABLE ROWS
-                        ...papers.map((paper) {
-                          final subject = paper['subject']?['name'] ?? 'N/A';
-                          final date = paper['date'] != null ? DateFormat('dd MMM').format(DateTime.parse(paper['date'])) : 'N/A';
-                          final time = "${paper['start_time'] ?? ''}\n${paper['end_time'] ?? ''}";
-                          final venue = paper['venue'] ?? 'N/A';
-
-                          return Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-                            decoration: BoxDecoration(
-                              border: Border(top: BorderSide(color: Colors.white.withValues(alpha: 0.05)))
-                            ),
+            Flexible(
+              child: SingleChildScrollView(
+                padding: EdgeInsets.symmetric(horizontal: context.md, vertical: context.sm),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    if (papers.isNotEmpty) ...[
+                      Divider(color: colorScheme.outlineVariant.withValues(alpha: 0.5)),
+                      SizedBox(height: context.sm),
+                      ...papers.map((p) => Padding(
+                            padding: EdgeInsets.symmetric(vertical: context.xs),
                             child: Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
                               children: [
-                                Expanded(flex: 2, child: Text(subject, style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.w500))),
-                                Expanded(flex: 2, child: Text(date, textAlign: TextAlign.center, style: TextStyle(color: Colors.white.withValues(alpha: 0.7), fontSize: 10))),
-                                Expanded(flex: 2, child: Text(time, textAlign: TextAlign.center, style: TextStyle(color: Colors.white.withValues(alpha: 0.7), fontSize: 10))),
-                                Expanded(flex: 1, child: Text(venue, textAlign: TextAlign.right, style: TextStyle(color: Colors.white.withValues(alpha: 0.7), fontSize: 10))),
+                                Expanded(
+                                  child: Text(
+                                    p['subject']?['name'] ?? 'Subject',
+                                    style: TextStyle(
+                                      color: colorScheme.onSurface,
+                                      fontSize: context.font(14),
+                                    ),
+                                  ),
+                                ),
+                                Container(
+                                  padding: EdgeInsets.symmetric(horizontal: context.xs, vertical: 2),
+                                  decoration: BoxDecoration(
+                                    color: colorScheme.surfaceContainerHighest,
+                                    borderRadius: BorderRadius.circular(context.scale(4)),
+                                  ),
+                                  child: Text(
+                                    p['date'] ?? '',
+                                    style: TextStyle(
+                                      color: colorScheme.onSurfaceVariant,
+                                      fontSize: context.font(11),
+                                      fontWeight: FontWeight.w500,
+                                    ),
+                                  ),
+                                ),
                               ],
                             ),
-                          );
-                        }).toList(),
-                      ],
-                    ),
-                  ),
-
-                  const SizedBox(height: 24),
-
-                  /// BUTTON
-                  SizedBox(
-                    width: double.infinity,
-                    height: 50,
-                    child: ElevatedButton(
-                      onPressed: registered ? null : () => _registerExam(exam),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: _primary,
-                        disabledBackgroundColor: _secondary.withValues(alpha: 0.5),
-                        foregroundColor: Colors.white,
-                        disabledForegroundColor: Colors.white54,
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                        elevation: 0,
-                      ),
-                      child: Text(
-                        registered
-                            ? "ALREADY REGISTERED"
-                            : "REGISTER FOR EXAM",
-                        style: const TextStyle(fontWeight: FontWeight.bold, letterSpacing: 0.5, fontSize: 13),
+                          )),
+                    ],
+                    SizedBox(height: context.lg),
+                    SizedBox(
+                      width: double.infinity,
+                      height: context.scale(48),
+                      child: ElevatedButton(
+                        onPressed: registered ? null : () => _registerExam(exam),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: colorScheme.primary,
+                          disabledBackgroundColor: colorScheme.onSurface.withValues(alpha: 0.12),
+                          disabledForegroundColor: colorScheme.onSurface.withValues(alpha: 0.38),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(context.scale(12))),
+                          foregroundColor: colorScheme.onPrimary,
+                          elevation: 0,
+                        ),
+                        child: Text(
+                          registered ? "ALREADY REGISTERED" : "REGISTER NOW",
+                          style: TextStyle(fontSize: context.font(14), fontWeight: FontWeight.bold),
+                        ),
                       ),
                     ),
-                  )
-                ],
+                  ],
+                ),
               ),
-            )
+            ),
         ],
       ),
-    );
-  }
-
-  Widget _buildInfoRow(String label, String value) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          label,
-          style: TextStyle(color: _primary, fontWeight: FontWeight.bold, fontSize: 12, letterSpacing: 1),
-        ),
-        const SizedBox(height: 6),
-        Text(
-          value,
-          style: TextStyle(color: Colors.white.withValues(alpha: 0.7), fontSize: 13, height: 1.5),
-        ),
-      ],
     );
   }
 }

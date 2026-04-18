@@ -1,29 +1,56 @@
 import 'dart:async';
+import 'package:eduphin/services/api_service.dart';
 import 'package:eduphin/services/responsive_helper.dart';
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 
 // 1. Data Model for an Event
 class Event {
+  final int id;
   final String title;
   final String description;
+  final String? imageUrl;
+  final String? venue;
+  final String? eventDate;
+  final String? startTime;
+  final String? endTime;
+  final bool isTicketed;
+  final String? ticketPrice;
 
   Event({
+    required this.id,
     required this.title,
     required this.description,
+    this.imageUrl,
+    this.venue,
+    this.eventDate,
+    this.startTime,
+    this.endTime,
+    required this.isTicketed,
+    this.ticketPrice,
   });
+
+  factory Event.fromJson(Map<String, dynamic> json) {
+    return Event(
+      id: json['id'] ?? 0,
+      title: json['title'] ?? '',
+      description: json['description'] ?? '',
+      imageUrl: json['image'] != null ? ApiService.getStorageUrl(json['image']) : null,
+      venue: json['venue'],
+      eventDate: json['event_date'],
+      startTime: json['start_time'],
+      endTime: json['end_time'],
+      isTicketed: json['is_ticketed'] == 1 || json['is_ticketed'] == true,
+      ticketPrice: json['ticket_price']?.toString(),
+    );
+  }
 }
 
 // 2. Data Provider to fetch event data
 class EventProvider {
   Future<List<Event>> fetchEvents() async {
-    await Future.delayed(const Duration(seconds: 1));
-    return List.generate(
-      15,
-      (index) => Event(
-        title: 'Institute Event ${index + 1}',
-        description: 'Detailed description for event ${index + 1}. This event is scheduled for all students and faculty.',
-      ),
-    );
+    final data = await ApiService.getModeratorEvents();
+    return data.map((e) => Event.fromJson(e)).toList();
   }
 }
 
@@ -53,44 +80,35 @@ class _EventsPageState extends State<EventsPage> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
+    final theme = context.theme;
     final colorScheme = theme.colorScheme;
 
     return Scaffold(
+      backgroundColor: theme.scaffoldBackgroundColor,
       appBar: AppBar(
-        title: const Text('All Events'),
+        title: Text('All Events', style: TextStyle(fontSize: context.font(20), fontWeight: FontWeight.bold)),
         actions: [
           IconButton(
             onPressed: _refreshEvents,
-            icon: const Icon(Icons.refresh_rounded),
+            icon: Icon(Icons.refresh_rounded, size: context.scale(24)),
           ),
-          const SizedBox(width: 8),
+          SizedBox(width: context.md),
         ],
       ),
       body: RefreshIndicator(
         onRefresh: _refreshEvents,
+        color: theme.colorScheme.primary,
         child: FutureBuilder<List<Event>>(
           future: _eventsFuture,
           builder: (context, snapshot) {
             if (snapshot.connectionState == ConnectionState.waiting) {
-              return const Center(child: CircularProgressIndicator());
+              return Center(child: CircularProgressIndicator(color: theme.colorScheme.primary));
             }
             if (snapshot.hasError) {
-              return Center(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(Icons.error_outline_rounded, size: 48, color: colorScheme.error),
-                    const SizedBox(height: 16),
-                    Text('Failed to load events', style: theme.textTheme.titleMedium),
-                    const SizedBox(height: 24),
-                    ElevatedButton(onPressed: _refreshEvents, child: const Text("Retry")),
-                  ],
-                ),
-              );
+              return _buildComingSoon(context);
             }
             if (!snapshot.hasData || snapshot.data!.isEmpty) {
-              return _buildEmptyState(theme);
+              return _buildEmptyState(context);
             }
 
             final events = snapshot.data!;
@@ -100,16 +118,16 @@ class _EventsPageState extends State<EventsPage> {
               physics: const AlwaysScrollableScrollPhysics(),
               child: Center(
                 child: ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 1200),
+                  constraints: BoxConstraints(maxWidth: context.scale(1200)),
                   child: GridView.builder(
                     shrinkWrap: true,
                     physics: const NeverScrollableScrollPhysics(),
                     itemCount: events.length,
                     gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
                       crossAxisCount: context.responsive(1, tablet: 2, desktop: 3),
-                      crossAxisSpacing: 16,
-                      mainAxisSpacing: 16,
-                      mainAxisExtent: 140,
+                      crossAxisSpacing: context.md,
+                      mainAxisSpacing: context.md,
+                      mainAxisExtent: context.scale(260),
                     ),
                     itemBuilder: (context, index) {
                       return EventCard(event: events[index]);
@@ -124,15 +142,56 @@ class _EventsPageState extends State<EventsPage> {
     );
   }
 
-  Widget _buildEmptyState(ThemeData theme) {
+  Widget _buildEmptyState(BuildContext context) {
+    final theme = context.theme;
     return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(Icons.event_busy_outlined, size: 64, color: theme.hintColor.withOpacity(0.3)),
-          const SizedBox(height: 16),
-          const Text("No events found", style: TextStyle(fontWeight: FontWeight.bold)),
+          Icon(Icons.event_busy_outlined, size: context.scale(64), color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.3)),
+          SizedBox(height: context.md),
+          Text("No events found", style: TextStyle(fontWeight: FontWeight.bold, fontSize: context.font(16), color: theme.colorScheme.onSurfaceVariant)),
         ],
+      ),
+    );
+  }
+
+  Widget _buildComingSoon(BuildContext context) {
+    final theme = context.theme;
+    return Center(
+      child: Padding(
+        padding: context.pagePadding,
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(
+              padding: EdgeInsets.all(context.scale(24)),
+              decoration: BoxDecoration(
+                color: theme.colorScheme.primaryContainer.withValues(alpha: 0.3),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(Icons.rocket_launch_rounded, size: context.scale(64), color: theme.colorScheme.primary),
+            ),
+            SizedBox(height: context.lg),
+            Text(
+              "Coming Soon!",
+              style: TextStyle(
+                fontWeight: FontWeight.w900,
+                fontSize: context.font(28),
+                color: theme.colorScheme.primary,
+              ),
+            ),
+            SizedBox(height: context.sm),
+            Text(
+              "We're working hard to bring events to your dashboard. Stay tuned!",
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: context.font(16),
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -148,55 +207,109 @@ class EventCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
+    final theme = context.theme;
     final colorScheme = theme.colorScheme;
+    final primaryColor = colorScheme.primary;
+
+    String formattedDate = "N/A";
+    if (event.eventDate != null) {
+      try {
+        DateTime dt = DateTime.parse(event.eventDate!);
+        formattedDate = DateFormat('EEE, dd MMM yyyy').format(dt);
+      } catch (_) {}
+    }
+
+    final String price = event.isTicketed ? "₹${event.ticketPrice ?? '0'}" : "FREE";
 
     return Card(
+      color: theme.colorScheme.surfaceContainerLow,
+      elevation: 0,
+      clipBehavior: Clip.antiAlias,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(context.md),
+        side: BorderSide(color: theme.colorScheme.outlineVariant),
+      ),
       child: InkWell(
         onTap: () {},
-        borderRadius: BorderRadius.circular(16),
-        child: Padding(
-          padding: const EdgeInsets.all(20),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(8),
-                    decoration: BoxDecoration(
-                      color: colorScheme.primary.withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: Icon(Icons.calendar_today_rounded, color: colorScheme.primary, size: 20),
+        borderRadius: BorderRadius.circular(context.md),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Stack(
+              children: [
+                Container(
+                  height: context.scale(120),
+                  width: double.infinity,
+                  color: colorScheme.surfaceContainerHighest,
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.vertical(top: Radius.circular(context.md)),
+                    child: event.imageUrl != null && event.imageUrl!.isNotEmpty
+                        ? Image.network(
+                            event.imageUrl!,
+                            fit: BoxFit.cover,
+                            errorBuilder: (context, error, stackTrace) => Center(child: Icon(Icons.event_note, color: primaryColor.withValues(alpha: 0.2), size: context.scale(48))),
+                          )
+                        : Center(child: Icon(Icons.event_note, color: primaryColor.withValues(alpha: 0.2), size: context.scale(48))),
                   ),
-                  const SizedBox(width: 12),
-                  Expanded(
+                ),
+                Positioned(
+                  top: context.scale(8),
+                  right: context.scale(8),
+                  child: Container(
+                    padding: EdgeInsets.symmetric(horizontal: context.scale(8), vertical: context.scale(4)),
+                    decoration: BoxDecoration(
+                      color: event.isTicketed ? const Color(0xFFF59E0B) : const Color(0xFF10B981),
+                      borderRadius: BorderRadius.circular(context.scale(4)),
+                    ),
                     child: Text(
+                      price,
+                      style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: context.font(10)),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            Expanded(
+              child: Padding(
+                padding: EdgeInsets.all(context.md),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
                       event.title,
-                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: context.font(16), color: colorScheme.onSurface),
+                      overflow: TextOverflow.ellipsis,
+                      maxLines: 1,
+                    ),
+                    const SizedBox(height: 4),
+                    if (event.eventDate != null)
+                      Row(
+                        children: [
+                          Icon(Icons.calendar_today, size: context.scale(12), color: primaryColor),
+                          const SizedBox(width: 4),
+                          Text(formattedDate, style: theme.textTheme.bodySmall?.copyWith(fontSize: context.font(11))),
+                        ],
+                      ),
+                    const Spacer(),
+                    Text(
+                      event.description,
+                      style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant, height: 1.4, fontSize: context.font(12)),
+                      maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                     ),
-                  ),
-                ],
+                    SizedBox(height: context.sm),
+                    Row(
+                      children: [
+                        Text("Read More", style: TextStyle(color: colorScheme.primary, fontSize: context.font(12), fontWeight: FontWeight.bold)),
+                        SizedBox(width: context.xs),
+                        Icon(Icons.arrow_forward_rounded, color: colorScheme.primary, size: context.scale(14)),
+                      ],
+                    ),
+                  ],
+                ),
               ),
-              const Spacer(),
-              Text(
-                event.description,
-                style: theme.textTheme.bodySmall?.copyWith(color: theme.hintColor, height: 1.4),
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-              ),
-              const SizedBox(height: 8),
-              Row(
-                children: [
-                  Text("Read More", style: TextStyle(color: colorScheme.primary, fontSize: 12, fontWeight: FontWeight.bold)),
-                  const SizedBox(width: 4),
-                  Icon(Icons.arrow_forward_rounded, color: colorScheme.primary, size: 14),
-                ],
-              ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );

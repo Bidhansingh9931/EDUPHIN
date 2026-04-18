@@ -31,6 +31,11 @@ class _AddNewRemarksPageState extends State<AddNewRemarksPage> {
     });
 
     try {
+      final roleId = await ApiService.getRoleId();
+      final endpoint = roleId == 5 
+          ? 'teacher/students/remarks'
+          : 'manager/students/remarks';
+
       final remarkData = {
         'student_id': widget.studentId,
         'remarks_type': _selectedRemarkType,
@@ -39,7 +44,7 @@ class _AddNewRemarksPageState extends State<AddNewRemarksPage> {
         'to_date': _toDateController.text,
       };
 
-      final response = await ApiService.post('manager/students/remarks', remarkData);
+      final response = await ApiService.post(endpoint, remarkData);
 
       if (mounted) {
         final theme = Theme.of(context);

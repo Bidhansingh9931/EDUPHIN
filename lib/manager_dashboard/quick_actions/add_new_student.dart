@@ -56,11 +56,18 @@ class _AddNewStudentPageState extends State<AddNewStudentPage> {
   }
 
   Future<void> _pickFile(void Function(AppFile file) onFilePicked) async {
-    FilePickerResult? result = await FilePicker.platform.pickFiles(type: FileType.any);
+    FilePickerResult? result = await FilePicker.platform.pickFiles(
+      type: FileType.any,
+      withData: true, // Crucial for Web to get bytes
+    );
     if (result != null) {
       final file = result.files.single;
       setState(() {
-        onFilePicked(AppFile(name: file.name, path: kIsWeb ? null : file.path, bytes: file.bytes));
+        onFilePicked(AppFile(
+          name: file.name,
+          path: kIsWeb ? null : file.path,
+          bytes: file.bytes,
+        ));
       });
     }
   }
@@ -77,12 +84,11 @@ class _AddNewStudentPageState extends State<AddNewStudentPage> {
     setState(() => _isSubmitting = true);
 
     try {
-      final responseData = await _addStudent(_newStudent);
+      await ApiService.addStudent(_newStudent);
       if (!mounted) {
         return;
       }
-      final message = responseData['message'] ?? 'Student added successfully!';
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message), backgroundColor: theme.colorScheme.primary));
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: const Text('Student added successfully!'), backgroundColor: theme.colorScheme.primary));
       Navigator.of(context).pop(true);
     } catch (e) {
       if (!mounted) {
@@ -99,102 +105,7 @@ class _AddNewStudentPageState extends State<AddNewStudentPage> {
     }
   }
 
-  Future<void> _addFileToRequest(
-      http.MultipartRequest request, String field, AppFile? file) async {
-    if (file == null) {
-      return;
-    }
-    if (kIsWeb && file.bytes != null) {
-      request.files.add(
-          http.MultipartFile.fromBytes(field, file.bytes!, filename: file.name));
-    } else if (!kIsWeb && file.path != null) {
-      request.files.add(await http.MultipartFile.fromPath(field, file.path!));
-    }
-  }
-
-  Future<Map<String, dynamic>> _addStudent(NewStudent student) async {
-    final url = Uri.parse('${ApiService.baseUrl}/api/manager/students');
-    final token = await ApiService.getToken();
-    if (token == null) {
-      throw Exception("Authentication token not found.");
-    }
-
-    try {
-      var request = http.MultipartRequest('POST', url);
-      request.headers.addAll({
-        'Accept': 'application/json',
-        'Authorization': 'Bearer $token',
-      });
-
-      request.fields.addAll({
-        'first_name': student.firstName,
-        'student_roll_no': student.rollNo,
-        'registration_no': student.registrationNo,
-        'email': student.email,
-        'password': student.password,
-        'class_id': student.classId.toString(),
-        'section_id': student.sectionId.toString(),
-        'dob': DateFormat('yyyy-MM-dd').format(student.dob!),
-        'gender': student.gender!,
-        'middle_name': student.middleName,
-        'last_name': student.lastName,
-        'phone': student.phone,
-        'alternate_phone': student.altPhone,
-        'address': student.address,
-        'city': student.city,
-        'district': student.district,
-        'state': student.state,
-        'pincode': student.pincode,
-        'blood_group': student.bloodGroup ?? '',
-        'nationality': student.nationality,
-        'admission_date': student.admissionDate != null
-            ? DateFormat('yyyy-MM-dd').format(student.admissionDate!)
-            : '',
-        'lateral_admission': student.lateralAdmission ?? '',
-        'admission_category': student.admissionCategory ?? '',
-        'student_status': student.studentStatus ?? '',
-        'aadhaar_no': student.aadhaarNumber,
-        'father_name': student.fatherName,
-        'father_occupation': student.fatherOccupation,
-        'father_phone': student.fatherPhone,
-        'mother_name': student.motherName,
-        'mother_occupation': student.motherOccupation,
-        'mother_phone': student.motherPhone,
-        'guardian_name': student.guardianName,
-        'guardian_relation': student.guardianRelation,
-        'guardian_phone': student.guardianPhone,
-        'allergies': student.allergies,
-        'medications': student.medications,
-      });
-
-      await _addFileToRequest(request, 'profile_image', student.profileImage);
-      await _addFileToRequest(request, 'aadhar_file', student.aadhaarFile);
-      await _addFileToRequest(request, 'doc_10th_marksheet', student.marksheet10);
-      await _addFileToRequest(request, 'doc_12th_marksheet', student.marksheet12);
-      await _addFileToRequest(
-          request, 'doc_transfer_certificate', student.transferCertificate);
-      await _addFileToRequest(request, 'doc_id_proof', student.idProof);
-
-      final streamedResponse =
-          await request.send().timeout(const Duration(seconds: 30));
-      final response = await http.Response.fromStream(streamedResponse);
-      final responseBody = jsonDecode(response.body);
-
-      if (response.statusCode == 201 && responseBody['status'] == true) {
-        return responseBody;
-      } else {
-        throw Exception(responseBody['message'] ??
-            'Failed to add student. Status: ${response.statusCode}');
-      }
-    } on TimeoutException {
-      throw Exception('Connection timed out. Please try again.');
-    } on http.ClientException {
-      throw Exception(
-          'Could not connect to the server. Check your network connection and the server address.');
-    } catch (e) {
-      throw Exception('An unexpected error occurred: ${e.toString()}');
-    }
-  }
+  // Removed _addFileToRequest and _addStudent as they are moved to ApiService
 
   @override
   Widget build(BuildContext context) {

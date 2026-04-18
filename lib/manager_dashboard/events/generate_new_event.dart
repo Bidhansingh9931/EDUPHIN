@@ -60,11 +60,11 @@ class _GenerateNewEventState extends State<GenerateNewEvent> {
 
     if (pickedFile != null) {
       final imageSize = await pickedFile.length();
-      if (imageSize > 5 * 1024 * 1024) {
+      if (imageSize > 2 * 1024 * 1024) {
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: const Text('Image size cannot exceed 5MB.'),
+            content: const Text('Image size cannot exceed 2MB to match server limits.'),
             backgroundColor: Theme.of(context).colorScheme.error,
           ),
         );
@@ -80,6 +80,27 @@ class _GenerateNewEventState extends State<GenerateNewEvent> {
 
   Future<void> _generateEvent() async {
     if (!_formKey.currentState!.validate()) {
+      return;
+    }
+
+    List<String> selectedAudiences = [];
+    if (openForAll) {
+      selectedAudiences.add('all');
+    } else {
+      audienceSelection.forEach((key, value) {
+        if (value) {
+          selectedAudiences.add(key.toLowerCase());
+        }
+      });
+    }
+
+    if (selectedAudiences.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text('Please select at least one audience.'),
+          backgroundColor: Theme.of(context).colorScheme.error,
+        ),
+      );
       return;
     }
 
@@ -105,81 +126,39 @@ class _GenerateNewEventState extends State<GenerateNewEvent> {
       final date = DateFormat('dd-MM-yyyy').parse(_dateController.text);
       final formattedDate = DateFormat('yyyy-MM-dd').format(date);
 
-      List<String> selectedAudiences = [];
-      if (openForAll) {
-        selectedAudiences.add('all');
-      } else {
-        audienceSelection.forEach((key, value) {
-          if (value) {
-            selectedAudiences.add(key.toLowerCase());
-          }
-        });
-      }
-
-      final fields = {
+      final Map<String, dynamic> fields = {
         'title': _titleController.text,
         'description': _descriptionController.text,
         'venue': _venueController.text,
         'event_date': formattedDate,
         'start_time': startTime,
         'end_time': endTime,
-        'is_ticketed': isTicked ? '1' : '0',
+        // Backend uses has('is_ticketed'), so only send if true
+        if (isTicked) 'is_ticketed': '1',
         if (isTicked) 'ticket_price': _ticketPriceController.text,
         if (_maxParticipantsController.text.isNotEmpty)
           'max_participants': _maxParticipantsController.text,
       };
 
-      for (int i = 0; i < selectedAudiences.length; i++) {
-        fields['audience[$i]'] = selectedAudiences[i];
-      }
+      // Handle audience array properly for both JSON and Multipart
+      fields['audience'] = selectedAudiences;
 
-      final url = Uri.parse('${ApiService.baseUrl}/api/manager/events');
-      final request = http.MultipartRequest('POST', url);
-      final token = await ApiService.getToken();
-      if (token != null) {
-        request.headers['Authorization'] = 'Bearer $token';
-      }
-      request.headers['Accept'] = 'application/json';
-
-      request.fields.addAll(fields);
-
-      request.files.add(http.MultipartFile.fromBytes(
-        'image',
-        _eventPosterBytes!,
-        filename: _eventPosterFile!.name,
-      ));
-
-      final streamedResponse = await request.send();
-
-      final response = await http.Response.fromStream(streamedResponse);
-      final responseData = jsonDecode(response.body);
+      await ApiService.addEvent(
+        fields,
+        imageBytes: _eventPosterBytes,
+        imageName: _eventPosterFile?.name,
+      );
 
       if (!mounted) return;
       final theme = Theme.of(context);
 
-      if (response.statusCode == 201 && responseData['status'] == true) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-                responseData['message'] ?? 'Event generated successfully!'),
-            backgroundColor: theme.colorScheme.primary,
-          ),
-        );
-        Navigator.pop(context, true);
-      } else {
-        if (response.statusCode == 422 && responseData['errors'] != null) {
-          final errors = responseData['errors'] as Map<String, dynamic>;
-          final firstError = errors.values.first;
-          if (firstError is List && firstError.isNotEmpty) {
-            throw Exception(firstError.first);
-          } else {
-            throw Exception(firstError.toString());
-          }
-        } else {
-          throw Exception(responseData['message'] ??
-              'Failed to generate event. Status code: ${response.statusCode}');
-        }
-      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text('Event generated successfully!'),
+          backgroundColor: theme.colorScheme.primary,
+        ),
+      );
+      Navigator.pop(context, true);
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -217,7 +196,7 @@ class _GenerateNewEventState extends State<GenerateNewEvent> {
     if (pickedDate != null) {
       setState(() {
         _dateController.text =
-            "${pickedDate.day.toString().padLeft(2, '0')}-${pickedDate.month.toString().padLeft(2, '0')}-${pickedDate.year}";
+        "${pickedDate.day.toString().padLeft(2, '0')}-${pickedDate.month.toString().padLeft(2, '0')}-${pickedDate.year}";
       });
     }
   }
@@ -294,11 +273,11 @@ class _GenerateNewEventState extends State<GenerateNewEvent> {
         TextFormField(
           controller: _titleController,
           validator: (value) =>
-              value == null || value.isEmpty ? 'Please enter a title' : null,
+          value == null || value.isEmpty ? 'Please enter a title' : null,
           decoration: InputDecoration(
             hintText: "Enter Event Title",
             hintStyle:
-                theme.textTheme.bodyMedium?.copyWith(color: theme.hintColor),
+            theme.textTheme.bodyMedium?.copyWith(color: theme.hintColor),
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
             ),
@@ -326,33 +305,33 @@ class _GenerateNewEventState extends State<GenerateNewEvent> {
               ),
               child: _eventPosterBytes != null
                   ? ClipRRect(
-                      borderRadius: BorderRadius.circular(12),
-                      child: Image.memory(_eventPosterBytes!, fit: BoxFit.cover),
-                    )
+                borderRadius: BorderRadius.circular(12),
+                child: Image.memory(_eventPosterBytes!, fit: BoxFit.cover),
+              )
                   : Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(
-                          Icons.cloud_upload_outlined,
-                          size: 48,
-                          color: theme.colorScheme.secondary,
-                        ),
-                        const SizedBox(height: 8),
-                        Text(
-                          "Click to upload event poster",
-                          style: theme.textTheme.bodyLarge?.copyWith(
-                            color: theme.colorScheme.secondary,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          "PNG, JPG, up to 5MB",
-                          style: theme.textTheme.bodySmall
-                              ?.copyWith(color: theme.hintColor),
-                        ),
-                      ],
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(
+                    Icons.cloud_upload_outlined,
+                    size: 48,
+                    color: theme.colorScheme.secondary,
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    "Click to upload event poster",
+                    style: theme.textTheme.bodyLarge?.copyWith(
+                      color: theme.colorScheme.secondary,
+                      fontWeight: FontWeight.bold,
                     ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    "PNG, JPG, up to 5MB",
+                    style: theme.textTheme.bodySmall
+                        ?.copyWith(color: theme.hintColor),
+                  ),
+                ],
+              ),
             ),
           ),
         ),
@@ -368,7 +347,7 @@ class _GenerateNewEventState extends State<GenerateNewEvent> {
           decoration: InputDecoration(
             hintText: "Enter a detailed Description for the event",
             hintStyle:
-                theme.textTheme.bodyMedium?.copyWith(color: theme.hintColor),
+            theme.textTheme.bodyMedium?.copyWith(color: theme.hintColor),
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
             ),
@@ -382,15 +361,15 @@ class _GenerateNewEventState extends State<GenerateNewEvent> {
         TextFormField(
           controller: _venueController,
           validator: (value) =>
-              value == null || value.isEmpty ? 'Please enter a venue' : null,
+          value == null || value.isEmpty ? 'Please enter a venue' : null,
           decoration: InputDecoration(
             prefixIcon:
-                Icon(Icons.location_on, color: theme.colorScheme.onSurface),
+            Icon(Icons.location_on, color: theme.colorScheme.onSurface),
             filled: true,
             fillColor: theme.colorScheme.surface,
             hintText: "Enter the Venue",
             hintStyle:
-                theme.textTheme.bodyMedium?.copyWith(color: theme.hintColor),
+            theme.textTheme.bodyMedium?.copyWith(color: theme.hintColor),
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
             ),
@@ -404,7 +383,7 @@ class _GenerateNewEventState extends State<GenerateNewEvent> {
           readOnly: true,
           onTap: () => selectDate(),
           validator: (value) =>
-              value == null || value.isEmpty ? 'Please select a date' : null,
+          value == null || value.isEmpty ? 'Please select a date' : null,
           decoration: InputDecoration(
             prefixIcon: Icon(Icons.calendar_month,
                 color: theme.colorScheme.onSurface),
@@ -412,7 +391,7 @@ class _GenerateNewEventState extends State<GenerateNewEvent> {
             fillColor: theme.colorScheme.surface,
             hintText: "Select Event Date",
             hintStyle:
-                theme.textTheme.bodyMedium?.copyWith(color: theme.hintColor),
+            theme.textTheme.bodyMedium?.copyWith(color: theme.hintColor),
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
             ),
@@ -437,7 +416,7 @@ class _GenerateNewEventState extends State<GenerateNewEvent> {
             fillColor: theme.colorScheme.surface,
             hintText: "Select Start Time",
             hintStyle:
-                theme.textTheme.bodyMedium?.copyWith(color: theme.hintColor),
+            theme.textTheme.bodyMedium?.copyWith(color: theme.hintColor),
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
             ),
@@ -474,7 +453,7 @@ class _GenerateNewEventState extends State<GenerateNewEvent> {
             fillColor: theme.colorScheme.surface,
             hintText: "Select End Time",
             hintStyle:
-                theme.textTheme.bodyMedium?.copyWith(color: theme.hintColor),
+            theme.textTheme.bodyMedium?.copyWith(color: theme.hintColor),
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
             ),
@@ -565,10 +544,10 @@ class _GenerateNewEventState extends State<GenerateNewEvent> {
                 : null,
             decoration: InputDecoration(
               prefixIcon:
-                  Icon(Icons.currency_rupee, color: theme.colorScheme.onSurface),
+              Icon(Icons.currency_rupee, color: theme.colorScheme.onSurface),
               hintText: "Enter Ticket Price",
               hintStyle:
-                  theme.textTheme.bodyMedium?.copyWith(color: theme.hintColor),
+              theme.textTheme.bodyMedium?.copyWith(color: theme.hintColor),
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12),
               ),

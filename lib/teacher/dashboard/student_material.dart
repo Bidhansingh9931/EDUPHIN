@@ -1,4 +1,3 @@
-import 'dart:typed_data';
 import 'package:eduphin/services/api_service.dart';
 import 'package:eduphin/services/responsive_helper.dart';
 import 'package:eduphin/teacher/dashboard/study_material_model.dart';
@@ -7,6 +6,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'dart:io';
 import 'common_widgets.dart';
+import 'app_drawer.dart';
 
 class StudentMaterialPage extends StatefulWidget {
   const StudentMaterialPage({super.key});
@@ -50,42 +50,76 @@ class _StudentMaterialPageState extends State<StudentMaterialPage> {
     showDialog(
       context: context,
       builder: (context) {
+        final theme = context.theme;
+        final colorScheme = theme.colorScheme;
         return StatefulBuilder(
           builder: (context, setDialogState) {
             return AlertDialog(
-              title: const Text('Upload New Material'),
-              content: SingleChildScrollView(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    buildTextField(context, titleController, 'Title'),
-                    const SizedBox(height: 16),
-                    buildTextField(context, descriptionController, 'Description'),
-                    const SizedBox(height: 20),
-                    OutlinedButton.icon(
-                      onPressed: () async {
-                        FilePickerResult? result = await FilePicker.platform.pickFiles(withData: true);
-                        if (result != null) {
-                          setDialogState(() {
-                            if (kIsWeb) {
-                              selectedFileBytes = result.files.single.bytes;
-                            } else {
-                              selectedFile = File(result.files.single.path!);
-                            }
-                            fileName = result.files.single.name;
-                          });
-                        }
-                      },
-                      icon: const Icon(Icons.attach_file),
-                      label: Text(fileName ?? 'Select File'),
-                    ),
-                  ],
+              backgroundColor: theme.colorScheme.surface,
+              surfaceTintColor: Colors.transparent,
+              title: Text('Upload New Material', style: TextStyle(fontSize: context.font(18), fontWeight: FontWeight.bold, color: colorScheme.onSurface)),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(context.scale(20))),
+              content: ConstrainedBox(
+                constraints: BoxConstraints(maxWidth: context.scale(400)),
+                child: SingleChildScrollView(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text("Title *", style: TextStyle(fontSize: context.font(14), fontWeight: FontWeight.w600, color: colorScheme.onSurface)),
+                      SizedBox(height: context.scale(8)),
+                      buildTextField(context, titleController, 'Enter title'),
+                      SizedBox(height: context.scale(16)),
+                      Text("Description", style: TextStyle(fontSize: context.font(14), fontWeight: FontWeight.w600, color: colorScheme.onSurface)),
+                      SizedBox(height: context.scale(8)),
+                      buildTextField(context, descriptionController, 'Enter description', maxLines: 3),
+                      SizedBox(height: context.scale(20)),
+                      InkWell(
+                        onTap: () async {
+                          FilePickerResult? result = await FilePicker.platform.pickFiles(withData: true);
+                          if (result != null) {
+                            setDialogState(() {
+                              if (kIsWeb) {
+                                selectedFileBytes = result.files.single.bytes;
+                              } else {
+                                selectedFile = File(result.files.single.path!);
+                              }
+                              fileName = result.files.single.name;
+                            });
+                          }
+                        },
+                        borderRadius: BorderRadius.circular(context.scale(12)),
+                        child: Container(
+                          padding: EdgeInsets.symmetric(horizontal: context.scale(16), vertical: context.scale(16)),
+                          decoration: BoxDecoration(
+                            border: Border.all(color: colorScheme.outlineVariant),
+                            borderRadius: BorderRadius.circular(context.scale(12)),
+                            color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
+                          ),
+                          child: Row(
+                            children: [
+                              Icon(Icons.cloud_upload_outlined, size: context.scale(20), color: colorScheme.primary),
+                              SizedBox(width: context.scale(12)),
+                              Expanded(
+                                child: Text(
+                                  fileName ?? 'Click to select file',
+                                  style: TextStyle(fontSize: context.font(14), color: fileName != null ? colorScheme.onSurface : colorScheme.onSurfaceVariant),
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ),
               actions: [
                 TextButton(
                   onPressed: () => Navigator.of(context).pop(),
-                  child: const Text('Cancel'),
+                  style: TextButton.styleFrom(foregroundColor: colorScheme.onSurfaceVariant),
+                  child: Text('Cancel', style: TextStyle(fontSize: context.font(14), fontWeight: FontWeight.w600)),
                 ),
                 ElevatedButton(
                   onPressed: () async {
@@ -112,8 +146,7 @@ class _StudentMaterialPageState extends State<StudentMaterialPage> {
                         
                         if (mounted) {
                           Navigator.of(context).pop();
-                          // Use outer setState to refresh the whole page
-                          this.setState(() {
+                          setState(() {
                             _dataFuture = ApiService.getStudyMaterialsData();
                           });
                         }
@@ -121,7 +154,7 @@ class _StudentMaterialPageState extends State<StudentMaterialPage> {
                         if (mounted) {
                           Navigator.of(context).pop();
                           ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(content: Text('Upload failed: $e'), backgroundColor: Colors.red),
+                            SnackBar(content: Text('Upload failed: $e'), backgroundColor: colorScheme.error),
                           );
                         }
                       }
@@ -131,7 +164,13 @@ class _StudentMaterialPageState extends State<StudentMaterialPage> {
                       );
                     }
                   },
-                  child: const Text('Upload'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: colorScheme.primary,
+                    foregroundColor: colorScheme.onPrimary,
+                    padding: EdgeInsets.symmetric(horizontal: context.scale(24), vertical: context.scale(12)),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(context.scale(8))),
+                  ),
+                  child: Text('Upload', style: TextStyle(fontSize: context.font(14), fontWeight: FontWeight.bold)),
                 ),
               ],
             );
@@ -143,21 +182,38 @@ class _StudentMaterialPageState extends State<StudentMaterialPage> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = context.theme;
     return Scaffold(
+      backgroundColor: theme.scaffoldBackgroundColor,
       appBar: AppBar(
-        title: const Text("Study Materials"),
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        title: Row(
+          children: [
+            Icon(Icons.auto_stories_outlined, size: context.scale(20), color: theme.colorScheme.primary),
+            SizedBox(width: context.scale(12)),
+            Text(
+              "Study Materials",
+              style: TextStyle(
+                fontWeight: FontWeight.bold,
+                fontSize: context.font(18),
+                color: theme.colorScheme.onSurface,
+              ),
+            ),
+          ],
+        ),
       ),
+      drawer: const AppDrawer(),
       body: FutureBuilder<StudyMaterialPageData>(
         future: _dataFuture,
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
             return const Center(child: CircularProgressIndicator());
           } else if (snapshot.hasError) {
-            return Center(child: Text('Error: ${snapshot.error}'));
+            return Center(child: Text('Error: ${snapshot.error}', style: TextStyle(fontSize: context.font(14), color: theme.colorScheme.error)));
           } else if (snapshot.hasData) {
             final pageData = snapshot.data!;
             
-            // Auto-refresh filtered list if a schedule is already selected
             if (_selectedSchedule != null) {
                _filteredMaterials = pageData.studyMaterials
                   .where((material) =>
@@ -169,39 +225,65 @@ class _StudentMaterialPageState extends State<StudentMaterialPage> {
 
             return SingleChildScrollView(
               padding: context.pagePadding,
-              child: Column(
-                children: [
-                  Card(
-                    child: Padding(
-                      padding: const EdgeInsets.all(20.0),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          buildLabel(context, "Select Class Schedule"),
-                          const SizedBox(height: 12),
-                          buildDropdown(context, pageData.schedules.map((e) => e.displayText).toList(), _selectedSchedule?.displayText, (newValue) {
-                             setState(() {
-                              _selectedSchedule = pageData.schedules.firstWhere((element) => element.displayText == newValue);
-                              _filterMaterials(pageData.studyMaterials);
-                            });
-                          }),
-                          const SizedBox(height: 24),
-                          ElevatedButton.icon(
-                            onPressed: _selectedSchedule != null ? _showUploadDialog : null,
-                            icon: const Icon(Icons.add),
-                            label: const Text("UPLOAD NEW MATERIAL"),
+              child: Center(
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 800),
+                  child: Column(
+                    children: [
+                      Card(
+                        elevation: 0,
+                        color: theme.colorScheme.surfaceContainerLow,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(context.scale(16)),
+                          side: BorderSide(color: theme.colorScheme.outlineVariant.withValues(alpha: 0.5)),
+                        ),
+                        child: Padding(
+                          padding: EdgeInsets.all(context.spacing),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                "Select Class Schedule",
+                                style: TextStyle(
+                                  fontSize: context.font(15),
+                                  fontWeight: FontWeight.bold,
+                                  color: theme.colorScheme.onSurface,
+                                ),
+                              ),
+                              SizedBox(height: context.scale(16)),
+                              buildDropdown(context, pageData.schedules.map((e) => e.displayText).toList(), _selectedSchedule?.displayText, (newValue) {
+                                 setState(() {
+                                  _selectedSchedule = pageData.schedules.firstWhere((element) => element.displayText == newValue);
+                                  _filterMaterials(pageData.studyMaterials);
+                                });
+                              }, hint: "Select Schedule"),
+                              SizedBox(height: context.scale(20)),
+                              ElevatedButton.icon(
+                                onPressed: _selectedSchedule != null ? _showUploadDialog : null,
+                                icon: Icon(Icons.add, size: context.scale(18)),
+                                label: Text("UPLOAD NEW MATERIAL", style: TextStyle(fontSize: context.font(13), fontWeight: FontWeight.bold, letterSpacing: 1.1)),
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: theme.colorScheme.primary,
+                                  foregroundColor: theme.colorScheme.onPrimary,
+                                  minimumSize: Size(double.infinity, context.scale(48)),
+                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(context.scale(12))),
+                                  elevation: 0,
+                                ),
+                              ),
+                            ],
                           ),
-                        ],
+                        ),
                       ),
-                    ),
+                      SizedBox(height: context.spacing),
+                      _buildMaterialSection(context),
+                      SizedBox(height: context.spacing * 2),
+                    ],
                   ),
-                  const SizedBox(height: 24),
-                  _buildMaterialSection(context),
-                ],
+                ),
               ),
             );
           } else {
-            return const Center(child: Text('No data'));
+            return Center(child: Text('No data', style: TextStyle(fontSize: context.font(14))));
           }
         },
       ),
@@ -209,43 +291,72 @@ class _StudentMaterialPageState extends State<StudentMaterialPage> {
   }
 
   Widget _buildMaterialSection(BuildContext context) {
-    final theme = Theme.of(context);
+    final theme = context.theme;
     if (_selectedSchedule == null) {
       return Padding(
-        padding: const EdgeInsets.all(40.0),
+        padding: EdgeInsets.all(context.scale(40.0)),
         child: Column(
           children: [
-            Icon(Icons.auto_stories_outlined, size: 80, color: theme.hintColor.withOpacity(0.3)),
-            const SizedBox(height: 20),
-            Text("Select a schedule to view materials.", textAlign: TextAlign.center, style: TextStyle(color: theme.hintColor)),
+            Icon(Icons.auto_stories_outlined, size: context.scale(80), color: theme.colorScheme.outlineVariant),
+            SizedBox(height: context.scale(20)),
+            Text("Select a schedule to view materials.", textAlign: TextAlign.center, style: TextStyle(color: theme.colorScheme.outline, fontSize: context.font(14))),
           ],
         ),
       );
     }
 
     if (_filteredMaterials.isEmpty) {
-      return Center(child: Padding(padding: const EdgeInsets.all(24), child: Text('No materials found for this selection.', style: TextStyle(color: theme.hintColor))));
+      return Center(child: Padding(padding: EdgeInsets.all(context.scale(24)), child: Text('No materials found for this selection.', style: TextStyle(color: theme.colorScheme.outline, fontSize: context.font(14)))));
     }
 
     return ListView.builder(
       shrinkWrap: true,
+      padding: EdgeInsets.zero,
       physics: const NeverScrollableScrollPhysics(),
       itemCount: _filteredMaterials.length,
       itemBuilder: (context, index) {
         final material = _filteredMaterials[index];
         return Card(
-          margin: const EdgeInsets.only(bottom: 12),
+          elevation: 0,
+          color: theme.colorScheme.surfaceContainerLow,
+          margin: EdgeInsets.only(bottom: context.scale(12)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(context.scale(12)),
+            side: BorderSide(color: theme.colorScheme.outlineVariant.withValues(alpha: 0.5)),
+          ),
           child: ListTile(
-            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            leading: CircleAvatar(
-              backgroundColor: theme.colorScheme.primary.withOpacity(0.1),
-              child: Icon(Icons.description_outlined, color: theme.colorScheme.primary),
+            contentPadding: EdgeInsets.symmetric(horizontal: context.scale(16), vertical: context.scale(8)),
+            leading: Container(
+              padding: EdgeInsets.all(context.scale(10)),
+              decoration: BoxDecoration(
+                color: theme.colorScheme.primary.withValues(alpha: 0.1),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(Icons.description_outlined, color: theme.colorScheme.primary, size: context.scale(20)),
             ),
-            title: Text(material.title, style: const TextStyle(fontWeight: FontWeight.bold)),
-            subtitle: Text(material.description ?? 'No description', maxLines: 2, overflow: TextOverflow.ellipsis),
+            title: Text(
+              material.title,
+              style: TextStyle(
+                fontWeight: FontWeight.bold,
+                fontSize: context.font(14),
+                color: theme.colorScheme.onSurface,
+              ),
+            ),
+            subtitle: Padding(
+              padding: EdgeInsets.only(top: context.scale(4)),
+              child: Text(
+                material.description ?? 'No description',
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontSize: context.font(12),
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
+              ),
+            ),
             trailing: IconButton(
-              icon: const Icon(Icons.delete_outline_rounded),
-              color: theme.colorScheme.error,
+              icon: Icon(Icons.delete_outline_rounded, size: context.scale(20)),
+              color: theme.colorScheme.error.withValues(alpha: 0.8),
               onPressed: () => _deleteMaterial(material.id),
             ),
           ),
@@ -257,17 +368,34 @@ class _StudentMaterialPageState extends State<StudentMaterialPage> {
   Future<void> _deleteMaterial(int id) async {
     final confirmed = await showDialog<bool>(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Delete Material'),
-        content: const Text('Are you sure you want to delete this study material?'),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(backgroundColor: Theme.of(context).colorScheme.error),
-            onPressed: () => Navigator.pop(context, true), 
-            child: const Text('Delete', style: TextStyle(color: Colors.white))),
-        ],
-      ),
+      builder: (context) {
+        final theme = context.theme;
+        final colorScheme = theme.colorScheme;
+        return AlertDialog(
+          backgroundColor: theme.colorScheme.surface,
+          surfaceTintColor: Colors.transparent,
+          title: Text('Delete Material', style: TextStyle(fontSize: context.font(18), fontWeight: FontWeight.bold, color: colorScheme.onSurface)),
+          content: Text('Are you sure you want to delete this study material?', style: TextStyle(fontSize: context.font(14), color: colorScheme.onSurfaceVariant)),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(context.scale(20))),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              style: TextButton.styleFrom(foregroundColor: colorScheme.onSurfaceVariant),
+              child: Text('Cancel', style: TextStyle(fontSize: context.font(14), fontWeight: FontWeight.w600)),
+            ),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: colorScheme.error,
+                foregroundColor: colorScheme.onError,
+                padding: EdgeInsets.symmetric(horizontal: context.scale(20), vertical: context.scale(10)),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(context.scale(8))),
+                elevation: 0,
+              ),
+              onPressed: () => Navigator.pop(context, true), 
+              child: Text('Delete', style: TextStyle(fontSize: context.font(14), fontWeight: FontWeight.bold))),
+          ],
+        );
+      },
     );
 
     if (confirmed == true) {

@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:eduphin/login_logout/ui_helper.dart';
 import 'package:eduphin/login_logout/verify.dart';
 import 'package:eduphin/services/api_service.dart';
+import 'package:eduphin/services/responsive_helper.dart';
 import 'package:flutter/material.dart';
 
 class ForgotPasswordPage extends StatefulWidget {
@@ -24,7 +25,7 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: const Text('Please enter a valid email address.'),
-          backgroundColor: Theme.of(context).colorScheme.error,
+          backgroundColor: context.theme.colorScheme.error,
         ),
       );
       return;
@@ -40,7 +41,7 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
       });
 
       if (mounted) {
-        final theme = Theme.of(context);
+        final theme = context.theme;
         final responseData = jsonDecode(response.body);
         if (response.statusCode == 200 && responseData['status'] == true) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -60,7 +61,7 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
       }
     } catch (e) {
       if (mounted) {
-        final theme = Theme.of(context);
+        final theme = context.theme;
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
               content: Text(e.toString().replaceFirst('Exception: ', '')),
@@ -84,106 +85,99 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final isDarkMode = theme.brightness == Brightness.dark;
-    final screenSize = MediaQuery.of(context).size;
+    final theme = context.theme;
 
     return Scaffold(
-      body: Container(
-        width: double.infinity,
-        height: double.infinity,
-        decoration: BoxDecoration(
-          color: theme.scaffoldBackgroundColor,
-        ),
-        child: Center(
-          child: SingleChildScrollView(
-            child: Padding(
-              padding: EdgeInsets.symmetric(
-                horizontal: screenSize.width * 0.06,
-                vertical: screenSize.height * 0.05,
-              ),
-              child: LayoutBuilder(
-                builder: (context, constraints) {
-                  return Container(
-                    width: constraints.maxWidth > 500
-                        ? 500
-                        : constraints.maxWidth,
-                    decoration: BoxDecoration(
-                      color: theme.cardColor.withOpacity(0.95),
-                      borderRadius: BorderRadius.circular(20),
-                    ),
-                    child: Padding(
-                      padding: EdgeInsets.all(screenSize.width * 0.06),
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        crossAxisAlignment: CrossAxisAlignment.center,
-                        children: [
-                          Icon(
-                            Icons.school,
-                            size: screenSize.width * 0.25,
-                            color: theme.colorScheme.onSurface,
+      backgroundColor: theme.scaffoldBackgroundColor,
+      body: Center(
+        child: SingleChildScrollView(
+          child: Padding(
+            padding: context.pagePadding,
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                return Container(
+                  width: constraints.maxWidth > 500
+                      ? 500
+                      : constraints.maxWidth,
+                  decoration: BoxDecoration(
+                    color: theme.cardColor.withValues(alpha: 0.95),
+                    borderRadius: BorderRadius.circular(context.scale(20)),
+                  ),
+                  child: Padding(
+                    padding: EdgeInsets.all(context.scale(24)),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      crossAxisAlignment: CrossAxisAlignment.center,
+                      children: [
+                        Icon(
+                          Icons.school,
+                          size: context.scale(100),
+                          color: theme.colorScheme.onSurface,
+                        ),
+                        SizedBox(height: context.scale(16)),
+                        Text(
+                          "Forgot Your Password?",
+                          style: theme.textTheme.headlineSmall?.copyWith(
+                            fontWeight: FontWeight.bold,
+                            fontSize: context.font(24),
                           ),
-                          SizedBox(height: screenSize.height * 0.015),
-                          Text(
-                            "Forgot Your Password?",
-                            style: theme.textTheme.headlineSmall?.copyWith(
-                              fontWeight: FontWeight.bold,
-                            ),
-                            textAlign: TextAlign.center,
+                          textAlign: TextAlign.center,
+                        ),
+                        SizedBox(height: context.scale(8)),
+                        Text(
+                          "Enter your email address and we'll send you a link to reset your password.",
+                          style: theme.textTheme.bodyMedium?.copyWith(
+                            fontSize: context.font(14),
                           ),
-                          SizedBox(height: screenSize.height * 0.01),
-                          Text(
-                            "Enter your email address and we'll send you a link to reset your password.",
-                            style: theme.textTheme.bodyMedium,
-                            textAlign: TextAlign.center,
-                          ),
-                          SizedBox(height: screenSize.height * 0.04),
-                          UiHelper.customTextField(
-                            context,
-                            emailController,
-                            "your.email@example.com",
-                            Icons.mail_outline,
-                            false,
-                          ),
-                          SizedBox(height: screenSize.height * 0.02),
-                          SizedBox(
-                            width: double.infinity,
-                            height: 50,
-                            child: ElevatedButton(
-                              onPressed: _isLoading ? null : _sendResetLink,
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: theme.colorScheme.primary,
-                                foregroundColor: theme.colorScheme.onPrimary,
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(15),
-                                ),
-                                disabledBackgroundColor:
-                                    theme.colorScheme.primary.withOpacity(0.5),
+                          textAlign: TextAlign.center,
+                        ),
+                        SizedBox(height: context.scale(32)),
+                        UiHelper.customTextField(
+                          context,
+                          emailController,
+                          "your.email@example.com",
+                          Icons.mail_outline,
+                          false,
+                        ),
+                        SizedBox(height: context.scale(20)),
+                        SizedBox(
+                          width: double.infinity,
+                          height: context.scale(50),
+                          child: ElevatedButton(
+                            onPressed: _isLoading ? null : _sendResetLink,
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: theme.colorScheme.primary,
+                              foregroundColor: theme.colorScheme.onPrimary,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(context.scale(15)),
                               ),
-                              child: _isLoading
-                                  ? const SizedBox(
-                                      height: 24,
-                                      width: 24,
-                                      child: CircularProgressIndicator(
-                                        strokeWidth: 3,
-                                      ),
-                                    )
-                                  : Text(
-                                      "SEND RESET LINK",
-                                      style: theme.textTheme.titleMedium
-                                          ?.copyWith(
-                                              color:
-                                                  theme.colorScheme.onPrimary,
-                                              fontWeight: FontWeight.bold),
-                                    ),
+                              disabledBackgroundColor:
+                                  theme.colorScheme.primary.withValues(alpha: 0.5),
                             ),
+                            child: _isLoading
+                                ? const SizedBox(
+                                    height: 24,
+                                    width: 24,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 3,
+                                    ),
+                                  )
+                                : Text(
+                                    "SEND RESET LINK",
+                                    style: theme.textTheme.titleMedium
+                                        ?.copyWith(
+                                            color:
+                                                theme.colorScheme.onPrimary,
+                                            fontSize: context.font(16),
+                                            fontWeight: FontWeight.bold),
+                                  ),
                           ),
-                        ],
-                      ),
+                        ),
+                      ],
                     ),
-                  );
-                },
-              ),
+                  ),
+                );
+              },
             ),
           ),
         ),

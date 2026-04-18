@@ -1,7 +1,8 @@
 import 'dart:convert';
 import 'package:eduphin/services/api_service.dart';
+import 'package:eduphin/services/responsive_helper.dart';
+import 'package:eduphin/teacher/dashboard/common_widgets.dart';
 import 'package:flutter/material.dart';
-
 import 'searchSchedule/daily_class_schedule.dart';
 
 // --- Data Models from API ---
@@ -140,51 +141,58 @@ class _ClassScheduleSearchPageState extends State<ClassScheduleSearchPage> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
+    final theme = context.theme;
     return Scaffold(
-      backgroundColor: theme.scaffoldBackgroundColor,
+      backgroundColor: theme.colorScheme.surface,
       appBar: AppBar(
-        title: const Text("Class Schedule Search"),
-        centerTitle: true,
-      ),
-      floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
-      floatingActionButton: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16.0),
-        child: SizedBox(
-          width: double.infinity,
-          child: ElevatedButton(
-            onPressed: _isLoading || _error.isNotEmpty ? null : _searchSchedule,
-            style: ElevatedButton.styleFrom(
-              padding: const EdgeInsets.symmetric(vertical: 16),
-              backgroundColor: theme.colorScheme.primary,
-              foregroundColor: theme.colorScheme.onPrimary,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
-            ),
-            child: const Text("Search"),
-          ),
+        title: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text("Schedule Search", style: theme.appBarTheme.titleTextStyle?.copyWith(fontSize: context.font(18))),
+            Text("Find daily schedules for classes", style: theme.textTheme.labelSmall?.copyWith(color: theme.hintColor, fontSize: context.font(11))),
+          ],
         ),
+        centerTitle: false,
       ),
+        bottomNavigationBar: _isLoading || _error.isNotEmpty
+            ? null
+            : SafeArea(
+                child: Container(
+                  padding: EdgeInsets.fromLTRB(context.spacing, context.scale(8), context.spacing, context.scale(16)),
+                  decoration: BoxDecoration(
+                    color: theme.colorScheme.surface,
+                    border: Border(top: BorderSide(color: theme.colorScheme.outlineVariant.withValues(alpha: 0.5))),
+                  ),
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 600),
+                    child: buildActionButton(context, "SEARCH SCHEDULE", _searchSchedule),
+                  ),
+                ),
+              ),
       body: _buildBody(theme),
     );
   }
-  
+
   Widget _buildBody(ThemeData theme) {
     if (_isLoading) {
-      return const Center(child: CircularProgressIndicator());
+      return Center(child: CircularProgressIndicator(color: theme.colorScheme.primary));
     }
 
     if (_error.isNotEmpty) {
       return Center(
         child: Padding(
-          padding: const EdgeInsets.all(20.0),
+          padding: EdgeInsets.all(context.spacing),
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Text('Error: $_error', style: TextStyle(color: theme.colorScheme.error), textAlign: TextAlign.center,),
-              const SizedBox(height: 16),
-              ElevatedButton(onPressed: _fetchDropdownData, child: const Text("Retry"))
+              Icon(Icons.error_outline_rounded, size: context.scale(48), color: theme.colorScheme.error),
+              SizedBox(height: context.scale(16)),
+              Text('Error: $_error', style: TextStyle(color: theme.colorScheme.error, fontSize: context.font(14)), textAlign: TextAlign.center),
+              SizedBox(height: context.scale(24)),
+              SizedBox(
+                width: context.scale(120),
+                child: buildActionButton(context, "RETRY", _fetchDropdownData),
+              )
             ],
           ),
         ),
@@ -192,59 +200,61 @@ class _ClassScheduleSearchPageState extends State<ClassScheduleSearchPage> {
     }
 
     return SingleChildScrollView(
-      padding: const EdgeInsets.fromLTRB(16, 16, 16, 100),
+      padding: context.pagePadding,
       child: Center(
         child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 500),
+          constraints: const BoxConstraints(maxWidth: 600),
           child: Form(
             key: _formKey,
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const SizedBox(height: 16),
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+                Text(
+                  "Search Parameters",
+                  style: TextStyle(color: theme.colorScheme.onSurface, fontWeight: FontWeight.bold, fontSize: context.font(18)),
+                ),
+                SizedBox(height: context.scale(4)),
+                Text(
+                  "Select details to find a specific daily schedule",
+                  style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: context.font(12)),
+                ),
+                SizedBox(height: context.scale(24)),
+                buildFilterCard(
+                  context,
                   children: [
-                    _buildDropdown(
-                      theme,
-                      label: "Class",
-                      value: _selectedClass,
-                      items: _classList,
-                      onChanged: (value) => setState(() => _selectedClass = value),
-                      hint: "--Select Class",
-                    ),
-                    const SizedBox(width: 16),
-                    _buildDropdown(
-                      theme,
-                      label: "Section",
-                      value: _selectedSection,
-                      items: _sectionList,
-                      onChanged: (value) => setState(() => _selectedSection = value),
-                      hint: "--Select Section",
-                    ),
+                    buildResponsiveRow(context, [
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          buildLabel(context, "Class"),
+                          buildDropdown(
+                            context,
+                            _classList,
+                            _selectedClass,
+                            (value) => setState(() => _selectedClass = value),
+                            hint: "Select Class",
+                          ),
+                        ],
+                      ),
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          buildLabel(context, "Section"),
+                          buildDropdown(
+                            context,
+                            _sectionList,
+                            _selectedSection,
+                            (value) => setState(() => _selectedSection = value),
+                            hint: "Select Section",
+                          ),
+                        ],
+                      ),
+                    ]),
+                    SizedBox(height: context.scale(16)),
+                    buildLabel(context, "Date"),
+                    buildDateField(context, _selectDateController, "Select Date"),
                   ],
                 ),
-                const SizedBox(height: 16),
-                Text("Date", style: theme.textTheme.titleMedium),
-                const SizedBox(height: 8),
-                TextFormField(
-                  controller: _selectDateController,
-                  readOnly: true,
-                  onTap: () => selectDate(context, _selectDateController),
-                  decoration: InputDecoration(
-                    prefixIcon: const Icon(Icons.calendar_month),
-                    filled: true,
-                    fillColor: theme.colorScheme.surface,
-                    hintText: "Select Date",
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: BorderSide.none,
-                    ),
-                  ),
-                  validator: (value) =>
-                      value!.isEmpty ? 'Please select a date' : null,
-                ),
-                const SizedBox(height: 80), // Padding for FAB
               ],
             ),
           ),
@@ -253,40 +263,4 @@ class _ClassScheduleSearchPageState extends State<ClassScheduleSearchPage> {
     );
   }
 
-  Widget _buildDropdown(
-    ThemeData theme,
-      {required String label,
-      String? value,
-      required List<String> items,
-      required ValueChanged<String?> onChanged,
-      required String hint}) {
-    return Expanded(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            label,
-            style: theme.textTheme.titleMedium,
-          ),
-          const SizedBox(height: 8),
-          DropdownButtonFormField<String>(
-            value: value,
-            isExpanded: true,
-            items: items.map((e) => DropdownMenuItem(value: e, child: Text(e, overflow: TextOverflow.ellipsis))).toList(),
-            onChanged: onChanged,
-            decoration: InputDecoration(
-              filled: true,
-              fillColor: theme.colorScheme.surface,
-              hintText: hint,
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-                borderSide: BorderSide.none,
-              ),
-            ),
-            validator: (value) => value == null ? 'Please make a selection' : null,
-          ),
-        ],
-      ),
-    );
-  }
 }

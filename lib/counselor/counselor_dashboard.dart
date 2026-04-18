@@ -1,3 +1,4 @@
+import 'package:eduphin/services/common_widgets.dart';
 import 'dart:convert';
 import 'package:eduphin/services/responsive_helper.dart';
 import 'package:flutter/material.dart';
@@ -55,16 +56,25 @@ class _CounselorDashboardPageState extends State<CounselorDashboardPage> {
       final response = await ApiService.get('counselor/dashboard');
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
-        if (mounted) {
-          setState(() {
-            _dashboardData = CounselorDashboardData.fromJson(data);
-            _isLoading = false;
-          });
+        if (data['status'] == true || data['status'] == 'success') {
+          if (mounted) {
+            setState(() {
+              _dashboardData = CounselorDashboardData.fromJson(data);
+              _isLoading = false;
+            });
+          }
+        } else {
+          if (mounted) {
+            setState(() {
+              _errorMessage = data['message'] ?? "Failed to load dashboard";
+              _isLoading = false;
+            });
+          }
         }
       } else {
         if (mounted) {
           setState(() {
-            _errorMessage = "Failed to load dashboard";
+            _errorMessage = ApiService.errorMessage(response, "Failed to load dashboard");
             _isLoading = false;
           });
         }
@@ -81,26 +91,28 @@ class _CounselorDashboardPageState extends State<CounselorDashboardPage> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
+    final theme = context.theme;
 
     if (_isLoading) {
-      return const Scaffold(
-        body: Center(child: CircularProgressIndicator()),
+      return Scaffold(
+        backgroundColor: theme.colorScheme.surface,
+        body: const Center(child: CircularProgressIndicator()),
       );
     }
 
     if (_errorMessage != null) {
       return Scaffold(
+        backgroundColor: theme.colorScheme.surface,
         body: Center(
           child: Padding(
-            padding: const EdgeInsets.all(24.0),
+            padding: EdgeInsets.all(context.spacing * 1.5),
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Icon(Icons.error_outline, size: 60, color: theme.colorScheme.error),
-                const SizedBox(height: 16),
-                Text(_errorMessage!, textAlign: TextAlign.center, style: const TextStyle(fontWeight: FontWeight.bold)),
-                const SizedBox(height: 24),
+                Icon(Icons.error_outline, size: context.scale(60), color: theme.colorScheme.error),
+                SizedBox(height: context.spacing),
+                Text(_errorMessage!, textAlign: TextAlign.center, style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
+                SizedBox(height: context.spacing * 1.5),
                 ElevatedButton(
                   onPressed: _fetchDashboardData,
                   child: const Text("Retry"),
@@ -113,64 +125,90 @@ class _CounselorDashboardPageState extends State<CounselorDashboardPage> {
     }
 
     return Scaffold(
+      backgroundColor: theme.colorScheme.surface,
       appBar: AppBar(
-        title: const Text("Counselor Dashboard"),
+        title: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              "Counselor Dashboard",
+              style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold, fontSize: context.font(18)),
+            ),
+            Text(
+              "Overview & Management",
+              style: theme.textTheme.labelSmall?.copyWith(color: theme.colorScheme.onSurfaceVariant, fontSize: context.font(11)),
+            ),
+          ],
+        ),
+        centerTitle: false,
         actions: [
           IconButton(
-            icon: const Icon(Icons.notifications_none_rounded),
+            icon: Icon(Icons.notifications_none_rounded, size: context.scale(24)),
             onPressed: () {},
           ),
+          IconButton(
+            onPressed: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const CounselorProfilePage()),
+            ).then((_) => _fetchDashboardData()),
+            icon: ProfileAvatar(
+              imageUrl: _dashboardData?.userDetail.photo != null ? ApiService.getStorageUrl(_dashboardData!.userDetail.photo) : null,
+              radius: context.scale(16),
+            ),
+          ),
+          SizedBox(width: context.scale(8)),
         ],
       ),
       body: RefreshIndicator(
         onRefresh: _fetchDashboardData,
         child: SingleChildScrollView(
+          physics: const AlwaysScrollableScrollPhysics(),
           padding: context.pagePadding,
           child: Center(
             child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 1000),
+              constraints: BoxConstraints(maxWidth: context.scale(1000)),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   _buildQuickStats(context),
-                  const SizedBox(height: 32),
+                  SizedBox(height: context.spacing * 2),
                   _buildProfilePreview(context),
-                  const SizedBox(height: 32),
+                  SizedBox(height: context.spacing * 2),
                   _buildSectionHeader(context, "Academic Management", Icons.school_outlined),
-                  const SizedBox(height: 16),
+                  SizedBox(height: context.spacing),
                   _buildActionGrid(context, [
-                    _ActionItem("Classes", Icons.class_outlined, const ManageClassesPage(), Colors.orange),
-                    _ActionItem("Subjects", Icons.auto_stories_outlined, const SubjectManagementPage(), Colors.blue),
-                    _ActionItem("Routines", Icons.calendar_view_day_outlined, const CounselorClassRoutinePage(), Colors.purple),
-                    _ActionItem("Exams", Icons.assignment_outlined, const ExamListPage(), Colors.red),
+                    _ActionItem("Classes", Icons.class_outlined, const ManageClassesPage(), theme.colorScheme.primary),
+                    _ActionItem("Subjects", Icons.auto_stories_outlined, const SubjectManagementPage(), theme.colorScheme.secondary),
+                    _ActionItem("Routines", Icons.calendar_view_day_outlined, const CounselorClassRoutinePage(), theme.colorScheme.tertiary),
+                    _ActionItem("Exams", Icons.assignment_outlined, const ExamListPage(), theme.colorScheme.error),
                   ]),
-                  const SizedBox(height: 32),
+                  SizedBox(height: context.spacing * 2),
                   _buildSectionHeader(context, "Administrative", Icons.admin_panel_settings_outlined),
-                  const SizedBox(height: 16),
+                  SizedBox(height: context.spacing),
                   _buildActionGrid(context, [
-                    _ActionItem("Managers", Icons.manage_accounts_outlined, const InstituteManagerPage(), Colors.indigo),
-                    _ActionItem("Counselors", Icons.support_agent_outlined, const CounselorPage(), Colors.teal),
-                    _ActionItem("Teachers", Icons.person_outline, const TeachersPage(), Colors.cyan),
-                    _ActionItem("Librarians", Icons.local_library_outlined, const LibrarianPage(), Colors.amber),
-                    _ActionItem("Accountants", Icons.account_balance_outlined, const AccountantPage(), Colors.pink),
-                    _ActionItem("Staff", Icons.badge_outlined, const StaffPage(), Colors.lightGreen),
+                    _ActionItem("Managers", Icons.manage_accounts_outlined, const InstituteManagerPage(), theme.colorScheme.primary),
+                    _ActionItem("Counselors", Icons.support_agent_outlined, const CounselorPage(), theme.colorScheme.secondary),
+                    _ActionItem("Teachers", Icons.person_outline, const TeachersPage(), theme.colorScheme.tertiary),
+                    _ActionItem("Librarians", Icons.local_library_outlined, const LibrarianPage(), theme.colorScheme.primary),
+                    _ActionItem("Accountants", Icons.account_balance_outlined, const AccountantPage(), theme.colorScheme.secondary),
+                    _ActionItem("Staff", Icons.badge_outlined, const StaffPage(), theme.colorScheme.tertiary),
                   ]),
-                  const SizedBox(height: 32),
+                  SizedBox(height: context.spacing * 2),
                   _buildSectionHeader(context, "Campus Life", Icons.local_activity_outlined),
-                  const SizedBox(height: 16),
+                  SizedBox(height: context.spacing),
                   _buildActionGrid(context, [
-                    _ActionItem("Library", Icons.menu_book, const BookCatelogPage(), Colors.blueAccent),
-                    _ActionItem("Lending", Icons.library_add_check, const MyBookIssuePage(), Colors.green),
-                    _ActionItem("Events", Icons.event_note, const ExploreEventsPage(), Colors.deepOrange),
-                    _ActionItem("My Events", Icons.event_available, const MyRegisteredEventsPage(), Colors.pinkAccent),
+                    _ActionItem("Library", Icons.menu_book, const BookCatelogPage(), theme.colorScheme.primary),
+                    _ActionItem("Lending", Icons.library_add_check, const MyBookIssuePage(), theme.colorScheme.secondary),
+                    _ActionItem("Events", Icons.event_note, const ExploreEventsPage(), theme.colorScheme.tertiary),
+                    _ActionItem("My Events", Icons.event_available, const MyRegisteredEventsPage(), theme.colorScheme.secondary),
                   ]),
-                  const SizedBox(height: 32),
+                  SizedBox(height: context.spacing * 2),
                   _buildSectionHeader(context, "Support & Finance", Icons.headset_mic_outlined),
-                  const SizedBox(height: 16),
+                  SizedBox(height: context.spacing),
                   _buildSalaryCard(context),
-                  const SizedBox(height: 16),
+                  SizedBox(height: context.spacing),
                   _buildSupportSection(context),
-                  const SizedBox(height: 40),
+                  SizedBox(height: context.spacing * 2.5),
                 ],
               ),
             ),
@@ -181,31 +219,44 @@ class _CounselorDashboardPageState extends State<CounselorDashboardPage> {
   }
 
   Widget _buildQuickStats(BuildContext context) {
+    final theme = context.theme;
     return Row(
       children: [
-        Expanded(child: _buildStatItem(context, "Active Classes", "${_dashboardData?.sections.length ?? 0}", Icons.class_rounded, Colors.orange)),
-        const SizedBox(width: 16),
-        Expanded(child: _buildStatItem(context, "Open Tickets", "${_dashboardData?.tickets.where((t) => t.status != 'closed').length ?? 0}", Icons.confirmation_number_rounded, Colors.red)),
+        Expanded(child: _buildStatItem(context, "Active Classes", "${_dashboardData?.sections.length ?? 0}", Icons.class_rounded, theme.colorScheme.primary)),
+        SizedBox(width: context.spacing),
+        Expanded(child: _buildStatItem(context, "Open Tickets", "${_dashboardData?.tickets.where((t) => t.status != 'closed').length ?? 0}", Icons.confirmation_number_rounded, theme.colorScheme.error)),
       ],
     );
   }
 
   Widget _buildStatItem(BuildContext context, String title, String value, IconData icon, Color color) {
-    final theme = Theme.of(context);
+    final theme = context.theme;
     return Card(
+      elevation: 0,
+      color: theme.colorScheme.surfaceContainerLow,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(context.scale(16)),
+        side: BorderSide(color: theme.colorScheme.outlineVariant, width: 0.5),
+      ),
       child: Padding(
-        padding: const EdgeInsets.all(16),
+        padding: EdgeInsets.all(context.spacing),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             CircleAvatar(
-              radius: 18,
+              radius: context.scale(18),
               backgroundColor: color.withValues(alpha: 0.1),
-              child: Icon(icon, color: color, size: 18),
+              child: Icon(icon, color: color, size: context.scale(18)),
             ),
-            const SizedBox(height: 16),
-            Text(value, style: theme.textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold)),
-            Text(title, style: theme.textTheme.labelSmall?.copyWith(color: theme.hintColor)),
+            SizedBox(height: context.spacing),
+            Text(
+              value,
+              style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold, fontSize: context.font(20)),
+            ),
+            Text(
+              title,
+              style: theme.textTheme.labelSmall?.copyWith(color: theme.colorScheme.onSurfaceVariant, fontSize: context.font(11)),
+            ),
           ],
         ),
       ),
@@ -213,51 +264,86 @@ class _CounselorDashboardPageState extends State<CounselorDashboardPage> {
   }
 
   Widget _buildProfilePreview(BuildContext context) {
-    final theme = Theme.of(context);
+    final theme = context.theme;
+    final colorScheme = theme.colorScheme;
     final user = _dashboardData?.userDetail;
+    
     return Card(
-      color: theme.colorScheme.primaryContainer,
+      elevation: 0,
+      color: colorScheme.surfaceContainerLow,
+      surfaceTintColor: Colors.transparent,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(context.scale(20)),
+        side: BorderSide(color: colorScheme.outlineVariant.withValues(alpha: 0.5), width: 0.5),
+      ),
       child: Padding(
-        padding: const EdgeInsets.all(24),
+        padding: EdgeInsets.all(context.scale(20.0)),
         child: Column(
           children: [
-            Row(
+            ProfileAvatar(
+              imageUrl: user?.photo != null ? ApiService.getStorageUrl(user!.photo) : null,
+              radius: context.scale(44),
+            ),
+            SizedBox(height: context.scale(16)),
+            Text(
+              user?.fullName ?? "Counselor",
+              style: TextStyle(
+                fontWeight: FontWeight.bold,
+                fontSize: context.font(20),
+                color: colorScheme.onSurface,
+              ),
+              textAlign: TextAlign.center,
+            ),
+            Text(
+              user?.position ?? "Counselor",
+              style: TextStyle(
+                fontSize: context.font(14),
+                color: colorScheme.onSurfaceVariant,
+              ),
+            ),
+            SizedBox(height: context.scale(24)),
+            Wrap(
+              spacing: context.scale(16),
+              runSpacing: context.scale(12),
+              alignment: WrapAlignment.center,
               children: [
-                CircleAvatar(
-                  radius: 35,
-                  backgroundColor: theme.colorScheme.onPrimaryContainer.withValues(alpha: 0.1),
-                  backgroundImage: const AssetImage('assets/images/girl_image.webp'),
-                  foregroundImage: user?.photo != null && user!.photo!.isNotEmpty
-                      ? NetworkImage(ApiService.getStorageUrl(user.photo))
-                      : null,
-                ),
-                const SizedBox(width: 20),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(user?.fullName ?? "Counselor", style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold, color: theme.colorScheme.onPrimaryContainer)),
-                      Text(user?.position ?? "Counselor", style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onPrimaryContainer.withValues(alpha: 0.7))),
-                    ],
-                  ),
-                ),
-                IconButton(
-                  onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const VirtualIdCardPage())),
-                  icon: Icon(Icons.qr_code_2, color: theme.colorScheme.onPrimaryContainer, size: 28),
-                )
+                _buildProfileInfoItemDetail(context, Icons.badge_outlined, user?.employeeId ?? "N/A"),
+                _buildProfileInfoItemDetail(context, Icons.phone_outlined, user?.phone ?? "N/A"),
+                _buildProfileInfoItemDetail(context, Icons.location_on_outlined, "Campus Main"),
               ],
             ),
-            const SizedBox(height: 24),
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton(
-                onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const CounselorProfilePage())),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: theme.colorScheme.onPrimaryContainer,
-                  foregroundColor: theme.colorScheme.primaryContainer,
+            SizedBox(height: context.scale(24)),
+            Row(
+              children: [
+                Expanded(
+                  child: FilledButton.tonalIcon(
+                    onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const VirtualIdCardPage())),
+                    icon: Icon(Icons.vignette_outlined, size: context.scale(18)),
+                    label: Text("VIRTUAL ID", style: TextStyle(fontSize: context.font(12), fontWeight: FontWeight.bold)),
+                    style: FilledButton.styleFrom(
+                      backgroundColor: colorScheme.primary.withValues(alpha: 0.1),
+                      foregroundColor: colorScheme.primary,
+                      padding: EdgeInsets.symmetric(vertical: context.scale(12)),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(context.scale(12))),
+                    ),
+                  ),
                 ),
-                child: const Text("VIEW FULL PROFILE"),
-              ),
+                SizedBox(width: context.scale(12)),
+                Expanded(
+                  child: FilledButton.icon(
+                    onPressed: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (_) => const CounselorProfilePage()),
+                    ).then((_) => _fetchDashboardData()),
+                    icon: Icon(Icons.person_outline, size: context.scale(18)),
+                    label: Text("PROFILE", style: TextStyle(fontSize: context.font(12), fontWeight: FontWeight.bold)),
+                    style: FilledButton.styleFrom(
+                      padding: EdgeInsets.symmetric(vertical: context.scale(12)),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(context.scale(12))),
+                    ),
+                  ),
+                ),
+              ],
             )
           ],
         ),
@@ -265,13 +351,42 @@ class _CounselorDashboardPageState extends State<CounselorDashboardPage> {
     );
   }
 
+  Widget _buildProfileInfoItemDetail(BuildContext context, IconData icon, String value) {
+    final colorScheme = context.theme.colorScheme;
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+          padding: EdgeInsets.all(context.scale(8)),
+          decoration: BoxDecoration(
+            color: colorScheme.primary.withValues(alpha: 0.1),
+            shape: BoxShape.circle,
+          ),
+          child: Icon(icon, size: context.scale(20), color: colorScheme.primary),
+        ),
+        SizedBox(height: context.scale(6)),
+        Text(
+          value,
+          style: TextStyle(
+            fontWeight: FontWeight.w600,
+            fontSize: context.font(11),
+            color: colorScheme.onSurface,
+          ),
+        ),
+      ],
+    );
+  }
+
   Widget _buildSectionHeader(BuildContext context, String title, IconData icon) {
-    final theme = Theme.of(context);
+    final theme = context.theme;
     return Row(
       children: [
-        Icon(icon, color: theme.colorScheme.primary, size: 20),
-        const SizedBox(width: 10),
-        Text(title, style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
+        Icon(icon, color: theme.colorScheme.primary, size: context.scale(20)),
+        SizedBox(width: context.scale(10)),
+        Text(
+          title,
+          style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold, fontSize: context.font(18)),
+        ),
       ],
     );
   }
@@ -281,57 +396,68 @@ class _CounselorDashboardPageState extends State<CounselorDashboardPage> {
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
       gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: context.isTablet ? 4 : 2,
-        crossAxisSpacing: 16,
-        mainAxisSpacing: 16,
-        childAspectRatio: 2.2,
+        crossAxisCount: context.responsive(2, tablet: 4, desktop: 6),
+        crossAxisSpacing: context.scale(12),
+        mainAxisSpacing: context.scale(12),
+        childAspectRatio: 1.1,
       ),
       itemCount: items.length,
       itemBuilder: (context, index) {
         final item = items[index];
-        return Card(
-          child: InkWell(
-            onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => item.page)),
-            borderRadius: BorderRadius.circular(16),
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 12),
-              child: Row(
-                children: [
-                  Icon(item.icon, color: item.color, size: 20),
-                  const SizedBox(width: 12),
-                  Expanded(child: Text(item.title, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13), maxLines: 1, overflow: TextOverflow.ellipsis)),
-                ],
-              ),
-            ),
-          ),
+        return QuickActionItem(
+          label: item.title.toUpperCase(),
+          icon: item.icon,
+          onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => item.page)),
+          color: item.color,
         );
       },
     );
   }
 
   Widget _buildSalaryCard(BuildContext context) {
+    final theme = context.theme;
     final salary = _dashboardData?.lastSalary;
     return Card(
+      elevation: 0,
+      color: theme.colorScheme.surfaceContainerLow,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(context.scale(16)),
+        side: BorderSide(color: theme.colorScheme.outlineVariant, width: 0.5),
+      ),
       child: ListTile(
         onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const SalaryBankPage())),
-        leading: CircleAvatar(backgroundColor: Colors.green.withValues(alpha: 0.1), child: const Icon(Icons.account_balance_wallet, color: Colors.green)),
-        title: const Text("Monthly Salary", style: TextStyle(fontSize: 12)),
-        subtitle: Text(salary != null ? "₹${salary.amount}" : "₹0.00", style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
-        trailing: const Icon(Icons.chevron_right),
+        leading: CircleAvatar(
+          backgroundColor: theme.colorScheme.primary.withValues(alpha: 0.1),
+          child: Icon(Icons.account_balance_wallet, color: theme.colorScheme.primary, size: context.scale(20)),
+        ),
+        title: Text(
+          "Monthly Salary",
+          style: theme.textTheme.labelSmall?.copyWith(color: theme.colorScheme.onSurfaceVariant, fontSize: context.font(11)),
+        ),
+        subtitle: Text(
+          salary != null ? "₹${salary.amount}" : "₹0.00",
+          style: theme.textTheme.titleMedium?.copyWith(
+            fontWeight: FontWeight.bold,
+            color: theme.colorScheme.primary,
+            fontSize: context.font(16),
+          ),
+        ),
+        trailing: Icon(Icons.chevron_right, color: theme.colorScheme.onSurfaceVariant, size: context.scale(20)),
       ),
     );
   }
 
   Widget _buildSupportSection(BuildContext context) {
+    final theme = context.theme;
     return Column(
       children: [
-        _buildSupportItem(context, "My Tickets", Icons.confirmation_num_outlined, const SupportTicketsPage(), Colors.blue),
-        const SizedBox(height: 12),
+        _buildSupportItem(context, "My Tickets", Icons.confirmation_num_outlined, const SupportTicketsPage(), theme.colorScheme.primary),
+        SizedBox(height: context.spacing),
         Row(
           children: [
-            Expanded(child: _buildSupportItem(context, "Create New", Icons.add_comment_outlined, const CreateSupportTicketPage(), Colors.orange)),
-            const SizedBox(width: 12),
-            Expanded(child: _buildSupportItem(context, "Assigned", Icons.assignment_ind_outlined, const AssignedTicketsPage(), Colors.purple)),
+            Expanded(child: _buildSupportItem(context, "Create New", Icons.add_comment_outlined, const CreateSupportTicketPage(), theme.colorScheme.secondary)),
+            SizedBox(width: context.spacing),
+            Expanded(child: _buildSupportItem(context, "Assigned", Icons.assignment_ind_outlined, const AssignedTicketsPage(), theme.colorScheme.tertiary)),
           ],
         )
       ],
@@ -339,12 +465,22 @@ class _CounselorDashboardPageState extends State<CounselorDashboardPage> {
   }
 
   Widget _buildSupportItem(BuildContext context, String title, IconData icon, Widget page, Color color) {
+    final theme = context.theme;
     return Card(
+      elevation: 0,
+      color: theme.colorScheme.surfaceContainerLow,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(context.scale(16)),
+        side: BorderSide(color: theme.colorScheme.outlineVariant, width: 0.5),
+      ),
       child: ListTile(
         onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => page)),
-        leading: Icon(icon, color: color, size: 20),
-        title: Text(title, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
-        trailing: const Icon(Icons.chevron_right, size: 16),
+        leading: Icon(icon, color: color, size: context.scale(20)),
+        title: Text(
+          title,
+          style: theme.textTheme.labelMedium?.copyWith(fontWeight: FontWeight.bold, fontSize: context.font(13)),
+        ),
+        trailing: Icon(Icons.chevron_right, size: context.scale(16), color: theme.colorScheme.onSurfaceVariant),
       ),
     );
   }

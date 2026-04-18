@@ -3,6 +3,7 @@ import 'package:eduphin/services/api_service.dart';
 import 'package:eduphin/moderator_dashboard/dashboard_cards/active_institutes/add_institute.dart';
 import 'package:eduphin/moderator_dashboard/dashboard_cards/active_institutes/view_institute_page.dart';
 import 'package:eduphin/services/responsive_helper.dart';
+import 'package:eduphin/services/common_widgets.dart';
 import 'package:flutter/material.dart';
 
 import '../../institute/institute_model.dart';
@@ -97,18 +98,18 @@ class _InstitutesPageState extends State<InstitutesPage> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
+    final theme = context.theme;
     final colorScheme = theme.colorScheme;
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text("Active Institutes"),
+        title: Text("Active Institutes", style: TextStyle(fontSize: context.font(20))),
         actions: [
           IconButton(
             onPressed: _fetchData,
-            icon: const Icon(Icons.refresh_rounded),
+            icon: Icon(Icons.refresh_rounded, size: context.scale(24)),
           ),
-          const SizedBox(width: 8),
+          SizedBox(width: context.md),
         ],
       ),
       body: RefreshIndicator(
@@ -122,47 +123,66 @@ class _InstitutesPageState extends State<InstitutesPage> {
                   Expanded(
                     child: TextField(
                       controller: _searchController,
-                      decoration: const InputDecoration(
+                      style: TextStyle(fontSize: context.font(14)),
+                      decoration: InputDecoration(
                         hintText: "Search by name or code...",
-                        prefixIcon: Icon(Icons.search_rounded),
+                        hintStyle: TextStyle(color: colorScheme.onSurfaceVariant, fontSize: context.font(14)),
+                        prefixIcon: Icon(Icons.search_rounded, color: colorScheme.primary),
+                        filled: true,
+                        fillColor: colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
+                        contentPadding: EdgeInsets.symmetric(horizontal: context.md, vertical: context.sm),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(context.scale(12)),
+                          borderSide: BorderSide(color: colorScheme.outlineVariant),
+                        ),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(context.scale(12)),
+                          borderSide: BorderSide(color: colorScheme.outlineVariant),
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(context.scale(12)),
+                          borderSide: BorderSide(color: colorScheme.primary, width: 2),
+                        ),
                       ),
                     ),
                   ),
-                  const SizedBox(width: 12),
+                  SizedBox(width: context.md),
                   IconButton.filled(
                     onPressed: _navigateAndAdd,
-                    icon: const Icon(Icons.add_rounded),
+                    icon: Icon(Icons.add_rounded, size: context.scale(24)),
                     style: IconButton.styleFrom(
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                      padding: const EdgeInsets.all(12),
+                      backgroundColor: colorScheme.primary,
+                      foregroundColor: colorScheme.onPrimary,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(context.scale(12))),
+                      padding: EdgeInsets.all(context.scale(12)),
                     ),
                   ),
                 ],
               ),
             ),
-            const SizedBox(height: 16),
+            SizedBox(height: context.md),
             Expanded(
               child: _isLoading
                   ? const Center(child: CircularProgressIndicator())
                   : _error != null
-                      ? _buildErrorState(theme)
+                      ? _buildErrorState(context)
                       : _filteredInstitutes.isEmpty
-                          ? _buildEmptyState(theme)
+                          ? _buildEmptyState(context)
                           : SingleChildScrollView(
                               padding: context.pagePadding,
                               physics: const AlwaysScrollableScrollPhysics(),
                               child: Center(
                                 child: ConstrainedBox(
-                                  constraints: const BoxConstraints(maxWidth: 1200),
+                                  constraints: BoxConstraints(maxWidth: context.scale(1200)),
                                   child: GridView.builder(
                                     shrinkWrap: true,
                                     physics: const NeverScrollableScrollPhysics(),
                                     itemCount: _filteredInstitutes.length,
                                     gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
                                       crossAxisCount: context.responsive(1, tablet: 2, desktop: 3),
-                                      crossAxisSpacing: 16,
-                                      mainAxisSpacing: 16,
-                                      mainAxisExtent: 210,
+                                      crossAxisSpacing: context.md,
+                                      mainAxisSpacing: context.md,
+                                      mainAxisExtent: context.scale(210),
                                     ),
                                     itemBuilder: (context, index) {
                                       return InstituteCard(data: _filteredInstitutes[index]);
@@ -178,30 +198,45 @@ class _InstitutesPageState extends State<InstitutesPage> {
     );
   }
 
-  Widget _buildErrorState(ThemeData theme) {
+  Widget _buildErrorState(BuildContext context) {
+    final theme = context.theme;
+    final colorScheme = theme.colorScheme;
     return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(Icons.cloud_off_rounded, size: 64, color: theme.colorScheme.error.withOpacity(0.5)),
-          const SizedBox(height: 16),
-          Text("Connection Error", style: theme.textTheme.titleMedium),
-          Text(_error ?? "Unknown error", style: TextStyle(color: theme.hintColor), textAlign: TextAlign.center),
-          const SizedBox(height: 24),
-          ElevatedButton(onPressed: _fetchData, child: const Text("Retry")),
+          Icon(Icons.cloud_off_rounded, size: context.scale(64), color: colorScheme.error.withValues(alpha: 0.5)),
+          SizedBox(height: context.md),
+          Text("Connection Error", style: theme.textTheme.titleMedium?.copyWith(fontSize: context.font(18), color: colorScheme.error)),
+          Padding(
+            padding: EdgeInsets.symmetric(horizontal: context.lg),
+            child: Text(_error ?? "Unknown error", style: TextStyle(color: colorScheme.onSurfaceVariant, fontSize: context.font(14)), textAlign: TextAlign.center),
+          ),
+          SizedBox(height: context.scale(24)),
+          ElevatedButton.icon(
+            onPressed: _fetchData, 
+            icon: const Icon(Icons.refresh_rounded),
+            label: Text("Retry", style: TextStyle(fontSize: context.font(16))),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: colorScheme.primary,
+              foregroundColor: colorScheme.onPrimary,
+            ),
+          ),
         ],
       ),
     );
   }
 
-  Widget _buildEmptyState(ThemeData theme) {
+  Widget _buildEmptyState(BuildContext context) {
+    final theme = context.theme;
+    final colorScheme = theme.colorScheme;
     return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(Icons.business_rounded, size: 64, color: theme.hintColor.withOpacity(0.3)),
-          const SizedBox(height: 16),
-          const Text("No institutes found", style: TextStyle(fontWeight: FontWeight.bold)),
+          Icon(Icons.business_rounded, size: context.scale(64), color: colorScheme.onSurfaceVariant.withValues(alpha: 0.3)),
+          SizedBox(height: context.md),
+          Text("No institutes found", style: TextStyle(fontWeight: FontWeight.bold, fontSize: context.font(16), color: colorScheme.onSurfaceVariant)),
         ],
       ),
     );
@@ -213,50 +248,54 @@ class InstituteCard extends StatelessWidget {
 
   const InstituteCard({super.key, required this.data});
   
-  Color _getStatusColor(String status) {
+  Color _getStatusColor(String status, ColorScheme colorScheme) {
     switch (status.toLowerCase()) {
       case 'active': return Colors.greenAccent[400]!;
-      case 'inactive': return Colors.redAccent[200]!;
-      case 'pending': return Colors.orangeAccent[200]!;
-      default: return Colors.blueGrey;
+      case 'inactive': return colorScheme.error;
+      case 'pending': return Colors.orangeAccent[400]!;
+      default: return colorScheme.outline;
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
+    final theme = context.theme;
     final colorScheme = theme.colorScheme;
+    final statusColor = _getStatusColor(data.status, colorScheme);
 
     return Card(
+      elevation: 0,
+      color: colorScheme.surfaceContainerLow,
+      surfaceTintColor: Colors.transparent,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(context.scale(20)),
+        side: BorderSide(color: colorScheme.outlineVariant, width: 1),
+      ),
       child: Padding(
-        padding: const EdgeInsets.all(16),
+        padding: EdgeInsets.all(context.scale(16)),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(
               children: [
-                Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: colorScheme.primary.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Icon(Icons.school_rounded, color: colorScheme.primary, size: 24),
+                ProfileAvatar(
+                  imageUrl: ApiService.getStorageUrl(data.logo),
+                  radius: context.scale(24),
                 ),
-                const SizedBox(width: 16),
+                SizedBox(width: context.md),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
                         data.name,
-                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: context.font(16), color: colorScheme.onSurface),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                       ),
                       Text(
                         "Code: ${data.code}",
-                        style: TextStyle(color: theme.hintColor, fontSize: 12),
+                        style: TextStyle(color: colorScheme.onSurfaceVariant, fontSize: context.font(12)),
                       ),
                     ],
                   ),
@@ -267,18 +306,18 @@ class InstituteCard extends StatelessWidget {
             Row(
               children: [
                 Container(
-                  width: 8,
-                  height: 8,
-                  decoration: BoxDecoration(shape: BoxShape.circle, color: _getStatusColor(data.status)),
+                  width: context.scale(8),
+                  height: context.scale(8),
+                  decoration: BoxDecoration(shape: BoxShape.circle, color: statusColor),
                 ),
-                const SizedBox(width: 8),
+                SizedBox(width: context.scale(8)),
                 Text(
                   data.status.toUpperCase(),
-                  style: TextStyle(color: _getStatusColor(data.status), fontWeight: FontWeight.bold, fontSize: 11, letterSpacing: 1.1),
+                  style: TextStyle(color: statusColor, fontWeight: FontWeight.bold, fontSize: context.font(11), letterSpacing: 1.1),
                 ),
               ],
             ),
-            const SizedBox(height: 16),
+            SizedBox(height: context.md),
             Row(
               children: [
                 Expanded(
@@ -290,13 +329,14 @@ class InstituteCard extends StatelessWidget {
                               builder: (_) => ViewInstitutePage(instituteId: data.id.toString())));
                     },
                     style: OutlinedButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(vertical: 12),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                      side: BorderSide(color: colorScheme.outlineVariant),
+                      padding: EdgeInsets.symmetric(vertical: context.scale(12)),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(context.scale(8))),
                     ),
-                    child: const Text("View Info", style: TextStyle(fontSize: 12)),
+                    child: Text("View Info", style: TextStyle(fontSize: context.font(12), color: colorScheme.primary)),
                   ),
                 ),
-                const SizedBox(width: 8),
+                SizedBox(width: context.scale(8)),
                 Expanded(
                   child: ElevatedButton(
                     onPressed: () {
@@ -311,10 +351,13 @@ class InstituteCard extends StatelessWidget {
                       );
                     },
                     style: ElevatedButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(vertical: 12),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                      backgroundColor: colorScheme.primary,
+                      foregroundColor: colorScheme.onPrimary,
+                      elevation: 0,
+                      padding: EdgeInsets.symmetric(vertical: context.scale(12)),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(context.scale(8))),
                     ),
-                    child: const Text("Manage", style: TextStyle(fontSize: 12)),
+                    child: Text("Manage", style: TextStyle(fontSize: context.font(12))),
                   ),
                 ),
               ],

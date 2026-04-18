@@ -1,5 +1,7 @@
+import 'package:eduphin/services/responsive_helper.dart';
 import 'package:eduphin/login_logout/login.dart';
 import 'package:eduphin/services/api_service.dart';
+import 'package:eduphin/services/common_widgets.dart';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'teacher_dashboard.dart';
@@ -16,6 +18,7 @@ import 'exam_information_page.dart';
 import 'marks_entry_page.dart';
 import 'exam_schedule_page.dart';
 import 'student_material.dart';
+import '../../student/examinations/exam_registration.dart';
 import 'upload_material_page.dart';
 import 'student_leave.dart';
 import 'mentored_section.dart';
@@ -28,6 +31,38 @@ import 'create_assignment.dart';
 import '../../librarian/librarian_dashboard.dart';
 import '../../accountant/dashboard/accountant_dashbard.dart';
 import '../../staff/staff_dashboard/staff_dashboard.dart';
+import '../../moderator_dashboard/moderator_dashboard.dart';
+import '../../manager_dashboard/manager_dashboard.dart';
+import '../../counselor/counselor_dashboard.dart';
+import '../../superAdmin/super_admin_dashboard.dart';
+
+import '../../superAdmin/super_admin_profile.dart';
+import '../../librarian/librarian_profile.dart';
+import '../../accountant/dashboard/accountant_profile.dart';
+import '../../staff/staff_dashboard/staff_profile.dart';
+import '../../manager_dashboard/manager_profile.dart';
+import '../../counselor/profile.dart';
+import '../../moderator_dashboard/profile.dart';
+import '../../student/student_profile.dart';
+
+import '../../student/student_dashboard.dart';
+import '../../student/academic/assignments.dart';
+import '../../student/academic/lacture_notes.dart';
+import '../../student/attendence/view_attendance.dart';
+import '../../student/attendence/leave_application.dart';
+import '../../student/time_table/week_schedule.dart';
+import '../../student/time_table/custom_schedule.dart';
+import '../../student/examinations/admit_card.dart';
+import '../../student/examinations/exam_result.dart';
+import '../../student/library_resources/available_resources.dart';
+import '../../student/library_resources/borrowed_books.dart';
+import '../../student/event_management/all_event.dart';
+import '../../student/event_management/registed_event.dart';
+import '../../student/support_ticket/my_ticket.dart';
+import '../../student/support_ticket/create_tickets.dart';
+import '../../student/fee_details.dart';
+import '../../student/faculty_remark.dart';
+import '../../student/view_virtual_id_card.dart';
 
 class AppDrawer extends StatefulWidget {
   const AppDrawer({super.key});
@@ -46,11 +81,14 @@ class _AppDrawerState extends State<AppDrawer> {
     _loadUserInfo();
   }
 
+  String? _photoUrl;
+
   Future<void> _loadUserInfo() async {
     final prefs = await SharedPreferences.getInstance();
     setState(() {
       _roleId = prefs.getInt('role_id') ?? 0;
       _userName = prefs.getString('user_name') ?? _getRoleName(_roleId);
+      _photoUrl = prefs.getString('user_photo');
     });
   }
 
@@ -74,16 +112,57 @@ class _AppDrawerState extends State<AppDrawer> {
       case Roles.librarian: return const LibrarianDashboard();
       case Roles.accountant: return const AccountantDashboard();
       case Roles.staff: return const StaffDashboard();
+      case Roles.moderator: return const ModeratorDashboardPage();
+      case Roles.manager: return const ManagerDashboardPage();
+      case Roles.counselor: return const CounselorDashboardPage();
+      case Roles.superAdmin: return const SuperAdminDashboard();
+      case Roles.student: return const StudentDashboard();
       default: return const TeacherDashboardPage(); // Fallback
     }
   }
 
+  String _getProfileTitle(int roleId) {
+    switch (roleId) {
+      case Roles.manager: return "Manager Profile";
+      case Roles.superAdmin: return "Super Admin Profile";
+      case Roles.librarian: return "Librarian Profile";
+      case Roles.accountant: return "Accountant Profile";
+      case Roles.staff: return "Staff Profile";
+      case Roles.counselor: return "Counselor Profile";
+      case Roles.moderator: return "Moderator Profile";
+      case Roles.student: return "Student Profile";
+      default: return "My Profile";
+    }
+  }
+
+  Widget _getProfilePage(int roleId) {
+    switch (roleId) {
+      case Roles.manager: return ManagerProfilePage();
+      case Roles.superAdmin: return const ManageProfileScreen();
+      case Roles.librarian: return const LibrarianProfilePage();
+      case Roles.accountant: return const AccountantProfile();
+      case Roles.staff: return const StaffProfilePage();
+      case Roles.counselor: return const CounselorProfilePage();
+      case Roles.moderator: return const ModeratorProfilePage();
+      case Roles.student: return const StudentProfilePage();
+      default: return const ProfilePage();
+    }
+  }
+
+  Widget _getVirtualIdPage(int roleId) {
+    if (roleId == Roles.student) {
+      return const ViewVirtualIdCard();
+    }
+    return const VirtualIdPage();
+  }
+
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
+    final theme = context.theme;
     final colorScheme = theme.colorScheme;
 
     return Drawer(
+      width: context.isMobile ? null : context.scale(300),
       child: Column(
         children: [
           UserAccountsDrawerHeader(
@@ -94,11 +173,12 @@ class _AppDrawerState extends State<AppDrawer> {
                 colors: [colorScheme.primary, colorScheme.primaryContainer],
               ),
             ),
-            accountName: Text(_userName, style: const TextStyle(fontWeight: FontWeight.bold)),
-            accountEmail: const Text("Eduphin Platform"),
-            currentAccountPicture: CircleAvatar(
-              backgroundColor: colorScheme.onPrimary.withValues(alpha: 0.2),
-              child: Icon(Icons.person, color: colorScheme.onPrimary, size: 40),
+            margin: EdgeInsets.zero,
+            accountName: Text(_userName, style: TextStyle(fontWeight: FontWeight.bold, fontSize: context.font(16))),
+            accountEmail: Text("Eduphin Platform", style: TextStyle(fontSize: context.font(14))),
+            currentAccountPicture: ProfileAvatar(
+              imageUrl: ApiService.getStorageUrl(_photoUrl),
+              radius: context.scale(40),
             ),
           ),
           Expanded(
@@ -113,11 +193,57 @@ class _AppDrawerState extends State<AppDrawer> {
                   title: "My Profile",
                   icon: Icons.person_outline,
                   children: [
-                    _drawerItem(context, Icons.account_circle_outlined, "View Profile", () {
-                      Navigator.push(context, MaterialPageRoute(builder: (_) => const ProfilePage()));
+                    _drawerItem(context, Icons.account_circle_outlined, _getProfileTitle(_roleId), () {
+                      Navigator.push(context, MaterialPageRoute(builder: (_) => _getProfilePage(_roleId)));
                     }),
                     _drawerItem(context, Icons.badge_outlined, "Virtual ID Card", () {
-                      Navigator.push(context, MaterialPageRoute(builder: (_) => const VirtualIdPage()));
+                      Navigator.push(context, MaterialPageRoute(builder: (_) => _getVirtualIdPage(_roleId)));
+                    }),
+                    if (_roleId == Roles.student)
+                      _drawerItem(context, Icons.comment_outlined, "Faculty Remarks", () {
+                        Navigator.push(context, MaterialPageRoute(builder: (_) => const RemarksPage()));
+                      }),
+                  ],
+                ),
+
+                if (_roleId == Roles.student)
+                _expandableSection(
+                  title: "Academic",
+                  icon: Icons.history_edu_outlined,
+                  children: [
+                    _drawerItem(context, Icons.assignment_outlined, "Assignments", () {
+                      Navigator.push(context, MaterialPageRoute(builder: (_) => const AssignmentsPage()));
+                    }),
+                    _drawerItem(context, Icons.note_outlined, "Lecture Notes", () {
+                      Navigator.push(context, MaterialPageRoute(builder: (_) => const NotesPage()));
+                    }),
+                  ],
+                ),
+
+                if (_roleId == Roles.student)
+                _expandableSection(
+                  title: "Attendance",
+                  icon: Icons.how_to_reg_outlined,
+                  children: [
+                    _drawerItem(context, Icons.calendar_month_outlined, "View Attendance", () {
+                      Navigator.push(context, MaterialPageRoute(builder: (_) => const AttendanceReportPage()));
+                    }),
+                    _drawerItem(context, Icons.edit_calendar_outlined, "Leave Application", () {
+                      Navigator.push(context, MaterialPageRoute(builder: (_) => const LeaveApplicationPage()));
+                    }),
+                  ],
+                ),
+
+                if (_roleId == Roles.student)
+                _expandableSection(
+                  title: "Time Table",
+                  icon: Icons.table_chart_outlined,
+                  children: [
+                    _drawerItem(context, Icons.view_week_outlined, "Week Schedule", () {
+                      Navigator.push(context, MaterialPageRoute(builder: (_) => const TimetablePage()));
+                    }),
+                    _drawerItem(context, Icons.calendar_view_day_outlined, "Custom Schedule", () {
+                      Navigator.push(context, MaterialPageRoute(builder: (_) => const ClassSchedulePage()));
                     }),
                   ],
                 ),
@@ -155,8 +281,20 @@ class _AppDrawerState extends State<AppDrawer> {
                   icon: Icons.school_outlined,
                   children: [
                     _drawerItem(context, Icons.info_outline, "Exam Information", () {
-                      Navigator.push(context, MaterialPageRoute(builder: (_) => const ExamInformationPage()));
+                      if (_roleId == Roles.student) {
+                        Navigator.push(context, MaterialPageRoute(builder: (_) => const ExamRegistrationPage()));
+                      } else {
+                        Navigator.push(context, MaterialPageRoute(builder: (_) => const ExamInformationPage()));
+                      }
                     }),
+                    if (_roleId == Roles.student) ...[
+                      _drawerItem(context, Icons.badge_outlined, "Admit Card", () {
+                        Navigator.push(context, MaterialPageRoute(builder: (_) => const AdmitCardPage()));
+                      }),
+                      _drawerItem(context, Icons.assessment_outlined, "Exam Result", () {
+                        Navigator.push(context, MaterialPageRoute(builder: (_) => const ExamResultPage()));
+                      }),
+                    ],
                     if (_roleId == Roles.teacher) ...[
                       _drawerItem(context, Icons.schedule_outlined, "Exam Schedule", () {
                         Navigator.push(context, MaterialPageRoute(builder: (_) => const ExamSchedulePage()));
@@ -187,10 +325,18 @@ class _AppDrawerState extends State<AppDrawer> {
                   icon: Icons.local_library_outlined,
                   children: [
                     _drawerItem(context, Icons.book_outlined, "Browse Books", () {
-                      Navigator.push(context, MaterialPageRoute(builder: (_) => const LibraryBookPage()));
+                      if (_roleId == Roles.student) {
+                        Navigator.push(context, MaterialPageRoute(builder: (_) => const LibraryBooksPage()));
+                      } else {
+                        Navigator.push(context, MaterialPageRoute(builder: (_) => const LibraryBookPage()));
+                      }
                     }),
                     _drawerItem(context, Icons.assignment_return_outlined, "Lending History", () {
-                      Navigator.push(context, MaterialPageRoute(builder: (_) => const LendingBooksPage()));
+                      if (_roleId == Roles.student) {
+                        Navigator.push(context, MaterialPageRoute(builder: (_) => const MyLendingBooksPage()));
+                      } else {
+                        Navigator.push(context, MaterialPageRoute(builder: (_) => const LendingBooksPage()));
+                      }
                     }),
                   ],
                 ),
@@ -213,9 +359,14 @@ class _AppDrawerState extends State<AppDrawer> {
                   title: "Salary & Finance",
                   icon: Icons.payments_outlined,
                   children: [
-                    _drawerItem(context, Icons.account_balance_outlined, "Salary Details", () {
-                      Navigator.push(context, MaterialPageRoute(builder: (_) => const SalaryBankDetailsPage()));
-                    }),
+                    if (_roleId == Roles.student)
+                      _drawerItem(context, Icons.receipt_long_outlined, "Fee Details", () {
+                        Navigator.push(context, MaterialPageRoute(builder: (_) => const StudentFeePage()));
+                      }),
+                    if (_roleId != Roles.student)
+                      _drawerItem(context, Icons.account_balance_outlined, "Salary Details", () {
+                        Navigator.push(context, MaterialPageRoute(builder: (_) => const SalaryBankDetailsPage()));
+                      }),
                   ],
                 ),
 
@@ -224,10 +375,18 @@ class _AppDrawerState extends State<AppDrawer> {
                   icon: Icons.event_outlined,
                   children: [
                     _drawerItem(context, Icons.search, "Explore Events", () {
-                      Navigator.push(context, MaterialPageRoute(builder: (_) => const ExploreEventsPage()));
+                      if (_roleId == Roles.student) {
+                        Navigator.push(context, MaterialPageRoute(builder: (_) => const ManageEventsPage()));
+                      } else {
+                        Navigator.push(context, MaterialPageRoute(builder: (_) => const ExploreEventsPage()));
+                      }
                     }),
                     _drawerItem(context, Icons.how_to_reg_outlined, "My Registered Events", () {
-                      Navigator.push(context, MaterialPageRoute(builder: (_) => const MyRegisteredEventPage()));
+                      if (_roleId == Roles.student) {
+                        Navigator.push(context, MaterialPageRoute(builder: (_) => const RegisteredEventsPage()));
+                      } else {
+                        Navigator.push(context, MaterialPageRoute(builder: (_) => const MyRegisteredEventPage()));
+                      }
                     }),
                   ],
                 ),
@@ -237,34 +396,35 @@ class _AppDrawerState extends State<AppDrawer> {
                   icon: Icons.support_agent_outlined,
                   children: [
                     _drawerItem(context, Icons.confirmation_number_outlined, "My Tickets", () {
-                      Navigator.push(context, MaterialPageRoute(builder: (_) => const YourSupportTicketPage()));
+                      if (_roleId == Roles.student) {
+                        Navigator.push(context, MaterialPageRoute(builder: (_) => const SupportTicketsPage()));
+                      } else {
+                        Navigator.push(context, MaterialPageRoute(builder: (_) => const YourSupportTicketPage()));
+                      }
                     }),
-                    _drawerItem(context, Icons.assignment_ind_outlined, "Assigned Tickets", () {
-                      Navigator.push(context, MaterialPageRoute(builder: (_) => const AssignedTicketsPage()));
-                    }),
+                    if (_roleId == Roles.student)
+                      _drawerItem(context, Icons.add_comment_outlined, "Create Ticket", () {
+                        Navigator.push(context, MaterialPageRoute(builder: (_) => const CreateSupportTicketPage()));
+                      }),
+                    if (_roleId != Roles.student)
+                      _drawerItem(context, Icons.assignment_ind_outlined, "Assigned Tickets", () {
+                        Navigator.push(context, MaterialPageRoute(builder: (_) => const AssignedTicketsPage()));
+                      }),
                   ],
                 ),
 
                 const Divider(),
                 _drawerItem(context, Icons.logout, "Logout", () async {
+                  final navigator = Navigator.of(context);
                   try {
                     await ApiService.logout();
-                    if (context.mounted) {
-                      Navigator.pushAndRemoveUntil(
-                        context,
-                        MaterialPageRoute(builder: (_) => const LoginPage()),
-                        (route) => false,
-                      );
-                    }
-                  } catch (e) {
-                    if (context.mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(content: Text("Logout failed: $e")),
-                      );
-                    }
-                  }
+                  } catch (_) {}
+                  navigator.pushAndRemoveUntil(
+                    MaterialPageRoute(builder: (_) => const LoginPage()),
+                    (route) => false,
+                  );
                 }, iconColor: colorScheme.error),
-                const SizedBox(height: 20),
+                SizedBox(height: context.spacing),
               ],
             ),
           ),
@@ -274,10 +434,10 @@ class _AppDrawerState extends State<AppDrawer> {
   }
 
   Widget _drawerItem(BuildContext context, IconData icon, String title, VoidCallback onTap, {Color? iconColor}) {
-    final theme = Theme.of(context);
+    final theme = context.theme;
     return ListTile(
-      leading: Icon(icon, color: iconColor ?? theme.colorScheme.primary, size: 22),
-      title: Text(title, style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w500)),
+      leading: Icon(icon, color: iconColor ?? theme.colorScheme.primary, size: context.scale(22)),
+      title: Text(title, style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w500, fontSize: context.font(14))),
       onTap: () {
         Navigator.pop(context); // Close drawer
         onTap();
@@ -288,11 +448,11 @@ class _AppDrawerState extends State<AppDrawer> {
   }
 
   Widget _expandableSection({required String title, required IconData icon, required List<Widget> children}) {
-    final theme = Theme.of(context);
+    final theme = context.theme;
     return ExpansionTile(
-      leading: Icon(icon, color: theme.colorScheme.primary, size: 22),
-      title: Text(title, style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.bold)),
-      childrenPadding: const EdgeInsets.only(left: 16),
+      leading: Icon(icon, color: theme.colorScheme.primary, size: context.scale(22)),
+      title: Text(title, style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.bold, fontSize: context.font(14))),
+      childrenPadding: EdgeInsets.only(left: context.scale(16)),
       shape: const Border(), // Remove default borders
       children: children,
     );

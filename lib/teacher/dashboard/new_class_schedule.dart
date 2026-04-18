@@ -1,3 +1,4 @@
+import 'package:eduphin/services/responsive_helper.dart';
 import 'package:flutter/material.dart';
 import 'package:eduphin/services/api_service.dart';
 import 'package:eduphin/teacher/dashboard/view_schedule_model.dart';
@@ -70,7 +71,7 @@ class _ViewClassSchedulePageState extends State<ViewClassSchedulePage> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
+    final theme = context.theme;
 
     return Scaffold(
       backgroundColor: theme.scaffoldBackgroundColor,
@@ -83,10 +84,15 @@ class _ViewClassSchedulePageState extends State<ViewClassSchedulePage> {
           if (snapshot.connectionState == ConnectionState.waiting) {
             return const Center(child: CircularProgressIndicator());
           } else if (snapshot.hasError) {
-            return Center(child: Text('Error: ${snapshot.error}'));
+            return Center(child: Text('Error: ${snapshot.error}', style: TextStyle(fontSize: context.font(14))));
           } else if (snapshot.hasData) {
             final pageData = snapshot.data!;
-            return _buildContent(pageData);
+            return Center(
+              child: ConstrainedBox(
+                constraints: BoxConstraints(maxWidth: context.scale(800)),
+                child: _buildContent(pageData),
+              ),
+            );
           } else {
             return const Center(child: Text("No data found"));
           }
@@ -96,54 +102,52 @@ class _ViewClassSchedulePageState extends State<ViewClassSchedulePage> {
   }
 
   Widget _buildContent(ViewSchedulePageData pageData) {
+    final theme = context.theme;
     return SingleChildScrollView(
-      child: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            _buildSelectionCard(pageData),
-            if (_filteredSchedules.isNotEmpty) ...[
-              const Padding(
-                padding: EdgeInsets.symmetric(vertical: 24.0),
+      padding: context.pagePadding,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _buildSelectionCard(pageData),
+          if (_filteredSchedules.isNotEmpty) ...[
+            Padding(
+              padding: EdgeInsets.symmetric(vertical: context.spacing * 1.5),
+              child: Text(
+                "Weekly Schedule",
+                style: theme.textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold, fontSize: context.font(20)),
+              ),
+            ),
+            _buildScheduleCards(pageData),
+          ] else if (_selectedSection != null)
+            Center(
+              child: Padding(
+                padding: EdgeInsets.only(top: context.scale(40)),
                 child: Text(
-                  "Weekly Schedule",
-                  style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+                  "No classes scheduled for this selection",
+                  style: TextStyle(color: theme.hintColor, fontSize: context.font(16)),
                 ),
               ),
-              _buildScheduleCards(pageData),
-            ] else if (_selectedSection != null)
-              const Center(
-                child: Padding(
-                  padding: EdgeInsets.only(top: 40),
-                  child: Text(
-                    "No classes scheduled for this selection",
-                    style: TextStyle(color: Colors.grey, fontSize: 16),
-                  ),
-                ),
-              ),
-          ],
-        ),
+            ),
+        ],
       ),
     );
   }
 
   Widget _buildSelectionCard(ViewSchedulePageData pageData) {
+    final theme = context.theme;
     return Card(
-      elevation: 2,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      elevation: 0,
+      color: theme.colorScheme.surfaceContainerLow,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(context.scale(16)),
+        side: BorderSide(color: theme.colorScheme.outlineVariant.withValues(alpha: 0.5)),
+      ),
       child: Padding(
-        padding: const EdgeInsets.all(20.0),
+        padding: EdgeInsets.all(context.spacing * 1.5),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Row(
-              children: [
-                const Text("Class", style: TextStyle(fontWeight: FontWeight.w600, fontSize: 16)),
-                Text(" *", style: TextStyle(color: Colors.red.shade700, fontSize: 16)),
-              ],
-            ),
-            const SizedBox(height: 8),
+            buildLabel(context, "Class *"),
             buildDropdown(
                 context,
                 pageData.classes.map((e) => e.name).toList(),
@@ -151,15 +155,10 @@ class _ViewClassSchedulePageState extends State<ViewClassSchedulePage> {
                 (newValue) {
                   final selectedClass = newValue == null ? null : pageData.classes.firstWhere((c) => c.name == newValue);
                   _onClassSelected(selectedClass, pageData.sections);
-                }),
-            const SizedBox(height: 20),
-            Row(
-              children: [
-                const Text("Section", style: TextStyle(fontWeight: FontWeight.w600, fontSize: 16)),
-                Text(" *", style: TextStyle(color: Colors.red.shade700, fontSize: 16)),
-              ],
-            ),
-            const SizedBox(height: 8),
+                },
+                hint: "Select Class"),
+            SizedBox(height: context.spacing),
+            buildLabel(context, "Section *"),
             buildDropdown(
                 context,
                 _filteredSections.map((e) => e.name).toList(),
@@ -168,22 +167,10 @@ class _ViewClassSchedulePageState extends State<ViewClassSchedulePage> {
                   setState(() {
                     _selectedSection = newValue == null ? null : _filteredSections.firstWhere((s) => s.name == newValue);
                   });
-                }),
-            const SizedBox(height: 30),
-            SizedBox(
-              width: double.infinity,
-              height: 48,
-              child: ElevatedButton.icon(
-                onPressed: _showSchedule,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF3b66cf),
-                  foregroundColor: Colors.white,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                ),
-                icon: const Icon(Icons.search, size: 20),
-                label: const Text("SHOW", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-              ),
-            ),
+                },
+                hint: "Select Section"),
+            SizedBox(height: context.spacing * 1.5),
+            buildActionButton(context, "SHOW SCHEDULE", _showSchedule),
           ],
         ),
       ),
@@ -202,36 +189,36 @@ class _ViewClassSchedulePageState extends State<ViewClassSchedulePage> {
   }
 
   Widget _buildDayCard(String day, List<ScheduleEntry> daySchedules, List<SubjectInfo> subjects, List<TeacherInfo> teachers) {
-    final theme = Theme.of(context);
+    final theme = context.theme;
     return Container(
-      margin: const EdgeInsets.only(bottom: 24),
+      margin: EdgeInsets.only(bottom: context.spacing * 1.5),
       decoration: BoxDecoration(
-        color: theme.cardColor,
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.08), blurRadius: 10, offset: const Offset(0, 4))],
+        color: theme.colorScheme.surfaceContainerLow,
+        borderRadius: BorderRadius.circular(context.scale(12)),
+        border: Border.all(color: theme.colorScheme.outlineVariant.withValues(alpha: 0.5)),
       ),
       clipBehavior: Clip.antiAlias,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Container(
-            padding: const EdgeInsets.symmetric(vertical: 12),
-            color: const Color(0xFF4a69bd),
+            padding: EdgeInsets.symmetric(vertical: context.scale(12)),
+            color: theme.colorScheme.primaryContainer,
             child: Text(
               day,
               textAlign: TextAlign.center,
-              style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 18),
+              style: TextStyle(color: theme.colorScheme.onPrimaryContainer, fontWeight: FontWeight.bold, fontSize: context.font(16)),
             ),
           ),
           Padding(
-            padding: const EdgeInsets.all(16.0),
+            padding: EdgeInsets.all(context.spacing),
             child: daySchedules.isEmpty
-                ? const Padding(
-                    padding: EdgeInsets.symmetric(vertical: 30),
+                ? Padding(
+                    padding: EdgeInsets.symmetric(vertical: context.spacing * 2),
                     child: Text(
                       "No classes scheduled",
                       textAlign: TextAlign.center,
-                      style: TextStyle(color: Colors.grey, fontSize: 15, fontStyle: FontStyle.italic),
+                      style: TextStyle(color: theme.hintColor, fontSize: context.font(14), fontStyle: FontStyle.italic),
                     ),
                   )
                 : Column(
@@ -239,12 +226,12 @@ class _ViewClassSchedulePageState extends State<ViewClassSchedulePage> {
                       final subject = subjects.firstWhere((sub) => sub.id == s.subjectId, orElse: () => SubjectInfo(id: -1, name: 'N/A'));
                       final teacher = teachers.firstWhere((t) => t.id == s.teacherId, orElse: () => TeacherInfo(id: -1, name: 'Unknown'));
                       return Container(
-                        margin: const EdgeInsets.only(bottom: 12),
-                        padding: const EdgeInsets.all(16),
+                        margin: EdgeInsets.only(bottom: context.scale(12)),
+                        padding: EdgeInsets.all(context.spacing),
                         decoration: BoxDecoration(
-                          color: theme.brightness == Brightness.light ? Colors.grey.shade50 : Colors.white.withOpacity(0.05),
-                          borderRadius: BorderRadius.circular(10),
-                          border: Border.all(color: Colors.grey.withOpacity(0.2)),
+                          color: theme.colorScheme.surface,
+                          borderRadius: BorderRadius.circular(context.scale(10)),
+                          border: Border.all(color: theme.colorScheme.outlineVariant.withValues(alpha: 0.3)),
                         ),
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
@@ -255,30 +242,30 @@ class _ViewClassSchedulePageState extends State<ViewClassSchedulePage> {
                                 Expanded(
                                   child: Text(
                                     subject.name,
-                                    style: const TextStyle(color: Color(0xFF3b66cf), fontWeight: FontWeight.bold, fontSize: 17),
+                                    style: TextStyle(color: theme.colorScheme.primary, fontWeight: FontWeight.bold, fontSize: context.font(15)),
                                   ),
                                 ),
                                 Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                  padding: EdgeInsets.symmetric(horizontal: context.scale(10), vertical: context.scale(6)),
                                   decoration: BoxDecoration(
-                                    color: Colors.grey.shade800,
-                                    borderRadius: BorderRadius.circular(6),
+                                    color: theme.colorScheme.surfaceContainerHighest,
+                                    borderRadius: BorderRadius.circular(context.scale(6)),
                                   ),
                                   child: Text(
                                     "${_formatTime(s.startTime)} - ${_formatTime(s.endTime)}",
-                                    style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
+                                    style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: context.font(11), fontWeight: FontWeight.bold),
                                   ),
                                 ),
                               ],
                             ),
-                            const SizedBox(height: 12),
+                            SizedBox(height: context.scale(12)),
                             Row(
                               children: [
-                                const Icon(Icons.person, size: 18, color: Color(0xFF27ae60)),
-                                const SizedBox(width: 8),
+                                Icon(Icons.person, size: context.scale(16), color: theme.colorScheme.secondary),
+                                SizedBox(width: context.scale(8)),
                                 Text(
                                   teacher.name,
-                                  style: const TextStyle(color: Color(0xFF27ae60), fontWeight: FontWeight.w600, fontSize: 15),
+                                  style: TextStyle(color: theme.colorScheme.secondary, fontWeight: FontWeight.w600, fontSize: context.font(13)),
                                 ),
                               ],
                             ),

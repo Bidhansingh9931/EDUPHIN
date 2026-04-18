@@ -1,7 +1,6 @@
 import 'dart:convert';
 import 'package:eduphin/services/responsive_helper.dart';
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
 import '../../services/api_service.dart';
 import '../counselor_models.dart';
 
@@ -32,24 +31,27 @@ class _MyRegisteredEventsPageState extends State<MyRegisteredEventsPage> {
     });
     try {
       final response = await ApiService.get('counselor/events/registered');
+      if (!mounted) return;
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
         setState(() {
-          final List registrationsData = data['data'] ?? [];
+          final List registrationsData = data['data'] ?? data['registered_events'] ?? [];
           _registrations = registrationsData.map((e) => EventRegistration.fromJson(e)).toList();
           _isLoading = false;
         });
       } else {
         setState(() {
-          _errorMessage = "Failed to load registered events";
+          _errorMessage = ApiService.errorMessage(response, "Failed to load registered events");
           _isLoading = false;
         });
       }
     } catch (e) {
-      setState(() {
-        _errorMessage = "Error: $e";
-        _isLoading = false;
-      });
+      if (mounted) {
+        setState(() {
+          _errorMessage = "Error: $e";
+          _isLoading = false;
+        });
+      }
     }
   }
 
@@ -57,7 +59,7 @@ class _MyRegisteredEventsPageState extends State<MyRegisteredEventsPage> {
     final controller = TextEditingController();
     final result = await showDialog<bool>(
       context: context,
-      builder: (context) => AlertDialog(
+      builder: (dialogContext) => AlertDialog(
         title: const Text("Cancel Registration"),
         content: Column(
           mainAxisSize: MainAxisSize.min,
@@ -74,9 +76,9 @@ class _MyRegisteredEventsPageState extends State<MyRegisteredEventsPage> {
           ],
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text("NO")),
+          TextButton(onPressed: () => Navigator.pop(dialogContext, false), child: const Text("NO")),
           TextButton(
-            onPressed: () => Navigator.pop(context, true),
+            onPressed: () => Navigator.pop(dialogContext, true),
             child: const Text("YES, CANCEL"),
           ),
         ],
@@ -88,24 +90,24 @@ class _MyRegisteredEventsPageState extends State<MyRegisteredEventsPage> {
         final response = await ApiService.post('counselor/events/cancel/$registrationId', {
           'reason_for_cancel': controller.text,
         });
+        if (!mounted) return;
         if (response.statusCode == 200) {
-          if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Registration cancelled successfully")));
-            _fetchRegisteredEvents();
-          }
+          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Registration cancelled successfully")));
+          _fetchRegisteredEvents();
         } else {
           final error = jsonDecode(response.body)['message'] ?? "Cancellation failed";
-          if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(error)));
+          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(error)));
         }
       } catch (e) {
-        if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Error: $e")));
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Error: $e")));
       }
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    _colorScheme = Theme.of(context).colorScheme;
+    _colorScheme = context.theme.colorScheme;
     return Scaffold(
       appBar: AppBar(
         title: const Text("My Registered Events"),
@@ -115,15 +117,25 @@ class _MyRegisteredEventsPageState extends State<MyRegisteredEventsPage> {
         child: _isLoading
             ? const Center(child: CircularProgressIndicator())
             : _errorMessage != null
-                ? Center(child: Text(_errorMessage!, style: TextStyle(color: _colorScheme.error)))
+                ? Center(
+                    child: Text(_errorMessage!,
+                        style: TextStyle(
+                            color: _colorScheme.error, fontSize: context.font(14))))
                 : _registrations.isEmpty
-                    ? const Center(child: Text("No registered events found"))
+                    ? Center(
+                        child: Text("No registered events found",
+                            style: TextStyle(fontSize: context.font(14))))
                     : ListView.builder(
-                        padding: const EdgeInsets.all(20),
+                        padding: context.pagePadding,
                         itemCount: _registrations.length,
                         itemBuilder: (context, index) {
                           final reg = _registrations[index];
-                          return _buildEventCard(reg);
+                          return Center(
+                            child: ConstrainedBox(
+                              constraints: const BoxConstraints(maxWidth: 800),
+                              child: _buildEventCard(reg),
+                            ),
+                          );
                         },
                       ),
       ),
@@ -135,10 +147,18 @@ class _MyRegisteredEventsPageState extends State<MyRegisteredEventsPage> {
     final isCancelled = reg.status == 'cancelled';
 
     return Card(
-      margin: const EdgeInsets.only(bottom: 20),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      margin: EdgeInsets.only(bottom: context.spacing),
+      elevation: 0,
+      color: context.theme.colorScheme.surfaceContainerLow,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(context.scale(12)),
+        side: BorderSide(
+          color: context.theme.colorScheme.outlineVariant,
+          width: 1,
+        ),
+      ),
       child: Padding(
-        padding: const EdgeInsets.all(20),
+        padding: EdgeInsets.all(context.spacing),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -146,68 +166,85 @@ class _MyRegisteredEventsPageState extends State<MyRegisteredEventsPage> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Container(
-                  width: 60,
-                  height: 60,
+                  width: context.scale(60),
+                  height: context.scale(60),
                   decoration: BoxDecoration(
-                    color: _colorScheme.primaryContainer.withValues(alpha: 0.5),
-                    borderRadius: BorderRadius.circular(12),
+                    color: _colorScheme.primary.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(context.scale(12)),
                   ),
-                  child: Icon(Icons.event_note_rounded, color: _colorScheme.primary),
+                  child: Icon(Icons.event_note_rounded,
+                      color: _colorScheme.primary, size: context.scale(24)),
                 ),
-                const SizedBox(width: 16),
+                SizedBox(width: context.spacing / 2),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(event.title, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-                      const SizedBox(height: 4),
-                      Text(event.description ?? "", maxLines: 2, overflow: TextOverflow.ellipsis, style: TextStyle(color: _colorScheme.onSurfaceVariant, fontSize: 13)),
+                      Text(event.title,
+                          style: TextStyle(
+                              fontSize: context.font(16), fontWeight: FontWeight.bold)),
+                      SizedBox(height: context.spacing / 4),
+                      Text(event.description ?? "",
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                              color: _colorScheme.onSurfaceVariant,
+                              fontSize: context.font(13))),
                     ],
                   ),
                 ),
               ],
             ),
-            const SizedBox(height: 20),
+            SizedBox(height: context.spacing / 2),
             const Divider(),
-            const SizedBox(height: 16),
-            _buildInfoRow(Icons.calendar_today_rounded, "${event.eventDate} • ${event.startTime} - ${event.endTime}"),
-            const SizedBox(height: 10),
+            SizedBox(height: context.spacing / 2),
+            _buildInfoRow(Icons.calendar_today_rounded,
+                "${event.eventDate} • ${event.startTime} - ${event.endTime}"),
+            SizedBox(height: context.spacing / 4),
             _buildInfoRow(Icons.location_on_outlined, event.venue ?? "N/A"),
-            const SizedBox(height: 10),
+            SizedBox(height: context.spacing / 4),
             _buildInfoRow(
               Icons.info_outline_rounded,
               reg.status.toUpperCase(),
               color: isCancelled ? Colors.red : Colors.green,
             ),
-            const SizedBox(height: 20),
+            SizedBox(height: context.spacing / 2),
             Container(
               width: double.infinity,
-              padding: const EdgeInsets.all(12),
+              padding: EdgeInsets.all(context.spacing / 2),
               decoration: BoxDecoration(
                 color: _colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: BorderRadius.circular(context.scale(8)),
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text("Registered on:", style: TextStyle(color: _colorScheme.onSurfaceVariant, fontSize: 11)),
-                  Text(reg.registeredAt ?? "-", style: const TextStyle(fontWeight: FontWeight.w500, fontSize: 13)),
+                  Text("Registered on:",
+                      style: TextStyle(
+                          color: _colorScheme.onSurfaceVariant,
+                          fontSize: context.font(11))),
+                  Text(reg.registeredAt ?? "-",
+                      style: TextStyle(
+                          fontWeight: FontWeight.w500, fontSize: context.font(13))),
                 ],
               ),
             ),
             if (!isCancelled) ...[
-              const SizedBox(height: 20),
+              SizedBox(height: context.spacing / 2),
               SizedBox(
                 width: double.infinity,
-                height: 44,
+                height: context.scale(44),
                 child: FilledButton(
                   onPressed: () => _cancelRegistration(reg.id),
                   style: FilledButton.styleFrom(
-                    backgroundColor: _colorScheme.errorContainer,
-                    foregroundColor: _colorScheme.error,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    backgroundColor: _colorScheme.secondaryContainer,
+                    foregroundColor: _colorScheme.onSecondaryContainer,
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(context.scale(8))),
                   ),
-                  child: const Text("CANCEL REGISTRATION", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+                  child: Text("CANCEL REGISTRATION",
+                      style: TextStyle(
+                          fontWeight: FontWeight.bold, fontSize: context.font(12))),
                 ),
               ),
             ],
@@ -220,9 +257,9 @@ class _MyRegisteredEventsPageState extends State<MyRegisteredEventsPage> {
   Widget _buildInfoRow(IconData icon, String text, {Color? color}) {
     return Row(
       children: [
-        Icon(icon, size: 16, color: color ?? _colorScheme.onSurfaceVariant),
-        const SizedBox(width: 10),
-        Expanded(child: Text(text, style: TextStyle(fontSize: 13, color: color, fontWeight: color != null ? FontWeight.bold : FontWeight.normal))),
+        Icon(icon, size: context.scale(16), color: color ?? _colorScheme.onSurfaceVariant),
+        SizedBox(width: context.scale(10)),
+        Expanded(child: Text(text, style: TextStyle(fontSize: context.font(13), color: color, fontWeight: color != null ? FontWeight.bold : FontWeight.normal))),
       ],
     );
   }

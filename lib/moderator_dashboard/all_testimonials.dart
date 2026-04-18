@@ -1,111 +1,146 @@
+import 'package:eduphin/services/common_widgets.dart';
 import 'package:eduphin/services/responsive_helper.dart';
 import 'package:flutter/material.dart';
+import 'dashboard_data_provider.dart';
+import 'dashboard_models.dart';
 
-class Testimonial {
-  final String name;
-  final String role;
-  final String content;
-  final String date;
-
-  Testimonial({required this.name, required this.role, required this.content, required this.date});
-}
-
-class AllTestimonialsPage extends StatelessWidget {
+class AllTestimonialsPage extends StatefulWidget {
   const AllTestimonialsPage({super.key});
 
   @override
+  State<AllTestimonialsPage> createState() => _AllTestimonialsPageState();
+}
+
+class _AllTestimonialsPageState extends State<AllTestimonialsPage> {
+  final DashboardDataProvider _provider = DashboardDataProvider();
+  late Future<DashboardData> _dashboardDataFuture;
+
+  @override
+  void initState() {
+    super.initState();
+    _dashboardDataFuture = _provider.fetchDashboardData();
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
+    final theme = context.theme;
     final colorScheme = theme.colorScheme;
 
-    // Dummy data for testimonials
-    final List<Testimonial> testimonials = [
-      Testimonial(
-        name: "Dr. Robert Smith",
-        role: "Principal, Global Academy",
-        content: "Eduphin has transformed how we manage our administrative tasks. The automation is seamless.",
-        date: "Oct 12, 2023",
-      ),
-      Testimonial(
-        name: "Maria Garcia",
-        role: "Parent",
-        content: "I can easily track my child's progress and attendance. The interface is very user-friendly.",
-        date: "Nov 05, 2023",
-      ),
-      Testimonial(
-        name: "James Wilson",
-        role: "HOD Mathematics",
-        content: "The examination management module is a lifesaver. It saves us hours of manual work.",
-        date: "Dec 15, 2023",
-      ),
-    ];
-
     return Scaffold(
+      backgroundColor: theme.scaffoldBackgroundColor,
       appBar: AppBar(
-        title: const Text('Success Stories'),
+        title: Text('Success Stories',
+            style: TextStyle(
+                fontSize: context.font(20), fontWeight: FontWeight.bold)),
       ),
-      body: SingleChildScrollView(
-        padding: context.pagePadding,
-        child: Center(
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 1000),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text("What our users say", style: theme.textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold)),
-                const SizedBox(height: 8),
-                Text("Real feedback from our global community", style: TextStyle(color: theme.hintColor)),
-                const SizedBox(height: 32),
-                ListView.separated(
-                  shrinkWrap: true,
-                  physics: const NeverScrollableScrollPhysics(),
-                  itemCount: testimonials.length,
-                  separatorBuilder: (context, index) => const SizedBox(height: 16),
-                  itemBuilder: (context, index) {
-                    final item = testimonials[index];
-                    return Card(
-                      child: Padding(
-                        padding: const EdgeInsets.all(24),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const Icon(Icons.format_quote_rounded, color: Colors.blueAccent, size: 32),
-                            const SizedBox(height: 12),
-                            Text(
-                              item.content,
-                              style: theme.textTheme.bodyLarge?.copyWith(height: 1.6, fontStyle: FontStyle.italic),
-                            ),
-                            const SizedBox(height: 24),
-                            Row(
+      body: FutureBuilder<DashboardData>(
+        future: _dashboardDataFuture,
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return const Center(child: CircularProgressIndicator());
+          } else if (snapshot.hasError) {
+            return Center(child: Text('Error: ${snapshot.error}'));
+          } else if (!snapshot.hasData || snapshot.data!.testimonials.isEmpty) {
+            return const Center(child: Text('No testimonials found.'));
+          }
+
+          final testimonials = snapshot.data!.testimonials;
+
+          return SingleChildScrollView(
+            padding: context.pagePadding,
+            physics: const AlwaysScrollableScrollPhysics(),
+            child: Center(
+              child: ConstrainedBox(
+                constraints: BoxConstraints(maxWidth: context.scale(1000)),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text("What our users say",
+                        style: theme.textTheme.headlineSmall?.copyWith(
+                            fontWeight: FontWeight.bold,
+                            fontSize: context.font(24),
+                            color: theme.colorScheme.onSurface)),
+                    SizedBox(height: context.sm),
+                    Text("Real feedback from our global community",
+                        style: TextStyle(
+                            color: theme.colorScheme.onSurfaceVariant,
+                            fontSize: context.font(14))),
+                    SizedBox(height: context.lg),
+                    ListView.separated(
+                      shrinkWrap: true,
+                      physics: const NeverScrollableScrollPhysics(),
+                      itemCount: testimonials.length,
+                      separatorBuilder: (context, index) =>
+                          SizedBox(height: context.md),
+                      itemBuilder: (context, index) {
+                        final item = testimonials[index];
+                        return Card(
+                          color: theme.colorScheme.surfaceContainerLow,
+                          elevation: 0,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(context.md),
+                            side: BorderSide(
+                                color: theme.colorScheme.outlineVariant),
+                          ),
+                          child: Padding(
+                            padding: EdgeInsets.all(context.lg),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                CircleAvatar(
-                                  backgroundColor: colorScheme.primary.withOpacity(0.1),
-                                  child: Text(item.name[0], style: TextStyle(color: colorScheme.primary, fontWeight: FontWeight.bold)),
+                                Icon(Icons.format_quote_rounded,
+                                    color: colorScheme.primary,
+                                    size: context.scale(32)),
+                                SizedBox(height: context.md),
+                                Text(
+                                  item.review,
+                                  style: theme.textTheme.bodyLarge?.copyWith(
+                                      height: 1.6,
+                                      fontStyle: FontStyle.italic,
+                                      fontSize: context.font(16),
+                                      color: theme.colorScheme.onSurface),
                                 ),
-                                const SizedBox(width: 16),
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      Text(item.name, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
-                                      Text(item.role, style: TextStyle(color: theme.hintColor, fontSize: 13)),
-                                    ],
-                                  ),
+                                SizedBox(height: context.lg),
+                                Row(
+                                  children: [
+                                    ProfileAvatar(
+                                      imageUrl: item.imageUrl,
+                                      radius: context.scale(20),
+                                    ),
+                                    SizedBox(width: context.md),
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        children: [
+                                          Text(item.name,
+                                              style: TextStyle(
+                                                  fontWeight: FontWeight.bold,
+                                                  fontSize: context.font(15),
+                                                  color: theme.colorScheme
+                                                      .onSurface)),
+                                          Text(item.school,
+                                              style: TextStyle(
+                                                  color: theme.colorScheme
+                                                      .onSurfaceVariant,
+                                                  fontSize: context.font(13))),
+                                        ],
+                                      ),
+                                    ),
+                                  ],
                                 ),
-                                Text(item.date, style: TextStyle(color: theme.hintColor, fontSize: 12)),
                               ],
                             ),
-                          ],
-                        ),
-                      ),
-                    );
-                  },
+                          ),
+                        );
+                      },
+                    ),
+                    SizedBox(height: context.lg),
+                  ],
                 ),
-                const SizedBox(height: 50),
-              ],
+              ),
             ),
-          ),
-        ),
+          );
+        },
       ),
     );
   }

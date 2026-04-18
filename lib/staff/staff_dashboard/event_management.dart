@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 import '../../services/api_service.dart';
 import '../../services/responsive_helper.dart';
 import 'staff_models.dart';
@@ -34,29 +35,46 @@ class _StaffEventManagementPageState extends State<StaffEventManagementPage> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
+    final theme = context.theme;
     
     return Scaffold(
+      backgroundColor: theme.scaffoldBackgroundColor,
       appBar: AppBar(
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 20),
-          onPressed: () => Navigator.pop(context),
-        ),
-        title: const Text("Event Management"),
+        title: Text("Event Management", style: TextStyle(fontSize: context.font(20))),
       ),
       body: RefreshIndicator(
         onRefresh: () async => _loadEvents(),
         child: SingleChildScrollView(
           physics: const AlwaysScrollableScrollPhysics(),
-          padding: context.pagePadding,
-          child: Column(
-            children: [
-              _buildFilterCard(context),
-              const SizedBox(height: 24),
-              _buildEventListSection(context, "Upcoming Events", _eventsFuture, isRegistered: false),
-              const SizedBox(height: 24),
-              _buildEventListSection(context, "Registered Events", _registeredEventsFuture, isRegistered: true),
-            ],
+          child: Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 1200),
+              child: Column(
+                children: [
+                  _buildFilterCard(context),
+                  Padding(
+                    padding: context.pagePadding,
+                    child: context.responsive(
+                      Column(
+                        children: [
+                          _buildEventListSection(context, "Upcoming Events", _eventsFuture, isRegistered: false),
+                          SizedBox(height: context.spacing),
+                          _buildEventListSection(context, "Registered Events", _registeredEventsFuture, isRegistered: true),
+                        ],
+                      ),
+                      tablet: Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Expanded(child: _buildEventListSection(context, "Upcoming Events", _eventsFuture, isRegistered: false)),
+                          SizedBox(width: context.spacing),
+                          Expanded(child: _buildEventListSection(context, "Registered Events", _registeredEventsFuture, isRegistered: true)),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
           ),
         ),
       ),
@@ -64,86 +82,154 @@ class _StaffEventManagementPageState extends State<StaffEventManagementPage> {
   }
 
   Widget _buildFilterCard(BuildContext context) {
-    final theme = Theme.of(context);
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text("Status", style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold)),
-            const SizedBox(height: 8),
-            _buildDropdown(context, _selectedStatus, ["All Events", "Upcoming", "Past"], (val) {
-              setState(() => _selectedStatus = val!);
-            }),
-            const SizedBox(height: 16),
-            Text("Type", style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold)),
-            const SizedBox(height: 8),
-            _buildDropdown(context, _selectedType, ["All types", "Internal", "Workshop", "Seminar"], (val) {
-              setState(() => _selectedType = val!);
-            }),
-            const SizedBox(height: 24),
-            ElevatedButton(
-              onPressed: _loadEvents,
-              child: const Text("APPLY FILTERS"),
-            ),
-          ],
+    final theme = context.theme;
+    return Padding(
+      padding: context.pagePadding.copyWith(bottom: 0),
+      child: Card(
+        elevation: 0,
+        margin: EdgeInsets.zero,
+        color: theme.colorScheme.surfaceContainerLow,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(context.scale(20)),
+          side: BorderSide(color: theme.colorScheme.outlineVariant),
+        ),
+        child: Padding(
+          padding: EdgeInsets.all(context.scale(20)),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text("Filter Events", 
+                style: GoogleFonts.roboto(fontWeight: FontWeight.bold, fontSize: context.font(16))),
+              SizedBox(height: context.scale(16)),
+              context.responsive(
+                Column(
+                  children: [
+                    _buildDropdownField(context, "Status", _selectedStatus, ["All Events", "Upcoming", "Past"], (val) {
+                      setState(() => _selectedStatus = val!);
+                    }),
+                    SizedBox(height: context.scale(12)),
+                    _buildDropdownField(context, "Type", _selectedType, ["All types", "Internal", "Workshop", "Seminar"], (val) {
+                      setState(() => _selectedType = val!);
+                    }),
+                  ],
+                ),
+                tablet: Row(
+                  children: [
+                    Expanded(child: _buildDropdownField(context, "Status", _selectedStatus, ["All Events", "Upcoming", "Past"], (val) {
+                      setState(() => _selectedStatus = val!);
+                    })),
+                    SizedBox(width: context.scale(16)),
+                    Expanded(child: _buildDropdownField(context, "Type", _selectedType, ["All types", "Internal", "Workshop", "Seminar"], (val) {
+                      setState(() => _selectedType = val!);
+                    })),
+                    SizedBox(width: context.scale(16)),
+                    Padding(
+                      padding: EdgeInsets.only(top: context.scale(22)),
+                      child: FilledButton(
+                        onPressed: _loadEvents,
+                        style: FilledButton.styleFrom(
+                          padding: EdgeInsets.symmetric(horizontal: context.scale(24), vertical: context.scale(14)),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(context.scale(12))),
+                        ),
+                        child: const Text("APPLY", style: TextStyle(fontWeight: FontWeight.bold)),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              if (context.isMobile) ...[
+                SizedBox(height: context.scale(16)),
+                SizedBox(
+                  width: double.infinity,
+                  child: FilledButton(
+                    onPressed: _loadEvents,
+                    style: FilledButton.styleFrom(
+                      padding: EdgeInsets.symmetric(vertical: context.scale(14)),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(context.scale(12))),
+                    ),
+                    child: const Text("APPLY FILTERS", style: TextStyle(fontWeight: FontWeight.bold)),
+                  ),
+                ),
+              ],
+            ],
+          ),
         ),
       ),
     );
   }
 
-  Widget _buildDropdown(BuildContext context, String value, List<String> items, ValueChanged<String?> onChanged) {
-    final theme = Theme.of(context);
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-      decoration: BoxDecoration(
-        color: theme.inputDecorationTheme.fillColor,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: theme.colorScheme.outline.withValues(alpha: 0.1)),
-      ),
-      child: DropdownButtonHideUnderline(
-        child: DropdownButton<String>(
-          value: value,
-          isExpanded: true,
-          dropdownColor: theme.cardTheme.color,
-          icon: Icon(Icons.keyboard_arrow_down_rounded, color: theme.hintColor),
-          style: theme.textTheme.bodyMedium,
-          items: items.map((e) => DropdownMenuItem(value: e, child: Text(e))).toList(),
-          onChanged: onChanged,
+  Widget _buildDropdownField(BuildContext context, String label, String value, List<String> items, ValueChanged<String?> onChanged) {
+    final theme = context.theme;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(label, style: theme.textTheme.labelMedium?.copyWith(color: theme.colorScheme.onSurfaceVariant, fontWeight: FontWeight.bold)),
+        SizedBox(height: context.scale(6)),
+        Container(
+          padding: EdgeInsets.symmetric(horizontal: context.scale(16)),
+          decoration: BoxDecoration(
+            color: theme.colorScheme.surface,
+            borderRadius: BorderRadius.circular(context.scale(12)),
+            border: Border.all(color: theme.colorScheme.outlineVariant),
+          ),
+          child: DropdownButtonHideUnderline(
+            child: DropdownButton<String>(
+              value: value,
+              isExpanded: true,
+              dropdownColor: theme.colorScheme.surface,
+              icon: Icon(Icons.keyboard_arrow_down_rounded, color: theme.colorScheme.primary, size: context.scale(20)),
+              style: theme.textTheme.bodyMedium?.copyWith(fontSize: context.font(14)),
+              items: items.map((e) => DropdownMenuItem(value: e, child: Text(e))).toList(),
+              onChanged: onChanged,
+            ),
+          ),
         ),
-      ),
+      ],
     );
   }
 
   Widget _buildEventListSection(BuildContext context, String title, Future<dynamic> future, {required bool isRegistered}) {
-    final theme = Theme.of(context);
+    final theme = context.theme;
     return Card(
+      elevation: 0,
+      margin: EdgeInsets.zero,
+      color: theme.colorScheme.surfaceContainerLow,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(context.scale(20)),
+        side: BorderSide(color: theme.colorScheme.outlineVariant),
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Padding(
-            padding: const EdgeInsets.all(16.0),
-            child: Text(title, style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
+            padding: EdgeInsets.all(context.scale(20)),
+            child: Text(title, 
+              style: GoogleFonts.roboto(fontWeight: FontWeight.bold, fontSize: context.font(16))),
           ),
-          const Divider(height: 1),
+          Divider(color: theme.colorScheme.outlineVariant, height: 1),
           FutureBuilder<dynamic>(
             future: future,
             builder: (context, snapshot) {
               if (snapshot.connectionState == ConnectionState.waiting) {
-                return const Padding(
-                  padding: EdgeInsets.all(20.0),
-                  child: Center(child: CircularProgressIndicator()),
+                return Padding(
+                  padding: EdgeInsets.all(context.scale(40)),
+                  child: const Center(child: CircularProgressIndicator()),
                 );
               } else if (snapshot.hasError) {
                 return Padding(
-                  padding: const EdgeInsets.all(20.0),
-                  child: Text("Error: ${snapshot.error}"),
+                  padding: EdgeInsets.all(context.scale(20)),
+                  child: Center(child: Text("Error: ${snapshot.error}", style: TextStyle(color: theme.colorScheme.error, fontSize: context.font(13)))),
                 );
               } else if (!snapshot.hasData || (snapshot.data as List).isEmpty) {
                 return Padding(
-                  padding: const EdgeInsets.all(20.0),
-                  child: Text("No events found", style: TextStyle(color: theme.hintColor)),
+                  padding: EdgeInsets.all(context.scale(40)),
+                  child: Column(
+                    children: [
+                      Icon(Icons.event_busy_rounded, size: context.scale(48), color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.3)),
+                      SizedBox(height: context.scale(12)),
+                      Center(child: Text("No events found", style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: context.font(14)))),
+                    ],
+                  ),
                 );
               }
 
@@ -152,32 +238,50 @@ class _StaffEventManagementPageState extends State<StaffEventManagementPage> {
                 shrinkWrap: true,
                 physics: const NeverScrollableScrollPhysics(),
                 itemCount: dataList.length,
-                separatorBuilder: (context, index) => const Divider(height: 1),
+                separatorBuilder: (context, index) => Divider(color: theme.colorScheme.outlineVariant, height: 1),
                 itemBuilder: (context, index) {
                   final item = dataList[index];
                   final Event event = isRegistered ? (item as EventRegistration).event : (item as Event);
                   final String idToCancel = isRegistered ? (item as EventRegistration).encryptedId ?? item.id.toString() : "";
 
                   return ListTile(
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                    title: Text(event.title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
-                    subtitle: Text(event.eventDate ?? 'N/A', style: TextStyle(color: theme.hintColor, fontSize: 12)),
+                    contentPadding: EdgeInsets.symmetric(horizontal: context.scale(20), vertical: context.scale(12)),
+                    leading: Container(
+                      width: context.scale(44),
+                      height: context.scale(44),
+                      decoration: BoxDecoration(
+                        color: theme.colorScheme.primary.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(context.scale(12)),
+                      ),
+                      child: Icon(Icons.event_note_rounded, color: theme.colorScheme.primary, size: context.scale(22)),
+                    ),
+                    title: Text(event.title, 
+                      style: theme.textTheme.bodyLarge?.copyWith(fontWeight: FontWeight.bold, fontSize: context.font(14))),
+                    subtitle: Padding(
+                      padding: EdgeInsets.only(top: context.scale(4)),
+                      child: Row(
+                        children: [
+                          Icon(Icons.calendar_today_rounded, size: context.scale(12), color: theme.colorScheme.onSurfaceVariant),
+                          SizedBox(width: context.scale(4)),
+                          Text(event.eventDate ?? 'N/A', 
+                            style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: context.font(12))),
+                        ],
+                      ),
+                    ),
                     trailing: isRegistered 
                       ? IconButton(
-                          icon: Icon(Icons.cancel_outlined, color: theme.colorScheme.error, size: 20),
-                          onPressed: () => _cancelRegistration(idToCancel),
+                          icon: Icon(Icons.cancel_outlined, color: theme.colorScheme.error, size: context.scale(22)),
+                          onPressed: () => _showCancelDialog(context, idToCancel),
+                          tooltip: "Cancel Registration",
                         )
-                      : ConstrainedBox(
-                          constraints: const BoxConstraints(maxWidth: 100),
-                          child: ElevatedButton(
-                            onPressed: () => _registerForEvent(event.id),
-                            style: ElevatedButton.styleFrom(
-                              padding: const EdgeInsets.symmetric(horizontal: 12),
-                              minimumSize: const Size(0, 36),
-                              textStyle: const TextStyle(fontSize: 10),
-                            ),
-                            child: const Text("REGISTER"),
+                      : FilledButton.tonal(
+                          onPressed: () => _registerForEvent(event.id),
+                          style: FilledButton.styleFrom(
+                            padding: EdgeInsets.symmetric(horizontal: context.scale(16)),
+                            minimumSize: Size(0, context.scale(36)),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(context.scale(8))),
                           ),
+                          child: Text("REGISTER", style: TextStyle(fontSize: context.font(12), fontWeight: FontWeight.bold)),
                         ),
                   );
                 },
@@ -189,15 +293,51 @@ class _StaffEventManagementPageState extends State<StaffEventManagementPage> {
     );
   }
 
+  void _showCancelDialog(BuildContext context, String registrationId) {
+    final colorScheme = context.theme.colorScheme;
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text("Cancel Registration", style: TextStyle(fontSize: context.font(18), fontWeight: FontWeight.bold)),
+        content: Text("Are you sure you want to cancel your registration for this event?", style: TextStyle(fontSize: context.font(14))),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(context.scale(20))),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context), 
+            child: Text("NO", style: TextStyle(color: colorScheme.onSurfaceVariant, fontWeight: FontWeight.bold)),
+          ),
+          TextButton(
+            onPressed: () {
+              Navigator.pop(context);
+              _cancelRegistration(registrationId);
+            }, 
+            child: Text("YES, CANCEL", style: TextStyle(color: colorScheme.error, fontWeight: FontWeight.bold)),
+          ),
+        ],
+      ),
+    );
+  }
+
   Future<void> _registerForEvent(dynamic eventId) async {
     try {
       await ApiService.staffRegisterForEvent(eventId.toString());
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Registered successfully')));
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: const Text('Registered successfully'),
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+        ));
         _loadEvents();
       }
     } catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Failed to register: $e')));
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text('Failed to register: $e'),
+          backgroundColor: context.theme.colorScheme.error,
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+        ));
+      }
     }
   }
 
@@ -205,11 +345,23 @@ class _StaffEventManagementPageState extends State<StaffEventManagementPage> {
     try {
       await ApiService.cancelStaffEventRegistration(registrationId);
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Registration cancelled')));
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: const Text('Registration cancelled'),
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+        ));
         _loadEvents();
       }
     } catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Failed to cancel: $e')));
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text('Failed to cancel: $e'),
+          backgroundColor: context.theme.colorScheme.error,
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+        ));
+      }
     }
   }
 }
+

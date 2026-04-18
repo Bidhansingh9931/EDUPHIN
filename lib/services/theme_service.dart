@@ -17,8 +17,9 @@ class ThemeService {
       surface: isDark ? const Color(0xFF0F172A) : Colors.white,
       onSurface: isDark ? const Color(0xFFF8FAFC) : const Color(0xFF1E293B),
       error: const Color(0xFFEF4444),
-      outline: isDark ? Colors.white.withOpacity(0.1) : Colors.black.withOpacity(0.1),
+      outline: isDark ? Colors.white.withValues(alpha: 0.1) : Colors.black.withValues(alpha: 0.1),
       surfaceContainerHighest: isDark ? const Color(0xFF1E293B) : const Color(0xFFF1F5F9),
+      outlineVariant: isDark ? Colors.white10 : Colors.black12,
     );
 
     final baseTheme = brightness == Brightness.dark 
@@ -28,11 +29,14 @@ class ThemeService {
     return baseTheme.copyWith(
       brightness: brightness,
       colorScheme: colorScheme,
-      scaffoldBackgroundColor: isDark ? const Color(0xFF020617) : const Color(0xFFF8FAFC),
+      scaffoldBackgroundColor: isDark ? const Color(0xff0B1220) : const Color(0xFFF8FAFC),
+      dividerColor: colorScheme.outline,
+      hintColor: isDark ? Colors.white38 : Colors.black38,
+      cardColor: isDark ? const Color(0xff1E2746) : Colors.white,
       
       // Global Card Styling
       cardTheme: CardThemeData(
-        color: colorScheme.surface,
+        color: isDark ? const Color(0xff1E2746) : Colors.white,
         elevation: 0,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(16),
@@ -43,12 +47,12 @@ class ThemeService {
 
       // Global AppBar Styling
       appBarTheme: AppBarTheme(
-        backgroundColor: isDark ? const Color(0xFF020617) : const Color(0xFFF8FAFC),
+        backgroundColor: Colors.transparent,
         elevation: 0,
         centerTitle: false,
-        iconTheme: IconThemeData(color: colorScheme.onSurface),
+        iconTheme: IconThemeData(color: isDark ? Colors.white : colorScheme.onSurface),
         titleTextStyle: GoogleFonts.inter(
-          color: colorScheme.onSurface,
+          color: isDark ? Colors.white : colorScheme.onSurface,
           fontSize: 20,
           fontWeight: FontWeight.w700,
         ),
@@ -69,7 +73,7 @@ class ThemeService {
       // Global Input Styling
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
-        fillColor: isDark ? Colors.white.withOpacity(0.05) : Colors.black.withOpacity(0.03),
+        fillColor: isDark ? Colors.white.withValues(alpha: 0.05) : Colors.black.withValues(alpha: 0.03),
         contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
@@ -85,7 +89,7 @@ class ThemeService {
         ),
         hintStyle: GoogleFonts.inter(color: isDark ? Colors.white38 : Colors.black38, fontSize: 14),
         prefixIconColor: colorScheme.primary,
-        suffixIconColor: colorScheme.onSurface.withOpacity(0.5),
+        suffixIconColor: colorScheme.onSurface.withValues(alpha: 0.5),
       ),
       
       dividerTheme: DividerThemeData(

@@ -26,7 +26,6 @@ class CounselorDashboardData {
   });
 
   factory CounselorDashboardData.fromJson(Map<String, dynamic> json) {
-    // If the top level has a 'data' key, unwrap it first
     final Map<String, dynamic> source = json['data'] is Map<String, dynamic> ? json['data'] : json;
 
     List<T> _parseList<T>(dynamic data, T Function(Map<String, dynamic>) fromJson) {
@@ -44,11 +43,8 @@ class CounselorDashboardData {
       userDetail: UserDetail.fromJson(source['userDetail'] is Map ? source['userDetail'] : (source['account'] is Map ? source['account'] : source)),
       lastSalary: source['lastSalary'] is Map ? Salary.fromJson(source['lastSalary']) : null,
       events: _parseList(source['events'], Event.fromJson),
-      // PHP key is 'exams', model uses 'instituteexam'
       instituteExam: _parseList(source['exams'] ?? source['instituteexam'], ExamType.fromJson),
-      // PHP key is 'myTickets', model uses 'tickets'
       tickets: _parseList(source['myTickets'] ?? source['tickets'], SupportTicket.fromJson),
-      // PHP key is 'assignedTickets', model uses 'assigntickets'
       assignedTickets: _parseList(source['assignedTickets'] ?? source['assigntickets'], SupportTicket.fromJson),
       sections: _parseList(source['sections'], Section.fromJson),
       subjects: _parseList(source['subjects'] ?? source['subject'], Subject.fromJson),
@@ -61,10 +57,12 @@ class CounselorDashboardData {
 class UserDetail {
   final int id;
   final int userId;
+  final String? name;
   final String? firstName;
   final String? lastName;
   final String? email;
   final String? phone;
+  final String? alternatePhone;
   final String? gender;
   final String? dateOfBirth;
   final String? address;
@@ -82,14 +80,23 @@ class UserDetail {
   final String? bankName;
   final String? branchName;
   final String? relationshipStatus;
+  final String? emergencyContactName;
+  final String? emergencyContactNumber;
+  final String? aadharNumber;
+  final String? xMarks;
+  final String? xiiMarks;
+  final String? salary;
+  final String? experience;
 
   UserDetail({
     required this.id,
     required this.userId,
+    this.name,
     this.firstName,
     this.lastName,
     this.email,
     this.phone,
+    this.alternatePhone,
     this.gender,
     this.dateOfBirth,
     this.address,
@@ -107,9 +114,17 @@ class UserDetail {
     this.bankName,
     this.branchName,
     this.relationshipStatus,
+    this.emergencyContactName,
+    this.emergencyContactNumber,
+    this.aadharNumber,
+    this.xMarks,
+    this.xiiMarks,
+    this.salary,
+    this.experience,
   });
 
   String get fullName {
+    if (name != null && name!.isNotEmpty) return name!;
     if ((firstName == null || firstName!.isEmpty) && (lastName == null || lastName!.isEmpty)) {
       return "Unknown User";
     }
@@ -119,33 +134,33 @@ class UserDetail {
   factory UserDetail.fromJson(Map<String, dynamic> json) {
     if (json.isEmpty) return UserDetail(id: 0, userId: 0);
     
-    // Check if details are nested under 'account', 'userDetail', or 'user'
     Map<String, dynamic> data = json;
-    if (json['account'] is Map<String, dynamic>) {
-      data = json['account'];
-    } else if (json['userDetail'] is Map<String, dynamic>) {
-      data = json['userDetail'];
-    } else if (json['user'] is Map<String, dynamic>) {
-      data = json['user'];
-    }
+    Map<String, dynamic> userData = json['user'] is Map<String, dynamic> ? json['user'] : (json['account'] is Map<String, dynamic> ? json['account'] : json);
 
     return UserDetail(
-      id: json['id'] ?? data['id'] ?? 0,
-      userId: json['user_id'] ?? data['user_id'] ?? 0,
-      firstName: (data['first_name'] ?? data['firstname'] ?? data['name'])?.toString(),
-      lastName: (data['last_name'] ?? data['lastname'])?.toString(),
-      email: (data['email'] ?? json['email'])?.toString(),
-      phone: (data['phone'] ?? json['phone'])?.toString(),
+      id: json['id'] ?? 0,
+      userId: json['user_id'] ?? userData['id'] ?? 0,
+      name: (data['name'] ?? userData['name'])?.toString(),
+      firstName: (data['first_name'] ?? data['firstname'] ?? userData['first_name'])?.toString(),
+      lastName: (data['last_name'] ?? data['lastname'] ?? userData['last_name'])?.toString(),
+      email: (data['email'] ?? userData['email'] ?? json['email'])?.toString(),
+      phone: (data['phone'] ?? json['phone'] ?? userData['phone'])?.toString(),
+      alternatePhone: (data['alternate_phone'] ?? data['alt_phone'])?.toString(),
       gender: data['gender']?.toString(),
       dateOfBirth: data['date_of_birth']?.toString(),
       address: data['address']?.toString(),
       city: data['city']?.toString(),
       state: data['state']?.toString(),
       pincode: data['pincode']?.toString(),
-      photo: (data['photo'] ?? data['profile_image'])?.toString(),
-      position: data['position']?.toString(),
+      photo: (data['photo'] ?? 
+              data['profile_image'] ?? 
+              userData['photo'] ?? 
+              userData['profile_image'] ?? 
+              data['image'] ?? 
+              data['avatar'])?.toString(),
+      position: (data['position'] ?? data['designation'] ?? userData['role']?['name'])?.toString(),
       employeeId: (data['employee_id'] ?? data['id']?.toString())?.toString(),
-      joiningDate: data['joining_date']?.toString(),
+      joiningDate: (data['joining_date'] ?? data['date_of_joining'])?.toString(),
       status: (data['status'] ?? json['status'])?.toString(),
       qualification: data['qualification']?.toString(),
       bankAccountNumber: data['bank_account_number']?.toString(),
@@ -153,6 +168,106 @@ class UserDetail {
       bankName: data['bank_name']?.toString(),
       branchName: data['branch_name']?.toString(),
       relationshipStatus: data['relationship_status']?.toString(),
+      emergencyContactName: data['emergency_contact_name']?.toString(),
+      emergencyContactNumber: (data['emergency_contact_number'] ?? data['emergency_contact_phone'])?.toString(),
+      aadharNumber: data['aadhar_number']?.toString(),
+      xMarks: data['x_marks']?.toString(),
+      xiiMarks: data['xii_marks']?.toString(),
+      salary: data['salary']?.toString(),
+      experience: data['experience']?.toString(),
+    );
+  }
+}
+
+class CounselorVirtualIdCardData {
+  final String name;
+  final String email;
+  final String? photoUrl;
+  final String? instituteName;
+  final String? instituteLogo;
+  final String? instituteAddress;
+  final String? institutePhone;
+  final String? instituteWebsite;
+  final String? employeeId;
+  final String? position;
+  final String? employmentType;
+  final String? joiningDate;
+  final String? phone;
+  final String? alternatePhone;
+  final String? gender;
+  final String? status;
+  final String? fullAddress;
+  final String? emergencyContactName;
+  final String? emergencyContactPhone;
+  final String? issueDate;
+
+  CounselorVirtualIdCardData({
+    required this.name,
+    required this.email,
+    this.photoUrl,
+    this.instituteName,
+    this.instituteLogo,
+    this.instituteAddress,
+    this.institutePhone,
+    this.instituteWebsite,
+    this.employeeId,
+    this.position,
+    this.employmentType,
+    this.joiningDate,
+    this.phone,
+    this.alternatePhone,
+    this.gender,
+    this.status,
+    this.fullAddress,
+    this.emergencyContactName,
+    this.emergencyContactPhone,
+    this.issueDate,
+  });
+
+  factory CounselorVirtualIdCardData.fromJson(Map<String, dynamic> json) {
+    final user = json['user'] is Map ? json['user'] : {};
+    final userDetail = json['user_detail'] is Map 
+        ? json['user_detail'] 
+        : (json['userDetail'] is Map ? json['userDetail'] : json);
+
+    String address = ([
+      userDetail['address'],
+      userDetail['city'],
+      userDetail['state'],
+      userDetail['pincode']
+    ].where((s) => s != null && s.toString().isNotEmpty && s.toString() != 'null').join(', '));
+
+    return CounselorVirtualIdCardData(
+      name: (user['name'] ?? 
+          (userDetail['name']) ??
+          (userDetail['first_name'] != null
+              ? "${userDetail['first_name']} ${userDetail['last_name'] ?? ''}".trim()
+              : null) ?? 
+          'N/A').toString(),
+      email: (user['email'] ?? userDetail['email'] ?? 'N/A').toString(),
+      photoUrl: (userDetail['photo'] ?? 
+                user['photo'] ?? 
+                userDetail['profile_image'] ?? 
+                user['profile_image'] ??
+                userDetail['image'] ?? 
+                userDetail['avatar'])?.toString(),
+      instituteName: json['institute_name']?.toString(),
+      instituteLogo: json['institute_logo']?.toString(),
+      instituteAddress: json['institute_address']?.toString(),
+      institutePhone: json['institute_phone']?.toString(),
+      instituteWebsite: json['institute_website']?.toString(),
+      employeeId: (userDetail['employee_id'] ?? userDetail['id'] ?? user['id'])?.toString(),
+      position: (userDetail['designation'] ?? userDetail['position'] ?? user['role']?['name'])?.toString(),
+      employmentType: userDetail['employment_type']?.toString(),
+      joiningDate: (userDetail['date_of_joining'] ?? userDetail['joining_date'])?.toString(),
+      phone: (userDetail['phone'] ?? user['phone'])?.toString(),
+      alternatePhone: (userDetail['alternate_phone'] ?? userDetail['alt_phone'])?.toString(),
+      gender: userDetail['gender']?.toString(),
+      status: (userDetail['status'] ?? 'Active').toString(),
+      fullAddress: address.isNotEmpty ? address : userDetail['address']?.toString(),
+      emergencyContactName: userDetail['emergency_contact_name']?.toString(),
+      emergencyContactPhone: (userDetail['emergency_contact_phone'] ?? userDetail['emergency_contact_number'])?.toString(),
+      issueDate: json['issue_date']?.toString(),
     );
   }
 }
@@ -290,7 +405,7 @@ class EventRegistration {
       userId: json['user_id'] ?? 0,
       status: (json['status'] ?? 'registered').toString(),
       registeredAt: (json['registered_at'] ?? json['created_at'])?.toString(),
-      event: Event.fromJson(json['event'] is Map ? json['event'] : {}),
+      event: Event.fromJson(json['event'] is Map ? json['event'] : (json['events'] is Map ? json['events'] : {})),
     );
   }
 }
@@ -344,14 +459,17 @@ class ExamPaperSchedule {
   });
 
   factory ExamPaperSchedule.fromJson(Map<String, dynamic> json) {
+    final Map<String, dynamic> subjectData = json['subject'] is Map ? json['subject'] : {};
+    final Map<String, dynamic> classData = json['class'] is Map ? json['class'] : {};
+    
     return ExamPaperSchedule(
       id: json['id'] ?? 0,
-      date: json['exam_date']?.toString(),
-      startTime: json['start_time']?.toString(),
-      endTime: json['end_time']?.toString(),
-      roomNo: json['room_number']?.toString(),
-      subjectName: (json['subject'] is Map ? json['subject']['name'] : null)?.toString(),
-      className: (json['class'] is Map ? (json['class']['class_name'] ?? json['class']['name']) : null)?.toString(),
+      date: (json['exam_date'] ?? json['date'])?.toString(),
+      startTime: (json['start_time'] ?? json['start'])?.toString(),
+      endTime: (json['end_time'] ?? json['end'])?.toString(),
+      roomNo: (json['room_number'] ?? json['room_no'] ?? json['room'])?.toString(),
+      subjectName: (subjectData['name'] ?? subjectData['subject_name'])?.toString(),
+      className: (classData['class_name'] ?? classData['name'])?.toString(),
     );
   }
 }
@@ -474,17 +592,22 @@ class ClassSchedule {
   });
 
   factory ClassSchedule.fromJson(Map<String, dynamic> json) {
+    final Map<String, dynamic> classData = json['class'] is Map ? json['class'] : {};
+    final Map<String, dynamic> sectionData = json['section'] is Map ? json['section'] : {};
+    final Map<String, dynamic> subjectData = json['subject'] is Map ? json['subject'] : {};
+    final Map<String, dynamic> teacherData = json['teacher'] is Map ? json['teacher'] : {};
+
     return ClassSchedule(
       id: json['id'] ?? 0,
-      day: json['day']?.toString(),
-      startTime: json['start_time']?.toString(),
-      endTime: json['end_time']?.toString(),
-      className: (json['class'] is Map ? (json['class']['class_name'] ?? json['class']['name']) : null)?.toString(),
-      sectionName: (json['section'] is Map ? json['section']['name'] : null)?.toString(),
-      subjectName: (json['subject'] is Map ? json['subject']['name'] : null)?.toString(),
-      teacherName: (json['teacher'] is Map && json['teacher']['first_name'] != null)
-          ? "${json['teacher']['first_name']} ${json['teacher']['last_name'] ?? ''}".trim()
-          : null,
+      day: (json['day'] ?? json['weekday'])?.toString(),
+      startTime: (json['start_time'] ?? json['start'])?.toString(),
+      endTime: (json['end_time'] ?? json['end'])?.toString(),
+      className: (classData['class_name'] ?? classData['name'])?.toString(),
+      sectionName: (sectionData['name'] ?? sectionData['section_name'])?.toString(),
+      subjectName: (subjectData['name'] ?? subjectData['subject_name'])?.toString(),
+      teacherName: (teacherData['first_name'] != null)
+          ? "${teacherData['first_name']} ${teacherData['last_name'] ?? ''}".trim()
+          : (teacherData['name']?.toString()),
     );
   }
 }

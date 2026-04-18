@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:eduphin/services/api_service.dart';
+import 'package:eduphin/services/responsive_helper.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
@@ -201,40 +202,70 @@ class _AccountDetailsPageState extends State<AccountDetailsPage> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
+    final theme = context.theme;
     return Scaffold(
       backgroundColor: theme.scaffoldBackgroundColor,
       appBar: AppBar(
         title: const Text("Account Details"),
       ),
-      floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
-      floatingActionButton: _isLoading ? null : _buildSaveButton(theme),
+      bottomNavigationBar: _isLoading ? null : _buildBottomAction(theme),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
-          : LayoutBuilder(builder: (context, constraints) {
-              if (constraints.maxWidth > 800) {
-                return _buildWideLayout();
-              } else {
-                return _buildNarrowLayout();
-              }
-            }),
+          : Center(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 1200),
+                child: context.responsive(
+                  _buildNarrowLayout(),
+                  tablet: _buildWideLayout(),
+                  desktop: _buildWideLayout(),
+                ),
+              ),
+            ),
     );
   }
 
-  Widget _buildSaveButton(ThemeData theme) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16.0),
-      child: SizedBox(
-        width: double.infinity,
-        child: FloatingActionButton.extended(
-          onPressed: _isSaving ? null : _saveAccountDetails,
-          label: _isSaving
-              ? const CircularProgressIndicator(
-                  valueColor: AlwaysStoppedAnimation(Colors.white))
-              : Text("Save Changes",
-                  style: theme.textTheme.labelLarge
-                      ?.copyWith(color: theme.colorScheme.onPrimary)),
-        ),
+  Widget _buildBottomAction(ThemeData theme) {
+    return Container(
+      padding: EdgeInsets.fromLTRB(
+        context.spacing,
+        context.spacing / 2,
+        context.spacing,
+        context.spacing + MediaQuery.of(context).viewInsets.bottom,
+      ),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surface,
+        border: Border(top: BorderSide(color: theme.colorScheme.outlineVariant)),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: OutlinedButton(
+              onPressed: () => Navigator.pop(context),
+              style: OutlinedButton.styleFrom(
+                minimumSize: const Size(0, 50),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(context.scale(12))),
+              ),
+              child: const Text("Cancel"),
+            ),
+          ),
+          SizedBox(width: context.md),
+          Expanded(
+            child: FilledButton(
+              onPressed: _isSaving ? null : _saveAccountDetails,
+              style: FilledButton.styleFrom(
+                minimumSize: const Size(0, 50),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(context.scale(12))),
+              ),
+              child: _isSaving
+                  ? const SizedBox(
+                      height: 20,
+                      width: 20,
+                      child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                    )
+                  : const Text("Save Changes"),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -243,13 +274,12 @@ class _AccountDetailsPageState extends State<AccountDetailsPage> {
 
   Widget _buildNarrowLayout() {
     return SingleChildScrollView(
-      padding: const EdgeInsets.fromLTRB(16, 16, 16, 50),
+      padding: context.pagePadding,
       child: Column(
         children: [
           _buildBankingInfoSection(),
-          const SizedBox(height: 16),
+          SizedBox(height: context.md),
           _buildPastSalariesSection(),
-          const SizedBox(height: 80), // Padding for FAB
         ],
       ),
     );
@@ -257,7 +287,7 @@ class _AccountDetailsPageState extends State<AccountDetailsPage> {
 
   Widget _buildWideLayout() {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 16, 16, 50),
+      padding: context.pagePadding,
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -265,7 +295,7 @@ class _AccountDetailsPageState extends State<AccountDetailsPage> {
             flex: 2,
             child: SingleChildScrollView(child: _buildBankingInfoSection()),
           ),
-          const SizedBox(width: 16),
+          SizedBox(width: context.md),
           Expanded(
             flex: 3,
             child: SingleChildScrollView(child: _buildPastSalariesSection()),
@@ -290,7 +320,7 @@ class _AccountDetailsPageState extends State<AccountDetailsPage> {
             label: "IFSC Code", controller: _ifscController, editable: true),
         CustomTextField(
             label: "Bank Name", controller: _bankNameController, editable: true),
-        const Divider(height: 24),
+        Divider(height: context.lg, color: context.theme.colorScheme.outlineVariant),
         CustomTextField(
             label: "Employer Branch",
             controller: _employerBranchController,
@@ -314,7 +344,7 @@ class _AccountDetailsPageState extends State<AccountDetailsPage> {
           shrinkWrap: true,
           physics: const NeverScrollableScrollPhysics(),
           itemCount: _pastRecords.length,
-          separatorBuilder: (context, index) => const SizedBox(height: 16),
+          separatorBuilder: (context, index) => SizedBox(height: context.sm),
           itemBuilder: (context, index) {
             return _buildSalaryRecordCard(_pastRecords[index]);
           },
@@ -324,12 +354,13 @@ class _AccountDetailsPageState extends State<AccountDetailsPage> {
   }
 
   Widget _buildSalaryRecordCard(PastSalaryRecord record) {
-    final theme = Theme.of(context);
+    final theme = context.theme;
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: theme.scaffoldBackgroundColor, // Use theme color
-        borderRadius: BorderRadius.circular(14),
+        color: theme.colorScheme.surfaceContainerLow,
+        borderRadius: BorderRadius.circular(context.scale(14)),
+        border: Border.all(color: theme.colorScheme.outlineVariant),
       ),
       child: Column(
         children: [
@@ -339,8 +370,8 @@ class _AccountDetailsPageState extends State<AccountDetailsPage> {
               Text(record.monthYear, style: theme.textTheme.titleMedium),
               Row(
                 children: [
-                  Icon(Icons.currency_rupee, size: 20, color: Colors.green.shade400),
-                  Text(record.amount, style: theme.textTheme.titleMedium?.copyWith(color: Colors.green.shade400)),
+                  Icon(Icons.currency_rupee, size: context.scale(20), color: Colors.green),
+                  Text(record.amount, style: theme.textTheme.titleMedium?.copyWith(color: Colors.green)),
                 ],
               )
             ],
@@ -374,12 +405,13 @@ class SectionCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
+    final theme = context.theme;
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: theme.colorScheme.surface, // Use theme color
-        borderRadius: BorderRadius.circular(14),
+        color: theme.colorScheme.surfaceContainerLow,
+        borderRadius: BorderRadius.circular(context.scale(14)),
+        border: Border.all(color: theme.colorScheme.outlineVariant),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -393,7 +425,7 @@ class SectionCard extends StatelessWidget {
                       ?.copyWith(fontWeight: FontWeight.bold)),
             ],
           ),
-          const SizedBox(height: 16),
+          SizedBox(height: context.md),
           ...children,
         ],
       ),
@@ -417,9 +449,9 @@ class CustomTextField extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
+    final theme = context.theme;
     return Padding(
-      padding: const EdgeInsets.only(bottom: 12.0),
+      padding: EdgeInsets.only(bottom: context.sm),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -433,12 +465,14 @@ class CustomTextField extends StatelessWidget {
             style: theme.textTheme.bodyLarge,
             decoration: InputDecoration(
               filled: true,
-              fillColor: editable
-                  ? theme.scaffoldBackgroundColor
-                  : theme.colorScheme.surface.withAlpha(100),
+              fillColor: theme.scaffoldBackgroundColor,
               border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(10),
-                borderSide: BorderSide.none,
+                borderRadius: BorderRadius.circular(context.scale(10)),
+                borderSide: BorderSide(color: theme.colorScheme.outlineVariant),
+              ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(context.scale(10)),
+                borderSide: BorderSide(color: theme.colorScheme.outlineVariant),
               ),
             ),
           ),

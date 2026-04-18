@@ -118,18 +118,18 @@ class _ManageInstitutePageState extends State<ManageInstitute> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
+    final theme = context.theme;
     final colorScheme = theme.colorScheme;
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(widget.instituteName),
+        title: Text(widget.instituteName, style: TextStyle(fontSize: context.font(20))),
         actions: [
           IconButton(
             onPressed: () => Navigator.pushAndRemoveUntil(context, MaterialPageRoute(builder: (context) => const ModeratorDashboardPage()), (route) => false),
-            icon: const Icon(Icons.dashboard_rounded),
+            icon: Icon(Icons.dashboard_rounded, size: context.scale(24)),
           ),
-          const SizedBox(width: 8),
+          SizedBox(width: context.md),
         ],
       ),
       body: RefreshIndicator(
@@ -145,41 +145,64 @@ class _ManageInstitutePageState extends State<ManageInstitute> {
                       Expanded(
                         child: TextField(
                           controller: _searchController,
-                          decoration: const InputDecoration(
+                          style: TextStyle(fontSize: context.font(14)),
+                          decoration: InputDecoration(
                             hintText: "Search employees...",
-                            prefixIcon: Icon(Icons.search_rounded),
+                            hintStyle: TextStyle(color: colorScheme.onSurfaceVariant, fontSize: context.font(14)),
+                            prefixIcon: Icon(Icons.search_rounded, color: colorScheme.primary),
+                            filled: true,
+                            fillColor: colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
+                            contentPadding: EdgeInsets.symmetric(horizontal: context.md, vertical: context.sm),
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(context.scale(12)),
+                              borderSide: BorderSide(color: colorScheme.outlineVariant),
+                            ),
+                            enabledBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(context.scale(12)),
+                              borderSide: BorderSide(color: colorScheme.outlineVariant),
+                            ),
+                            focusedBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(context.scale(12)),
+                              borderSide: BorderSide(color: colorScheme.primary, width: 2),
+                            ),
                           ),
                         ),
                       ),
-                      const SizedBox(width: 12),
+                      SizedBox(width: context.md),
                       IconButton.filled(
                         onPressed: _navigateAndRefresh,
-                        icon: const Icon(Icons.person_add_rounded),
+                        icon: Icon(Icons.person_add_rounded, size: context.scale(24)),
                         style: IconButton.styleFrom(
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                          padding: const EdgeInsets.all(12),
+                          backgroundColor: colorScheme.primary,
+                          foregroundColor: colorScheme.onPrimary,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(context.scale(12))),
+                          padding: EdgeInsets.all(context.scale(12)),
                         ),
                       ),
                     ],
                   ),
-                  const SizedBox(height: 16),
+                  SizedBox(height: context.md),
                   SizedBox(
-                    height: 40,
+                    height: context.scale(40),
                     child: ListView.builder(
                       scrollDirection: Axis.horizontal,
                       itemCount: employeeRoles.length,
                       itemBuilder: (context, index) {
                         final role = employeeRoles[index];
+                        final isSelected = _selectedRole == role;
                         return Padding(
-                          padding: const EdgeInsets.only(right: 8.0),
+                          padding: EdgeInsets.only(right: context.scale(8)),
                           child: FilterChip(
-                            label: Text(role, style: TextStyle(fontSize: 12, fontWeight: _selectedRole == role ? FontWeight.bold : FontWeight.normal)),
-                            selected: _selectedRole == role,
+                            label: Text(role, style: TextStyle(fontSize: context.font(12), color: isSelected ? colorScheme.onPrimary : colorScheme.onSurfaceVariant, fontWeight: isSelected ? FontWeight.bold : FontWeight.normal)),
+                            selected: isSelected,
                             onSelected: (bool selected) => _onRoleSelected(role),
-                            backgroundColor: colorScheme.surface,
-                            selectedColor: colorScheme.primary.withOpacity(0.2),
-                            checkmarkColor: colorScheme.primary,
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20), side: BorderSide(color: _selectedRole == role ? colorScheme.primary : colorScheme.outline.withOpacity(0.2))),
+                            backgroundColor: colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
+                            selectedColor: colorScheme.primary,
+                            showCheckmark: false,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(context.scale(20)), 
+                              side: BorderSide(color: isSelected ? colorScheme.primary : colorScheme.outlineVariant)
+                            ),
                           ),
                         );
                       },
@@ -188,29 +211,29 @@ class _ManageInstitutePageState extends State<ManageInstitute> {
                 ],
               ),
             ),
-            const SizedBox(height: 16),
+            SizedBox(height: context.md),
             Expanded(
               child: _isLoading
                   ? const Center(child: CircularProgressIndicator())
                   : _error != null
-                      ? _buildErrorState(theme)
+                      ? _buildErrorState(context)
                       : _filteredEmployees.isEmpty
-                          ? _buildEmptyState(theme)
+                          ? _buildEmptyState(context)
                           : SingleChildScrollView(
                               padding: context.pagePadding,
                               physics: const AlwaysScrollableScrollPhysics(),
                               child: Center(
                                 child: ConstrainedBox(
-                                  constraints: const BoxConstraints(maxWidth: 1200),
+                                  constraints: BoxConstraints(maxWidth: context.scale(1200)),
                                   child: GridView.builder(
                                     shrinkWrap: true,
                                     physics: const NeverScrollableScrollPhysics(),
                                     itemCount: _filteredEmployees.length,
                                     gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
                                       crossAxisCount: context.responsive(1, tablet: 2, desktop: 3),
-                                      crossAxisSpacing: 16,
-                                      mainAxisSpacing: 16,
-                                      mainAxisExtent: 80,
+                                      crossAxisSpacing: context.md,
+                                      mainAxisSpacing: context.md,
+                                      mainAxisExtent: context.scale(80),
                                     ),
                                     itemBuilder: (context, index) {
                                       return EmployeeCard(employee: _filteredEmployees[index]);
@@ -226,29 +249,39 @@ class _ManageInstitutePageState extends State<ManageInstitute> {
     );
   }
 
-  Widget _buildErrorState(ThemeData theme) {
+  Widget _buildErrorState(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
     return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(Icons.error_outline_rounded, size: 64, color: theme.colorScheme.error.withOpacity(0.5)),
-          const SizedBox(height: 16),
-          const Text("Failed to load employees", style: TextStyle(fontWeight: FontWeight.bold)),
-          const SizedBox(height: 24),
-          ElevatedButton(onPressed: _fetchEmployees, child: const Text("Retry")),
+          Icon(Icons.error_outline_rounded, size: context.scale(64), color: colorScheme.error.withValues(alpha: 0.5)),
+          SizedBox(height: context.md),
+          Text("Failed to load employees", style: TextStyle(fontWeight: FontWeight.bold, fontSize: context.font(16), color: colorScheme.onSurface)),
+          SizedBox(height: context.scale(24)),
+          ElevatedButton.icon(
+            onPressed: _fetchEmployees, 
+            icon: const Icon(Icons.refresh_rounded),
+            label: Text("Retry", style: TextStyle(fontSize: context.font(16))),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: colorScheme.primary,
+              foregroundColor: colorScheme.onPrimary,
+            ),
+          ),
         ],
       ),
     );
   }
 
-  Widget _buildEmptyState(ThemeData theme) {
+  Widget _buildEmptyState(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
     return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(Icons.people_outline_rounded, size: 64, color: theme.hintColor.withOpacity(0.3)),
-          const SizedBox(height: 16),
-          const Text("No employees found", style: TextStyle(fontWeight: FontWeight.bold)),
+          Icon(Icons.people_outline_rounded, size: context.scale(64), color: colorScheme.onSurfaceVariant.withValues(alpha: 0.3)),
+          SizedBox(height: context.md),
+          Text("No employees found", style: TextStyle(fontWeight: FontWeight.bold, fontSize: context.font(16), color: colorScheme.onSurfaceVariant)),
         ],
       ),
     );
@@ -262,15 +295,15 @@ class EmployeeCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
+    final colorScheme = Theme.of(context).colorScheme;
 
     return Card(
       elevation: 0,
-      color: theme.colorScheme.surfaceContainerHighest.withOpacity(0.3),
+      color: colorScheme.surfaceContainerLow,
+      surfaceTintColor: Colors.transparent,
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
-        side: BorderSide(color: colorScheme.outline.withOpacity(0.1)),
+        borderRadius: BorderRadius.circular(context.scale(16)),
+        side: BorderSide(color: colorScheme.outlineVariant, width: 1),
       ),
       child: InkWell(
         onTap: () {
@@ -279,17 +312,17 @@ class EmployeeCard extends StatelessWidget {
             MaterialPageRoute(builder: (context) => EmployeeDetailsPage(employeeId: employee.id)),
           );
         },
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(context.scale(16)),
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16),
+          padding: EdgeInsets.symmetric(horizontal: context.md),
           child: Row(
             children: [
               CircleAvatar(
-                radius: 20,
-                backgroundColor: colorScheme.primary.withOpacity(0.1),
-                child: Text(employee.name[0].toUpperCase(), style: TextStyle(color: colorScheme.primary, fontWeight: FontWeight.bold)),
+                radius: context.scale(20),
+                backgroundColor: colorScheme.primaryContainer,
+                child: Text(employee.name[0].toUpperCase(), style: TextStyle(color: colorScheme.onPrimaryContainer, fontWeight: FontWeight.bold, fontSize: context.font(14))),
               ),
-              const SizedBox(width: 16),
+              SizedBox(width: context.md),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -297,18 +330,18 @@ class EmployeeCard extends StatelessWidget {
                   children: [
                     Text(
                       employee.name,
-                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: context.font(14), color: colorScheme.onSurface),
                       overflow: TextOverflow.ellipsis,
                     ),
                     Text(
                       employee.role,
-                      style: TextStyle(color: theme.hintColor, fontSize: 12),
+                      style: TextStyle(color: colorScheme.onSurfaceVariant, fontSize: context.font(12)),
                       overflow: TextOverflow.ellipsis,
                     ),
                   ],
                 ),
               ),
-              const Icon(Icons.chevron_right_rounded, size: 20),
+              Icon(Icons.chevron_right_rounded, size: context.scale(20), color: colorScheme.onSurfaceVariant),
             ],
           ),
         ),

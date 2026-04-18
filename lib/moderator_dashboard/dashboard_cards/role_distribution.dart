@@ -102,39 +102,59 @@ class _RoleDistributionPageState extends State<RoleDistributionPage> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
+    final theme = context.theme;
     final colorScheme = theme.colorScheme;
 
     return Scaffold(
+      backgroundColor: theme.scaffoldBackgroundColor,
       appBar: AppBar(
-        title: const Text("User Distribution"),
+        title: Text("User Distribution", style: TextStyle(fontSize: context.font(20), fontWeight: FontWeight.bold)),
         actions: [
-          IconButton(onPressed: _refreshData, icon: const Icon(Icons.refresh_rounded)),
-          const SizedBox(width: 8),
+          IconButton(onPressed: _refreshData, icon: Icon(Icons.refresh_rounded, size: context.scale(24))),
+          SizedBox(width: context.md),
         ],
       ),
       body: FutureBuilder<List<UserRole>>(
         future: _userRolesFuture,
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
+            return Center(child: CircularProgressIndicator(color: theme.colorScheme.primary));
           }
           if (snapshot.hasError) {
             return Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(Icons.error_outline_rounded, size: 48, color: colorScheme.error),
-                  const SizedBox(height: 16),
-                  Text('Failed to load distribution', style: theme.textTheme.titleMedium),
-                  const SizedBox(height: 24),
-                  ElevatedButton(onPressed: _refreshData, child: const Text("Retry")),
-                ],
+              child: Padding(
+                padding: context.pagePadding,
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(Icons.error_outline_rounded, size: context.scale(48), color: colorScheme.error),
+                    SizedBox(height: context.md),
+                    Text('Failed to load distribution', style: theme.textTheme.titleMedium?.copyWith(fontSize: context.font(18), color: theme.colorScheme.onSurface)),
+                    SizedBox(height: context.lg),
+                    ElevatedButton(
+                      onPressed: _refreshData,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: theme.colorScheme.primary,
+                        foregroundColor: theme.colorScheme.onPrimary,
+                      ),
+                      child: Text("Retry", style: TextStyle(fontSize: context.font(16))),
+                    ),
+                  ],
+                ),
               ),
             );
           }
           if (!snapshot.hasData || snapshot.data!.isEmpty) {
-            return const Center(child: Text('No data found.'));
+            return Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.groups_outlined, size: context.scale(64), color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.3)),
+                  SizedBox(height: context.md),
+                  Text('No data found.', style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: context.font(16), fontWeight: FontWeight.bold)),
+                ],
+              ),
+            );
           }
 
           final userRoles = snapshot.data!;
@@ -142,26 +162,27 @@ class _RoleDistributionPageState extends State<RoleDistributionPage> {
 
           return SingleChildScrollView(
             padding: context.pagePadding,
+            physics: const AlwaysScrollableScrollPhysics(),
             child: Center(
               child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 1000),
+                constraints: BoxConstraints(maxWidth: context.scale(1000)),
                 child: Column(
                   children: [
                     _buildTotalUsersCard(context, totalUsers),
-                    const SizedBox(height: 24),
+                    SizedBox(height: context.lg),
                     GridView.builder(
                       shrinkWrap: true,
                       physics: const NeverScrollableScrollPhysics(),
                       itemCount: userRoles.length,
                       gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
                         crossAxisCount: context.responsive(1, tablet: 2, desktop: 3),
-                        crossAxisSpacing: 16,
-                        mainAxisSpacing: 16,
-                        mainAxisExtent: 140,
+                        crossAxisSpacing: context.md,
+                        mainAxisSpacing: context.md,
+                        mainAxisExtent: context.scale(140),
                       ),
                       itemBuilder: (context, index) => _buildRoleCard(context, userRoles[index]),
                     ),
-                    const SizedBox(height: 50),
+                    SizedBox(height: context.lg),
                   ],
                 ),
               ),
@@ -173,79 +194,85 @@ class _RoleDistributionPageState extends State<RoleDistributionPage> {
   }
 
   Widget _buildTotalUsersCard(BuildContext context, int totalUsers) {
-    final theme = Theme.of(context);
+    final theme = context.theme;
     final colorScheme = theme.colorScheme;
     
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(24),
+      padding: EdgeInsets.all(context.lg),
       decoration: BoxDecoration(
         gradient: LinearGradient(
-          colors: [colorScheme.primary, colorScheme.primary.withBlue(220)],
+          colors: [colorScheme.primary, colorScheme.primaryContainer],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
-        borderRadius: BorderRadius.circular(24),
+        borderRadius: BorderRadius.circular(context.lg),
         boxShadow: [
           BoxShadow(
-            color: colorScheme.primary.withOpacity(0.3),
-            blurRadius: 15,
-            offset: const Offset(0, 8),
+            color: colorScheme.primary.withValues(alpha: 0.2),
+            blurRadius: context.scale(15),
+            offset: Offset(0, context.scale(8)),
           )
         ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text("TOTAL REGISTERED USERS", style: TextStyle(color: Colors.white70, fontSize: 12, fontWeight: FontWeight.bold, letterSpacing: 1.2)),
-          const SizedBox(height: 8),
+          Text("TOTAL REGISTERED USERS", style: TextStyle(color: colorScheme.onPrimary.withValues(alpha: 0.7), fontSize: context.font(12), fontWeight: FontWeight.bold, letterSpacing: 1.2)),
+          SizedBox(height: context.sm),
           Text(
             totalUsers.toString(),
-            style: const TextStyle(color: Colors.white, fontSize: 48, fontWeight: FontWeight.w900),
+            style: TextStyle(color: colorScheme.onPrimary, fontSize: context.font(48), fontWeight: FontWeight.w900),
           ),
-          const SizedBox(height: 8),
-          const Text("Across all institutes and roles", style: TextStyle(color: Colors.white60, fontSize: 13)),
+          SizedBox(height: context.sm),
+          Text("Across all institutes and roles", style: TextStyle(color: colorScheme.onPrimary.withValues(alpha: 0.6), fontSize: context.font(13))),
         ],
       ),
     );
   }
 
   Widget _buildRoleCard(BuildContext context, UserRole role) {
-    final theme = Theme.of(context);
+    final theme = context.theme;
     
     return Card(
+      color: theme.colorScheme.surfaceContainerLow,
+      elevation: 0,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(context.md),
+        side: BorderSide(color: theme.colorScheme.outlineVariant),
+      ),
       child: Padding(
-        padding: const EdgeInsets.all(20),
+        padding: EdgeInsets.all(context.md),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(
               children: [
                 Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(color: role.color.withOpacity(0.1), borderRadius: BorderRadius.circular(10)),
-                  child: Icon(role.icon, color: role.color, size: 24),
+                  padding: EdgeInsets.all(context.sm),
+                  decoration: BoxDecoration(color: role.color.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(context.sm)),
+                  child: Icon(role.icon, color: role.color, size: context.scale(24)),
                 ),
-                const SizedBox(width: 16),
+                SizedBox(width: context.md),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(role.title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16), overflow: TextOverflow.ellipsis),
-                      Text("${role.count} Users", style: TextStyle(color: theme.hintColor, fontSize: 13)),
+                      Text(role.title, style: TextStyle(fontWeight: FontWeight.bold, fontSize: context.font(16), color: theme.colorScheme.onSurface), overflow: TextOverflow.ellipsis),
+                      Text("${role.count} Users", style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: context.font(13))),
                     ],
                   ),
                 ),
-                Text("${role.percent.toStringAsFixed(1)}%", style: TextStyle(fontWeight: FontWeight.w900, color: role.color, fontSize: 16)),
+                Text("${role.percent.toStringAsFixed(1)}%", style: TextStyle(fontWeight: FontWeight.w900, color: role.color, fontSize: context.font(16))),
               ],
             ),
             const Spacer(),
             ClipRRect(
-              borderRadius: BorderRadius.circular(4),
+              borderRadius: BorderRadius.circular(context.xs),
               child: LinearProgressIndicator(
                 value: role.percent / 100,
-                minHeight: 8,
-                backgroundColor: role.color.withOpacity(0.1),
+                minHeight: context.scale(8),
+                backgroundColor: role.color.withValues(alpha: 0.1),
                 valueColor: AlwaysStoppedAnimation<Color>(role.color),
               ),
             ),

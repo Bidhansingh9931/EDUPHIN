@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:eduphin/services/api_service.dart';
 import 'package:eduphin/teacher/dashboard/view_schedule_model.dart';
 import 'common_widgets.dart';
+import 'app_drawer.dart';
 
 class UploadAssignmentPage extends StatefulWidget {
   const UploadAssignmentPage({super.key});
@@ -91,7 +92,7 @@ class _UploadAssignmentPageState extends State<UploadAssignmentPage> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Upload failed: $e"), backgroundColor: Colors.red));
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Upload failed: $e"), backgroundColor: const Color(0xFFEF4444)));
       }
     } finally {
       if (mounted) setState(() => _isUploading = false);
@@ -107,6 +108,7 @@ class _UploadAssignmentPageState extends State<UploadAssignmentPage> {
       appBar: AppBar(
         title: const Text("Upload Material"),
       ),
+      drawer: const AppDrawer(),
       body: FutureBuilder<ViewSchedulePageData>(
         future: _dataFuture,
         builder: (context, snapshot) {
@@ -124,30 +126,38 @@ class _UploadAssignmentPageState extends State<UploadAssignmentPage> {
             padding: context.pagePadding,
             child: Center(
               child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 600),
+                constraints: const BoxConstraints(maxWidth: 800),
                 child: Card(
+                  elevation: 0,
+                  color: colorScheme.surfaceContainerLow,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(context.scale(16)),
+                    side: BorderSide(color: colorScheme.outlineVariant.withValues(alpha: 0.5)),
+                  ),
                   child: Padding(
-                    padding: const EdgeInsets.all(20),
+                    padding: EdgeInsets.all(context.spacing),
                     child: Form(
                       key: _formKey,
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          _buildLabel("Select Class/Subject *"),
-                          const SizedBox(height: 10),
+                          buildLabel(context, "Select Class/Subject *"),
+                          SizedBox(height: context.scale(8)),
                           buildDropdown(
-                            context, 
+                            context,
                             data.schedules.map((s) {
                               final sub = data.subjects.firstWhere((sub) => sub.id == s.subjectId).name;
                               final cls = data.classes.firstWhere((c) => c.id == s.classId).name;
                               return "$sub - $cls (${s.weekday})";
-                            }).toList(), 
-                            _selectedSchedule == null ? null : (() {
-                              final s = _selectedSchedule!;
-                              final sub = data.subjects.firstWhere((sub) => sub.id == s.subjectId).name;
-                              final cls = data.classes.firstWhere((c) => c.id == s.classId).name;
-                              return "$sub - $cls (${s.weekday})";
-                            })(), 
+                            }).toList(),
+                            _selectedSchedule == null
+                                ? null
+                                : (() {
+                                    final s = _selectedSchedule!;
+                                    final sub = data.subjects.firstWhere((sub) => sub.id == s.subjectId).name;
+                                    final cls = data.classes.firstWhere((c) => c.id == s.classId).name;
+                                    return "$sub - $cls (${s.weekday})";
+                                  })(),
                             (val) {
                               setState(() {
                                 _selectedSchedule = data.schedules.firstWhere((s) {
@@ -157,87 +167,96 @@ class _UploadAssignmentPageState extends State<UploadAssignmentPage> {
                                 });
                               });
                             },
-                            hint: "Select Schedule"
+                            hint: "Select Schedule",
                           ),
-
-                          const SizedBox(height: 24),
-                          _buildLabel("Title *"),
-                          const SizedBox(height: 10),
+                          SizedBox(height: context.spacing),
+                          buildLabel(context, "Title *"),
+                          SizedBox(height: context.scale(8)),
                           buildTextField(context, titleController, "Enter title"),
-
-                          const SizedBox(height: 24),
-                          _buildLabel("Description"),
-                          const SizedBox(height: 10),
-                          TextFormField(
-                            controller: descController,
-                            maxLines: 4,
-                            decoration: const InputDecoration(hintText: "Enter description (optional)"),
-                          ),
-
-                          const SizedBox(height: 24),
-                          _buildLabel("Upload File *"),
-                          const SizedBox(height: 10),
+                          SizedBox(height: context.spacing),
+                          buildLabel(context, "Description"),
+                          SizedBox(height: context.scale(8)),
+                          buildTextField(context, descController, "Enter description (optional)", maxLines: 4),
+                          SizedBox(height: context.spacing),
+                          buildLabel(context, "Upload File *"),
+                          SizedBox(height: context.scale(8)),
                           InkWell(
                             onTap: _pickFile,
-                            borderRadius: BorderRadius.circular(12),
+                            borderRadius: BorderRadius.circular(context.scale(12)),
                             child: Container(
-                              height: 56,
+                              height: context.scale(56),
                               decoration: BoxDecoration(
-                                color: colorScheme.surfaceContainerHighest.withOpacity(0.3),
-                                borderRadius: BorderRadius.circular(12),
-                                border: Border.all(color: colorScheme.outline.withOpacity(0.2)),
+                                color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
+                                borderRadius: BorderRadius.circular(context.scale(12)),
+                                border: Border.all(color: colorScheme.outlineVariant.withValues(alpha: 0.5)),
                               ),
                               child: Row(
                                 children: [
                                   Container(
-                                    width: 120,
+                                    width: context.scale(120),
                                     decoration: BoxDecoration(
-                                      color: colorScheme.primary.withOpacity(0.1),
-                                      borderRadius: const BorderRadius.only(
-                                        topLeft: Radius.circular(12),
-                                        bottomLeft: Radius.circular(12),
+                                      color: colorScheme.primary.withValues(alpha: 0.1),
+                                      borderRadius: BorderRadius.only(
+                                        topLeft: Radius.circular(context.scale(12)),
+                                        bottomLeft: Radius.circular(context.scale(12)),
                                       ),
                                     ),
                                     alignment: Alignment.center,
-                                    child: Text("Choose File",
-                                        style: TextStyle(color: colorScheme.primary, fontWeight: FontWeight.bold, fontSize: 13)),
+                                    child: Text(
+                                      "Choose File",
+                                      style: TextStyle(color: colorScheme.primary, fontWeight: FontWeight.bold, fontSize: context.font(13)),
+                                    ),
                                   ),
                                   Expanded(
                                     child: Padding(
-                                      padding: const EdgeInsets.only(left: 12, right: 12),
+                                      padding: EdgeInsets.symmetric(horizontal: context.scale(12)),
                                       child: Text(
                                         _fileName ?? "No file chosen",
-                                        style: const TextStyle(color: Colors.grey, fontSize: 13),
+                                        style: TextStyle(color: colorScheme.onSurfaceVariant, fontSize: context.font(13)),
                                         overflow: TextOverflow.ellipsis,
                                       ),
                                     ),
-                                  )
+                                  ),
                                 ],
                               ),
                             ),
                           ),
-                          const SizedBox(height: 8),
+                          SizedBox(height: context.scale(8)),
                           Text(
                             "Allowed: PDF, Word, PPT, Images. Max: 20 MB.",
-                            style: theme.textTheme.labelSmall?.copyWith(color: theme.hintColor),
+                            style: theme.textTheme.labelSmall?.copyWith(color: theme.hintColor, fontSize: context.font(11)),
                           ),
-
-                          const SizedBox(height: 32),
+                          SizedBox(height: context.scale(32)),
                           Row(
                             children: [
                               Expanded(
                                 child: ElevatedButton(
                                   onPressed: _isUploading ? null : _handleUpload,
-                                  child: _isUploading 
-                                    ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                                    : const Text("UPLOAD"),
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: colorScheme.primary,
+                                    foregroundColor: colorScheme.onPrimary,
+                                    padding: EdgeInsets.symmetric(vertical: context.scale(16)),
+                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(context.scale(12))),
+                                  ),
+                                  child: _isUploading
+                                      ? SizedBox(
+                                          height: context.scale(20),
+                                          width: context.scale(20),
+                                          child: CircularProgressIndicator(strokeWidth: 2, color: colorScheme.onPrimary),
+                                        )
+                                      : Text("UPLOAD", style: TextStyle(fontWeight: FontWeight.bold, fontSize: context.font(14))),
                                 ),
                               ),
-                              const SizedBox(width: 12),
+                              SizedBox(width: context.scale(12)),
                               Expanded(
                                 child: OutlinedButton(
                                   onPressed: () => Navigator.pop(context),
-                                  child: const Text("CANCEL"),
+                                  style: OutlinedButton.styleFrom(
+                                    padding: EdgeInsets.symmetric(vertical: context.scale(16)),
+                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(context.scale(12))),
+                                    side: BorderSide(color: colorScheme.outline),
+                                  ),
+                                  child: Text("CANCEL", style: TextStyle(fontWeight: FontWeight.bold, fontSize: context.font(14))),
                                 ),
                               ),
                             ],
@@ -250,12 +269,8 @@ class _UploadAssignmentPageState extends State<UploadAssignmentPage> {
               ),
             ),
           );
-        }
+        },
       ),
     );
-  }
-
-  Widget _buildLabel(String text) {
-    return Text(text, style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold));
   }
 }

@@ -3,6 +3,7 @@ import 'dart:ui';
 import 'package:eduphin/manager_dashboard/manageClasses/subjectList/create_new_subject.dart';
 import 'package:eduphin/manager_dashboard/manageClasses/subjectList/edit_suject.dart';
 import 'package:eduphin/services/api_service.dart';
+import 'package:eduphin/services/responsive_helper.dart';
 import 'package:flutter/material.dart';
 
 // Data model for a Subject
@@ -114,9 +115,9 @@ class _SubjectListPageState extends State<SubjectListPage> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
+    final theme = context.theme;
     return Scaffold(
-      backgroundColor: theme.scaffoldBackgroundColor,
+      backgroundColor: theme.colorScheme.surface,
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () async {
           final result = await Navigator.push(
@@ -127,33 +128,57 @@ class _SubjectListPageState extends State<SubjectListPage> {
             _fetchSubjects();
           }
         },
-        label: const Text("Create New Subject"),
-        icon: const Icon(Icons.add),
+        backgroundColor: theme.colorScheme.primary,
+        foregroundColor: theme.colorScheme.onPrimary,
+        elevation: 2,
+        label: Text("CREATE NEW SUBJECT", style: TextStyle(fontSize: context.font(12), fontWeight: FontWeight.bold, letterSpacing: 0.5)),
+        icon: Icon(Icons.add, size: context.scale(20)),
       ),
       floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
       appBar: AppBar(
-        title: const Text("Subject List"),
-        centerTitle: true,
+        title: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text("Subject Inventory", style: theme.appBarTheme.titleTextStyle?.copyWith(fontSize: context.font(18))),
+            Text("Manage academic subjects and credits", style: theme.textTheme.labelSmall?.copyWith(color: theme.hintColor, fontSize: context.font(11))),
+          ],
+        ),
+        centerTitle: false,
       ),
       body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
+          ? Center(child: CircularProgressIndicator(color: theme.colorScheme.primary))
           : RefreshIndicator(
               onRefresh: _fetchSubjects,
-              child: LayoutBuilder(
-                builder: (context, constraints) {
-                  final bool isWide = constraints.maxWidth > 600;
-                  return isWide ? _buildGridView() : _buildListView();
-                },
-              ),
+              color: theme.colorScheme.primary,
+              child: _subjects.isEmpty
+                  ? Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(Icons.subject_outlined, size: context.scale(64), color: theme.colorScheme.outlineVariant.withValues(alpha: 0.5)),
+                          SizedBox(height: context.scale(16)),
+                          Text('No subjects found.', style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: context.font(16))),
+                        ],
+                      ),
+                    )
+                  : Center(
+                      child: ConstrainedBox(
+                        constraints: const BoxConstraints(maxWidth: 1200),
+                        child: context.responsive(
+                          _buildListView(),
+                          tablet: _buildGridView(),
+                        ),
+                      ),
+                    ),
             ),
     );
   }
 
   Widget _buildListView() {
     return ListView.separated(
-      padding: const EdgeInsets.fromLTRB(16, 16, 16, 80), // Padding for FAB
+      padding: context.pagePadding.copyWith(bottom: context.scale(80)), // Padding for FAB
       itemCount: _subjects.length,
-      separatorBuilder: (context, index) => const SizedBox(height: 16),
+      separatorBuilder: (context, index) => SizedBox(height: context.scale(16)),
       itemBuilder: (context, index) {
         final subject = _subjects[index];
         return SubjectCard(subject: subject, onDelete: () => _deleteSubject(subject.id), onEdit: () => _navigateToEdit(subject));
@@ -163,13 +188,13 @@ class _SubjectListPageState extends State<SubjectListPage> {
 
   Widget _buildGridView() {
     return GridView.builder(
-      padding: const EdgeInsets.fromLTRB(16, 16, 16, 80), // Padding for FAB
+      padding: context.pagePadding.copyWith(bottom: context.scale(80)), // Padding for FAB
       itemCount: _subjects.length,
-      gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
-        maxCrossAxisExtent: 500,
-        mainAxisSpacing: 16,
-        crossAxisSpacing: 16,
-        childAspectRatio: 1.5, // Adjust aspect ratio as needed
+      gridDelegate: SliverGridDelegateWithMaxCrossAxisExtent(
+        maxCrossAxisExtent: context.scale(500),
+        mainAxisSpacing: context.scale(16),
+        crossAxisSpacing: context.scale(16),
+        childAspectRatio: context.responsive(1.5, tablet: 1.8, desktop: 2.0),
       ),
       itemBuilder: (context, index) {
         final subject = _subjects[index];
@@ -201,16 +226,17 @@ class SubjectCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
+    final theme = context.theme;
     final statusColor = subject.isActive ? theme.colorScheme.primary : theme.colorScheme.error;
     final statusText = subject.isActive ? "Active" : "Inactive";
 
     return Container(
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(12),
-        color: theme.colorScheme.surface,
+        borderRadius: BorderRadius.circular(context.scale(16)),
+        color: theme.colorScheme.surfaceContainerLow,
+        border: Border.all(color: theme.colorScheme.outlineVariant),
       ),
-      padding: const EdgeInsets.all(16),
+      padding: EdgeInsets.all(context.scale(16)),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -219,35 +245,44 @@ class SubjectCard extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Expanded(
-                child: Text(subject.name,
-                    style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold)),
+                child: Text(
+                  subject.name,
+                  style: TextStyle(color: theme.colorScheme.onSurface, fontWeight: FontWeight.bold, fontSize: context.font(18)),
+                ),
               ),
               const SizedBox(width: 8),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                padding: EdgeInsets.symmetric(horizontal: context.scale(10), vertical: context.scale(4)),
                 decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(8),
-                  color: statusColor.withAlpha(26),
+                  borderRadius: BorderRadius.circular(context.scale(8)),
+                  color: statusColor.withValues(alpha: 0.1),
                 ),
-                child: Text(statusText,
-                    style: theme.textTheme.labelMedium?.copyWith(color: statusColor, fontWeight: FontWeight.bold)),
+                child: Text(
+                  statusText,
+                  style: TextStyle(color: statusColor, fontWeight: FontWeight.bold, fontSize: context.font(12)),
+                ),
               ),
             ],
           ),
-          const SizedBox(height: 8),
-          Text(subject.description, style: theme.textTheme.bodyMedium?.copyWith(color: theme.hintColor)),
-          const SizedBox(height: 12),
+          SizedBox(height: context.scale(8)),
+          Text(
+            subject.description,
+            style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: context.font(14)),
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+          ),
+          SizedBox(height: context.scale(16)),
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              _buildInfoColumn(theme, "Subject Code", subject.code),
-              _buildInfoColumn(theme, "Credit", subject.credit, crossAxisAlignment: CrossAxisAlignment.center),
-              _buildInfoColumn(theme, "Type", subject.type, crossAxisAlignment: CrossAxisAlignment.end),
+              _buildInfoColumn(context, "Subject Code", subject.code),
+              _buildInfoColumn(context, "Credit", subject.credit, crossAxisAlignment: CrossAxisAlignment.center),
+              _buildInfoColumn(context, "Type", subject.type, crossAxisAlignment: CrossAxisAlignment.end),
             ],
           ),
-          const SizedBox(height: 12),
-          Divider(color: theme.dividerColor, thickness: 1),
-          const SizedBox(height: 8),
+          SizedBox(height: context.scale(16)),
+          Divider(color: theme.colorScheme.outlineVariant, height: 1),
+          SizedBox(height: context.scale(16)),
           Row(
             children: [
               Expanded(
@@ -256,21 +291,27 @@ class SubjectCard extends StatelessWidget {
                   style: ElevatedButton.styleFrom(
                     backgroundColor: theme.colorScheme.primaryContainer,
                     foregroundColor: theme.colorScheme.onPrimaryContainer,
+                    elevation: 0,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(context.scale(10))),
+                    padding: EdgeInsets.symmetric(vertical: context.scale(12)),
                   ),
-                  icon: const Icon(Icons.edit, size: 16),
-                  label: const Text("Edit"),
+                  icon: Icon(Icons.edit_outlined, size: context.scale(16)),
+                  label: Text("Edit", style: TextStyle(fontSize: context.font(14), fontWeight: FontWeight.bold)),
                 ),
               ),
-              const SizedBox(width: 16),
+              SizedBox(width: context.scale(16)),
               Expanded(
                 child: ElevatedButton.icon(
                   onPressed: () => showDeleteDialog(context, subject.name, onDelete),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: theme.colorScheme.errorContainer,
                     foregroundColor: theme.colorScheme.onErrorContainer,
+                    elevation: 0,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(context.scale(10))),
+                    padding: EdgeInsets.symmetric(vertical: context.scale(12)),
                   ),
-                  icon: const Icon(Icons.delete, size: 16),
-                  label: const Text("Delete"),
+                  icon: Icon(Icons.delete_outline, size: context.scale(16)),
+                  label: Text("Delete", style: TextStyle(fontSize: context.font(14), fontWeight: FontWeight.bold)),
                 ),
               ),
             ],
@@ -280,13 +321,20 @@ class SubjectCard extends StatelessWidget {
     );
   }
 
-  Widget _buildInfoColumn(ThemeData theme, String label, String value, {CrossAxisAlignment? crossAxisAlignment}) {
+  Widget _buildInfoColumn(BuildContext context, String label, String value, {CrossAxisAlignment? crossAxisAlignment}) {
+    final theme = context.theme;
     return Column(
       crossAxisAlignment: crossAxisAlignment ?? CrossAxisAlignment.start,
       children: [
-        Text(label, style: theme.textTheme.bodySmall?.copyWith(color: theme.hintColor)),
-        const SizedBox(height: 2),
-        Text(value, style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.bold)),
+        Text(
+          label,
+          style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: context.font(10), fontWeight: FontWeight.bold, letterSpacing: 0.5),
+        ),
+        SizedBox(height: context.scale(2)),
+        Text(
+          value,
+          style: TextStyle(color: theme.colorScheme.onSurface, fontSize: context.font(13), fontWeight: FontWeight.w600),
+        ),
       ],
     );
   }
@@ -297,7 +345,7 @@ void showDeleteDialog(BuildContext context, String subjectName, VoidCallback onC
     context: context,
     barrierDismissible: true,
     barrierLabel: "Delete",
-    barrierColor: Theme.of(context).colorScheme.scrim,
+    barrierColor: Colors.black54,
     transitionDuration: const Duration(milliseconds: 200),
     pageBuilder: (_, __, ___) {
       return DeleteSubjectDialog(
@@ -320,63 +368,68 @@ class DeleteSubjectDialog extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
+    final theme = context.theme;
     return Scaffold(
       backgroundColor: Colors.transparent,
       body: BackdropFilter(
         filter: ImageFilter.blur(sigmaX: 6, sigmaY: 6),
         child: Center(
           child: Container(
-            margin: const EdgeInsets.symmetric(horizontal: 24),
-            padding: const EdgeInsets.all(20),
+            margin: EdgeInsets.symmetric(horizontal: context.scale(24)),
+            padding: EdgeInsets.all(context.scale(20)),
             decoration: BoxDecoration(
-              color: theme.cardColor,
-              borderRadius: BorderRadius.circular(20),
+              color: theme.colorScheme.surface,
+              borderRadius: BorderRadius.circular(context.scale(20)),
+              border: Border.all(color: theme.colorScheme.outlineVariant),
             ),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Text("Delete Subject", style: theme.textTheme.headlineSmall),
-                const SizedBox(height: 12),
+                Text(
+                  "Delete Subject",
+                  style: TextStyle(color: theme.colorScheme.onSurface, fontWeight: FontWeight.bold, fontSize: context.font(20)),
+                ),
+                SizedBox(height: context.scale(12)),
                 Text(
                   "Are you sure you want to delete the subject: '$subjectName'? This action cannot be undone.",
                   textAlign: TextAlign.center,
-                  style: theme.textTheme.bodyMedium?.copyWith(color: theme.hintColor),
+                  style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: context.font(14)),
                 ),
-                const SizedBox(height: 24),
+                SizedBox(height: context.scale(24)),
                 SizedBox(
                   width: double.infinity,
                   child: ElevatedButton(
                     style: ElevatedButton.styleFrom(
                       backgroundColor: theme.colorScheme.error,
                       foregroundColor: theme.colorScheme.onError,
-                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      padding: EdgeInsets.symmetric(vertical: context.scale(14)),
+                      elevation: 0,
                       shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
+                        borderRadius: BorderRadius.circular(context.scale(12)),
                       ),
                     ),
                     onPressed: () {
                       Navigator.pop(context);
                       onConfirm();
                     },
-                    child: const Text("Yes, Delete"),
+                    child: Text("Yes, Delete", style: TextStyle(fontSize: context.font(16), fontWeight: FontWeight.bold)),
                   ),
                 ),
-                const SizedBox(height: 12),
+                SizedBox(height: context.scale(12)),
                 SizedBox(
                   width: double.infinity,
                   child: OutlinedButton(
                     style: OutlinedButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(vertical: 14),
-                      side: BorderSide(color: theme.dividerColor),
+                      padding: EdgeInsets.symmetric(vertical: context.scale(14)),
+                      side: BorderSide(color: theme.colorScheme.outlineVariant),
                       shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
+                        borderRadius: BorderRadius.circular(context.scale(12)),
                       ),
                     ),
                     onPressed: () {
                       Navigator.pop(context);
                     },
-                    child: const Text("Cancel"),
+                    child: Text("Cancel", style: TextStyle(color: theme.colorScheme.onSurface, fontSize: context.font(16), fontWeight: FontWeight.w600)),
                   ),
                 ),
               ],

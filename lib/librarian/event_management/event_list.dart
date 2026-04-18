@@ -58,7 +58,8 @@ class _ExploreEventsPageState extends State<ExploreEventsPage> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
+    final theme = context.theme;
+    final colorScheme = theme.colorScheme;
 
     return Scaffold(
       appBar: AppBar(
@@ -71,13 +72,19 @@ class _ExploreEventsPageState extends State<ExploreEventsPage> {
           padding: context.pagePadding,
           child: Center(
             child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 1000),
+              constraints: const BoxConstraints(maxWidth: 1200),
               child: Column(
                 children: [
                   /// FILTER SECTION
                   Card(
+                    elevation: 0,
+                    color: colorScheme.surfaceContainerLow,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(context.md),
+                      side: BorderSide(color: colorScheme.outlineVariant, width: 0.5),
+                    ),
                     child: Padding(
-                      padding: const EdgeInsets.all(16),
+                      padding: EdgeInsets.all(context.md),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
@@ -89,16 +96,20 @@ class _ExploreEventsPageState extends State<ExploreEventsPage> {
                               setState(() => selectedType = val!);
                             }),
                           ]),
-                          const SizedBox(height: 12),
+                          SizedBox(height: context.sm),
                           Row(
                             children: [
                               Expanded(
-                                child: ElevatedButton(
+                                child: FilledButton(
                                   onPressed: _fetchEvents,
-                                  child: const Text("APPLY FILTERS"),
+                                  style: FilledButton.styleFrom(
+                                    padding: EdgeInsets.symmetric(vertical: context.md),
+                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(context.sm)),
+                                  ),
+                                  child: Text("APPLY FILTERS", style: TextStyle(fontSize: context.font(14), fontWeight: FontWeight.bold)),
                                 ),
                               ),
-                              const SizedBox(width: 12),
+                              SizedBox(width: context.md),
                               Expanded(
                                 child: OutlinedButton(
                                   onPressed: () {
@@ -108,7 +119,11 @@ class _ExploreEventsPageState extends State<ExploreEventsPage> {
                                     });
                                     _fetchEvents();
                                   },
-                                  child: const Text("RESET"),
+                                  style: OutlinedButton.styleFrom(
+                                    padding: EdgeInsets.symmetric(vertical: context.md),
+                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(context.sm)),
+                                  ),
+                                  child: Text("RESET", style: TextStyle(fontSize: context.font(14), fontWeight: FontWeight.bold)),
                                 ),
                               ),
                             ],
@@ -118,49 +133,56 @@ class _ExploreEventsPageState extends State<ExploreEventsPage> {
                     ),
                   ),
 
-                  const SizedBox(height: 24),
+                  SizedBox(height: context.md),
 
                   /// ALL EVENTS LIST SECTION
                   Card(
+                    elevation: 0,
+                    color: colorScheme.surfaceContainerLow,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(context.md),
+                      side: BorderSide(color: colorScheme.outlineVariant, width: 0.5),
+                    ),
+                    clipBehavior: Clip.antiAlias,
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Padding(
-                          padding: const EdgeInsets.all(16),
+                          padding: EdgeInsets.all(context.md),
                           child: Row(
                             children: [
-                              Text("Event List", style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
+                              Text("Event List", style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold, fontSize: context.font(16))),
                               const Spacer(),
-                              _exportIcon(Icons.description, Colors.teal),
-                              _exportIcon(Icons.table_chart, Colors.green),
+                              _exportIcon(context, Icons.description, Colors.teal),
+                              _exportIcon(context, Icons.table_chart, Colors.green),
                             ],
                           ),
                         ),
                         const Divider(height: 1),
                         
                         if (_isLoading)
-                          const Center(child: Padding(
-                            padding: EdgeInsets.symmetric(vertical: 40),
-                            child: CircularProgressIndicator(),
+                          Center(child: Padding(
+                            padding: EdgeInsets.symmetric(vertical: context.xl),
+                            child: const CircularProgressIndicator(),
                           ))
                         else if (_events.isEmpty)
-                          const Center(child: Padding(
-                            padding: EdgeInsets.symmetric(vertical: 40),
-                            child: Text("No events found."),
+                          Center(child: Padding(
+                            padding: EdgeInsets.symmetric(vertical: context.xl),
+                            child: Text("No events found.", style: TextStyle(fontSize: context.font(14))),
                           ))
                         else
                           SingleChildScrollView(
                             scrollDirection: Axis.horizontal,
                             child: DataTable(
-                              headingRowColor: WidgetStateProperty.all(theme.colorScheme.primary.withValues(alpha: 0.05)),
-                              columnSpacing: 25,
-                              columns: const [
-                                DataColumn(label: Text("#", style: TextStyle(fontWeight: FontWeight.bold))),
-                                DataColumn(label: Text("Image", style: TextStyle(fontWeight: FontWeight.bold))),
-                                DataColumn(label: Text("Event Details", style: TextStyle(fontWeight: FontWeight.bold))),
-                                DataColumn(label: Text("Date & Time", style: TextStyle(fontWeight: FontWeight.bold))),
-                                DataColumn(label: Text("Ticket info", style: TextStyle(fontWeight: FontWeight.bold))),
-                                DataColumn(label: Text("Action", style: TextStyle(fontWeight: FontWeight.bold))),
+                              headingRowColor: WidgetStateProperty.all(colorScheme.surfaceContainer),
+                              columnSpacing: context.md,
+                              columns: [
+                                DataColumn(label: Text("#", style: TextStyle(fontWeight: FontWeight.bold, fontSize: context.font(12)))),
+                                DataColumn(label: Text("Image", style: TextStyle(fontWeight: FontWeight.bold, fontSize: context.font(12)))),
+                                DataColumn(label: Text("Event Details", style: TextStyle(fontWeight: FontWeight.bold, fontSize: context.font(12)))),
+                                DataColumn(label: Text("Date & Time", style: TextStyle(fontWeight: FontWeight.bold, fontSize: context.font(12)))),
+                                DataColumn(label: Text("Ticket info", style: TextStyle(fontWeight: FontWeight.bold, fontSize: context.font(12)))),
+                                DataColumn(label: Text("Action", style: TextStyle(fontWeight: FontWeight.bold, fontSize: context.font(12)))),
                               ],
                               rows: _events.asMap().entries.map((entry) {
                                 int index = entry.key + 1;
@@ -169,7 +191,7 @@ class _ExploreEventsPageState extends State<ExploreEventsPage> {
                               }).toList(),
                             ),
                           ),
-                        const SizedBox(height: 16),
+                        SizedBox(height: context.md),
                       ],
                     ),
                   ),
@@ -183,26 +205,43 @@ class _ExploreEventsPageState extends State<ExploreEventsPage> {
   }
 
   Widget _buildResponsiveRow(BuildContext context, List<Widget> children) {
-    if (!context.isTablet) return Column(children: children);
+    if (!context.isTablet && !context.isDesktop) {
+      return Column(children: children.map((c) => Padding(padding: EdgeInsets.only(bottom: context.sm), child: c)).toList());
+    }
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
-      children: children.map((c) => Expanded(child: Padding(padding: const EdgeInsets.only(right: 12), child: c))).toList(),
+      children: children.map((c) => Expanded(child: Padding(padding: EdgeInsets.only(right: context.sm), child: c))).toList(),
     );
   }
 
   Widget _buildDropdownField(BuildContext context, String label, String value, List<String> items, Function(String?) onChanged) {
-    final theme = Theme.of(context);
+    final theme = context.theme;
+    final colorScheme = theme.colorScheme;
     return Padding(
-      padding: const EdgeInsets.only(bottom: 12),
+      padding: EdgeInsets.only(bottom: context.sm),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(label, style: theme.textTheme.labelMedium?.copyWith(color: theme.hintColor)),
-          const SizedBox(height: 8),
+          Text(label, style: theme.textTheme.labelMedium?.copyWith(color: colorScheme.onSurfaceVariant, fontSize: context.font(12), fontWeight: FontWeight.bold)),
+          SizedBox(height: context.xs),
           DropdownButtonFormField<String>(
             value: value,
             isExpanded: true,
-            items: items.map((e) => DropdownMenuItem(value: e, child: Text(e, style: const TextStyle(fontSize: 14)))).toList(),
+            style: TextStyle(fontSize: context.font(14), color: colorScheme.onSurface),
+            decoration: InputDecoration(
+              filled: true,
+              fillColor: colorScheme.surface,
+              contentPadding: EdgeInsets.symmetric(horizontal: context.sm, vertical: context.xs),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(context.sm),
+                borderSide: BorderSide(color: colorScheme.outlineVariant),
+              ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(context.sm),
+                borderSide: BorderSide(color: colorScheme.outlineVariant),
+              ),
+            ),
+            items: items.map((e) => DropdownMenuItem(value: e, child: Text(e, style: TextStyle(fontSize: context.font(14))))).toList(),
             onChanged: onChanged,
           ),
         ],
@@ -210,21 +249,22 @@ class _ExploreEventsPageState extends State<ExploreEventsPage> {
     );
   }
 
-  Widget _exportIcon(IconData icon, Color color) {
+  Widget _exportIcon(BuildContext context, IconData icon, Color color) {
     return Container(
-      margin: const EdgeInsets.only(left: 8),
-      padding: const EdgeInsets.all(8),
+      margin: EdgeInsets.only(left: context.xs),
+      padding: EdgeInsets.all(context.xs),
       decoration: BoxDecoration(
         color: color.withValues(alpha: 0.1),
-        borderRadius: BorderRadius.circular(8),
+        borderRadius: BorderRadius.circular(context.xs),
         border: Border.all(color: color.withValues(alpha: 0.2)),
       ),
-      child: Icon(icon, color: color, size: 16),
+      child: Icon(icon, color: color, size: context.scale(16)),
     );
   }
 
   DataRow _buildDataRow(BuildContext context, String hash, model.Event event) {
-    final theme = Theme.of(context);
+    final theme = context.theme;
+    final colorScheme = theme.colorScheme;
     bool isExpired = false;
     if (event.eventDate != null) {
       try {
@@ -234,56 +274,56 @@ class _ExploreEventsPageState extends State<ExploreEventsPage> {
     }
 
     return DataRow(cells: [
-      DataCell(Text(hash)),
+      DataCell(Text(hash, style: TextStyle(fontSize: context.font(12)))),
       DataCell(
         ClipRRect(
-          borderRadius: BorderRadius.circular(4),
+          borderRadius: BorderRadius.circular(context.scale(4)),
           child: event.image != null
               ? Image.network(
                   "${ApiService.baseImageUrl}/storage/${event.image}",
-                  width: 40, height: 40, fit: BoxFit.cover,
-                  errorBuilder: (_, __, ___) => const Icon(Icons.image, size: 20),
+                  width: context.scale(40), height: context.scale(40), fit: BoxFit.cover,
+                  errorBuilder: (_, __, ___) => Icon(Icons.image, size: context.scale(20)),
                 )
-              : const Icon(Icons.image, size: 20),
+              : Icon(Icons.image, size: context.scale(20)),
         ),
       ),
       DataCell(SizedBox(
-        width: 150,
+        width: context.scale(150),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Text(event.title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12), overflow: TextOverflow.ellipsis),
-            Text(event.venue ?? "N/A", style: theme.textTheme.bodySmall?.copyWith(fontSize: 10), overflow: TextOverflow.ellipsis),
+            Text(event.title, style: TextStyle(fontWeight: FontWeight.bold, fontSize: context.font(12)), overflow: TextOverflow.ellipsis),
+            Text(event.venue ?? "N/A", style: theme.textTheme.bodySmall?.copyWith(fontSize: context.font(10)), overflow: TextOverflow.ellipsis),
           ],
         ),
       )),
       DataCell(Text(
         "${event.eventDate ?? ''}\n${event.startTime ?? ''}",
-        style: const TextStyle(fontSize: 10),
+        style: TextStyle(fontSize: context.font(10)),
       )),
       DataCell(Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Text(event.isTicketed ? "₹${event.ticketPrice}" : "Free", style: const TextStyle(fontSize: 11)),
-          const SizedBox(height: 2),
+          Text(event.isTicketed ? "₹${event.ticketPrice}" : "Free", style: TextStyle(fontSize: context.font(11))),
+          SizedBox(height: context.scale(2)),
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+            padding: EdgeInsets.symmetric(horizontal: context.scale(6), vertical: context.scale(2)),
             decoration: BoxDecoration(
               color: (event.isTicketed ? Colors.orange : Colors.green).withValues(alpha: 0.1),
-              borderRadius: BorderRadius.circular(4),
+              borderRadius: BorderRadius.circular(context.scale(4)),
             ),
-            child: Text(event.isTicketed ? "Ticketed" : "Free", style: TextStyle(color: event.isTicketed ? Colors.orange : Colors.green, fontSize: 8, fontWeight: FontWeight.bold)),
+            child: Text(event.isTicketed ? "Ticketed" : "Free", style: TextStyle(color: event.isTicketed ? Colors.orange : Colors.green, fontSize: context.font(8), fontWeight: FontWeight.bold)),
           ),
         ],
       )),
       DataCell(
         isExpired
-            ? Text("Expired", style: theme.textTheme.labelSmall?.copyWith(color: theme.colorScheme.error))
+            ? Text("Expired", style: theme.textTheme.labelSmall?.copyWith(color: colorScheme.error, fontSize: context.font(10)))
             : TextButton(
                 onPressed: () => _registerEvent(event.id),
-                child: const Text("Register", style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+                child: Text("Register", style: TextStyle(fontSize: context.font(11), fontWeight: FontWeight.bold, color: colorScheme.primary)),
               ),
       ),
     ]);

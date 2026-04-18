@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'package:eduphin/services/api_service.dart';
+import 'package:eduphin/services/responsive_helper.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -139,83 +140,241 @@ class _AddNotePageState extends State<AddNotePage> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
+    final theme = context.theme;
     return Scaffold(
-      appBar: AppBar(title: const Text("Add New Note")),
+      appBar: AppBar(
+        title: Text("Add New Note", style: TextStyle(fontSize: context.font(20))),
+        centerTitle: false,
+      ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
-          : Form(
-              key: _formKey,
-              child: ListView(
-                padding: const EdgeInsets.all(16.0),
-                children: [
-                  TextFormField(
-                    controller: _titleController,
-                    decoration: const InputDecoration(labelText: 'Title'),
-                    validator: (value) => value == null || value.isEmpty ? 'Please enter a title' : null,
+          : Center(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 1200),
+                child: Form(
+                  key: _formKey,
+                  child: ListView(
+                    padding: context.pagePadding,
+                    children: [
+                      _buildFormSection(
+                        title: 'Note Information',
+                        children: [
+                          TextFormField(
+                            controller: _titleController,
+                            decoration: InputDecoration(
+                              labelText: 'Title',
+                              hintText: 'Enter note title',
+                              prefixIcon: const Icon(Icons.title),
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(context.sm),
+                              ),
+                            ),
+                            validator: (value) => value == null || value.isEmpty ? 'Please enter a title' : null,
+                          ),
+                          SizedBox(height: context.md),
+                          LayoutBuilder(builder: (context, constraints) {
+                            if (constraints.maxWidth > 600) {
+                              return Row(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Expanded(child: _buildClassDropdown()),
+                                  SizedBox(width: context.md),
+                                  Expanded(child: _buildSectionDropdown()),
+                                ],
+                              );
+                            }
+                            return Column(
+                              children: [
+                                _buildClassDropdown(),
+                                SizedBox(height: context.md),
+                                _buildSectionDropdown(),
+                              ],
+                            );
+                          }),
+                          SizedBox(height: context.md),
+                          TextFormField(
+                            controller: _descriptionController,
+                            decoration: InputDecoration(
+                              labelText: 'Description',
+                              hintText: 'Enter note description',
+                              alignLabelWithHint: true,
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(context.sm),
+                              ),
+                            ),
+                            maxLines: 4,
+                            validator: (value) => value == null || value.isEmpty ? 'Please enter a description' : null,
+                          ),
+                        ],
+                      ),
+                      SizedBox(height: context.lg),
+                      _buildFormSection(
+                        title: 'Attachment',
+                        children: [
+                          InkWell(
+                            onTap: _pickFile,
+                            borderRadius: BorderRadius.circular(context.sm),
+                            child: Container(
+                              padding: EdgeInsets.all(context.md),
+                              decoration: BoxDecoration(
+                                color: theme.colorScheme.surfaceContainerLow,
+                                border: Border.all(color: theme.colorScheme.outlineVariant),
+                                borderRadius: BorderRadius.circular(context.sm),
+                              ),
+                              child: Row(
+                                children: [
+                                  Icon(Icons.attach_file, color: theme.colorScheme.primary),
+                                  SizedBox(width: context.md),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          _selectedFile?.name ?? 'Select File',
+                                          style: theme.textTheme.titleSmall,
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                        if (_selectedFile == null)
+                                          Text(
+                                            'PDF, JPG, PNG or DOC (Max 10MB)',
+                                            style: theme.textTheme.bodySmall?.copyWith(
+                                              color: theme.colorScheme.onSurfaceVariant,
+                                            ),
+                                          ),
+                                      ],
+                                    ),
+                                  ),
+                                  if (_selectedFile != null)
+                                    IconButton(
+                                      icon: const Icon(Icons.close),
+                                      onPressed: () => setState(() => _selectedFile = null),
+                                    )
+                                  else
+                                    Text(
+                                      'Browse',
+                                      style: TextStyle(
+                                        color: theme.colorScheme.primary,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      SizedBox(height: context.xl),
+                    ],
                   ),
-                  const SizedBox(height: 16),
-                  DropdownButtonFormField<int>(
-                    value: _selectedClassId,
-                    items: _classes.map<DropdownMenuItem<int>>((c) => DropdownMenuItem(value: c['id'], child: Text(c['name']))).toList(),
-                    onChanged: (value) {
-                      setState(() {
-                        _selectedClassId = value;
-                        _selectedSectionId = null;
-                        _sections = _classes.firstWhere((c) => c['id'] == value)['sections'] ?? [];
-                      });
-                    },
-                    decoration: const InputDecoration(labelText: 'Class'),
-                    validator: (value) => value == null ? 'Please select a class' : null,
-                  ),
-                  const SizedBox(height: 16),
-                  DropdownButtonFormField<int>(
-                    value: _selectedSectionId,
-                    items: _sections.map<DropdownMenuItem<int>>((s) => DropdownMenuItem(value: s['id'], child: Text(s['section_name']))).toList(),
-                    onChanged: (value) => setState(() => _selectedSectionId = value),
-                    decoration: const InputDecoration(labelText: 'Section'),
-                    validator: (value) => value == null ? 'Please select a section' : null,
-                  ),
-                  const SizedBox(height: 16),
-                  TextFormField(
-                    controller: _descriptionController,
-                    decoration: const InputDecoration(labelText: 'Description'),
-                    maxLines: 3,
-                    validator: (value) => value == null || value.isEmpty ? 'Please enter a description' : null,
-                  ),
-                  const SizedBox(height: 16),
-                  Container(
-                    padding: const EdgeInsets.symmetric(vertical: 8.0),
-                    decoration: BoxDecoration(
-                      border: Border.all(color: theme.dividerColor),
-                      borderRadius: BorderRadius.circular(4.0),
-                    ),
-                    child: Row(
-                      children: [
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Text(_selectedFile?.name ?? 'No file selected', overflow: TextOverflow.ellipsis),
-                        ),
-                        IconButton(
-                          icon: const Icon(Icons.attach_file),
-                          onPressed: _pickFile,
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
+                ),
               ),
             ),
-      floatingActionButton: ElevatedButton(
-        onPressed: _isSaving ? null : _saveNote,
-        style: ElevatedButton.styleFrom(
-          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-          backgroundColor: theme.colorScheme.primary,
-          foregroundColor: theme.colorScheme.onPrimary,
+      bottomNavigationBar: _buildBottomActions(),
+    );
+  }
+
+  Widget _buildFormSection({required String title, required List<Widget> children}) {
+    final theme = context.theme;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: EdgeInsets.only(bottom: context.sm),
+          child: Text(
+            title,
+            style: theme.textTheme.titleMedium?.copyWith(
+              fontWeight: FontWeight.bold,
+              color: theme.colorScheme.primary,
+            ),
+          ),
         ),
-        child: _isSaving 
-            ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2))
-            : const Text('Save Note'),
+        ...children,
+      ],
+    );
+  }
+
+  Widget _buildClassDropdown() {
+    return DropdownButtonFormField<int>(
+      value: _selectedClassId,
+      items: _classes.map<DropdownMenuItem<int>>((c) => DropdownMenuItem(value: c['id'], child: Text(c['name']))).toList(),
+      onChanged: (value) {
+        setState(() {
+          _selectedClassId = value;
+          _selectedSectionId = null;
+          _sections = _classes.firstWhere((c) => c['id'] == value)['sections'] ?? [];
+        });
+      },
+      decoration: InputDecoration(
+        labelText: 'Class',
+        prefixIcon: const Icon(Icons.class_),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(context.sm),
+        ),
+      ),
+      validator: (value) => value == null ? 'Please select a class' : null,
+    );
+  }
+
+  Widget _buildSectionDropdown() {
+    return DropdownButtonFormField<int>(
+      value: _selectedSectionId,
+      items: _sections.map<DropdownMenuItem<int>>((s) => DropdownMenuItem(value: s['id'], child: Text(s['section_name']))).toList(),
+      onChanged: (value) => setState(() => _selectedSectionId = value),
+      decoration: InputDecoration(
+        labelText: 'Section',
+        prefixIcon: const Icon(Icons.group),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(context.sm),
+        ),
+      ),
+      validator: (value) => value == null ? 'Please select a section' : null,
+    );
+  }
+
+  Widget _buildBottomActions() {
+    final theme = context.theme;
+    return Container(
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surface,
+        border: Border(top: BorderSide(color: theme.colorScheme.outlineVariant)),
+      ),
+      child: SafeArea(
+        child: Padding(
+          padding: EdgeInsets.all(context.md),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.end,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                style: TextButton.styleFrom(
+                  padding: EdgeInsets.symmetric(horizontal: context.lg, vertical: context.md),
+                ),
+                child: const Text('Cancel'),
+              ),
+              SizedBox(width: context.md),
+              ElevatedButton(
+                onPressed: _isSaving ? null : _saveNote,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: theme.colorScheme.primary,
+                  foregroundColor: theme.colorScheme.onPrimary,
+                  padding: EdgeInsets.symmetric(horizontal: context.xl, vertical: context.md),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(context.sm)),
+                ),
+                child: _isSaving
+                    ? SizedBox(
+                        height: 20,
+                        width: 20,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          valueColor: AlwaysStoppedAnimation(theme.colorScheme.onPrimary),
+                        ),
+                      )
+                    : const Text('Save Note'),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }

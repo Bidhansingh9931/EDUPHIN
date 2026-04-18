@@ -66,8 +66,13 @@ class _RemarksPageState extends State<RemarksPage> {
     });
 
     try {
-      final response =
-          await ApiService.get('manager/students/${widget.studentId}/remarks');
+      final roleId = await ApiService.getRoleId();
+      // Use teacher endpoint if role is Teacher (5), otherwise fallback to manager endpoint
+      final endpoint = roleId == 5 
+          ? 'teacher/students/${widget.studentId}/remarks'
+          : 'manager/students/${widget.studentId}/remarks';
+
+      final response = await ApiService.get(endpoint);
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
@@ -323,7 +328,12 @@ class _DeleteRemarkDialogState extends State<DeleteRemarkDialog> {
     setState(() => _isDeleting = true);
 
     try {
-      await ApiService.delete('manager/students/remarks/${widget.remark.id}');
+      final roleId = await ApiService.getRoleId();
+      final endpoint = roleId == 5 
+          ? 'teacher/students/remarks/${widget.remark.id}'
+          : 'manager/students/remarks/${widget.remark.id}';
+
+      await ApiService.delete(endpoint);
       if (mounted) {
         final theme = Theme.of(context);
         Navigator.of(context).pop();

@@ -9,9 +9,19 @@ import 'create_new_class.dart';
 class Class {
   final int id;
   final String name;
+  final String code;
+  final String description;
+  final String level;
   final List<SectionSummary> sections;
 
-  Class({required this.id, required this.name, required this.sections});
+  Class({
+    required this.id,
+    required this.name,
+    required this.code,
+    required this.description,
+    required this.level,
+    required this.sections,
+  });
 
   factory Class.fromJson(Map<String, dynamic> json) {
     var sectionsList = json['sections'] as List? ?? [];
@@ -20,6 +30,9 @@ class Class {
     return Class(
       id: json['id'] ?? 0,
       name: json['name'] ?? 'N/A',
+      code: json['code'] ?? '',
+      description: json['description'] ?? '',
+      level: json['level'] ?? '',
       sections: sections,
     );
   }
@@ -102,47 +115,59 @@ class _ClassListPageState extends State<ClassListPage> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
+    final theme = context.theme;
 
     return Scaffold(
+      backgroundColor: theme.colorScheme.surface,
       appBar: AppBar(
-        title: const Text("Manage Classes"),
+        title: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text("Manage Classes", style: theme.appBarTheme.titleTextStyle?.copyWith(fontSize: context.font(18))),
+            Text("Create and organize class sections", style: theme.textTheme.labelSmall?.copyWith(color: theme.hintColor, fontSize: context.font(11))),
+          ],
+        ),
+        centerTitle: false,
         actions: [
           IconButton(
-            icon: const Icon(Icons.add_circle_outline_rounded),
+            icon: Icon(Icons.add_circle_outline_rounded, color: theme.colorScheme.primary, size: context.scale(24)),
             onPressed: () async {
               final result = await Navigator.push(
                 context,
-                MaterialPageRoute(
-                    builder: (context) => const CreateNewClassPage()),
+                MaterialPageRoute(builder: (context) => const CreateNewClassPage()),
               );
               if (result == true) {
                 _fetchClasses();
               }
             },
           ),
-          const SizedBox(width: 8),
+          SizedBox(width: context.spacing),
         ],
       ),
       body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
+          ? Center(child: CircularProgressIndicator(color: theme.colorScheme.primary))
           : _classes.isEmpty
               ? _buildEmptyState(theme)
               : RefreshIndicator(
                   onRefresh: _fetchClasses,
-                  child: GridView.builder(
-                    padding: context.pagePadding,
-                    gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                      crossAxisCount: context.responsive(1, tablet: 2, desktop: 3),
-                      crossAxisSpacing: 16,
-                      mainAxisSpacing: 16,
-                      mainAxisExtent: 260, // Fixed height for cards
+                  color: theme.colorScheme.primary,
+                  child: Center(
+                    child: ConstrainedBox(
+                      constraints: const BoxConstraints(maxWidth: 1200),
+                      child: GridView.builder(
+                        padding: context.pagePadding,
+                        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                          crossAxisCount: context.responsive(1, tablet: 2, desktop: 3),
+                          crossAxisSpacing: context.spacing,
+                          mainAxisSpacing: context.spacing,
+                          mainAxisExtent: context.scale(300), // Fixed height for cards
+                        ),
+                        itemCount: _classes.length,
+                        itemBuilder: (context, index) {
+                          return _buildClassCard(context, _classes[index]);
+                        },
+                      ),
                     ),
-                    itemCount: _classes.length,
-                    itemBuilder: (context, index) {
-                      return _buildClassCard(context, _classes[index]);
-                    },
                   ),
                 ),
     );
@@ -153,34 +178,47 @@ class _ClassListPageState extends State<ClassListPage> {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(Icons.class_outlined, size: 64, color: theme.hintColor.withOpacity(0.5)),
-          const SizedBox(height: 16),
-          Text("No classes found", style: theme.textTheme.titleMedium),
-          const SizedBox(height: 8),
-          ElevatedButton(onPressed: _fetchClasses, child: const Text("Refresh")),
+          Icon(Icons.class_outlined, size: context.scale(64), color: theme.colorScheme.outlineVariant),
+          SizedBox(height: context.md),
+          Text("No classes found", style: theme.textTheme.bodyLarge?.copyWith(fontSize: context.font(16), color: theme.colorScheme.onSurfaceVariant)),
+          SizedBox(height: context.md),
+          ElevatedButton(
+            onPressed: _fetchClasses,
+            style: ElevatedButton.styleFrom(
+              backgroundColor: theme.colorScheme.primary,
+              foregroundColor: theme.colorScheme.onPrimary,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(context.scale(12))),
+            ),
+            child: const Text("Refresh"),
+          ),
         ],
       ),
     );
   }
 
   Widget _buildClassCard(BuildContext context, Class classItem) {
-    final theme = Theme.of(context);
+    final theme = context.theme;
     final colorScheme = theme.colorScheme;
 
     return Card(
+      elevation: 0,
+      color: theme.colorScheme.surfaceContainerLow,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(context.scale(16)),
+        side: BorderSide(color: theme.colorScheme.outlineVariant, width: 0.5),
+      ),
       child: InkWell(
         onTap: () {
           Navigator.push(
             context,
             MaterialPageRoute(
-              builder: (context) =>
-                  SectionsPage(classId: classItem.id, className: classItem.name),
+              builder: (context) => SectionsPage(classId: classItem.id, className: classItem.name),
             ),
           );
         },
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(context.scale(16)),
         child: Padding(
-          padding: const EdgeInsets.all(16.0),
+          padding: EdgeInsets.all(context.spacing),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -190,54 +228,54 @@ class _ClassListPageState extends State<ClassListPage> {
                   Expanded(
                     child: Text(
                       classItem.name,
-                      style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
+                      style: theme.textTheme.titleMedium?.copyWith(fontSize: context.font(18), fontWeight: FontWeight.bold, color: theme.colorScheme.onSurface),
                       overflow: TextOverflow.ellipsis,
                     ),
                   ),
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    padding: EdgeInsets.symmetric(horizontal: context.scale(8), vertical: context.scale(4)),
                     decoration: BoxDecoration(
-                      color: colorScheme.primary.withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(8),
+                      color: colorScheme.primary.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(context.scale(8)),
                     ),
                     child: Text(
-                      "${classItem.sections.length} Sections",
-                      style: TextStyle(color: colorScheme.primary, fontSize: 12, fontWeight: FontWeight.bold),
+                      "${classItem.sections.length} SECTIONS",
+                      style: theme.textTheme.labelSmall?.copyWith(color: colorScheme.primary, fontSize: context.font(10), fontWeight: FontWeight.bold),
                     ),
                   ),
                 ],
               ),
-              const SizedBox(height: 12),
-              const Divider(),
-              const SizedBox(height: 8),
+              SizedBox(height: context.spacing),
+              Divider(color: theme.colorScheme.outlineVariant, thickness: 0.5),
+              SizedBox(height: context.spacing / 2),
               Expanded(
                 child: classItem.sections.isEmpty
-                    ? Center(child: Text("No sections added", style: TextStyle(color: theme.hintColor, fontSize: 12)))
+                    ? Center(child: Text("No sections added", style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant, fontSize: context.font(12))))
                     : ListView.separated(
                         shrinkWrap: true,
                         physics: const NeverScrollableScrollPhysics(),
                         itemCount: classItem.sections.length > 2 ? 2 : classItem.sections.length,
-                        separatorBuilder: (context, index) => const SizedBox(height: 8),
+                        separatorBuilder: (context, index) => SizedBox(height: context.spacing / 2),
                         itemBuilder: (context, index) {
                           final section = classItem.sections[index];
                           return Row(
                             children: [
                               CircleAvatar(
-                                radius: 14,
-                                backgroundColor: colorScheme.secondary.withOpacity(0.1),
-                                child: Text(section.name[0], style: TextStyle(fontSize: 10, color: colorScheme.secondary)),
+                                radius: context.scale(14),
+                                backgroundColor: colorScheme.secondary.withValues(alpha: 0.1),
+                                child: Text(section.name.isNotEmpty ? section.name[0] : 'S', style: theme.textTheme.labelSmall?.copyWith(fontSize: context.font(10), color: colorScheme.secondary, fontWeight: FontWeight.bold)),
                               ),
-                              const SizedBox(width: 8),
+                              SizedBox(width: context.spacing / 2),
                               Expanded(
                                 child: Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
-                                    Text("Section ${section.name}", style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
-                                    Text(section.mentorName, style: TextStyle(color: theme.hintColor, fontSize: 11)),
+                                    Text("Section ${section.name}", style: theme.textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w600, fontSize: context.font(13), color: theme.colorScheme.onSurface)),
+                                    Text(section.mentorName, style: theme.textTheme.labelSmall?.copyWith(color: theme.colorScheme.onSurfaceVariant, fontSize: context.font(11))),
                                   ],
                                 ),
                               ),
-                              Text("${section.sectionLimit} Max", style: TextStyle(fontSize: 11, color: theme.hintColor)),
+                              Text("${section.sectionLimit} Max", style: theme.textTheme.labelSmall?.copyWith(fontSize: context.font(11), color: theme.colorScheme.onSurfaceVariant, fontWeight: FontWeight.w500)),
                             ],
                           );
                         },
@@ -245,10 +283,10 @@ class _ClassListPageState extends State<ClassListPage> {
               ),
               if (classItem.sections.length > 2)
                 Padding(
-                  padding: const EdgeInsets.only(top: 4),
-                  child: Text("+${classItem.sections.length - 2} more sections...", style: TextStyle(fontSize: 11, color: colorScheme.primary)),
+                  padding: EdgeInsets.only(top: context.scale(4)),
+                  child: Text("+${classItem.sections.length - 2} more sections...", style: theme.textTheme.labelSmall?.copyWith(fontSize: context.font(11), color: colorScheme.primary, fontWeight: FontWeight.bold)),
                 ),
-              const SizedBox(height: 12),
+              SizedBox(height: context.spacing),
               Row(
                 children: [
                   Expanded(
@@ -264,20 +302,34 @@ class _ClassListPageState extends State<ClassListPage> {
                           _fetchClasses();
                         }
                       },
-                      icon: const Icon(Icons.add, size: 16),
-                      label: const Text("Section", style: TextStyle(fontSize: 12)),
+                      icon: Icon(Icons.add, size: context.scale(16)),
+                      label: Text("SECTION", style: theme.textTheme.labelLarge?.copyWith(fontSize: context.font(12), fontWeight: FontWeight.bold, color: theme.colorScheme.primary)),
                       style: OutlinedButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(vertical: 8),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                        padding: EdgeInsets.symmetric(vertical: context.scale(8)),
+                        side: BorderSide(color: theme.colorScheme.primary),
+                        foregroundColor: theme.colorScheme.primary,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(context.scale(12))),
                       ),
                     ),
                   ),
-                  const SizedBox(width: 8),
+                  SizedBox(width: context.spacing / 2),
                   IconButton.filledTonal(
-                    onPressed: () {}, // Edit class logic
-                    icon: const Icon(Icons.edit_rounded, size: 18),
+                    onPressed: () async {
+                      final result = await Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => CreateNewClassPage(classToEdit: classItem),
+                        ),
+                      );
+                      if (result == true) {
+                        _fetchClasses();
+                      }
+                    }, // Edit class logic
+                    icon: Icon(Icons.edit_rounded, size: context.scale(18)),
                     style: IconButton.styleFrom(
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                      backgroundColor: theme.colorScheme.secondaryContainer,
+                      foregroundColor: theme.colorScheme.onSecondaryContainer,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(context.scale(12))),
                     ),
                   ),
                 ],

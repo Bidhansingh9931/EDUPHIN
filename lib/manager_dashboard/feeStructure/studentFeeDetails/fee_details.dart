@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import 'package:eduphin/manager_dashboard/feeStructure/studentFeeDetails/edit_fine.dart';
 import 'package:eduphin/services/api_service.dart';
+import 'package:eduphin/services/responsive_helper.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
@@ -175,42 +176,77 @@ class _FeeDetailsPageState extends State<FeeDetailsPage> {
       final data = jsonDecode(response.body);
       return StudentFeeDetails.fromJson(data);
     } else {
-      throw Exception('Failed to load fee details');
+      throw Exception(ApiService.errorMessage(response, 'Failed to load fee details'));
     }
   }
 
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
+    final theme = context.theme;
 
     return Scaffold(
-      backgroundColor: theme.scaffoldBackgroundColor,
+      backgroundColor: theme.colorScheme.surface,
       appBar: AppBar(
-        title: const Text("Student Fee Details"),
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        leading: IconButton(
+          icon: Icon(Icons.arrow_back, color: theme.colorScheme.onSurface),
+          onPressed: () => Navigator.pop(context),
+        ),
+        title: Text(
+          "Student Fee Details",
+          style: TextStyle(
+            fontWeight: FontWeight.bold,
+            color: theme.colorScheme.onSurface,
+            fontSize: context.font(20),
+          ),
+        ),
         centerTitle: true,
       ),
       body: FutureBuilder<StudentFeeDetails>(
         future: _feeDetailsFuture,
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
+            return Center(child: CircularProgressIndicator(color: theme.colorScheme.primary));
           } else if (snapshot.hasError) {
-            return Center(child: Text("Error: ${snapshot.error}"));
+            String errorMsg = snapshot.error.toString().replaceFirst('Exception: ', '');
+            return Center(child: Padding(
+              padding: context.pagePadding,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(errorMsg, 
+                    textAlign: TextAlign.center,
+                    style: TextStyle(color: theme.colorScheme.error, fontSize: context.font(14))),
+                  SizedBox(height: context.md),
+                  FilledButton.icon(
+                    onPressed: () => setState(() {
+                      _feeDetailsFuture = _fetchFeeDetails();
+                    }),
+                    icon: const Icon(Icons.refresh),
+                    label: const Text("Retry"),
+                  )
+                ],
+              ),
+            ));
           } else if (snapshot.hasData) {
             final data = snapshot.data!;
-            return LayoutBuilder(builder: (context, constraints) {
-              return SingleChildScrollView(
-                child: Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 16, 16, 50),
-                  child: constraints.maxWidth > 800
-                      ? _buildWideLayout(data)
-                      : _buildNarrowLayout(data),
+            return Center(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 1200),
+                child: SingleChildScrollView(
+                  padding: context.pagePadding,
+                  child: context.responsive(
+                    _buildNarrowLayout(data),
+                    tablet: _buildWideLayout(data),
+                    desktop: _buildWideLayout(data),
+                  ),
                 ),
-              );
-            });
+              ),
+            );
           } else {
-            return const Center(child: Text("No fee details available."));
+            return Center(child: Text("No fee details available.", style: TextStyle(fontSize: context.font(16), color: theme.colorScheme.onSurfaceVariant)));
           }
         },
       ),
@@ -221,14 +257,15 @@ class _FeeDetailsPageState extends State<FeeDetailsPage> {
     return Column(
       children: [
         CustomStudentInfoFeeDetailContainerBox(studentInfo: data.studentInfo),
-        const SizedBox(height: 16),
+        SizedBox(height: context.spacing),
         CustomFinancialSummaryFeeDetailContainerBox(summary: data.financialSummary),
-        const SizedBox(height: 16),
+        SizedBox(height: context.spacing),
         CustomFeeDetailsContainerBox(feeDetails: data.feeDetails),
-        const SizedBox(height: 16),
+        SizedBox(height: context.spacing),
         CustomFineDetailsContainerBox(studentId: widget.studentId, fineDetails: data.fineDetails),
-        const SizedBox(height: 16),
+        SizedBox(height: context.spacing),
         CustomPaymentHistoryContainerBox(paymentHistory: data.paymentHistory),
+        SizedBox(height: context.scale(50)),
       ],
     );
   }
@@ -242,21 +279,23 @@ class _FeeDetailsPageState extends State<FeeDetailsPage> {
           child: Column(
             children: [
               CustomStudentInfoFeeDetailContainerBox(studentInfo: data.studentInfo),
-              const SizedBox(height: 16),
+              SizedBox(height: context.spacing),
               CustomFeeDetailsContainerBox(feeDetails: data.feeDetails),
+              SizedBox(height: context.scale(50)),
             ],
           ),
         ),
-        const SizedBox(width: 16),
+        SizedBox(width: context.spacing),
         Expanded(
           flex: 1,
           child: Column(
             children: [
               CustomFinancialSummaryFeeDetailContainerBox(summary: data.financialSummary),
-              const SizedBox(height: 16),
+              SizedBox(height: context.spacing),
               CustomFineDetailsContainerBox(studentId: widget.studentId, fineDetails: data.fineDetails),
-              const SizedBox(height: 16),
+              SizedBox(height: context.spacing),
               CustomPaymentHistoryContainerBox(paymentHistory: data.paymentHistory),
+              SizedBox(height: context.scale(50)),
             ],
           ),
         ),
@@ -276,31 +315,36 @@ class CustomStudentInfoFeeDetailContainerBox extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
+    final theme = context.theme;
 
     return Card(
-      elevation: 2,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+      elevation: 0,
+      color: theme.colorScheme.surfaceContainerLow,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(context.scale(16)),
+        side: BorderSide(color: theme.colorScheme.outlineVariant),
+      ),
       child: Padding(
-        padding: const EdgeInsets.all(16),
+        padding: EdgeInsets.all(context.scale(16)),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text("Student Info", style: theme.textTheme.titleLarge),
-            const SizedBox(height: 8),
-            _buildInfoRow(theme, "Name", studentInfo.name, "Roll No.", studentInfo.roll),
-            const SizedBox(height: 8),
-            _buildInfoRow(theme, "Class", studentInfo.classes, "Email", studentInfo.email, isEmail: true),
-            const SizedBox(height: 8),
-            Text("Fee Frequency", style: theme.textTheme.titleSmall?.copyWith(color: theme.colorScheme.onSurface.withOpacity(0.6))),
-            Text(studentInfo.feeFrequency, style: theme.textTheme.bodyLarge),
+            Text("Student Info", style: TextStyle(fontSize: context.font(18), fontWeight: FontWeight.bold, color: theme.colorScheme.primary)),
+            SizedBox(height: context.scale(12)),
+            _buildInfoRow(context, "Name", studentInfo.name, "Roll No.", studentInfo.roll),
+            SizedBox(height: context.scale(12)),
+            _buildInfoRow(context, "Class", studentInfo.classes, "Email", studentInfo.email, isEmail: true),
+            SizedBox(height: context.scale(12)),
+            Text("Fee Frequency", style: TextStyle(fontSize: context.font(12), color: theme.colorScheme.onSurfaceVariant, fontWeight: FontWeight.w500)),
+            Text(studentInfo.feeFrequency, style: TextStyle(fontSize: context.font(14), fontWeight: FontWeight.bold, color: theme.colorScheme.onSurface)),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildInfoRow(ThemeData theme, String label1, String value1, String label2, String value2, {bool isEmail = false}) {
+  Widget _buildInfoRow(BuildContext context, String label1, String value1, String label2, String value2, {bool isEmail = false}) {
+    final theme = context.theme;
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -308,18 +352,18 @@ class CustomStudentInfoFeeDetailContainerBox extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(label1, style: theme.textTheme.titleSmall?.copyWith(color: theme.colorScheme.onSurface.withOpacity(0.6))),
-              Text(value1, style: theme.textTheme.bodyLarge),
+              Text(label1, style: TextStyle(fontSize: context.font(12), color: theme.colorScheme.onSurfaceVariant, fontWeight: FontWeight.w500)),
+              Text(value1, style: TextStyle(fontSize: context.font(14), fontWeight: FontWeight.bold, color: theme.colorScheme.onSurface)),
             ],
           ),
         ),
-        const SizedBox(width: 16),
+        SizedBox(width: context.scale(16)),
         Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(label2, style: theme.textTheme.titleSmall?.copyWith(color: theme.colorScheme.onSurface.withOpacity(0.6))),
-              Text(value2, style: theme.textTheme.bodyLarge, overflow: isEmail ? TextOverflow.ellipsis : null),
+              Text(label2, style: TextStyle(fontSize: context.font(12), color: theme.colorScheme.onSurfaceVariant, fontWeight: FontWeight.w500)),
+              Text(value2, style: TextStyle(fontSize: context.font(14), fontWeight: FontWeight.bold, color: theme.colorScheme.onSurface), overflow: isEmail ? TextOverflow.ellipsis : null),
             ],
           ),
         ),
@@ -335,39 +379,44 @@ class CustomFinancialSummaryFeeDetailContainerBox extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
+    final theme = context.theme;
 
     return Card(
-      elevation: 2,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+      elevation: 0,
+      color: theme.colorScheme.surfaceContainerLow,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(context.scale(16)),
+        side: BorderSide(color: theme.colorScheme.outlineVariant),
+      ),
       child: Padding(
-        padding: const EdgeInsets.all(16),
+        padding: EdgeInsets.all(context.scale(16)),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text("Financial Summary", style: theme.textTheme.titleLarge),
-            const SizedBox(height: 8),
-            _buildSummaryRow(theme, "Total Fee", summary.totalFee),
-            const SizedBox(height: 4),
-            _buildSummaryRow(theme, "Total Fine", summary.totalFine),
-            const Divider(),
-            _buildSummaryRow(theme, "Total Payable", summary.totalPayable, isBold: true, color: theme.colorScheme.secondary),
-            const Divider(),
-            _buildSummaryRow(theme, "Paid", summary.paid, color: theme.colorScheme.primary),
-            const SizedBox(height: 4),
-            _buildSummaryRow(theme, "Due", summary.due, color: theme.colorScheme.error),
+            Text("Financial Summary", style: TextStyle(fontSize: context.font(18), fontWeight: FontWeight.bold, color: theme.colorScheme.primary)),
+            SizedBox(height: context.scale(12)),
+            _buildSummaryRow(context, "Total Fee", summary.totalFee),
+            SizedBox(height: context.scale(4)),
+            _buildSummaryRow(context, "Total Fine", summary.totalFine),
+            Divider(color: theme.colorScheme.outlineVariant, height: context.scale(24)),
+            _buildSummaryRow(context, "Total Payable", summary.totalPayable, isBold: true, color: theme.colorScheme.secondary),
+            Divider(color: theme.colorScheme.outlineVariant, height: context.scale(24)),
+            _buildSummaryRow(context, "Paid", summary.paid, color: Colors.green, isBold: true),
+            SizedBox(height: context.scale(4)),
+            _buildSummaryRow(context, "Due", summary.due, color: theme.colorScheme.error, isBold: true),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildSummaryRow(ThemeData theme, String label, double amount, {Color? color, bool isBold = false}) {
+  Widget _buildSummaryRow(BuildContext context, String label, double amount, {Color? color, bool isBold = false}) {
+    final theme = context.theme;
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        Text(label, style: theme.textTheme.bodyLarge?.copyWith(color: color ?? theme.colorScheme.onSurface, fontWeight: isBold ? FontWeight.bold : FontWeight.normal)),
-        Text("₹${NumberFormat('#,##,##0.00').format(amount)}", style: theme.textTheme.bodyLarge?.copyWith(color: color ?? theme.colorScheme.onSurface, fontWeight: isBold ? FontWeight.bold : FontWeight.normal)),
+        Text(label, style: TextStyle(fontSize: context.font(14), color: color ?? theme.colorScheme.onSurface, fontWeight: isBold ? FontWeight.bold : FontWeight.normal)),
+        Text("₹${NumberFormat('#,##,##0.00').format(amount)}", style: TextStyle(fontSize: context.font(14), color: color ?? theme.colorScheme.onSurface, fontWeight: isBold ? FontWeight.bold : FontWeight.normal)),
       ],
     );
   }
@@ -380,29 +429,33 @@ class CustomFeeDetailsContainerBox extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
+    final theme = context.theme;
 
     return Card(
-      elevation: 2,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+      elevation: 0,
+      color: theme.colorScheme.surfaceContainerLow,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(context.scale(16)),
+        side: BorderSide(color: theme.colorScheme.outlineVariant),
+      ),
       child: Padding(
-        padding: const EdgeInsets.all(16),
+        padding: EdgeInsets.all(context.scale(16)),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text("Fee Details", style: theme.textTheme.titleLarge),
-            const SizedBox(height: 16),
+            Text("Fee Details", style: TextStyle(fontSize: context.font(18), fontWeight: FontWeight.bold, color: theme.colorScheme.primary)),
+            SizedBox(height: context.scale(16)),
             if (feeDetails.isEmpty)
-              Text("No fee details available.", style: TextStyle(color: theme.colorScheme.onSurface.withOpacity(0.7)))
+              Text("No fee details available.", style: TextStyle(fontSize: context.font(14), color: theme.colorScheme.onSurfaceVariant))
             else
               ListView.separated(
                 shrinkWrap: true,
                 physics: const NeverScrollableScrollPhysics(),
                 itemCount: feeDetails.length,
-                separatorBuilder: (context, index) => const Divider(height: 24),
+                separatorBuilder: (context, index) => Divider(color: theme.colorScheme.outlineVariant, height: context.scale(24)),
                 itemBuilder: (context, index) {
                   final item = feeDetails[index];
-                  return _buildFeeItem(theme, "${index + 1}. ${item.title}", item.amount, item.type, item.details, theme.colorScheme.secondary);
+                  return _buildFeeItem(context, "${index + 1}. ${item.title}", item.amount, item.type, item.details, theme.colorScheme.secondary);
                 },
               ),
           ],
@@ -411,33 +464,34 @@ class CustomFeeDetailsContainerBox extends StatelessWidget {
     );
   }
 
-  Widget _buildFeeItem(ThemeData theme, String title, double amount, String type, String details, Color typeColor) {
+  Widget _buildFeeItem(BuildContext context, String title, double amount, String type, String details, Color typeColor) {
+    final theme = context.theme;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Flexible(child: Text(title, style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w500))),
-            Text("₹${NumberFormat('#,##,##0.00').format(amount)}", style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
+            Flexible(child: Text(title, style: TextStyle(fontSize: context.font(15), fontWeight: FontWeight.w600, color: theme.colorScheme.onSurface))),
+            Text("₹${NumberFormat('#,##,##0.00').format(amount)}", style: TextStyle(fontSize: context.font(15), fontWeight: FontWeight.bold, color: theme.colorScheme.onSurface)),
           ],
         ),
-        const SizedBox(height: 8),
+        SizedBox(height: context.scale(8)),
         Row(
           children: [
-            Text("Type: ", style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w500)),
+            Text("Type: ", style: TextStyle(fontSize: context.font(13), fontWeight: FontWeight.w500, color: theme.colorScheme.onSurfaceVariant)),
             Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              padding: EdgeInsets.symmetric(horizontal: context.scale(8), vertical: context.scale(4)),
               decoration: BoxDecoration(
-                color: typeColor.withOpacity(0.1),
-                borderRadius: BorderRadius.circular(5),
+                color: typeColor.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(context.scale(6)),
               ),
-              child: Text(type, style: theme.textTheme.bodySmall?.copyWith(color: typeColor, fontWeight: FontWeight.bold)),
+              child: Text(type, style: TextStyle(fontSize: context.font(11), color: typeColor, fontWeight: FontWeight.bold)),
             ),
           ],
         ),
-        const SizedBox(height: 8),
-        Text(details, style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onSurface.withOpacity(0.7))),
+        SizedBox(height: context.scale(8)),
+        Text(details, style: TextStyle(fontSize: context.font(13), color: theme.colorScheme.onSurfaceVariant)),
       ],
     );
   }
@@ -451,20 +505,24 @@ class CustomFineDetailsContainerBox extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
+    final theme = context.theme;
 
     return Card(
-      elevation: 2,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+      elevation: 0,
+      color: theme.colorScheme.surfaceContainerLow,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(context.scale(16)),
+        side: BorderSide(color: theme.colorScheme.outlineVariant),
+      ),
       child: Padding(
-        padding: const EdgeInsets.all(16),
+        padding: EdgeInsets.all(context.scale(16)),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text("Fine Details", style: theme.textTheme.titleLarge),
+                Expanded(child: Text("Fine Details", style: TextStyle(fontSize: context.font(18), fontWeight: FontWeight.bold, color: theme.colorScheme.primary))),
                 ElevatedButton.icon(
                   onPressed: () {
                     Navigator.push(context, MaterialPageRoute(builder: (context) => AddNewFine(studentId: studentId)));
@@ -472,22 +530,24 @@ class CustomFineDetailsContainerBox extends StatelessWidget {
                   style: ElevatedButton.styleFrom(
                     backgroundColor: theme.colorScheme.secondary,
                     foregroundColor: theme.colorScheme.onSecondary,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    elevation: 0,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(context.scale(10))),
+                    padding: EdgeInsets.symmetric(horizontal: context.scale(12), vertical: context.scale(8)),
                   ),
-                  icon: const Icon(Icons.add, size: 16),
-                  label: const Text("Add New Fine"),
+                  icon: Icon(Icons.add, size: context.scale(16)),
+                  label: Text("Add Fine", style: TextStyle(fontSize: context.font(12), fontWeight: FontWeight.bold)),
                 ),
               ],
             ),
-            const SizedBox(height: 16),
+            SizedBox(height: context.scale(16)),
             if (fineDetails.isEmpty)
-              Text("No fine details available.", style: TextStyle(color: theme.colorScheme.onSurface.withOpacity(0.7)))
+              Text("No fine details available.", style: TextStyle(fontSize: context.font(14), color: theme.colorScheme.onSurfaceVariant))
             else
               ListView.separated(
                 shrinkWrap: true,
                 physics: const NeverScrollableScrollPhysics(),
                 itemCount: fineDetails.length,
-                separatorBuilder: (context, index) => const SizedBox(height: 24),
+                separatorBuilder: (context, index) => SizedBox(height: context.scale(24)),
                 itemBuilder: (context, index) {
                   final item = fineDetails[index];
                   return Column(
@@ -496,36 +556,37 @@ class CustomFineDetailsContainerBox extends StatelessWidget {
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          Flexible(child: Text("${index + 1}. ${item.title}", style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w500))),
-                          Text("₹${NumberFormat('#,##,##0.00').format(item.amount)}", style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
+                          Flexible(child: Text("${index + 1}. ${item.title}", style: TextStyle(fontSize: context.font(15), fontWeight: FontWeight.w600, color: theme.colorScheme.onSurface))),
+                          Text("₹${NumberFormat('#,##,##0.00').format(item.amount)}", style: TextStyle(fontSize: context.font(15), fontWeight: FontWeight.bold, color: theme.colorScheme.onSurface)),
                         ],
                       ),
-                      const SizedBox(height: 8),
+                      SizedBox(height: context.scale(8)),
                       Row(
                         children: [
-                          Text("Issued by: ", style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w500)),
+                          Text("Issued by: ", style: TextStyle(fontSize: context.font(13), fontWeight: FontWeight.w500, color: theme.colorScheme.onSurfaceVariant)),
                           Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                            decoration: BoxDecoration(color: theme.dividerColor.withOpacity(0.5), borderRadius: BorderRadius.circular(5)),
-                            child: Text(item.issuedBy, style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurface)),
+                            padding: EdgeInsets.symmetric(horizontal: context.scale(8), vertical: context.scale(4)),
+                            decoration: BoxDecoration(color: theme.colorScheme.outlineVariant.withValues(alpha: 0.5), borderRadius: BorderRadius.circular(context.scale(6))),
+                            child: Text(item.issuedBy, style: TextStyle(fontSize: context.font(11), color: theme.colorScheme.onSurface, fontWeight: FontWeight.w500)),
                           ),
                         ],
                       ),
-                      const SizedBox(height: 8),
-                      Text("Remark: ${item.remark}", style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onSurface.withOpacity(0.7))),
-                      const Divider(height: 24),
+                      SizedBox(height: context.scale(8)),
+                      Text("Remark: ${item.remark}", style: TextStyle(fontSize: context.font(13), color: theme.colorScheme.onSurfaceVariant)),
+                      Divider(color: theme.colorScheme.outlineVariant, height: context.scale(24)),
                       SizedBox(
                         width: double.infinity,
                         child: ElevatedButton.icon(
                           onPressed: () {
                             Navigator.push(context, MaterialPageRoute(builder: (context) => EditFinePage(fineId: item.id, reason: item.title, amount: item.amount.toString(), remarks: item.remark)));
                           },
-                          icon: const Icon(Icons.edit, size: 16),
-                          label: const Text("Edit Fine"),
+                          icon: Icon(Icons.edit, size: context.scale(16)),
+                          label: Text("Edit Fine", style: TextStyle(fontSize: context.font(13), fontWeight: FontWeight.bold)),
                           style: ElevatedButton.styleFrom(
-                            backgroundColor: theme.colorScheme.secondary.withOpacity(0.1),
+                            backgroundColor: theme.colorScheme.secondary.withValues(alpha: 0.1),
                             foregroundColor: theme.colorScheme.secondary,
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                            elevation: 0,
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(context.scale(10))),
                           ),
                         ),
                       ),
@@ -547,39 +608,43 @@ class CustomPaymentHistoryContainerBox extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
+    final theme = context.theme;
     return Card(
-      elevation: 2,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+      elevation: 0,
+      color: theme.colorScheme.surfaceContainerLow,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(context.scale(16)),
+        side: BorderSide(color: theme.colorScheme.outlineVariant),
+      ),
       child: Padding(
-        padding: const EdgeInsets.all(16),
+        padding: EdgeInsets.all(context.scale(16)),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text("Payment History", style: theme.textTheme.titleLarge),
-            const SizedBox(height: 16),
+            Text("Payment History", style: TextStyle(fontSize: context.font(18), fontWeight: FontWeight.bold, color: theme.colorScheme.primary)),
+            SizedBox(height: context.scale(16)),
             if (paymentHistory.isEmpty)
-              Text("No payment history available.", style: TextStyle(color: theme.colorScheme.onSurface.withOpacity(0.7)))
+              Text("No payment history available.", style: TextStyle(fontSize: context.font(14), color: theme.colorScheme.onSurfaceVariant))
             else
               ListView.separated(
                 shrinkWrap: true,
                 physics: const NeverScrollableScrollPhysics(),
                 itemCount: paymentHistory.length,
-                separatorBuilder: (context, index) => const Divider(height: 24),
+                separatorBuilder: (context, index) => Divider(color: theme.colorScheme.outlineVariant, height: context.scale(24)),
                 itemBuilder: (context, index) {
                   final item = paymentHistory[index];
                   return Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      _buildInfoRow(theme, "Payment Received", "₹${NumberFormat('#,##,##0.00').format(item.amount)}", valueColor: theme.colorScheme.primary),
-                      const SizedBox(height: 8),
-                      _buildInfoRow(theme, "Date", item.date),
-                      const SizedBox(height: 8),
-                      _buildInfoRow(theme, "Mode", item.mode),
-                      const SizedBox(height: 8),
-                      _buildInfoRow(theme, "Submitted by", item.submittedBy),
-                      const SizedBox(height: 8),
-                      _buildInfoRow(theme, "Remark", item.remark),
+                      _buildInfoRow(context, "Payment Received", "₹${NumberFormat('#,##,##0.00').format(item.amount)}", valueColor: Colors.green),
+                      SizedBox(height: context.scale(8)),
+                      _buildInfoRow(context, "Date", item.date),
+                      SizedBox(height: context.scale(8)),
+                      _buildInfoRow(context, "Mode", item.mode),
+                      SizedBox(height: context.scale(8)),
+                      _buildInfoRow(context, "Submitted by", item.submittedBy),
+                      SizedBox(height: context.scale(8)),
+                      _buildInfoRow(context, "Remark", item.remark),
                     ],
                   );
                 },
@@ -590,18 +655,19 @@ class CustomPaymentHistoryContainerBox extends StatelessWidget {
     );
   }
 
-  Widget _buildInfoRow(ThemeData theme, String label, String value, {Color? valueColor}) {
+  Widget _buildInfoRow(BuildContext context, String label, String value, {Color? valueColor}) {
+    final theme = context.theme;
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(label, style: theme.textTheme.bodyLarge?.copyWith(color: theme.colorScheme.onSurface.withOpacity(0.6))),
-        const SizedBox(width: 16),
+        Text(label, style: TextStyle(fontSize: context.font(13), color: theme.colorScheme.onSurfaceVariant, fontWeight: FontWeight.w500)),
+        SizedBox(width: context.scale(16)),
         Expanded(
           child: Text(
             value,
             textAlign: TextAlign.end,
-            style: theme.textTheme.bodyLarge?.copyWith(color: valueColor ?? theme.colorScheme.onSurface, fontWeight: FontWeight.bold),
+            style: TextStyle(fontSize: context.font(14), color: valueColor ?? theme.colorScheme.onSurface, fontWeight: FontWeight.bold),
           ),
         ),
       ],

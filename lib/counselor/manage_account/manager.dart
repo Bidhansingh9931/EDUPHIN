@@ -1,3 +1,4 @@
+import 'package:eduphin/services/common_widgets.dart';
 import 'dart:convert';
 import 'package:eduphin/services/responsive_helper.dart';
 import 'package:flutter/material.dart';
@@ -59,119 +60,134 @@ class _InstituteManagerPageState extends State<InstituteManagerPage> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    
+    final theme = context.theme;
+
     return Scaffold(
       appBar: AppBar(
-        title: const Text("Institute Managers"),
+        title: Text("Institute Managers", style: TextStyle(fontSize: context.font(20))),
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
           : _errorMessage != null
-              ? Center(child: Padding(
-                  padding: const EdgeInsets.all(24.0),
-                  child: Text(_errorMessage!, textAlign: TextAlign.center, style: TextStyle(color: theme.colorScheme.error)),
-                ))
-              : Column(
-                  children: [
-                    Padding(
-                      padding: const EdgeInsets.all(16.0),
-                      child: TextField(
-                        decoration: const InputDecoration(
-                          hintText: "Search managers...",
-                          prefixIcon: Icon(Icons.search),
+              ? Center(
+                  child: Padding(
+                    padding: EdgeInsets.all(context.scale(24.0)),
+                    child: Text(_errorMessage!, textAlign: TextAlign.center, style: TextStyle(color: theme.colorScheme.error, fontSize: context.font(14))),
+                  ),
+                )
+              : Center(
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 1000),
+                    child: Column(
+                      children: [
+                        Padding(
+                          padding: context.pagePadding,
+                          child: TextField(
+                            style: TextStyle(fontSize: context.font(14)),
+                            decoration: InputDecoration(
+                              hintText: "Search managers...",
+                              prefixIcon: Icon(Icons.search, size: context.scale(20)),
+                              hintStyle: TextStyle(fontSize: context.font(14)),
+                            ),
+                          ),
                         ),
-                      ),
-                    ),
-                    Expanded(
-                      child: RefreshIndicator(
-                        onRefresh: _fetchManagers,
-                        child: _managers.isEmpty
-                            ? ListView(
-                                children: [
-                                  SizedBox(height: MediaQuery.of(context).size.height * 0.2),
-                                  Center(child: Text("No managers found", style: TextStyle(color: theme.hintColor))),
-                                ],
-                              )
-                            : GridView.builder(
-                                padding: context.pagePadding,
-                                gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                                  crossAxisCount: context.isTablet ? 2 : 1,
-                                  mainAxisExtent: 110, // Increased slightly for better spacing
-                                  crossAxisSpacing: 16,
-                                  mainAxisSpacing: 12,
-                                ),
-                                itemCount: _managers.length,
-                                itemBuilder: (context, index) {
-                                  final manager = _managers[index];
-                                  final displayName = manager.fullName;
-                                  
-                                  return Card(
-                                    child: ListTile(
-                                      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                                      leading: CircleAvatar(
-                                        radius: 25,
-                                        backgroundColor: theme.colorScheme.primary.withValues(alpha: 0.1),
-                                        backgroundImage: (manager.photo != null && manager.photo!.isNotEmpty)
-                                            ? NetworkImage("${ApiService.baseImageUrl}/${manager.photo}") 
-                                            : null,
-                                        child: (manager.photo == null || manager.photo!.isEmpty)
-                                            ? Text(
-                                                displayName.isNotEmpty ? displayName[0].toUpperCase() : "?",
-                                                style: TextStyle(color: theme.colorScheme.primary, fontWeight: FontWeight.bold),
-                                              )
-                                            : null,
+                        Expanded(
+                          child: RefreshIndicator(
+                            onRefresh: _fetchManagers,
+                            child: _managers.isEmpty
+                                ? ListView(
+                                    children: [
+                                      SizedBox(height: context.screenHeight * 0.2),
+                                      Center(
+                                        child: Text(
+                                          "No managers found",
+                                          style: TextStyle(color: theme.hintColor, fontSize: context.font(14)),
+                                        ),
                                       ),
-                                      title: Text(
-                                        displayName, 
-                                        style: const TextStyle(fontWeight: FontWeight.bold),
-                                        maxLines: 1,
-                                        overflow: TextOverflow.ellipsis,
-                                      ),
-                                      subtitle: Column(
-                                        crossAxisAlignment: CrossAxisAlignment.start,
-                                        children: [
-                                          Text(
-                                            manager.employeeId != null ? 'ID: ${manager.employeeId}' : 'ID: N/A', 
-                                            style: TextStyle(color: theme.hintColor, fontSize: 12)
-                                          ),
-                                          if (manager.email != null)
-                                            Text(
-                                              manager.email!,
-                                              style: TextStyle(color: theme.hintColor, fontSize: 11),
-                                              maxLines: 1,
-                                              overflow: TextOverflow.ellipsis,
-                                            ),
-                                        ],
-                                      ),
-                                      trailing: _statusBadge(manager.status ?? "Active"),
+                                    ],
+                                  )
+                                : GridView.builder(
+                                    padding: context.pagePadding,
+                                    gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                                      crossAxisCount: context.responsive(1, tablet: 2, desktop: 3),
+                                      mainAxisExtent: context.scale(110),
+                                      crossAxisSpacing: context.spacing,
+                                      mainAxisSpacing: context.spacing,
                                     ),
-                                  );
-                                },
-                              ),
-                      ),
+                                    itemCount: _managers.length,
+                                    itemBuilder: (context, index) {
+                                      final manager = _managers[index];
+                                      final displayName = manager.fullName;
+
+                                      return Card(
+                                        elevation: 0,
+                                        color: theme.colorScheme.surfaceContainerLow,
+                                        shape: RoundedRectangleBorder(
+                                          borderRadius: BorderRadius.circular(context.scale(12)),
+                                          side: BorderSide(color: theme.colorScheme.outlineVariant),
+                                        ),
+                                        child: ListTile(
+                                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(context.scale(12))),
+                                          contentPadding: EdgeInsets.symmetric(horizontal: context.scale(16), vertical: context.scale(8)),
+                                          leading: ProfileAvatar(
+                                            radius: context.scale(25),
+                                            imageUrl: (manager.photo != null && manager.photo!.isNotEmpty) ? ApiService.getStorageUrl(manager.photo) : null,
+                                            borderWidth: 0,
+                                          ),
+                                          title: Text(
+                                            displayName,
+                                            style: TextStyle(fontWeight: FontWeight.bold, fontSize: context.font(14)),
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
+                                          subtitle: Column(
+                                            crossAxisAlignment: CrossAxisAlignment.start,
+                                            mainAxisSize: MainAxisSize.min,
+                                            children: [
+                                              Text(
+                                                manager.employeeId != null ? 'ID: ${manager.employeeId}' : 'ID: N/A',
+                                                style: TextStyle(color: theme.hintColor, fontSize: context.font(12)),
+                                              ),
+                                              if (manager.email != null)
+                                                Text(
+                                                  manager.email!,
+                                                  style: TextStyle(color: theme.hintColor, fontSize: context.font(11)),
+                                                  maxLines: 1,
+                                                  overflow: TextOverflow.ellipsis,
+                                                ),
+                                            ],
+                                          ),
+                                          trailing: _statusBadge(context, manager.status ?? "Active"),
+                                        ),
+                                      );
+                                    },
+                                  ),
+                          ),
+                        ),
+                      ],
                     ),
-                  ],
+                  ),
                 ),
     );
   }
 
-  Widget _statusBadge(String status) {
+  Widget _statusBadge(BuildContext context, String status) {
     final normalizedStatus = status.toLowerCase();
     final isLive = normalizedStatus == 'active' || normalizedStatus == 'live' || normalizedStatus == '1';
     final color = isLive ? Colors.green : Colors.orange;
-    
+
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      padding: EdgeInsets.symmetric(horizontal: context.scale(10), vertical: context.scale(4)),
       decoration: BoxDecoration(
         color: color.withValues(alpha: 0.1),
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(context.scale(20)),
         border: Border.all(color: color.withValues(alpha: 0.5)),
       ),
       child: Text(
         status.toUpperCase(),
-        style: TextStyle(color: color, fontSize: 9, fontWeight: FontWeight.bold),
+        style: TextStyle(color: color, fontSize: context.font(9), fontWeight: FontWeight.bold),
       ),
     );
   }
+
 }

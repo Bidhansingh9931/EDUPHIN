@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:eduphin/services/api_service.dart';
+import 'package:eduphin/services/responsive_helper.dart';
 import 'package:intl/intl.dart';
 
 import 'package:eduphin/manager_dashboard/examinations/create_new_exam.dart';
@@ -85,76 +86,91 @@ class _ExamInfoPageState extends State<ExamInfoPage> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
+    final theme = context.theme;
     return Scaffold(
-      floatingActionButton: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16.0),
-        child: SizedBox(
-          height: 50,
-          width: double.infinity,
-          child: FloatingActionButton.extended(
-            onPressed: () async {
-              final result = await Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                      builder: (context) => const CreateExamScreen()));
-              if (result == true) {
-                _refreshExams();
-              }
-            },
-            backgroundColor: theme.colorScheme.primary,
-            label: Text(
-              "Create New Exam",
-              style: theme.textTheme.titleMedium
-                  ?.copyWith(color: theme.colorScheme.onPrimary),
-            ),
-            icon: Icon(
-              Icons.add_circle_sharp,
-              color: theme.colorScheme.onPrimary,
+      backgroundColor: theme.colorScheme.surface,
+      appBar: AppBar(
+        title: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text("Exam Inventory", style: theme.appBarTheme.titleTextStyle?.copyWith(fontSize: context.font(18))),
+            Text("Manage examination schedules and results", style: theme.textTheme.labelSmall?.copyWith(color: theme.hintColor, fontSize: context.font(11))),
+          ],
+        ),
+        centerTitle: false,
+      ),
+      body: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 1200),
+          child: RefreshIndicator(
+            onRefresh: () async => _refreshExams(),
+            child: FutureBuilder<List<Exam>>(
+              future: _examsFuture,
+              builder: (context, snapshot) {
+                if (snapshot.connectionState == ConnectionState.waiting) {
+                  return const Center(child: CircularProgressIndicator());
+                } else if (snapshot.hasError) {
+                  return Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(Icons.error_outline, size: context.scale(48), color: theme.colorScheme.error),
+                        SizedBox(height: context.scale(16)),
+                        Text('Error: ${snapshot.error.toString().replaceFirst("Exception: ", "")}', 
+                          textAlign: TextAlign.center,
+                          style: theme.textTheme.bodyMedium?.copyWith(fontSize: context.font(14))),
+                      ],
+                    ),
+                  );
+                } else if (!snapshot.hasData || snapshot.data!.isEmpty) {
+                  return Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(Icons.assignment_outlined, size: context.scale(64), color: theme.colorScheme.outlineVariant.withValues(alpha: 0.5)),
+                        SizedBox(height: context.scale(16)),
+                        Text('No exams found.', style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: context.font(16))),
+                      ],
+                    ),
+                  );
+                } else {
+                  final exams = snapshot.data!;
+                  return context.responsive(
+                    _buildListView(exams),
+                    tablet: _buildGridView(exams, crossAxisCount: 2),
+                    desktop: _buildGridView(exams, crossAxisCount: 3),
+                  );
+                }
+              },
             ),
           ),
         ),
       ),
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: () async {
+          final result = await Navigator.push(
+              context,
+              MaterialPageRoute(
+                  builder: (context) => const CreateExamScreen()));
+          if (result == true) {
+            _refreshExams();
+          }
+        },
+        backgroundColor: theme.colorScheme.primary,
+        foregroundColor: theme.colorScheme.onPrimary,
+        elevation: 2,
+        label: Text("CREATE NEW EXAM", style: TextStyle(fontSize: context.font(12), fontWeight: FontWeight.bold, letterSpacing: 0.5)),
+        icon: Icon(Icons.add, size: context.scale(20)),
+      ),
       floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
-      backgroundColor: theme.scaffoldBackgroundColor,
-      appBar: AppBar(
-        title: const Text("Exam List"),
-        centerTitle: true,
-      ),
-      body: Padding(
-        padding: const EdgeInsets.fromLTRB(16, 16, 16, 50),
-        child: FutureBuilder<List<Exam>>(
-          future: _examsFuture,
-          builder: (context, snapshot) {
-            if (snapshot.connectionState == ConnectionState.waiting) {
-              return const Center(child: CircularProgressIndicator());
-            } else if (snapshot.hasError) {
-              // Display the error message from the exception
-              return Center(child: Text('Error: ${snapshot.error.toString().replaceFirst("Exception: ", "")}'));
-            } else if (!snapshot.hasData || snapshot.data!.isEmpty) {
-              return const Center(child: Text('No exams found.'));
-            } else {
-              final exams = snapshot.data!;
-              return LayoutBuilder(
-                builder: (context, constraints) {
-                  if (constraints.maxWidth < 600) {
-                    return _buildListView(exams);
-                  } else {
-                    return _buildGridView(exams);
-                  }
-                },
-              );
-            }
-          },
-        ),
-      ),
     );
   }
 
   Widget _buildListView(List<Exam> exams) {
     return ListView.separated(
+      padding: context.pagePadding.copyWith(bottom: context.scale(80)),
       itemCount: exams.length,
-      separatorBuilder: (context, index) => const SizedBox(height: 16),
+      separatorBuilder: (context, index) => SizedBox(height: context.scale(16)),
       itemBuilder: (context, index) {
         final exam = exams[index];
         return _buildExamCard(exam);
@@ -162,14 +178,15 @@ class _ExamInfoPageState extends State<ExamInfoPage> {
     );
   }
 
-  Widget _buildGridView(List<Exam> exams) {
+  Widget _buildGridView(List<Exam> exams, {required int crossAxisCount}) {
     return GridView.builder(
+      padding: context.pagePadding.copyWith(bottom: context.scale(80)),
       itemCount: exams.length,
-      gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
-        maxCrossAxisExtent: 500,
-        mainAxisSpacing: 16,
-        crossAxisSpacing: 16,
-        childAspectRatio: 1.8, // Adjust this for best fit
+      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: crossAxisCount,
+        mainAxisSpacing: context.scale(16),
+        crossAxisSpacing: context.scale(16),
+        childAspectRatio: 1.4,
       ),
       itemBuilder: (context, index) {
         final exam = exams[index];
@@ -269,170 +286,110 @@ class CustomExamListContainerBox extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final isDarkMode = theme.brightness == Brightness.dark;
+    final theme = context.theme;
     final isActiveStatus = isActive == "Active";
+    final statusColor = isActiveStatus ? theme.colorScheme.primary : theme.colorScheme.error;
 
     return Container(
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(10),
-        color: isDarkMode ? theme.colorScheme.surfaceContainerHighest : theme.colorScheme.surface,
-        boxShadow: [
-          BoxShadow(
-            color: theme.shadowColor.withAlpha(25),
-            spreadRadius: 1,
-            blurRadius: 3,
-            offset: const Offset(0, 1),
+        borderRadius: BorderRadius.circular(context.scale(16)),
+        color: theme.colorScheme.surfaceContainerLow,
+        border: Border.all(color: theme.colorScheme.outlineVariant),
+      ),
+      padding: EdgeInsets.all(context.scale(16)),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(heading,
+                  style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: context.font(12), fontWeight: FontWeight.bold)),
+              Container(
+                padding: EdgeInsets.symmetric(horizontal: context.scale(10), vertical: context.scale(4)),
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(context.scale(8)),
+                  color: statusColor.withValues(alpha: 0.1),
+                ),
+                child: Text(
+                  isActive,
+                  style: TextStyle(color: statusColor, fontWeight: FontWeight.bold, fontSize: context.font(12)),
+                ),
+              ),
+            ],
+          ),
+          SizedBox(height: context.scale(8)),
+          Text(subHeading,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(color: theme.colorScheme.onSurface, fontWeight: FontWeight.bold, fontSize: context.font(18))),
+          SizedBox(height: context.scale(16)),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              _buildInfoColumn(context, "Type", type),
+              _buildInfoColumn(context, "Exam Code", examCode, crossAxisAlignment: CrossAxisAlignment.center),
+              _buildInfoColumn(context, "Dates", startEndDate, crossAxisAlignment: CrossAxisAlignment.end),
+            ],
+          ),
+          SizedBox(height: context.scale(16)),
+          Divider(color: theme.colorScheme.outlineVariant, height: 1),
+          SizedBox(height: context.scale(16)),
+          Row(
+            children: [
+              Expanded(
+                child: ElevatedButton.icon(
+                  onPressed: onEdit,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: theme.colorScheme.secondaryContainer,
+                    foregroundColor: theme.colorScheme.onSecondaryContainer,
+                    elevation: 0,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(context.scale(10))),
+                    padding: EdgeInsets.symmetric(vertical: context.scale(12)),
+                  ),
+                  icon: Icon(Icons.edit_outlined, size: context.scale(16)),
+                  label: Text("Edit", style: TextStyle(fontSize: context.font(14), fontWeight: FontWeight.bold)),
+                ),
+              ),
+              SizedBox(width: context.scale(16)),
+              Expanded(
+                child: ElevatedButton(
+                  onPressed: onManageSchedule,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: theme.colorScheme.primaryContainer,
+                    foregroundColor: theme.colorScheme.onPrimaryContainer,
+                    elevation: 0,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(context.scale(10))),
+                    padding: EdgeInsets.symmetric(vertical: context.scale(12)),
+                  ),
+                  child: Text("Manage Schedule", textAlign: TextAlign.center, style: TextStyle(fontSize: context.font(14), fontWeight: FontWeight.bold)),
+                ),
+              ),
+            ],
           ),
         ],
       ),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(heading,
-                        style: theme.textTheme.bodyMedium?.copyWith(
-                            color: theme.colorScheme.onSurface.withAlpha(150))),
-                    Container(
-                        decoration: BoxDecoration(
-                          color: isActiveStatus
-                              ? theme.colorScheme.primary
-                              : theme.colorScheme.error.withAlpha(178),
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                        child: Padding(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 8, vertical: 4),
-                          child: Text(
-                            isActive,
-                            style: theme.textTheme.labelSmall?.copyWith(
-                                color: isActiveStatus ? theme.colorScheme.onPrimary: theme.colorScheme.onError,
-                                fontWeight: FontWeight.bold),
-                          ),
-                        )),
-                  ],
-                ),
-                Text(subHeading,
-                    style: theme.textTheme.titleLarge
-                        ?.copyWith(color: theme.colorScheme.onSurface)),
-                const SizedBox(
-                  height: 5,
-                ),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text("Type",
-                              style: theme.textTheme.bodyMedium?.copyWith(
-                                  color: theme.colorScheme.onSurface
-                                      .withAlpha(150))),
-                          Text(type,
-                              style: theme.textTheme.bodyMedium?.copyWith(
-                                  color: theme.colorScheme.onSurface)),
-                        ],
-                      ),
-                    ),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text("Exam Code",
-                              style: theme.textTheme.bodyMedium?.copyWith(
-                                  color: theme.colorScheme.onSurface
-                                      .withAlpha(150))),
-                          Text(examCode,
-                              style: theme.textTheme.bodyMedium?.copyWith(
-                                  color: theme.colorScheme.onSurface)),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(
-                  height: 5,
-                ),
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text("Start Date - End Date",
-                        style: theme.textTheme.bodyMedium?.copyWith(
-                            color: theme.colorScheme.onSurface
-                                .withAlpha(150))),
-                    Text(startEndDate,
-                        style: theme.textTheme.bodyMedium
-                            ?.copyWith(color: theme.colorScheme.secondary)),
-                  ],
-                ),
-              ],
-            ),
-            Column(
-              children: [
-                const SizedBox(height: 8),
-                Divider(
-                  color: theme.dividerColor,
-                  thickness: 1,
-                ),
-                Row(
-                  children: [
-                    Expanded(
-                      child: ElevatedButton.icon(
-                        onPressed: onEdit,
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: theme.colorScheme.secondary.withAlpha(25),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                          padding: const EdgeInsets.symmetric(vertical: 12),
-                        ),
-                        icon: Icon(
-                          Icons.edit,
-                          color: theme.colorScheme.secondary,
-                          size: 16,
-                        ),
-                        label: Text("Edit",
-                            style: theme.textTheme.labelLarge
-                                ?.copyWith(color: theme.colorScheme.secondary)),
-                      ),
-                    ),
-                    const SizedBox(
-                      width: 8,
-                    ),
-                    Expanded(
-                      child: ElevatedButton(
-                        onPressed: onManageSchedule,
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: theme.colorScheme.primary.withAlpha(25),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                          padding: const EdgeInsets.symmetric(vertical: 12),
-                        ),
-                        child: Text(
-                          "Manage Schedule",
-                          textAlign: TextAlign.center,
-                          style: theme.textTheme.labelLarge
-                              ?.copyWith(color: theme.colorScheme.primary),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ],
-        ),
+    );
+  }
+
+  Widget _buildInfoColumn(BuildContext context, String label, String value, {CrossAxisAlignment? crossAxisAlignment}) {
+    final theme = context.theme;
+    return Expanded(
+      child: Column(
+        crossAxisAlignment: crossAxisAlignment ?? CrossAxisAlignment.start,
+        children: [
+          Text(
+            label,
+            style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: context.font(10), fontWeight: FontWeight.bold, letterSpacing: 0.5),
+          ),
+          SizedBox(height: context.scale(2)),
+          Text(
+            value,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(color: theme.colorScheme.onSurface, fontSize: context.font(13), fontWeight: FontWeight.w600),
+          ),
+        ],
       ),
     );
   }

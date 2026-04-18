@@ -1,4 +1,8 @@
 import 'package:eduphin/services/api_service.dart';
+import 'package:eduphin/services/common_widgets.dart';
+import 'package:eduphin/services/responsive_helper.dart';
+import 'package:eduphin/services/pdf_service.dart';
+import 'package:eduphin/teacher/dashboard/common_widgets.dart';
 import 'package:eduphin/teacher/dashboard/teacher_profile_model.dart';
 import 'package:flutter/material.dart';
 
@@ -22,7 +26,6 @@ class _VirtualIdPageState extends State<VirtualIdPage> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    
     return Scaffold(
       appBar: AppBar(
         title: const Text("Virtual ID Card"),
@@ -33,52 +36,47 @@ class _VirtualIdPageState extends State<VirtualIdPage> {
           if (snapshot.connectionState == ConnectionState.waiting) {
             return const Center(child: CircularProgressIndicator());
           } else if (snapshot.hasError) {
-            return Center(child: Text("Error: ${snapshot.error}"));
+            return Center(
+              child: Padding(
+                padding: const EdgeInsets.all(24.0),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(Icons.error_outline, size: 48, color: theme.colorScheme.error),
+                    const SizedBox(height: 16),
+                    Text("Error: ${snapshot.error}", textAlign: TextAlign.center),
+                    const SizedBox(height: 24),
+                    ElevatedButton(
+                      onPressed: () => setState(() { _idDataFuture = ApiService.getVirtualIdCard(); }),
+                      child: const Text("Retry"),
+                    )
+                  ],
+                ),
+              ),
+            );
           } else if (!snapshot.hasData) {
             return const Center(child: Text("No data found"));
           }
 
           final data = snapshot.data!;
           return SingleChildScrollView(
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 16),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const SizedBox(height: 20),
-                  _buildIDCard(context, data),
-                  const SizedBox(height: 32),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: ElevatedButton(
-                          onPressed: () => setState(() => _isFlipped = !_isFlipped),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: theme.colorScheme.primary,
-                            foregroundColor: Colors.white,
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                          ),
-                          child: const Text("FLIP CARD"),
-                        ),
-                      ),
-                      const SizedBox(width: 16),
-                      Expanded(
-                        child: ElevatedButton.icon(
-                          onPressed: () {},
-                          icon: const Icon(Icons.picture_as_pdf, size: 18),
-                          label: const Text("DOWNLOAD PDF"),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.white,
-                            foregroundColor: theme.colorScheme.primary,
-                            side: BorderSide(color: theme.colorScheme.primary),
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 40),
-                ],
+            padding: context.pagePadding,
+            child: Center(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 600),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    _buildIDCard(context, data),
+                    const SizedBox(height: 32),
+                    buildResponsiveRow(context, [
+                      buildActionButton(context, "FLIP CARD", () => setState(() => _isFlipped = !_isFlipped)),
+                      const SizedBox(height: 12),
+                      buildActionButton(context, "DOWNLOAD PDF", () => PdfService.generateAndPrintIdCard(data), isPrimary: false),
+                    ]),
+                    const SizedBox(height: 40),
+                  ],
+                ),
               ),
             ),
           );
@@ -87,13 +85,14 @@ class _VirtualIdPageState extends State<VirtualIdPage> {
     );
   }
 
+
   Widget _buildIDCard(BuildContext context, VirtualIdCardData data) {
     return Container(
       constraints: const BoxConstraints(maxWidth: 350, maxHeight: 550),
       child: AspectRatio(
         aspectRatio: 0.63,
         child: AnimatedSwitcher(
-          duration: const Duration(milliseconds: 500),
+          duration: const Duration(milliseconds: 600),
           layoutBuilder: (currentChild, previousChildren) {
             return Stack(
               children: <Widget>[
@@ -113,7 +112,10 @@ class _VirtualIdPageState extends State<VirtualIdPage> {
                 tilt *= isUnder ? -1.0 : 1.0;
                 final value = isUnder ? (3.14159 + rotate.value) : rotate.value;
                 return Transform(
-                  transform: Matrix4.rotationY(value)..setEntry(3, 0, tilt),
+                  transform: Matrix4.identity()
+                    ..setEntry(3, 2, 0.001)
+                    ..rotateY(value)
+                    ..setEntry(3, 0, tilt),
                   alignment: Alignment.center,
                   child: child,
                 );
@@ -127,69 +129,88 @@ class _VirtualIdPageState extends State<VirtualIdPage> {
   }
 
   Widget _buildFrontCard(VirtualIdCardData data) {
-    final theme = Theme.of(context);
+    final theme = context.theme;
     return Card(
       key: const ValueKey(false),
-      elevation: 8,
+      elevation: 0,
       margin: EdgeInsets.zero,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      surfaceTintColor: Colors.transparent,
+      color: theme.colorScheme.surface,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(context.scale(24)),
+        side: BorderSide(color: theme.colorScheme.outlineVariant.withValues(alpha: 0.5), width: 0.5),
+      ),
       child: Container(
-        padding: const EdgeInsets.all(24),
+        padding: EdgeInsets.all(context.scale(24)),
         decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: BorderRadius.circular(context.scale(24)),
           gradient: LinearGradient(
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
-            colors: [theme.colorScheme.surface, theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.5)],
+            colors: [
+              theme.colorScheme.surface,
+              theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.1),
+            ],
           ),
         ),
         child: Column(
           children: [
             Row(
               children: [
-                CircleAvatar(
-                  radius: 20,
-                  backgroundColor: theme.colorScheme.primary.withValues(alpha: 0.1),
-                  child: Icon(Icons.school, color: theme.colorScheme.primary, size: 24),
+                Container(
+                  padding: EdgeInsets.all(context.scale(8)),
+                  decoration: BoxDecoration(
+                    color: theme.colorScheme.primaryContainer.withValues(alpha: 0.5),
+                    shape: BoxShape.circle,
+                  ),
+                  child: InstituteLogo(
+                    logoUrl: data.instituteLogo,
+                    size: context.scale(24),
+                  ),
                 ),
-                const SizedBox(width: 12),
+                SizedBox(width: context.scale(12)),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(data.instituteName ?? "N/A", 
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: theme.textTheme.labelMedium?.copyWith(fontWeight: FontWeight.bold, fontSize: 10)),
-                      Text(data.instituteAddress ?? "N/A", 
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        style: theme.textTheme.labelSmall?.copyWith(fontSize: 8, color: theme.hintColor)),
+                      Text(data.instituteName ?? "N/A",
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: theme.textTheme.labelMedium?.copyWith(fontWeight: FontWeight.bold, fontSize: context.font(12))),
+                      Text(data.instituteAddress ?? "N/A",
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: theme.textTheme.labelSmall?.copyWith(fontSize: context.font(10), color: theme.colorScheme.onSurfaceVariant)),
                     ],
                   ),
                 )
               ],
             ),
-            const SizedBox(height: 30),
-            Text("EMPLOYEE ID", style: theme.textTheme.labelMedium?.copyWith(fontWeight: FontWeight.bold, letterSpacing: 1.2)),
-            const SizedBox(height: 16),
-            CircleAvatar(
-              radius: 50,
-              backgroundColor: theme.colorScheme.primary.withValues(alpha: 0.05),
-              backgroundImage: data.photoUrl != null ? NetworkImage("${ApiService.baseUrl}/storage/${data.photoUrl}") : null,
-              child: data.photoUrl == null ? Icon(Icons.person, size: 70, color: theme.colorScheme.primary.withValues(alpha: 0.5)) : null,
+            SizedBox(height: context.scale(30)),
+            Text("EMPLOYEE ID",
+                style: theme.textTheme.labelMedium?.copyWith(
+                    fontWeight: FontWeight.bold,
+                    letterSpacing: 2,
+                    fontSize: context.font(12),
+                    color: theme.colorScheme.primary)),
+            SizedBox(height: context.scale(16)),
+            ProfileAvatar(
+              imageUrl: data.photoUrl != null ? ApiService.getStorageUrl(data.photoUrl) : null,
+              radius: context.scale(50),
+              borderWidth: 2,
             ),
-            const SizedBox(height: 20),
+            SizedBox(height: context.scale(20)),
             Container(
-              padding: const EdgeInsets.all(16),
+              padding: EdgeInsets.all(context.scale(16)),
               decoration: BoxDecoration(
-                color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
-                borderRadius: BorderRadius.circular(12),
+                color: theme.colorScheme.surfaceContainerLow,
+                borderRadius: BorderRadius.circular(context.scale(20)),
+                border: Border.all(color: theme.colorScheme.outlineVariant.withValues(alpha: 0.5), width: 0.5),
               ),
               child: Column(
                 children: [
-                  Text(data.name, style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
-                  const SizedBox(height: 12),
+                  Text(data.name, style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold, fontSize: context.font(16))),
+                  SizedBox(height: context.scale(16)),
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
@@ -197,7 +218,7 @@ class _VirtualIdPageState extends State<VirtualIdPage> {
                       _idInfo("Employee ID", data.employeeId ?? "N/A"),
                     ],
                   ),
-                  const SizedBox(height: 12),
+                  SizedBox(height: context.scale(12)),
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
@@ -211,11 +232,13 @@ class _VirtualIdPageState extends State<VirtualIdPage> {
             const Spacer(),
             Container(
               width: double.infinity,
-              padding: const EdgeInsets.symmetric(vertical: 8),
+              padding: EdgeInsets.symmetric(vertical: context.scale(8)),
               decoration: BoxDecoration(
-                border: Border(top: BorderSide(color: theme.colorScheme.outline.withValues(alpha: 0.2))),
+                border: Border(top: BorderSide(color: theme.colorScheme.outlineVariant.withValues(alpha: 0.5), width: 0.5)),
               ),
-              child: Text("Authorized Signature", textAlign: TextAlign.center, style: theme.textTheme.labelSmall?.copyWith(fontStyle: FontStyle.italic)),
+              child: Text("Authorized Signature",
+                  textAlign: TextAlign.center,
+                  style: theme.textTheme.labelSmall?.copyWith(fontStyle: FontStyle.italic, fontSize: context.font(10), color: theme.colorScheme.onSurfaceVariant)),
             )
           ],
         ),
@@ -224,33 +247,38 @@ class _VirtualIdPageState extends State<VirtualIdPage> {
   }
 
   Widget _buildBackCard(VirtualIdCardData data) {
-    final theme = Theme.of(context);
+    final theme = context.theme;
     return Card(
       key: const ValueKey(true),
-      elevation: 8,
+      elevation: 0,
       margin: EdgeInsets.zero,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      surfaceTintColor: Colors.transparent,
+      color: theme.colorScheme.surface,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(context.scale(24)),
+        side: BorderSide(color: theme.colorScheme.outlineVariant.withValues(alpha: 0.5), width: 0.5),
+      ),
       child: Container(
-        padding: const EdgeInsets.all(24),
+        padding: EdgeInsets.all(context.scale(24)),
         decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: BorderRadius.circular(context.scale(24)),
           color: theme.colorScheme.surface,
         ),
         child: Column(
           children: [
             const Spacer(),
-            const Icon(Icons.qr_code_2, size: 150),
-            const SizedBox(height: 20),
-            Text("Terms & Conditions", style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold)),
-            const SizedBox(height: 12),
+            Icon(Icons.qr_code_2, size: context.scale(150), color: theme.colorScheme.onSurface),
+            SizedBox(height: context.scale(20)),
+            Text("Terms & Conditions", style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold, fontSize: context.font(14))),
+            SizedBox(height: context.scale(12)),
             Text(
               "1. This card is non-transferable.\n2. In case of loss, report immediately to HR.\n3. Return card upon resignation or termination.",
-              style: theme.textTheme.labelSmall?.copyWith(fontSize: 10, height: 1.5),
+              style: theme.textTheme.labelSmall?.copyWith(fontSize: context.font(10), height: 1.5, color: theme.colorScheme.onSurfaceVariant),
               textAlign: TextAlign.center,
             ),
             const Spacer(),
-            Text(data.instituteName != null ? data.instituteName!.split(' ').first.toLowerCase() + ".com" : "iias.com", 
-              style: theme.textTheme.labelSmall?.copyWith(color: theme.colorScheme.primary)),
+            Text(data.instituteName != null ? data.instituteName!.split(' ').first.toLowerCase() + ".com" : "iias.com",
+                style: theme.textTheme.labelSmall?.copyWith(color: theme.colorScheme.primary, fontSize: context.font(10))),
           ],
         ),
       ),
@@ -258,13 +286,13 @@ class _VirtualIdPageState extends State<VirtualIdPage> {
   }
 
   Widget _idInfo(String label, String value) {
-    final theme = Theme.of(context);
+    final theme = context.theme;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(label, style: theme.textTheme.labelSmall?.copyWith(fontSize: 9, color: theme.hintColor)),
-        const SizedBox(height: 2),
-        Text(value, style: theme.textTheme.bodySmall?.copyWith(fontWeight: FontWeight.bold, fontSize: 10)),
+        Text(label, style: theme.textTheme.labelSmall?.copyWith(fontSize: context.font(9), color: theme.colorScheme.onSurfaceVariant)),
+        SizedBox(height: context.scale(2)),
+        Text(value, style: theme.textTheme.bodySmall?.copyWith(fontWeight: FontWeight.bold, fontSize: context.font(10))),
       ],
     );
   }

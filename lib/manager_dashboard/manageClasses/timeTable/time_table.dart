@@ -2,8 +2,9 @@ import 'dart:convert';
 
 import 'package:eduphin/manager_dashboard/manageClasses/timeTable/show_schedule.dart';
 import 'package:eduphin/services/api_service.dart';
+import 'package:eduphin/services/responsive_helper.dart';
+import 'package:eduphin/teacher/dashboard/common_widgets.dart';
 import 'package:flutter/material.dart';
-
 import 'add_new_schedule.dart';
 
 // ───────────────────────────────────────────────────────────
@@ -115,39 +116,41 @@ class _TimeTableClassesPageState extends State<TimeTableClassesPage> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
+    final theme = context.theme;
     return Scaffold(
-      backgroundColor: theme.scaffoldBackgroundColor,
+      backgroundColor: theme.colorScheme.surface,
       appBar: AppBar(
-        title: const Text("Time Table"),
-        centerTitle: true,
+        title: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text("Time Table", style: theme.textTheme.titleLarge?.copyWith(fontSize: context.font(18), fontWeight: FontWeight.bold)),
+            Text("Manage and view class schedules", style: theme.textTheme.labelSmall?.copyWith(color: theme.colorScheme.onSurfaceVariant, fontSize: context.font(11))),
+          ],
+        ),
+        centerTitle: false,
       ),
-      floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
-      floatingActionButton: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16.0),
-        child: SizedBox(
-          width: double.infinity,
-          child: ElevatedButton(
-            onPressed: _showSchedule,
-            style: ElevatedButton.styleFrom(
-              padding: const EdgeInsets.symmetric(vertical: 16),
-              backgroundColor: theme.colorScheme.primary,
-              foregroundColor: theme.colorScheme.onPrimary,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
+      bottomNavigationBar: _isLoading
+          ? null
+          : SafeArea(
+              child: Container(
+                padding: EdgeInsets.fromLTRB(context.spacing, context.scale(8), context.spacing, context.scale(16)),
+                decoration: BoxDecoration(
+                  color: theme.colorScheme.surface,
+                  border: Border(top: BorderSide(color: theme.colorScheme.outlineVariant.withValues(alpha: 0.5))),
+                ),
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 600),
+                  child: buildActionButton(context, "SHOW SCHEDULE", _showSchedule),
+                ),
               ),
             ),
-            child: const Text("Show Schedule"),
-          ),
-        ),
-      ),
       body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
+          ? Center(child: CircularProgressIndicator(color: theme.colorScheme.primary))
           : SingleChildScrollView(
-              padding: const EdgeInsets.fromLTRB(16, 16, 16, 50),
+              padding: context.pagePadding,
               child: Center(
                 child: ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 500),
+                  constraints: const BoxConstraints(maxWidth: 600),
                   child: Form(
                     key: _formKey,
                     child: Column(
@@ -156,53 +159,71 @@ class _TimeTableClassesPageState extends State<TimeTableClassesPage> {
                         SizedBox(
                           width: double.infinity,
                           child: OutlinedButton.icon(
-                            onPressed: () {
-                              Navigator.push(
+                            onPressed: () async {
+                              final result = await Navigator.push(
                                 context,
-                                MaterialPageRoute(
-                                    builder: (context) => const AddNewSchedulePage()),
+                                MaterialPageRoute(builder: (context) => const AddNewSchedulePage()),
                               );
+                              if (result == true) {
+                                _fetchDropdownData();
+                              }
                             },
-                            icon: const Icon(Icons.add),
-                            label: const Text("Add New Schedule"),
+                            icon: Icon(Icons.add, size: context.scale(20)),
+                            label: Text("ADD NEW SCHEDULE", style: TextStyle(fontSize: context.font(13), fontWeight: FontWeight.bold, letterSpacing: 0.5)),
                             style: OutlinedButton.styleFrom(
-                              padding: const EdgeInsets.symmetric(vertical: 16),
-                              foregroundColor: theme.colorScheme.onSurface,
-                              side: BorderSide(color: theme.dividerColor),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(12),
-                              ),
+                              padding: EdgeInsets.symmetric(vertical: context.scale(14)),
+                              foregroundColor: theme.colorScheme.primary,
+                              side: BorderSide(color: theme.colorScheme.primary),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(context.scale(12))),
                             ),
                           ),
                         ),
-                        const SizedBox(height: 24),
-                        Text("Select Class and Section to view Time Table", style: theme.textTheme.titleMedium),
-                        const SizedBox(height: 16),
-                        _buildDropdown(
-                          theme,
-                          label: "Class",
-                          value: _selectedClassId,
-                          items: _classList.map((c) => DropdownMenuItem(value: c.id, child: Text(c.name))).toList(),
-                          onChanged: (value) {
-                            if (value == null) return;
-                            setState(() {
-                              _selectedClassId = value;
-                              _sectionsForSelectedClass = _classList.firstWhere((c) => c.id == value).sections;
-                              _selectedSectionId = _sectionsForSelectedClass.isNotEmpty ? _sectionsForSelectedClass.first.id : null;
-                            });
-                          },
-                          hint: "--Select Class",
+                        SizedBox(height: context.scale(32)),
+                        Text(
+                          "View Schedule",
+                          style: TextStyle(color: theme.colorScheme.onSurface, fontWeight: FontWeight.bold, fontSize: context.font(18)),
                         ),
-                        const SizedBox(height: 16),
-                        _buildDropdown(
-                          theme,
-                          label: "Section",
-                          value: _selectedSectionId,
-                          items: _sectionsForSelectedClass.map((s) => DropdownMenuItem(value: s.id, child: Text(s.sectionName))).toList(),
-                          onChanged: (value) => setState(() => _selectedSectionId = value),
-                          hint: "--Select Section",
+                        SizedBox(height: context.scale(4)),
+                        Text(
+                          "Select Class and Section to view Time Table",
+                          style: theme.textTheme.labelSmall?.copyWith(color: theme.colorScheme.onSurfaceVariant, fontSize: context.font(11)),
                         ),
-                        const SizedBox(height: 80), // Padding for FAB
+                        SizedBox(height: context.scale(24)),
+                        buildFilterCard(
+                          context,
+                          children: [
+                            buildLabel(context, "Class"),
+                            buildDropdown(
+                              context,
+                              _classList.map((c) => c.name).toList(),
+                              _classList.any((c) => c.id == _selectedClassId) ? _classList.firstWhere((c) => c.id == _selectedClassId).name : null,
+                              (value) {
+                                if (value == null) return;
+                                setState(() {
+                                  final selectedClass = _classList.firstWhere((c) => c.name == value);
+                                  _selectedClassId = selectedClass.id;
+                                  _sectionsForSelectedClass = selectedClass.sections;
+                                  _selectedSectionId = _sectionsForSelectedClass.isNotEmpty ? _sectionsForSelectedClass.first.id : null;
+                                });
+                              },
+                              hint: "Select Class",
+                            ),
+                            SizedBox(height: context.scale(16)),
+                            buildLabel(context, "Section"),
+                            buildDropdown(
+                              context,
+                              _sectionsForSelectedClass.map((s) => s.sectionName).toList(),
+                              _sectionsForSelectedClass.any((s) => s.id == _selectedSectionId) ? _sectionsForSelectedClass.firstWhere((s) => s.id == _selectedSectionId).sectionName : null,
+                              (value) {
+                                if (value == null) return;
+                                setState(() {
+                                  _selectedSectionId = _sectionsForSelectedClass.firstWhere((s) => s.sectionName == value).id;
+                                });
+                              },
+                              hint: "Select Section",
+                            ),
+                          ],
+                        ),
                       ],
                     ),
                   ),
@@ -212,37 +233,5 @@ class _TimeTableClassesPageState extends State<TimeTableClassesPage> {
     );
   }
 
-  Widget _buildDropdown<T>(
-    ThemeData theme,
-      {required String label,
-      T? value,
-      required List<DropdownMenuItem<T>> items,
-      required ValueChanged<T?> onChanged,
-      required String hint}) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          label,
-          style: theme.textTheme.labelLarge?.copyWith(fontWeight: FontWeight.bold),
-        ),
-        const SizedBox(height: 8),
-        DropdownButtonFormField<T>(
-          value: value,
-          items: items,
-          onChanged: onChanged,
-          decoration: InputDecoration(
-            filled: true,
-            fillColor: theme.colorScheme.surface,
-            hintText: hint,
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-              borderSide: BorderSide.none,
-            ),
-          ),
-          validator: (value) => value == null ? 'Please make a selection' : null,
-        ),
-      ],
-    );
-  }
+
 }

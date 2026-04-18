@@ -1,11 +1,10 @@
 import 'dart:convert';
 import 'package:eduphin/services/api_service.dart';
+import 'package:eduphin/services/responsive_helper.dart';
+import 'package:eduphin/teacher/dashboard/common_widgets.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
-
 import 'enter_marks_page.dart';
-
-// Models for API data
 
 class Exam {
   final int id;
@@ -115,7 +114,6 @@ class _ExamResultPageState extends State<ExamResultPage> {
       }).toList();
 
       final results = await Future.wait(paperFutures);
-
       return results.where((e) => e.papers.isNotEmpty).toList();
     } catch (e) {
       throw Exception('Failed to fetch exam data: $e');
@@ -124,240 +122,195 @@ class _ExamResultPageState extends State<ExamResultPage> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
+    final theme = context.theme;
     return Scaffold(
+      backgroundColor: theme.scaffoldBackgroundColor,
       appBar: AppBar(
-        title: const Text("Exam Results"),
+        title: Text("Exam Results", style: TextStyle(fontWeight: FontWeight.bold, fontSize: context.font(20))),
         centerTitle: true,
       ),
-      body: FutureBuilder<List<ExamWithPapers>>(
-        future: _examDataFuture,
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
-          } else if (snapshot.hasError) {
-            return Center(child: Text('Error: ${snapshot.error}'));
-          } else if (!snapshot.hasData || snapshot.data!.isEmpty) {
-            return const Center(child: Text('No exam schedules found.'));
-          }
+      body: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 1200),
+          child: FutureBuilder<List<ExamWithPapers>>(
+            future: _examDataFuture,
+            builder: (context, snapshot) {
+              if (snapshot.connectionState == ConnectionState.waiting) {
+                return const Center(child: CircularProgressIndicator());
+              } else if (snapshot.hasError) {
+                return Center(
+                  child: Padding(
+                    padding: context.pagePadding,
+                    child: Text('Error: ${snapshot.error.toString().replaceFirst("Exception: ", "")}', textAlign: TextAlign.center, style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.error)),
+                  ),
+                );
+              } else if (!snapshot.hasData || snapshot.data!.isEmpty) {
+                return Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.assignment_turned_in_outlined, size: context.scale(64), color: theme.colorScheme.outlineVariant),
+                      SizedBox(height: context.md),
+                      Text('No exam schedules found.', style: theme.textTheme.titleMedium?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
+                    ],
+                  ),
+                );
+              }
 
-          final examData = snapshot.data!;
+              final examData = snapshot.data!;
 
-          return SingleChildScrollView(
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(16, 16, 16, 50),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: examData.map((examWithPapers) {
+              return ListView.builder(
+                padding: context.pagePadding,
+                itemCount: examData.length,
+                itemBuilder: (context, index) {
+                  final examWithPapers = examData[index];
                   return Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Row(children: [
-                        Icon(Icons.book, color: theme.colorScheme.onSurface, size: 18),
-                        const SizedBox(width: 5),
-                        Flexible(
-                            child: Text(examWithPapers.exam.name, style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onSurface, fontSize: 18))),
-                      ]),
-                      Text(
-                        "Papers assigned for this exam, grouped by class and section.",
-                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: Theme.of(context).colorScheme.onSurface.withAlpha(150), fontSize: 12),
+                      Padding(
+                        padding: EdgeInsets.symmetric(vertical: context.md),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              examWithPapers.exam.name,
+                              style: theme.textTheme.titleLarge?.copyWith(
+                                fontWeight: FontWeight.bold,
+                                fontSize: context.font(18),
+                              ),
+                            ),
+                            Text(
+                              "Select a paper to manage marks",
+                              style: theme.textTheme.labelSmall?.copyWith(
+                                color: theme.colorScheme.onSurfaceVariant,
+                                fontSize: context.font(11),
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
-                      const SizedBox(height: 10),
-                      ...examWithPapers.papers.map((paper) {
-                        String formattedDate = "N/A";
-                        String formattedStartTime = "N/A";
-                        String formattedEndTime = "N/A";
-
-                        try {
-                          if (paper.date.isNotEmpty) {
-                            formattedDate = DateFormat('d MMM yyyy').format(DateTime.parse(paper.date));
-                          }
-                        } catch (e) { /* Gracefully handle parse error */ }
-
-                        try {
-                          if (paper.startTime.isNotEmpty) {
-                            formattedStartTime = DateFormat('h:mm a').format(DateFormat('HH:mm:ss').parse(paper.startTime));
-                          }
-                        } catch (e) { /* Gracefully handle parse error */ }
-
-                        try {
-                          if (paper.endTime.isNotEmpty) {
-                            formattedEndTime = DateFormat('h:mm a').format(DateFormat('HH:mm:ss').parse(paper.endTime));
-                          }
-                        } catch (e) { /* Gracefully handle parse error */ }
-
-                        return Padding(
-                          padding: const EdgeInsets.only(bottom: 16.0),
-                          child: CustomExamResultContainerBox(
-                            paperId: paper.id,
-                            examId: paper.examId,
-                            classId: paper.classId,
-                            sectionId: paper.sectionId,
-                            subjectId: paper.subjectId,
-                            heading: "Class: ${paper.className}",
-                            section: "Section: ${paper.sectionName}",
-                            subject: paper.subjectName,
-                            venue: paper.venue ?? 'N/A',
-                            date: formattedDate,
-                            time: '$formattedStartTime - $formattedEndTime',
-                          ),
-                        );
-                      }),
-                      const SizedBox(height: 16),
+                      GridView.builder(
+                        shrinkWrap: true,
+                        physics: const NeverScrollableScrollPhysics(),
+                        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                          crossAxisCount: context.responsive(1, tablet: 2, desktop: 3),
+                          crossAxisSpacing: context.spacing,
+                          mainAxisSpacing: context.spacing,
+                          mainAxisExtent: context.scale(260),
+                        ),
+                        itemCount: examWithPapers.papers.length,
+                        itemBuilder: (context, pIndex) => _buildPaperItem(examWithPapers.papers[pIndex]),
+                      ),
+                      SizedBox(height: context.lg),
                     ],
                   );
-                }).toList(),
-              ),
-            ),
-          );
-        },
+                },
+              );
+            },
+          ),
+        ),
       ),
     );
   }
-}
 
-class CustomExamResultContainerBox extends StatelessWidget {
-  final int paperId;
-  final int examId;
-  final int classId;
-  final int sectionId;
-  final int subjectId;
-  final String heading;
-  final String subject;
-  final String section;
-  final String venue;
-  final String date;
-  final String time;
+  Widget _buildPaperItem(ExamPaper paper) {
+    final theme = context.theme;
+    String formattedDate = "N/A";
+    String formattedStartTime = "N/A";
+    String formattedEndTime = "N/A";
 
-  const CustomExamResultContainerBox({
-    super.key,
-    required this.paperId,
-    required this.examId,
-    required this.classId,
-    required this.sectionId,
-    required this.subjectId,
-    required this.heading,
-    required this.subject,
-    required this.section,
-    required this.venue,
-    required this.date,
-    required this.time,
-  });
+    try {
+      if (paper.date.isNotEmpty) {
+        formattedDate = DateFormat('d MMM yyyy').format(DateTime.parse(paper.date));
+      }
+    } catch (e) {}
 
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
+    try {
+      if (paper.startTime.isNotEmpty) {
+        formattedStartTime = DateFormat('h:mm a').format(DateFormat('HH:mm:ss').parse(paper.startTime));
+      }
+    } catch (e) {}
 
-    return Container(
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(10),
-        color: theme.primaryColor,
+    try {
+      if (paper.endTime.isNotEmpty) {
+        formattedEndTime = DateFormat('h:mm a').format(DateFormat('HH:mm:ss').parse(paper.endTime));
+      }
+    } catch (e) {}
+
+    return Card(
+      elevation: 0,
+      color: theme.colorScheme.surfaceContainerLow,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(context.scale(16)),
+        side: BorderSide(color: theme.colorScheme.outlineVariant.withValues(alpha: 0.5)),
       ),
       child: Padding(
-        padding: const EdgeInsets.all(16),
+        padding: EdgeInsets.all(context.spacing),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Row(
               children: [
-                Flexible(
+                Icon(Icons.class_outlined, size: context.scale(20), color: theme.colorScheme.primary),
+                SizedBox(width: context.sm),
+                Expanded(
                   child: Text(
-                    heading,
-                    overflow: TextOverflow.ellipsis,
-                    style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onPrimary),
-                  ),
-                ),
-                Text(" | ", style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onPrimary)),
-                Text(section, style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onPrimary)),
-              ],
-            ),
-            const SizedBox(height: 5),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text("SUBJECT", style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onPrimary.withAlpha(150))),
-                      Text(subject, style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onPrimary)),
-                    ],
-                  ),
-                ),
-                const SizedBox(width: 50),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text("VENUE", style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onPrimary.withAlpha(150))),
-                      Text(venue, style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onPrimary)),
-                    ],
+                    "Class ${paper.className} - ${paper.sectionName}",
+                    style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
                   ),
                 ),
               ],
             ),
-            const SizedBox(height: 5),
-            Row(
-              children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text("Date", style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onPrimary.withAlpha(150))),
-                      Text(date, style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onPrimary)),
-                    ],
-                  ),
-                ),
-                const SizedBox(width: 50),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text("Time", style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onPrimary.withAlpha(150))),
-                      Text(time, style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onPrimary)),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 8),
-            Divider(
-              color: theme.colorScheme.onPrimary.withAlpha(180),
-              thickness: 1,
-            ),
-            const SizedBox(height: 8),
-            ElevatedButton.icon(
-              onPressed: () {
+            SizedBox(height: context.md),
+            _buildInfoRow(context, "Subject", paper.subjectName, Icons.book_outlined),
+            SizedBox(height: context.sm),
+            _buildInfoRow(context, "Venue", paper.venue ?? 'N/A', Icons.location_on_outlined),
+            SizedBox(height: context.sm),
+            _buildInfoRow(context, "Schedule", "$formattedDate • $formattedStartTime - $formattedEndTime", Icons.schedule_outlined),
+            const Spacer(),
+            buildActionButton(
+              context,
+              "Enter Marks",
+              () {
                 Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                        builder: (context) => EnterMarksPage(
-                              paperId: paperId,
-                              examId: examId,
-                              classId: classId,
-                              sectionId: sectionId,
-                              subjectId: subjectId,
-                              subjectName: subject,
-                            )));
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => EnterMarksPage(
+                      paperId: paper.id,
+                      examId: paper.examId,
+                      classId: paper.classId,
+                      sectionId: paper.sectionId,
+                      subjectId: paper.subjectId,
+                      subjectName: paper.subjectName,
+                    ),
+                  ),
+                );
               },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: theme.colorScheme.secondary,
-                foregroundColor: theme.colorScheme.onSecondary,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                padding: const EdgeInsets.symmetric(vertical: 12),
-              ),
-              icon: const Icon(
-                Icons.edit,
-                size: 16,
-              ),
-              label: const Text("Enter Marks"),
             ),
           ],
         ),
       ),
+    );
+  }
+
+  Widget _buildInfoRow(BuildContext context, String label, String value, IconData icon) {
+    final theme = context.theme;
+    return Row(
+      children: [
+        Icon(icon, size: context.scale(16), color: theme.colorScheme.onSurfaceVariant),
+        SizedBox(width: context.sm),
+        Expanded(
+          child: RichText(
+            text: TextSpan(
+              style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurface),
+              children: [
+                TextSpan(text: "$label: ", style: const TextStyle(fontWeight: FontWeight.bold)),
+                TextSpan(text: value),
+              ],
+            ),
+          ),
+        ),
+      ],
     );
   }
 }

@@ -2,6 +2,8 @@ import 'dart:convert';
 import 'dart:ui';
 import 'package:eduphin/manager_dashboard/feeStructure/fee_Structure/create_new_fee.dart';
 import 'package:eduphin/services/api_service.dart';
+import 'package:eduphin/services/responsive_helper.dart';
+import 'package:eduphin/teacher/dashboard/common_widgets.dart';
 import 'package:flutter/material.dart';
 
 import 'edit_fee.dart';
@@ -101,12 +103,18 @@ class _FeeStructurePageState extends State<FeeStructurePage> {
       final response = await ApiService.get('manager/fees');
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
-        
+
         final List<dynamic> instituteFeesData = data['institute_fees'] as List? ?? [];
         final List<dynamic> classFeesData = data['class_fees'] as List? ?? [];
 
-        final instituteFees = instituteFeesData.whereType<Map<String, dynamic>>().map((fee) => InstituteFee.fromJson(fee)).toList();
-        final classFees = classFeesData.whereType<Map<String, dynamic>>().map((fee) => ClassFee.fromJson(fee)).toList();
+        final instituteFees = instituteFeesData
+            .whereType<Map<String, dynamic>>()
+            .map((fee) => InstituteFee.fromJson(fee))
+            .toList();
+        final classFees = classFeesData
+            .whereType<Map<String, dynamic>>()
+            .map((fee) => ClassFee.fromJson(fee))
+            .toList();
 
         if (mounted) {
           setState(() {
@@ -124,30 +132,34 @@ class _FeeStructurePageState extends State<FeeStructurePage> {
         );
       }
     } finally {
-      if(mounted) {
+      if (mounted) {
         setState(() => _isLoading = false);
       }
     }
   }
 
   Future<void> _deleteFee(int feeId) async {
-     try {
+    try {
       final response = await ApiService.delete('manager/fees/$feeId');
       if (response.statusCode == 200 || response.statusCode == 204) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: const Text('Fee deleted successfully'), backgroundColor: Theme.of(context).colorScheme.primary),
+            SnackBar(
+                content: const Text('Fee deleted successfully'),
+                backgroundColor: context.theme.colorScheme.primary),
           );
           _fetchData(); // Refresh the data
         }
       } else {
-         final error = jsonDecode(response.body)['message'] ?? 'Failed to delete fee';
+        final error = jsonDecode(response.body)['message'] ?? 'Failed to delete fee';
         throw Exception(error);
       }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(e.toString()), backgroundColor: Theme.of(context).colorScheme.error),
+          SnackBar(
+              content: Text(e.toString()),
+              backgroundColor: context.theme.colorScheme.error),
         );
       }
     }
@@ -155,62 +167,71 @@ class _FeeStructurePageState extends State<FeeStructurePage> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final screenSize = MediaQuery.of(context).size;
+    final theme = context.theme;
 
     return Scaffold(
       backgroundColor: theme.scaffoldBackgroundColor,
-      floatingActionButton: Padding(
-        padding: EdgeInsets.symmetric(horizontal: screenSize.width * 0.04),
-        child: FloatingActionButton.extended(
-          onPressed: () async {
-            final result = await Navigator.push(
-                context,
-                MaterialPageRoute(
-                    builder: (context) => const CreateNewFeePage()));
-            if (result == true) {
-              _fetchData();
-            }
-          },
-          backgroundColor: theme.colorScheme.primary,
-          foregroundColor: theme.colorScheme.onPrimary,
-          icon: const Icon(Icons.add),
-          label: const Text("Create New Fee"),
+      appBar: AppBar(
+        title: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text("Fee Inventory", style: theme.textTheme.titleLarge?.copyWith(fontSize: context.font(18), fontWeight: FontWeight.bold)),
+            Text("Manage institutional and class-specific fees", style: theme.textTheme.labelSmall?.copyWith(color: theme.colorScheme.onSurfaceVariant, fontSize: context.font(11))),
+          ],
+        ),
+        centerTitle: false,
+      ),
+      body: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 1200),
+          child: _isLoading
+              ? const Center(child: CircularProgressIndicator())
+              : RefreshIndicator(
+                  onRefresh: _fetchData,
+                  child: SingleChildScrollView(
+                    padding: context.pagePadding,
+                    physics: const AlwaysScrollableScrollPhysics(),
+                    child: Column(
+                      children: [
+                        if (context.isMobile)
+                          _buildNarrowLayout()
+                        else
+                          _buildWideLayout(),
+                        SizedBox(height: context.scale(80)),
+                      ],
+                    ),
+                  ),
+                ),
         ),
       ),
-      floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
-      appBar: AppBar(
-        title: const Text("Fee Structure"),
-        centerTitle: true,
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: () async {
+          final result = await Navigator.push(
+              context,
+              MaterialPageRoute(
+                  builder: (context) => const CreateNewFeePage()));
+          if (result == true) {
+            _fetchData();
+          }
+        },
+        backgroundColor: theme.colorScheme.primary,
+        foregroundColor: theme.colorScheme.onPrimary,
+        elevation: 2,
+        label: Text("CREATE NEW FEE", style: TextStyle(fontSize: context.font(12), fontWeight: FontWeight.bold, letterSpacing: 0.5)),
+        icon: Icon(Icons.add, size: context.scale(20)),
       ),
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : RefreshIndicator(
-              onRefresh: _fetchData,
-              child: Padding(
-                padding: EdgeInsets.fromLTRB(screenSize.width * 0.04, screenSize.width * 0.04, screenSize.width * 0.04, screenSize.height * 0.15),
-                child: LayoutBuilder(builder: (context, constraints) {
-                  if (constraints.maxWidth > 800) {
-                    return _buildWideLayout();
-                  } else {
-                    return _buildNarrowLayout();
-                  }
-                }),
-              ),
-            ),
+      floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
     );
   }
 
   Widget _buildNarrowLayout() {
-    return SingleChildScrollView(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          _buildInstituteFeesSection(),
-          const SizedBox(height: 16),
-          _buildClassFeesSection(),
-        ],
-      ),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _buildInstituteFeesSection(),
+        SizedBox(height: context.scale(24)),
+        _buildClassFeesSection(),
+      ],
     );
   }
 
@@ -219,55 +240,113 @@ class _FeeStructurePageState extends State<FeeStructurePage> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Expanded(
-          child: SingleChildScrollView(
-            child: _buildInstituteFeesSection(),
-          ),
+          child: _buildInstituteFeesSection(),
         ),
-        const SizedBox(width: 16),
+        SizedBox(width: context.md),
         Expanded(
-          child: SingleChildScrollView(
-            child: _buildClassFeesSection(),
-          ),
+          child: _buildClassFeesSection(),
         ),
       ],
     );
   }
 
   Widget _buildInstituteFeesSection() {
+    final theme = context.theme;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
           "Institute - Wide Fee",
-          style: Theme.of(context).textTheme.titleLarge,
+          style: theme.textTheme.titleLarge?.copyWith(fontSize: context.font(18), fontWeight: FontWeight.bold),
         ),
-        const SizedBox(
-          height: 16,
+        Text(
+          "Fees applicable to all students",
+          style: theme.textTheme.labelSmall?.copyWith(color: theme.colorScheme.onSurfaceVariant, fontSize: context.font(11)),
         ),
-        ListView.builder(
+        SizedBox(height: context.scale(16)),
+        ListView.separated(
           shrinkWrap: true,
           physics: const NeverScrollableScrollPhysics(),
           itemCount: _instituteFees.length,
+          separatorBuilder: (context, index) => SizedBox(height: context.scale(16)),
           itemBuilder: (context, index) {
             final fee = _instituteFees[index];
-            return Padding(
-              padding: const EdgeInsets.only(bottom: 16.0),
-              child: CustomInstituteContainerBox(
-                title: fee.title,
-                mandatoryOrOptional: fee.mandatoryOrOptional,
-                detail: fee.detail,
-                amount: fee.amount,
+            return CustomInstituteContainerBox(
+              title: fee.title,
+              mandatoryOrOptional: fee.mandatoryOrOptional,
+              detail: fee.detail,
+              amount: fee.amount,
+              onEdit: () async {
+                final result = await Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => EditFeePage(
+                      feeId: fee.id,
+                      feeName: fee.title,
+                      amount: fee.amount.toString(),
+                      description: fee.detail,
+                      applyTo: "institute",
+                      isOptional: fee.mandatoryOrOptional == "Optional",
+                    ),
+                  ),
+                );
+                if (result == true) {
+                  _fetchData();
+                }
+              },
+              onDelete: () {
+                showDeleteFeeDialog(
+                  context,
+                  feeName: fee.title,
+                  onConfirm: () => _deleteFee(fee.id),
+                );
+              },
+            );
+          },
+        ),
+      ],
+    );
+  }
+
+  Widget _buildClassFeesSection() {
+    final theme = context.theme;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          "Class Specific Fee",
+          style: theme.textTheme.titleLarge?.copyWith(fontSize: context.font(18), fontWeight: FontWeight.bold),
+        ),
+        Text(
+          "Fees applicable to specific classes",
+          style: theme.textTheme.labelSmall?.copyWith(color: theme.colorScheme.onSurfaceVariant, fontSize: context.font(11)),
+        ),
+        SizedBox(height: context.scale(16)),
+        ListView.separated(
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          itemCount: _classFees.length,
+          separatorBuilder: (context, index) => SizedBox(height: context.scale(16)),
+          itemBuilder: (context, index) {
+            final fee = _classFees[index];
+            return CustomSpecificContainerBox(
+                heading: fee.heading,
+                subHeading: fee.subHeading,
+                isOptional: fee.isOptional,
+                details: fee.details,
+                fee: fee.fee,
                 onEdit: () async {
                   final result = await Navigator.push(
                     context,
                     MaterialPageRoute(
                       builder: (context) => EditFeePage(
                         feeId: fee.id,
-                        feeName: fee.title,
-                        amount: fee.amount.toString(),
-                        description: fee.detail,
-                        applyTo: "institute",
-                        isOptional: fee.mandatoryOrOptional == "Optional",
+                        feeName: fee.subHeading,
+                        amount: fee.fee.toString(),
+                        description: fee.details,
+                        applyTo: "class",
+                        isOptional: fee.isOptional == "Optional",
+                        classId: fee.classId,
                       ),
                     ),
                   );
@@ -278,70 +357,10 @@ class _FeeStructurePageState extends State<FeeStructurePage> {
                 onDelete: () {
                   showDeleteFeeDialog(
                     context,
-                    feeName: fee.title,
+                    feeName: fee.subHeading,
                     onConfirm: () => _deleteFee(fee.id),
                   );
-                },
-              ),
-            );
-          },
-        ),
-      ],
-    );
-  }
-
-  Widget _buildClassFeesSection() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          "Class Specific Fee",
-          style: Theme.of(context).textTheme.titleLarge,
-        ),
-        const SizedBox(
-          height: 16,
-        ),
-        ListView.builder(
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          itemCount: _classFees.length,
-          itemBuilder: (context, index) {
-            final fee = _classFees[index];
-            return Padding(
-              padding: const EdgeInsets.only(bottom: 16.0),
-              child: CustomSpecificContainerBox(
-                  heading: fee.heading,
-                  subHeading: fee.subHeading,
-                  isOptional: fee.isOptional,
-                  details: fee.details,
-                  fee: fee.fee,
-                  onEdit: () async {
-                    final result = await Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => EditFeePage(
-                          feeId: fee.id,
-                          feeName: fee.subHeading,
-                          amount: fee.fee.toString(),
-                          description: fee.details,
-                          applyTo: "class",
-                          isOptional: fee.isOptional == "Optional",
-                          classId: fee.classId,
-                        ),
-                      ),
-                    );
-                    if (result == true) {
-                      _fetchData();
-                    }
-                  },
-                  onDelete: () {
-                    showDeleteFeeDialog(
-                      context,
-                      feeName: fee.subHeading,
-                      onConfirm: () => _deleteFee(fee.id),
-                    );
-                  }),
-            );
+                });
           },
         ),
       ],
@@ -358,7 +377,7 @@ void showDeleteFeeDialog(
     context: context,
     barrierDismissible: true,
     barrierLabel: "Delete",
-    barrierColor: Theme.of(context).colorScheme.scrim,
+    barrierColor: context.theme.colorScheme.scrim.withValues(alpha: 0.5),
     transitionDuration: const Duration(milliseconds: 200),
     pageBuilder: (_, __, ___) {
       return DeleteFeeDialog(
@@ -381,7 +400,7 @@ class DeleteFeeDialog extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
+    final theme = context.theme;
     return Scaffold(
       backgroundColor: Colors.transparent,
       body: Stack(
@@ -392,21 +411,22 @@ class DeleteFeeDialog extends StatelessWidget {
           ),
           Center(
             child: Container(
-              margin: const EdgeInsets.symmetric(horizontal: 24),
-              padding: const EdgeInsets.all(20),
+              margin: EdgeInsets.symmetric(horizontal: context.scale(24)),
+              padding: EdgeInsets.all(context.scale(20)),
               decoration: BoxDecoration(
-                color: theme.cardColor,
-                borderRadius: BorderRadius.circular(20),
+                color: theme.colorScheme.surface,
+                borderRadius: BorderRadius.circular(context.scale(20)),
+                border: Border.all(color: theme.colorScheme.outlineVariant.withValues(alpha: 0.5)),
               ),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Text("Delete Fee", style: theme.textTheme.titleLarge),
-                  const SizedBox(height: 12),
+                  Text("Delete Fee", style: theme.textTheme.titleLarge?.copyWith(fontSize: context.font(20), fontWeight: FontWeight.bold)),
+                  SizedBox(height: context.scale(12)),
                   RichText(
                     textAlign: TextAlign.center,
                     text: TextSpan(
-                      style: theme.textTheme.bodyMedium,
+                      style: theme.textTheme.bodyMedium?.copyWith(fontSize: context.font(14), color: theme.colorScheme.onSurface),
                       children: <TextSpan>[
                         const TextSpan(text: 'Are you sure you want to delete '),
                         TextSpan(text: '"$feeName"', style: const TextStyle(fontWeight: FontWeight.bold)),
@@ -414,32 +434,22 @@ class DeleteFeeDialog extends StatelessWidget {
                       ],
                     ),
                   ),
-                  const SizedBox(height: 24),
-                  SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton(
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: theme.colorScheme.error,
-                        padding: const EdgeInsets.symmetric(vertical: 14),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                      ),
-                      onPressed: () {
-                        Navigator.pop(context);
-                        onConfirm();
-                      },
-                      child: Text("Yes, Delete", style: theme.textTheme.labelLarge?.copyWith(color: theme.colorScheme.onError)),
-                    ),
+                  SizedBox(height: context.scale(24)),
+                  buildActionButton(
+                    context,
+                    "Yes, Delete",
+                    () {
+                      Navigator.pop(context);
+                      onConfirm();
+                    },
                   ),
-                  const SizedBox(height: 12),
-                  SizedBox(
-                    width: double.infinity,
-                    child: TextButton(
-                      onPressed: () => Navigator.pop(context),
-                      child: Text("Cancel", style: theme.textTheme.labelLarge?.copyWith(color: theme.colorScheme.onSurface)),
-                    ),
-                  )
+                  SizedBox(height: context.scale(12)),
+                  buildActionButton(
+                    context,
+                    "Cancel",
+                    () => Navigator.pop(context),
+                    isPrimary: false,
+                  ),
                 ],
               ),
             ),
@@ -474,13 +484,14 @@ class CustomInstituteContainerBox extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
+    final theme = context.theme;
     return Container(
       decoration: BoxDecoration(
-        color: theme.cardColor,
-        borderRadius: BorderRadius.circular(10),
+        color: theme.colorScheme.surfaceContainerLow,
+        borderRadius: BorderRadius.circular(context.scale(16)),
+        border: Border.all(color: theme.colorScheme.outlineVariant.withValues(alpha: 0.5)),
       ),
-      padding: const EdgeInsets.all(16.0),
+      padding: EdgeInsets.all(context.md),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -491,54 +502,78 @@ class CustomInstituteContainerBox extends StatelessWidget {
               Flexible(
                 child: Text(
                   title,
-                  style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w600),
+                  style: theme.textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.bold, fontSize: context.font(18)),
                 ),
               ),
-              const SizedBox(width: 8),
+              SizedBox(width: context.sm),
               Text(
                 "₹$amount",
-                style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w600),
+                style: theme.textTheme.titleLarge?.copyWith(
+                    fontWeight: FontWeight.bold,
+                    fontSize: context.font(20),
+                    color: theme.colorScheme.primary),
               ),
             ],
           ),
-          const SizedBox(height: 8),
-          Text(
-            mandatoryOrOptional,
-            style: theme.textTheme.bodyMedium?.copyWith(
-              color: mandatoryOrOptional == "Mandatory" ? theme.colorScheme.error : theme.colorScheme.primary,
+          SizedBox(height: context.xs),
+          Container(
+            padding: EdgeInsets.symmetric(
+                horizontal: context.sm, vertical: context.scale(2)),
+            decoration: BoxDecoration(
+              color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
+              borderRadius: BorderRadius.circular(context.scale(6)),
+            ),
+            child: Text(
+              mandatoryOrOptional.toUpperCase(),
+              style: theme.textTheme.labelSmall?.copyWith(
+                fontSize: context.font(10),
+                color: mandatoryOrOptional == "Mandatory"
+                    ? theme.colorScheme.error
+                    : theme.colorScheme.primary,
+                fontWeight: FontWeight.bold,
+                letterSpacing: 0.5,
+              ),
             ),
           ),
-          const SizedBox(height: 8),
-          Text(
-            detail,
-            style: theme.textTheme.bodySmall,
-          ),
-          const SizedBox(height: 16),
+          if (detail.isNotEmpty) ...[
+            SizedBox(height: context.sm),
+            Text(
+              detail,
+              style: theme.textTheme.bodySmall?.copyWith(
+                  fontSize: context.font(13),
+                  color: theme.colorScheme.onSurfaceVariant),
+            ),
+          ],
+          SizedBox(height: context.md),
           Row(
             children: [
               Expanded(
-                child: ElevatedButton.icon(
+                child: OutlinedButton.icon(
                   onPressed: onEdit,
-                  icon: Icon(Icons.edit, size: 16, color: theme.colorScheme.primary),
-                  label: Text("Edit", style: theme.textTheme.labelLarge?.copyWith(color: theme.colorScheme.primary)),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: theme.colorScheme.primary.withOpacity(0.1),
+                  icon: Icon(Icons.edit_rounded, size: context.scale(18)),
+                  label: const Text("Edit"),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: theme.colorScheme.primary,
+                    side: BorderSide(color: theme.colorScheme.primary.withValues(alpha: 0.5)),
                     shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(10),
+                      borderRadius: BorderRadius.circular(context.scale(12)),
                     ),
                   ),
                 ),
               ),
-              const SizedBox(width: 8),
+              SizedBox(width: context.sm),
               Expanded(
-                child: ElevatedButton.icon(
+                child: OutlinedButton.icon(
                   onPressed: onDelete,
-                  icon: Icon(Icons.delete, size: 16, color: theme.colorScheme.error),
-                  label: Text("Delete", style: theme.textTheme.labelLarge?.copyWith(color: theme.colorScheme.error)),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: theme.colorScheme.error.withOpacity(0.1),
+                  icon: Icon(Icons.delete_outline_rounded,
+                      size: context.scale(18)),
+                  label: const Text("Delete"),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: theme.colorScheme.error,
+                    side: BorderSide(color: theme.colorScheme.error.withValues(alpha: 0.5)),
                     shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(10),
+                      borderRadius: BorderRadius.circular(context.scale(12)),
                     ),
                   ),
                 ),
@@ -573,72 +608,100 @@ class CustomSpecificContainerBox extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
+    final theme = context.theme;
     return Container(
       decoration: BoxDecoration(
-        color: theme.cardColor,
-        borderRadius: BorderRadius.circular(10),
+        color: theme.colorScheme.surfaceContainerLow,
+        borderRadius: BorderRadius.circular(context.scale(16)),
+        border: Border.all(color: theme.colorScheme.outlineVariant.withValues(alpha: 0.5)),
       ),
-      padding: const EdgeInsets.all(16.0),
+      padding: EdgeInsets.all(context.md),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(heading, style: theme.textTheme.bodySmall),
-          const SizedBox(height: 4),
+          Text(heading,
+              style: theme.textTheme.labelMedium?.copyWith(
+                  fontWeight: FontWeight.bold,
+                  color: theme.colorScheme.onSurfaceVariant)),
+          SizedBox(height: context.xs),
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Flexible(
                 child: Text(
                   subHeading,
-                  style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w600),
+                  style: theme.textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.bold, fontSize: context.font(18)),
                 ),
               ),
-              const SizedBox(width: 8),
+              SizedBox(width: context.sm),
               Text(
                 "₹$fee",
-                style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w600),
+                style: theme.textTheme.titleLarge?.copyWith(
+                    fontWeight: FontWeight.bold,
+                    fontSize: context.font(20),
+                    color: theme.colorScheme.primary),
               ),
             ],
           ),
-          const SizedBox(height: 8),
-          Text(
-            isOptional,
-            style: theme.textTheme.bodyMedium?.copyWith(
-              color: isOptional == "Mandatory" ? theme.colorScheme.error : theme.colorScheme.primary,
+          SizedBox(height: context.xs),
+          Container(
+            padding: EdgeInsets.symmetric(
+                horizontal: context.sm, vertical: context.scale(2)),
+            decoration: BoxDecoration(
+              color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
+              borderRadius: BorderRadius.circular(context.scale(6)),
+            ),
+            child: Text(
+              isOptional.toUpperCase(),
+              style: theme.textTheme.labelSmall?.copyWith(
+                fontSize: context.font(10),
+                color: isOptional == "Mandatory"
+                    ? theme.colorScheme.error
+                    : theme.colorScheme.primary,
+                fontWeight: FontWeight.bold,
+                letterSpacing: 0.5,
+              ),
             ),
           ),
-          const SizedBox(height: 8),
-          Text(
-            details,
-            style: theme.textTheme.bodySmall,
-          ),
-          const SizedBox(height: 16),
+          if (details.isNotEmpty) ...[
+            SizedBox(height: context.sm),
+            Text(
+              details,
+              style: theme.textTheme.bodySmall?.copyWith(
+                  fontSize: context.font(13),
+                  color: theme.colorScheme.onSurfaceVariant),
+            ),
+          ],
+          SizedBox(height: context.md),
           Row(
             children: [
               Expanded(
-                child: ElevatedButton.icon(
+                child: OutlinedButton.icon(
                   onPressed: onEdit,
-                  icon: Icon(Icons.edit, size: 16, color: theme.colorScheme.primary),
-                  label: Text("Edit", style: theme.textTheme.labelLarge?.copyWith(color: theme.colorScheme.primary)),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: theme.colorScheme.primary.withOpacity(0.1),
+                  icon: Icon(Icons.edit_rounded, size: context.scale(18)),
+                  label: const Text("Edit"),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: theme.colorScheme.primary,
+                    side: BorderSide(color: theme.colorScheme.primary.withValues(alpha: 0.5)),
                     shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(10),
+                      borderRadius: BorderRadius.circular(context.scale(12)),
                     ),
                   ),
                 ),
               ),
-              const SizedBox(width: 8),
+              SizedBox(width: context.sm),
               Expanded(
-                child: ElevatedButton.icon(
+                child: OutlinedButton.icon(
                   onPressed: onDelete,
-                  icon: Icon(Icons.delete, size: 16, color: theme.colorScheme.error),
-                  label: Text("Delete", style: theme.textTheme.labelLarge?.copyWith(color: theme.colorScheme.error)),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: theme.colorScheme.error.withOpacity(0.1),
+                  icon: Icon(Icons.delete_outline_rounded,
+                      size: context.scale(18)),
+                  label: const Text("Delete"),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: theme.colorScheme.error,
+                    side: BorderSide(color: theme.colorScheme.error.withValues(alpha: 0.5)),
                     shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(10),
+                      borderRadius: BorderRadius.circular(context.scale(12)),
                     ),
                   ),
                 ),

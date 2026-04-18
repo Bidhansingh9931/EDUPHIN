@@ -134,7 +134,7 @@ class _EventAttendeesState extends State<EventAttendees> {
               attendee.status.toLowerCase().contains(query);
         }).toList();
       }
-      
+
       _filteredAttendees = results;
     });
   }
@@ -163,7 +163,7 @@ class _EventAttendeesState extends State<EventAttendees> {
             SearchBar(
               controller: _searchController,
               leading:
-                  Icon(Icons.search, color: theme.colorScheme.onSurface),
+              Icon(Icons.search, color: theme.colorScheme.onSurface),
               hintText: "Search for students, teachers...",
               hintStyle: WidgetStateProperty.all(TextStyle(
                 color: theme.hintColor,
@@ -210,19 +210,19 @@ class _EventAttendeesState extends State<EventAttendees> {
             Expanded(
               child: _isLoading
                   ? const Center(child: CircularProgressIndicator())
-                  : _errorMessage.isNotEmpty 
-                    ? Center(child: Text(_errorMessage, style: TextStyle(color: theme.colorScheme.error)))
-                    : _filteredAttendees.isEmpty 
-                        ? const Center(child: Text("No attendees found."))
-                        : LayoutBuilder(
-                            builder: (context, constraints) {
-                              if (constraints.maxWidth < 600) {
-                                return _buildAttendeeList();
-                              } else {
-                                return _buildAttendeeGrid();
-                              }
-                            },
-                          ),
+                  : _errorMessage.isNotEmpty
+                  ? Center(child: Text(_errorMessage, style: TextStyle(color: theme.colorScheme.error)))
+                  : _filteredAttendees.isEmpty
+                  ? const Center(child: Text("No attendees found."))
+                  : LayoutBuilder(
+                builder: (context, constraints) {
+                  if (constraints.maxWidth < 600) {
+                    return _buildAttendeeList();
+                  } else {
+                    return _buildAttendeeGrid();
+                  }
+                },
+              ),
             ),
           ],
         ),

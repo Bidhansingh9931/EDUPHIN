@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:csv/csv.dart';
 import 'package:eduphin/manager_dashboard/account_statics/institute_manager/add_manager.dart';
 import 'package:eduphin/services/api_service.dart';
+import 'package:eduphin/services/common_widgets.dart';
 import 'package:eduphin/services/responsive_helper.dart';
 import 'package:flutter/material.dart';
 import 'package:open_file/open_file.dart';
@@ -19,14 +20,16 @@ class Manager {
   final int id;
   final String name;
   final String designation;
+  final String? photo;
 
-  Manager({required this.id, required this.name, required this.designation});
+  Manager({required this.id, required this.name, required this.designation, this.photo});
 
   factory Manager.fromJson(Map<String, dynamic> json) {
     return Manager(
       id: json['id'] ?? 0,
       name: json['name'] ?? 'N/A',
       designation: json['designation'] ?? 'Manager',
+      photo: json['photo'] ?? json['profile_image'],
     );
   }
 }
@@ -144,6 +147,7 @@ class _ManagerListPageState extends State<ManagerListPage> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = context.theme;
     return Scaffold(
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () async {
@@ -153,13 +157,13 @@ class _ManagerListPageState extends State<ManagerListPage> {
           );
           if (result == true && mounted) _fetchManagersForRole(_selectedRoleId!);
         },
-        label: const Text("Add Manager"),
-        icon: const Icon(Icons.add),
+        label: Text("Add Manager", style: theme.textTheme.labelLarge?.copyWith(fontSize: context.font(14))),
+        icon: Icon(Icons.add, size: context.scale(20)),
       ),
       appBar: AppBar(
-        title: const Text("Manager List"),
+        title: Text("Manager List", style: theme.appBarTheme.titleTextStyle),
         actions: [
-            IconButton(icon: const Icon(Icons.download), onPressed: _downloadManagerList),
+            IconButton(icon: Icon(Icons.download, size: context.scale(24)), onPressed: _downloadManagerList),
           ],
       ),
       body: SafeArea(
@@ -206,9 +210,13 @@ class CustomManagerListBox extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
+    final theme = context.theme;
 
     return Card(
+      elevation: 0,
+      margin: EdgeInsets.zero,
+      color: theme.cardColor,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(context.scale(12))),
       child: Padding(
         padding: EdgeInsets.all(context.spacing),
         child: Column(
@@ -216,14 +224,18 @@ class CustomManagerListBox extends StatelessWidget {
           children: [
             DropdownButtonFormField<int>(
               value: selectedRoleId,
-              decoration: const InputDecoration(prefixIcon: Icon(Icons.badge_outlined)),
+              decoration: InputDecoration(
+                prefixIcon: Icon(Icons.badge_outlined, size: context.scale(20)),
+                contentPadding: EdgeInsets.symmetric(horizontal: context.scale(16)),
+              ),
               isExpanded: true,
               onChanged: onRoleChanged,
-              items: roles.map((role) => DropdownMenuItem(value: role.id, child: Text(role.name))).toList(),
+              dropdownColor: theme.cardColor,
+              items: roles.map((role) => DropdownMenuItem(value: role.id, child: Text(role.name, style: theme.textTheme.bodyLarge?.copyWith(fontSize: context.font(16))))).toList(),
             ),
-            const SizedBox(height: 24),
+            SizedBox(height: context.scale(24)),
             isLoading
-                ? const Center(child: Padding(padding: EdgeInsets.all(40), child: CircularProgressIndicator()))
+                ? Center(child: Padding(padding: EdgeInsets.all(context.scale(40)), child: const CircularProgressIndicator()))
                 : _buildContent(context),
           ],
         ),
@@ -232,8 +244,9 @@ class CustomManagerListBox extends StatelessWidget {
   }
 
   Widget _buildContent(BuildContext context) {
+    final theme = context.theme;
     if (managers.isEmpty) {
-      return const Center(child: Padding(padding: EdgeInsets.all(40), child: Text("No managers found.")));
+      return Center(child: Padding(padding: EdgeInsets.all(context.scale(40)), child: Text("No managers found.", style: theme.textTheme.bodyMedium?.copyWith(fontSize: context.font(14)))));
     }
 
     return LayoutBuilder(
@@ -247,9 +260,9 @@ class CustomManagerListBox extends StatelessWidget {
             itemCount: managers.length,
             gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
               crossAxisCount: crossAxisCount,
-              crossAxisSpacing: 16,
-              mainAxisSpacing: 16,
-              mainAxisExtent: 80,
+              crossAxisSpacing: context.scale(16),
+              mainAxisSpacing: context.scale(16),
+              mainAxisExtent: context.scale(80),
             ),
             itemBuilder: (context, index) => _buildManagerItem(context, managers[index]),
           );
@@ -258,7 +271,7 @@ class CustomManagerListBox extends StatelessWidget {
             shrinkWrap: true,
             physics: const NeverScrollableScrollPhysics(),
             itemCount: managers.length,
-            separatorBuilder: (context, index) => const SizedBox(height: 12),
+            separatorBuilder: (context, index) => SizedBox(height: context.scale(12)),
             itemBuilder: (context, index) => _buildManagerItem(context, managers[index]),
           );
         }
@@ -267,35 +280,35 @@ class CustomManagerListBox extends StatelessWidget {
   }
 
   Widget _buildManagerItem(BuildContext context, Manager manager) {
-    final theme = Theme.of(context);
+    final theme = context.theme;
     return Container(
-      padding: const EdgeInsets.all(12),
+      padding: EdgeInsets.all(context.scale(12)),
       decoration: BoxDecoration(
         color: theme.colorScheme.surfaceContainerLow,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: theme.colorScheme.outline.withOpacity(0.05)),
+        borderRadius: BorderRadius.circular(context.scale(12)),
+        border: Border.all(color: theme.colorScheme.outline.withValues(alpha: 0.05)),
       ),
       child: Row(
         children: [
-          CircleAvatar(
-            radius: 24,
-            backgroundColor: theme.colorScheme.primary.withOpacity(0.1),
-            child: Icon(Icons.person, color: theme.colorScheme.primary),
+          ProfileAvatar(
+            radius: context.scale(24),
+            imageUrl: ApiService.getStorageUrl(manager.photo),
           ),
-          const SizedBox(width: 16),
+          SizedBox(width: context.scale(16)),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Text(manager.name, style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold), maxLines: 1, overflow: TextOverflow.ellipsis),
-                Text(manager.designation, style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
+                Text(manager.name, style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold, fontSize: context.font(16)), maxLines: 1, overflow: TextOverflow.ellipsis),
+                Text(manager.designation, style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant, fontSize: context.font(12))),
               ],
             ),
           ),
-          Icon(Icons.chevron_right, color: theme.colorScheme.outline),
+          Icon(Icons.chevron_right, color: theme.colorScheme.outline, size: context.scale(20)),
         ],
       ),
     );
   }
 }
+

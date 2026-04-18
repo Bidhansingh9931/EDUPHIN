@@ -1,6 +1,8 @@
 import 'dart:convert';
 
 import 'package:eduphin/services/api_service.dart';
+import 'package:eduphin/services/responsive_helper.dart';
+import 'package:eduphin/services/common_widgets.dart';
 import 'package:flutter/material.dart';
 
 import 'fee_details.dart';
@@ -185,87 +187,82 @@ class _StudentFeeDetailsPageState extends State<StudentFeeDetailsPage> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
+    final theme = context.theme;
     return Scaffold(
+      backgroundColor: theme.colorScheme.surface,
       appBar: AppBar(
-        title: const Text("Student Fee Details"),
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        title: Text(
+          "Student Fee Details",
+          style: TextStyle(
+            fontWeight: FontWeight.bold,
+            color: theme.colorScheme.onSurface,
+            fontSize: context.font(20),
+          ),
+        ),
         centerTitle: true,
+        leading: IconButton(
+          icon: Icon(Icons.arrow_back, color: theme.colorScheme.onSurface),
+          onPressed: () => Navigator.pop(context),
+        ),
       ),
       body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : Padding(
-              padding: const EdgeInsets.fromLTRB(16, 16, 16, 50),
-              child: Column(
-                children: [
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+          ? Center(child: CircularProgressIndicator(color: theme.colorScheme.primary))
+          : Center(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 1200),
+                child: Padding(
+                  padding: context.pagePadding,
+                  child: Column(
                     children: [
-                      Expanded(
-                        child: _buildDropdown(
-                          label: "Class",
-                          value: _selectedClassId,
-                          items: _classList.map((c) => DropdownMenuItem(value: c.id, child: Text(c.name))).toList(),
-                          onChanged: (value) {
-                            if (value == null || value == _selectedClassId) return;
-                            setState(() {
-                              _selectedClassId = value;
-                              _sectionList = _classList.firstWhere((c) => c.id == value).sections;
-                              _selectedSectionId = _sectionList.isNotEmpty ? _sectionList.first.id : null;
-                            });
-                            _fetchStudents();
-                          },
-                        ),
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Expanded(
+                            child: _buildDropdown(
+                              label: "Class",
+                              value: _selectedClassId,
+                              items: _classList.map((c) => DropdownMenuItem(value: c.id, child: Text(c.name, style: TextStyle(fontSize: context.font(14))))).toList(),
+                              onChanged: (value) {
+                                if (value == null || value == _selectedClassId) return;
+                                setState(() {
+                                  _selectedClassId = value;
+                                  _sectionList = _classList.firstWhere((c) => c.id == value).sections;
+                                  _selectedSectionId = _sectionList.isNotEmpty ? _sectionList.first.id : null;
+                                });
+                                _fetchStudents();
+                              },
+                            ),
+                          ),
+                          SizedBox(width: context.spacing),
+                          Expanded(
+                            child: _buildDropdown(
+                              label: "Section",
+                              value: _selectedSectionId,
+                              items: _sectionList.map((s) => DropdownMenuItem(value: s.id, child: Text(s.name, style: TextStyle(fontSize: context.font(14))))).toList(),
+                              onChanged: (value) {
+                                 if (value == null || value == _selectedSectionId) return;
+                                setState(() => _selectedSectionId = value);
+                                _fetchStudents();
+                              },
+                            ),
+                          ),
+                        ],
                       ),
-                      const SizedBox(width: 16),
+                      SizedBox(height: context.spacing),
                       Expanded(
-                        child: _buildDropdown(
-                          label: "Section",
-                          value: _selectedSectionId,
-                          items: _sectionList.map((s) => DropdownMenuItem(value: s.id, child: Text(s.name))).toList(),
-                          onChanged: (value) {
-                             if (value == null || value == _selectedSectionId) return;
-                            setState(() => _selectedSectionId = value);
-                            _fetchStudents();
-                          },
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 16),
-                  Expanded(
-                    child: _isFetchingStudents
-                        ? const Center(child: CircularProgressIndicator())
-                        : _studentFeeDetails.isEmpty
-                            ? const Center(child: Text("No students found for this section."))
-                            : LayoutBuilder(
-                                builder: (context, constraints) {
-                                  if (constraints.maxWidth > 600) {
-                                    return GridView.builder(
-                                      gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
-                                        maxCrossAxisExtent: 500,
-                                        mainAxisSpacing: 16,
-                                        crossAxisSpacing: 16,
-                                        childAspectRatio: 2.5,
-                                      ),
-                                      itemCount: _studentFeeDetails.length,
-                                      itemBuilder: (context, index) {
-                                        final student = _studentFeeDetails[index];
-                                        return CustomStudentInfoFeeDetailContainerBox(
-                                          studentId: student.id,
-                                          heading: student.name,
-                                          subHeading: "Reg. No: ${student.regNo}, Class: ${student.className}-${student.sectionName}",
-                                          isActive: student.status,
-                                          imageUrl: student.imageUrl,
-                                        );
-                                      },
-                                    );
-                                  } else {
-                                    return ListView.builder(
+                        child: _isFetchingStudents
+                            ? Center(child: CircularProgressIndicator(color: theme.colorScheme.primary))
+                            : _studentFeeDetails.isEmpty
+                                ? Center(child: Text("No students found for this section.", style: TextStyle(fontSize: context.font(16), color: theme.colorScheme.onSurfaceVariant)))
+                                : context.responsive(
+                                    ListView.builder(
                                       itemCount: _studentFeeDetails.length,
                                       itemBuilder: (context, index) {
                                         final student = _studentFeeDetails[index];
                                         return Padding(
-                                          padding: const EdgeInsets.only(bottom: 16.0),
+                                          padding: EdgeInsets.only(bottom: context.spacing),
                                           child: CustomStudentInfoFeeDetailContainerBox(
                                             studentId: student.id,
                                             heading: student.name,
@@ -275,15 +272,54 @@ class _StudentFeeDetailsPageState extends State<StudentFeeDetailsPage> {
                                           ),
                                         );
                                       },
-                                    );
-                                  }
-                                },
-                              ),
+                                    ),
+                                    tablet: GridView.builder(
+                                      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                                        crossAxisCount: 2,
+                                        mainAxisSpacing: context.spacing,
+                                        crossAxisSpacing: context.spacing,
+                                        mainAxisExtent: context.scale(180),
+                                      ),
+                                      itemCount: _studentFeeDetails.length,
+                                      itemBuilder: (context, index) {
+                                        final student = _studentFeeDetails[index];
+                                        return CustomStudentInfoFeeDetailContainerBox(
+                                          studentId: student.id,
+                                          heading: student.name,
+                                          subHeading: "Reg. No: ${student.regNo}\nClass: ${student.className}-${student.sectionName}",
+                                          isActive: student.status,
+                                          imageUrl: student.imageUrl,
+                                        );
+                                      },
+                                    ),
+                                    desktop: GridView.builder(
+                                      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                                        crossAxisCount: 3,
+                                        mainAxisSpacing: context.spacing,
+                                        crossAxisSpacing: context.spacing,
+                                        mainAxisExtent: context.scale(180),
+                                      ),
+                                      itemCount: _studentFeeDetails.length,
+                                      itemBuilder: (context, index) {
+                                        final student = _studentFeeDetails[index];
+                                        return CustomStudentInfoFeeDetailContainerBox(
+                                          studentId: student.id,
+                                          heading: student.name,
+                                          subHeading: "Reg. No: ${student.regNo}\nClass: ${student.className}-${student.sectionName}",
+                                          isActive: student.status,
+                                          imageUrl: student.imageUrl,
+                                        );
+                                      },
+                                    ),
+                                  ),
+                      ),
+                    ],
                   ),
-                ],
+                ),
               ),
             ),
     );
+
   }
 
   Widget _buildDropdown<T>({ 
@@ -292,29 +328,33 @@ class _StudentFeeDetailsPageState extends State<StudentFeeDetailsPage> {
     required List<DropdownMenuItem<T>> items,
     required ValueChanged<T?> onChanged,
   }) {
-    final theme = Theme.of(context);
+    final theme = context.theme;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(label, style: theme.textTheme.titleMedium),
-        const SizedBox(height: 8),
+        Text(label, style: TextStyle(fontSize: context.font(16), fontWeight: FontWeight.bold, color: theme.colorScheme.onSurface)),
+        SizedBox(height: context.scale(8)),
         DropdownButtonFormField<T>(
           value: value,
           isExpanded: true,
           items: items,
           onChanged: onChanged,
+          dropdownColor: theme.colorScheme.surface,
+          style: TextStyle(color: theme.colorScheme.onSurface, fontSize: context.font(14)),
           decoration: InputDecoration(
-            contentPadding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+            contentPadding: EdgeInsets.symmetric(vertical: context.scale(12), horizontal: context.scale(16)),
+            filled: true,
+            fillColor: theme.colorScheme.surfaceContainerLow,
             border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(10.0),
-              borderSide: BorderSide(color: theme.dividerColor),
+              borderRadius: BorderRadius.circular(context.scale(10)),
+              borderSide: BorderSide(color: theme.colorScheme.outlineVariant),
             ),
             enabledBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(10.0),
-              borderSide: BorderSide(color: theme.dividerColor),
+              borderRadius: BorderRadius.circular(context.scale(10)),
+              borderSide: BorderSide(color: theme.colorScheme.outlineVariant),
             ),
             focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(10.0),
+              borderRadius: BorderRadius.circular(context.scale(10)),
               borderSide: BorderSide(color: theme.colorScheme.primary, width: 2),
             ),
           ),
@@ -342,54 +382,76 @@ class CustomStudentInfoFeeDetailContainerBox extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
+    final theme = context.theme;
     final isActiveStatus = isActive.toLowerCase() == "active" || isActive.toLowerCase() == "live";
-
-    ImageProvider<Object> backgroundImage = const AssetImage("assets/images/random_boy.jpg");
-    if (imageUrl.startsWith('http')) {
-      backgroundImage = NetworkImage(imageUrl);
-    }
 
     return Container(
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(10),
-        color: theme.primaryColor,
+        borderRadius: BorderRadius.circular(context.scale(12)),
+        color: theme.colorScheme.surfaceContainerLow,
+        border: Border.all(color: theme.colorScheme.outlineVariant),
+        boxShadow: [
+          BoxShadow(
+            color: theme.colorScheme.shadow.withValues(alpha: 0.05),
+            blurRadius: 8,
+            offset: const Offset(0, 4),
+          ),
+        ],
       ),
-      padding: const EdgeInsets.all(16),
+      padding: EdgeInsets.all(context.scale(16)),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           Row(
             children: [
-              ClipRRect(
-                  borderRadius: BorderRadius.circular(40),
-                  child: Image(image: backgroundImage, height: 50, width: 50, fit: BoxFit.cover)),
-              const SizedBox(width: 10),
+              ProfileAvatar(
+                imageUrl: imageUrl.isNotEmpty ? imageUrl : null,
+                radius: context.scale(25),
+                borderWidth: 0,
+              ),
+              SizedBox(width: context.scale(12)),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(heading, style: theme.textTheme.titleLarge?.copyWith(color: theme.colorScheme.onPrimary)),
-                    Text(subHeading, style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onPrimary.withOpacity(0.6))),
+                    Text(
+                      heading,
+                      style: TextStyle(
+                        fontSize: context.font(18),
+                        fontWeight: FontWeight.bold,
+                        color: theme.colorScheme.onSurface,
+                      ),
+                    ),
+                    Text(
+                      subHeading,
+                      style: TextStyle(
+                        fontSize: context.font(12),
+                        color: theme.colorScheme.onSurfaceVariant,
+                      ),
+                    ),
                   ],
                 ),
               ),
               Container(
                   decoration: BoxDecoration(
                     color: isActiveStatus ? Colors.green : Colors.red,
-                    borderRadius: BorderRadius.circular(10),
+                    borderRadius: BorderRadius.circular(context.scale(8)),
                   ),
                   child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    padding: EdgeInsets.symmetric(horizontal: context.scale(8), vertical: context.scale(4)),
                     child: Text(
                       isActive,
-                      style: theme.textTheme.labelMedium?.copyWith(color: Colors.white, fontWeight: FontWeight.bold),
+                      style: TextStyle(
+                        fontSize: context.font(10),
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
                   ))
             ],
           ),
-          const SizedBox(height: 8),
+          SizedBox(height: context.scale(12)),
           SizedBox(
             width: double.infinity,
             child: ElevatedButton(
@@ -401,14 +463,20 @@ class CustomStudentInfoFeeDetailContainerBox extends StatelessWidget {
                   );
                 },
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: theme.colorScheme.secondary,
+                  backgroundColor: theme.colorScheme.primary,
+                  foregroundColor: theme.colorScheme.onPrimary,
+                  elevation: 0,
+                  padding: EdgeInsets.symmetric(vertical: context.scale(10)),
                   shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(30),
+                    borderRadius: BorderRadius.circular(context.scale(20)),
                   ),
                 ),
                 child: Text(
                   "Fee Details",
-                  style: theme.textTheme.labelLarge?.copyWith(color: theme.colorScheme.onSecondary),
+                  style: TextStyle(
+                    fontSize: context.font(14),
+                    fontWeight: FontWeight.bold,
+                  ),
                 )),
           ),
         ],

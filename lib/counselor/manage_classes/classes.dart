@@ -30,29 +30,33 @@ class _ManageClassesPageState extends State<ManageClassesPage> {
     });
     try {
       final response = await ApiService.get('counselor/classes');
+      if (!mounted) return;
       if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
-        if (mounted) {
-          setState(() {
-            dynamic classesData = data['classes'] ?? data['data'] ?? [];
-            List rawList = [];
-            if (classesData is List) {
-              rawList = classesData;
-            } else if (classesData is Map && classesData['data'] is List) {
-              rawList = classesData['data'];
-            }
+        final jsonResponse = jsonDecode(response.body);
+        final data = jsonResponse['data'] is Map ? jsonResponse['data'] : jsonResponse;
+        
+        final List classesJson = data['classes'] is List ? data['classes'] : [];
+        final List sectionsJson = data['sections'] is List ? data['sections'] : [];
+
+        setState(() {
+          _classes = classesJson.map((classMap) {
+            // Link sections to their respective classes based on class_id
+            final classId = classMap['id'];
+            final classSections = sectionsJson.where((s) => s['class_id'] == classId).toList();
             
-            _classes = rawList.map((json) => ClassInfo.fromJson(json)).toList();
-            _isLoading = false;
-          });
-        }
+            // Inject sections into the map so ClassInfo.fromJson can pick them up
+            final fullClassMap = Map<String, dynamic>.from(classMap);
+            fullClassMap['sections'] = classSections;
+            
+            return ClassInfo.fromJson(fullClassMap);
+          }).toList();
+          _isLoading = false;
+        });
       } else {
-        if (mounted) {
-          setState(() {
-            _errorMessage = "Failed to load classes";
-            _isLoading = false;
-          });
-        }
+        setState(() {
+          _errorMessage = "Failed to load classes";
+          _isLoading = false;
+        });
       }
     } catch (e) {
       if (mounted) {
@@ -66,7 +70,6 @@ class _ManageClassesPageState extends State<ManageClassesPage> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
     return Scaffold(
       appBar: AppBar(
         title: const Text("Manage Classes"),
@@ -74,73 +77,121 @@ class _ManageClassesPageState extends State<ManageClassesPage> {
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
           : _errorMessage != null
-              ? Center(child: Padding(
-                  padding: const EdgeInsets.all(24.0),
-                  child: Text(_errorMessage!, textAlign: TextAlign.center, style: TextStyle(color: theme.colorScheme.error)),
-                ))
+              ? Center(
+                  child: Padding(
+                    padding: EdgeInsets.all(context.spacing),
+                    child: Text(_errorMessage!,
+                        textAlign: TextAlign.center,
+                        style: TextStyle(color: context.theme.colorScheme.error)),
+                  ),
+                )
               : RefreshIndicator(
                   onRefresh: _fetchClasses,
                   child: _classes.isEmpty
                       ? ListView(
                           children: [
-                            SizedBox(height: MediaQuery.of(context).size.height * 0.2),
-                            Center(child: Text("No classes found", style: TextStyle(color: theme.hintColor))),
+                            SizedBox(height: context.scale(200)),
+                            Center(
+                                child: Text("No classes found",
+                                    style: TextStyle(color: context.theme.hintColor))),
                           ],
                         )
-                      : GridView.builder(
-                          padding: context.pagePadding,
-                          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                            crossAxisCount: context.isTablet ? 2 : 1,
-                            mainAxisExtent: 180,
-                            crossAxisSpacing: 16,
-                            mainAxisSpacing: 16,
-                          ),
-                          itemCount: _classes.length,
-                          itemBuilder: (context, index) {
-                            final classInfo = _classes[index];
-                            final isActive = classInfo.status == 1;
-                            return Card(
-                              child: Padding(
-                                padding: const EdgeInsets.all(16.0),
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Row(
+                      : Center(
+                          child: ConstrainedBox(
+                            constraints: const BoxConstraints(maxWidth: 1200),
+                            child: GridView.builder(
+                              padding: context.pagePadding,
+                              gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                                crossAxisCount: context.responsive(1, tablet: 2, desktop: 3),
+                                mainAxisExtent: context.scale(200),
+                                crossAxisSpacing: context.spacing,
+                                mainAxisSpacing: context.spacing,
+                              ),
+                              itemCount: _classes.length,
+                              itemBuilder: (context, index) {
+                                final classInfo = _classes[index];
+                                final isActive = classInfo.status == 1;
+                                return Card(
+                                  elevation: 0,
+                                  color: context.theme.colorScheme.surfaceContainerLow,
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(context.scale(12)),
+                                    side: BorderSide(
+                                      color: context.theme.colorScheme.outlineVariant,
+                                      width: 1,
+                                    ),
+                                  ),
+                                  child: Padding(
+                                    padding: EdgeInsets.all(context.spacing),
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
                                       children: [
-                                        CircleAvatar(
-                                          backgroundColor: theme.colorScheme.primary.withValues(alpha: 0.1),
-                                          child: Icon(Icons.class_outlined, color: theme.colorScheme.primary),
+                                        Row(
+                                          children: [
+                                            CircleAvatar(
+                                              radius: context.scale(20),
+                                              backgroundColor: context.theme.colorScheme.primary
+                                                  .withValues(alpha: 0.1),
+                                              child: Icon(Icons.class_outlined,
+                                                  color: context.theme.colorScheme.primary,
+                                                  size: context.scale(20)),
+                                            ),
+                                            SizedBox(width: context.sm),
+                                            Expanded(
+                                              child: Column(
+                                                crossAxisAlignment: CrossAxisAlignment.start,
+                                                children: [
+                                                  Text(classInfo.name,
+                                                      style: TextStyle(
+                                                          fontWeight: FontWeight.bold,
+                                                          fontSize: context.font(16))),
+                                                  Text(isActive ? "ACTIVE" : "INACTIVE",
+                                                      style: TextStyle(
+                                                          color: isActive ? Colors.green : Colors.red,
+                                                          fontSize: context.font(10),
+                                                          fontWeight: FontWeight.bold)),
+                                                ],
+                                              ),
+                                            ),
+                                            IconButton(
+                                                onPressed: () {},
+                                                icon: Icon(Icons.edit_outlined,
+                                                    size: context.scale(20))),
+                                          ],
                                         ),
-                                        const SizedBox(width: 12),
+                                        const Spacer(),
+                                        Text("SECTIONS",
+                                            style: context.theme.textTheme.labelSmall?.copyWith(
+                                                color: context.theme.hintColor,
+                                                fontWeight: FontWeight.bold,
+                                                fontSize: context.font(10))),
+                                        SizedBox(height: context.xs),
                                         Expanded(
-                                          child: Column(
-                                            crossAxisAlignment: CrossAxisAlignment.start,
-                                            children: [
-                                              Text(classInfo.name, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-                                              Text(isActive ? "ACTIVE" : "INACTIVE", 
-                                                style: TextStyle(color: isActive ? Colors.green : Colors.red, fontSize: 10, fontWeight: FontWeight.bold)),
-                                            ],
+                                          flex: 2,
+                                          child: SingleChildScrollView(
+                                            child: Wrap(
+                                              spacing: context.xs,
+                                              runSpacing: context.xs,
+                                              children: classInfo.sections
+                                                  .map((s) => Chip(
+                                                        label: Text(s.name,
+                                                            style: TextStyle(fontSize: context.font(11))),
+                                                        padding: EdgeInsets.zero,
+                                                        visualDensity: VisualDensity.compact,
+                                                        materialTapTargetSize:
+                                                            MaterialTapTargetSize.shrinkWrap,
+                                                      ))
+                                                  .toList(),
+                                            ),
                                           ),
                                         ),
-                                        IconButton(onPressed: () {}, icon: const Icon(Icons.edit_outlined, size: 20)),
                                       ],
                                     ),
-                                    const Spacer(),
-                                    Text("SECTIONS", style: theme.textTheme.labelSmall?.copyWith(color: theme.hintColor, fontWeight: FontWeight.bold)),
-                                    const SizedBox(height: 8),
-                                    Wrap(
-                                      spacing: 8,
-                                      children: classInfo.sections.map((s) => Chip(
-                                        label: Text(s.name, style: const TextStyle(fontSize: 11)),
-                                        padding: EdgeInsets.zero,
-                                        materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                                      )).toList(),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            );
-                          },
+                                  ),
+                                );
+                              },
+                            ),
+                          ),
                         ),
                 ),
     );

@@ -1,6 +1,8 @@
 import 'dart:io';
+import 'package:eduphin/services/common_widgets.dart';
 import 'package:eduphin/login_logout/login.dart';
 import 'package:eduphin/services/responsive_helper.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import '../services/api_service.dart';
 import 'librarian_models.dart';
@@ -17,6 +19,8 @@ class _LibrarianProfilePageState extends State<LibrarianProfilePage> {
   bool _isLoading = true;
   UserDetail? _profile;
   File? _imageFile;
+  Uint8List? _webImage;
+  String? _fileName;
 
   final _addressController = TextEditingController();
   final _cityController = TextEditingController();
@@ -31,6 +35,7 @@ class _LibrarianProfilePageState extends State<LibrarianProfilePage> {
   final _emergencyNameController = TextEditingController();
   final _emergencyPhoneController = TextEditingController();
   final _passwordController = TextEditingController();
+  final _confirmPasswordController = TextEditingController();
 
   String _selectedGender = "Male";
   String _selectedDob = "";
@@ -75,9 +80,22 @@ class _LibrarianProfilePageState extends State<LibrarianProfilePage> {
 
   Future<void> _pickImage() async {
     final picker = ImagePicker();
-    final pickedFile = await picker.pickImage(source: ImageSource.gallery);
+    final pickedFile = await picker.pickImage(
+      source: ImageSource.gallery,
+      imageQuality: 50,
+      maxWidth: 1024,
+      maxHeight: 1024,
+    );
     if (pickedFile != null) {
-      setState(() => _imageFile = File(pickedFile.path));
+      if (kIsWeb) {
+        final bytes = await pickedFile.readAsBytes();
+        setState(() {
+          _webImage = bytes;
+          _fileName = pickedFile.name;
+        });
+      } else {
+        setState(() => _imageFile = File(pickedFile.path));
+      }
     }
   }
 
@@ -96,40 +114,52 @@ class _LibrarianProfilePageState extends State<LibrarianProfilePage> {
   }
 
   Future<void> _saveProfile() async {
+    if (_passwordController.text.isNotEmpty && _passwordController.text != _confirmPasswordController.text) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Passwords do not match")));
+      return;
+    }
+
     setState(() => _isLoading = true);
     try {
-      Map<String, String> data = {
-        'gender': _selectedGender,
-        'date_of_birth': _selectedDob,
-        'address': _addressController.text,
-        'city': _cityController.text,
-        'state': _stateController.text,
-        'pincode': _pincodeController.text,
-        'phone': _phoneController.text,
-        'alternate_phone': _altPhoneController.text,
-        'relationship_status': _selectedStatus,
-        'bank_account_number': _bankAccController.text,
-        'ifsc_code': _ifscController.text,
-        'bank_name': _bankNameController.text,
-        'branch_name': _branchNameController.text,
-        'emergency_contact_name': _emergencyNameController.text,
-        'emergency_contact_number': _emergencyPhoneController.text,
+      final Map<String, String> fields = {
+        "gender": _selectedGender,
+        "date_of_birth": _selectedDob,
+        "relationship_status": _selectedStatus,
+        "address": _addressController.text,
+        "city": _cityController.text,
+        "state": _stateController.text,
+        "pincode": _pincodeController.text,
+        "phone": _phoneController.text,
+        "alternate_phone": _altPhoneController.text,
+        "bank_account_number": _bankAccController.text,
+        "ifsc_code": _ifscController.text,
+        "bank_name": _bankNameController.text,
+        "branch_name": _branchNameController.text,
+        "emergency_contact_name": _emergencyNameController.text,
+        "emergency_contact_number": _emergencyPhoneController.text,
       };
 
       if (_passwordController.text.isNotEmpty) {
-        data['password'] = _passwordController.text;
+        fields["password"] = _passwordController.text;
+        fields["password_confirmation"] = _confirmPasswordController.text;
       }
 
-      await ApiService.updateLibrarianProfile(data, photo: _imageFile);
+      if (kIsWeb && _webImage != null) {
+        await ApiService.updateLibrarianProfileFromBytes(fields, _webImage!, _fileName);
+      } else {
+        await ApiService.updateLibrarianProfile(fields, photo: _imageFile);
+      }
+
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Profile updated successfully")));
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Profile updated successfully!")));
       _fetchProfile();
+      setState(() {
+        _passwordController.clear();
+        _confirmPasswordController.clear();
+      });
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Error updating profile: $e")));
-      }
-    } finally {
-      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Update failed: $e")));
         setState(() => _isLoading = false);
       }
     }
@@ -137,15 +167,20 @@ class _LibrarianProfilePageState extends State<LibrarianProfilePage> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
+    final theme = context.theme;
 
     if (_isLoading && _profile == null) {
-      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+      return Scaffold(
+        body: Center(child: CircularProgressIndicator(color: theme.colorScheme.primary)),
+      );
     }
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text("Profile Settings"),
+        title: Text(
+          "Profile Settings",
+          style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold, fontSize: context.font(20)),
+        ),
       ),
       body: SingleChildScrollView(
         padding: context.pagePadding,
@@ -156,154 +191,168 @@ class _LibrarianProfilePageState extends State<LibrarianProfilePage> {
               children: [
                 /// TOP PROFILE CARD
                 Card(
+                  elevation: 0,
+                  color: theme.colorScheme.surfaceContainerLow,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(context.scale(20)),
+                    side: BorderSide(color: theme.colorScheme.outlineVariant.withValues(alpha: 0.5), width: 0.5),
+                  ),
                   child: Padding(
-                    padding: const EdgeInsets.all(24),
-                    child: Column(
+                    padding: EdgeInsets.all(context.lg),
+                    child: context.isMobile
+                        ? Column(
                       children: [
-                        Stack(
-                          children: [
-                            Container(
-                              padding: const EdgeInsets.all(4),
-                              decoration: BoxDecoration(
-                                shape: BoxShape.circle,
-                                border: Border.all(color: theme.colorScheme.primary.withValues(alpha: 0.5), width: 2),
-                              ),
-                              child: CircleAvatar(
-                                radius: 50,
-                                backgroundColor: theme.colorScheme.surfaceVariant,
-                                backgroundImage: _imageFile != null
-                                    ? FileImage(_imageFile!)
-                                    : (_profile?.photo != null
-                                        ? NetworkImage("${ApiService.baseImageUrl}/storage/${_profile!.photo}") as ImageProvider
-                                        : null),
-                                child: (_imageFile == null && _profile?.photo == null)
-                                    ? Text(_profile?.firstName?.isNotEmpty == true ? _profile!.firstName!.substring(0, 1).toUpperCase() : "L",
-                                        style: TextStyle(color: theme.colorScheme.primary, fontSize: 32, fontWeight: FontWeight.bold))
-                                    : null,
-                              ),
-                            ),
-                            Positioned(
-                              bottom: 0,
-                              right: 0,
-                              child: GestureDetector(
-                                onTap: _pickImage,
-                                child: CircleAvatar(
-                                  radius: 18,
-                                  backgroundColor: theme.colorScheme.primary,
-                                  child: const Icon(Icons.camera_alt, color: Colors.white, size: 18),
-                                ),
-                              ),
-                            )
-                          ],
-                        ),
-                        const SizedBox(height: 16),
-                        Text(
-                          _profile?.fullName ?? "N/A",
-                          style: theme.textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold),
-                        ),
-                        Text(
-                          "Librarian - ${_profile?.employeeId ?? 'N/A'}",
-                          style: theme.textTheme.bodyMedium?.copyWith(color: theme.hintColor),
+                        _buildProfileAvatar(context, theme),
+                        SizedBox(height: context.md),
+                        ..._buildProfileInfo(context, theme),
+                      ],
+                    )
+                        : Row(
+                      crossAxisAlignment: CrossAxisAlignment.center,
+                      children: [
+                        _buildProfileAvatar(context, theme),
+                        SizedBox(width: context.lg),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: _buildProfileInfo(context, theme),
+                          ),
                         ),
                       ],
                     ),
                   ),
                 ),
 
-                const SizedBox(height: 24),
+                SizedBox(height: context.lg),
 
                 /// PERSONAL INFORMATION
-                _buildSection(
-                  context,
+                ProfileSection(
                   title: "Personal Details",
-                  icon: Icons.person_outline,
+                  icon: Icons.person_outline_rounded,
                   children: [
-                    _buildResponsiveRow(context, [
-                      _buildDropdownField(context, "Gender", _selectedGender, ["Male", "Female", "Other"], (val) {
-                        setState(() => _selectedGender = val!);
-                      }),
-                      _buildDateField(context, "Date of Birth", _selectedDob, () => _selectDate(context)),
+                    AdaptiveFieldRow(children: [
+                      ProfileDropdown(
+                        label: "Gender",
+                        value: _selectedGender,
+                        items: const ["Male", "Female", "Other"],
+                        onChanged: (val) {
+                          setState(() => _selectedGender = val!);
+                        },
+                      ),
+                      ProfileTextField(
+                        label: "Date of Birth",
+                        controller: TextEditingController(text: _selectedDob),
+                        readOnly: true,
+                        onTap: () => _selectDate(context),
+                        icon: Icons.calendar_today_rounded,
+                      ),
                     ]),
-                    _buildResponsiveRow(context, [
-                      _buildEditableTextField(context, "Phone Number", _phoneController),
-                      _buildEditableTextField(context, "Alternate Phone", _altPhoneController),
+                    AdaptiveFieldRow(children: [
+                      ProfileTextField(
+                        label: "Phone Number",
+                        controller: _phoneController,
+                        icon: Icons.phone_android_rounded,
+                      ),
+                      ProfileDropdown(
+                        label: "Relationship Status",
+                        value: _selectedStatus,
+                        items: const ["Single", "Married", "Divorced", "Widowed"],
+                        onChanged: (val) {
+                          setState(() => _selectedStatus = val!);
+                        },
+                      ),
                     ]),
-                    _buildDropdownField(context, "Relationship Status", _selectedStatus, ["Single", "Married", "Divorced", "Widowed"], (val) {
-                      setState(() => _selectedStatus = val!);
-                    }),
                   ],
                 ),
 
                 /// ADDRESS INFORMATION
-                _buildSection(
-                  context,
+                ProfileSection(
                   title: "Address Information",
                   icon: Icons.location_on_outlined,
                   children: [
-                    _buildEditableTextField(context, "Address", _addressController, maxLines: 2),
-                    _buildResponsiveRow(context, [
-                      _buildEditableTextField(context, "City", _cityController),
-                      _buildEditableTextField(context, "State", _stateController),
+                    ProfileTextField(
+                      label: "Full Address",
+                      controller: _addressController,
+                      maxLines: 2,
+                    ),
+                    AdaptiveFieldRow(children: [
+                      ProfileTextField(label: "City", controller: _cityController),
+                      ProfileTextField(label: "State", controller: _stateController),
                     ]),
-                    _buildEditableTextField(context, "PINCODE", _pincodeController),
+                    ProfileTextField(label: "Postal Code (PINCODE)", controller: _pincodeController),
                   ],
                 ),
 
                 /// BANKING INFORMATION
-                _buildSection(
-                  context,
+                ProfileSection(
                   title: "Banking Information",
                   icon: Icons.account_balance_outlined,
                   children: [
-                    _buildResponsiveRow(context, [
-                      _buildEditableTextField(context, "Account Number", _bankAccController),
-                      _buildEditableTextField(context, "IFSC Code", _ifscController),
+                    AdaptiveFieldRow(children: [
+                      ProfileTextField(label: "Account Number", controller: _bankAccController),
+                      ProfileTextField(label: "IFSC Code", controller: _ifscController),
                     ]),
-                    _buildResponsiveRow(context, [
-                      _buildEditableTextField(context, "Bank Name", _bankNameController),
-                      _buildEditableTextField(context, "Branch Name", _branchNameController),
+                    AdaptiveFieldRow(children: [
+                      ProfileTextField(label: "Bank Name", controller: _bankNameController),
+                      ProfileTextField(label: "Branch Name", controller: _branchNameController),
                     ]),
                   ],
                 ),
 
                 /// SECURITY
-                _buildSection(
-                  context,
+                ProfileSection(
                   title: "Security Settings",
-                  icon: Icons.lock_outline,
+                  icon: Icons.lock_outline_rounded,
                   children: [
-                    _buildEditableTextField(context, "Update Password", _passwordController, isPassword: true),
+                    AdaptiveFieldRow(children: [
+                      ProfileTextField(label: "New Password", controller: _passwordController, isPassword: true),
+                      ProfileTextField(label: "Confirm Password", controller: _confirmPasswordController, isPassword: true),
+                    ]),
                   ],
                 ),
 
-                const SizedBox(height: 32),
+                SizedBox(height: context.xl),
 
-                ElevatedButton.icon(
+                FilledButton.icon(
                   onPressed: _isLoading ? null : _saveProfile,
-                  icon: _isLoading ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white)) : const Icon(Icons.save_outlined),
-                  label: const Text("UPDATE PROFILE"),
-                ),
-                const SizedBox(height: 16),
-                OutlinedButton.icon(
-                  onPressed: () async {
-                    await ApiService.logout();
-                    if (mounted) {
-                      Navigator.pushAndRemoveUntil(
-                        context,
-                        MaterialPageRoute(builder: (context) => const LoginPage()),
-                        (route) => false,
-                      );
-                    }
-                  },
-                  icon: const Icon(Icons.logout),
-                  label: const Text("LOGOUT"),
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: Colors.red,
-                    side: const BorderSide(color: Colors.red),
-                    padding: const EdgeInsets.symmetric(vertical: 16),
+                  icon: _isLoading ? SizedBox(width: context.scale(20), height: context.scale(20), child: CircularProgressIndicator(strokeWidth: 2, color: theme.colorScheme.onPrimary)) : const Icon(Icons.save_rounded),
+                  label: const Text("SAVE PROFILE CHANGES"),
+                  style: FilledButton.styleFrom(
+                    minimumSize: Size(double.infinity, context.scale(56)),
                   ),
                 ),
-                const SizedBox(height: 40),
+                SizedBox(height: context.md),
+                FilledButton.tonalIcon(
+                  onPressed: () async {
+                    final confirmed = await showDialog<bool>(
+                      context: context,
+                      builder: (context) => AlertDialog(
+                        title: const Text("Confirm Logout"),
+                        content: const Text("Are you sure you want to log out of your account?"),
+                        actions: [
+                          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text("CANCEL")),
+                          TextButton(
+                            onPressed: () => Navigator.pop(context, true),
+                            child: Text("LOGOUT", style: TextStyle(color: theme.colorScheme.error)),
+                          ),
+                        ],
+                      ),
+                    );
+                    if (confirmed == true) {
+                      await ApiService.logout();
+                      if (context.mounted) {
+                        Navigator.pushAndRemoveUntil(context, MaterialPageRoute(builder: (c) => const LoginPage()), (r) => false);
+                      }
+                    }
+                  },
+                  icon: const Icon(Icons.logout_rounded),
+                  label: const Text("LOGOUT FROM ACCOUNT"),
+                  style: FilledButton.styleFrom(
+                    minimumSize: Size(double.infinity, context.scale(56)),
+                    foregroundColor: theme.colorScheme.error,
+                  ),
+                ),
+                SizedBox(height: context.xl * 2),
               ],
             ),
           ),
@@ -312,113 +361,28 @@ class _LibrarianProfilePageState extends State<LibrarianProfilePage> {
     );
   }
 
-  Widget _buildResponsiveRow(BuildContext context, List<Widget> children) {
-    if (!context.isTablet) return Column(children: children);
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: children.map((c) => Expanded(child: Padding(padding: const EdgeInsets.only(right: 12), child: c))).toList(),
+  Widget _buildProfileAvatar(BuildContext context, ThemeData theme) {
+    return ProfileAvatar(
+      radius: context.scale(55),
+      localImage: _imageFile,
+      webImage: _webImage,
+      imageUrl: ApiService.getStorageUrl(_profile?.photo),
+      onCameraTap: _pickImage,
     );
   }
 
-  Widget _buildSection(BuildContext context, {required String title, required IconData icon, required List<Widget> children}) {
-    final theme = Theme.of(context);
-    return Card(
-      margin: const EdgeInsets.only(bottom: 24),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: theme.colorScheme.primary.withValues(alpha: 0.05),
-              borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
-            ),
-            child: Row(
-              children: [
-                Icon(icon, color: theme.colorScheme.primary, size: 20),
-                const SizedBox(width: 10),
-                Text(title, style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold, color: theme.colorScheme.primary)),
-              ],
-            ),
-          ),
-          Padding(
-            padding: const EdgeInsets.all(16),
-            child: Column(children: children),
-          ),
-        ],
+  List<Widget> _buildProfileInfo(BuildContext context, ThemeData theme) {
+    return [
+      Text(
+        _profile?.fullName ?? "N/A",
+        textAlign: context.isMobile ? TextAlign.center : TextAlign.start,
+        style: theme.textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold),
       ),
-    );
-  }
-
-  Widget _buildEditableTextField(BuildContext context, String label, TextEditingController controller, {bool isPassword = false, int maxLines = 1}) {
-    final theme = Theme.of(context);
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(label, style: theme.textTheme.labelMedium?.copyWith(color: theme.hintColor)),
-          const SizedBox(height: 8),
-          TextField(
-            controller: controller,
-            obscureText: isPassword,
-            maxLines: maxLines,
-            decoration: const InputDecoration(contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 12)),
-          ),
-        ],
+      Text(
+        "Librarian • Employee ID: ${_profile?.employeeId ?? 'N/A'}",
+        textAlign: context.isMobile ? TextAlign.center : TextAlign.start,
+        style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.outline),
       ),
-    );
-  }
-
-  Widget _buildDropdownField(BuildContext context, String label, String value, List<String> items, Function(String?) onChanged) {
-    final theme = Theme.of(context);
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(label, style: theme.textTheme.labelMedium?.copyWith(color: theme.hintColor)),
-          const SizedBox(height: 8),
-          DropdownButtonFormField<String>(
-            value: items.contains(value) ? value : items.first,
-            isExpanded: true,
-            items: items.map((e) => DropdownMenuItem(value: e, child: Text(e, style: const TextStyle(fontSize: 14)))).toList(),
-            onChanged: onChanged,
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildDateField(BuildContext context, String label, String value, VoidCallback onTap) {
-    final theme = Theme.of(context);
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(label, style: theme.textTheme.labelMedium?.copyWith(color: theme.hintColor)),
-          const SizedBox(height: 8),
-          InkWell(
-            onTap: onTap,
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(12),
-                color: theme.inputDecorationTheme.fillColor,
-                border: Border.all(color: theme.colorScheme.outline.withValues(alpha: 0.1)),
-              ),
-              child: Row(
-                children: [
-                  Expanded(child: Text(value.isEmpty ? "Select Date" : value, style: theme.textTheme.bodyMedium)),
-                  const Icon(Icons.calendar_today, size: 16),
-                ],
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
+    ];
   }
 }

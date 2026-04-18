@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:eduphin/manager_dashboard/studyMaterial/add_note.dart';
 import 'package:eduphin/manager_dashboard/studyMaterial/edit_note.dart';
 import 'package:eduphin/services/api_service.dart';
+import 'package:eduphin/services/responsive_helper.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
@@ -10,7 +11,9 @@ class StudyMaterial {
   final int id;
   final String title;
   final String description;
-  final String className; // "class" is a reserved keyword in Dart
+  final int classId;
+  final int sectionId;
+  final String className; 
   final String section;
   final String uploadedBy;
   final String date;
@@ -19,6 +22,8 @@ class StudyMaterial {
     required this.id,
     required this.title,
     required this.description,
+    required this.classId,
+    required this.sectionId,
     required this.className,
     required this.section,
     required this.uploadedBy,
@@ -30,6 +35,8 @@ class StudyMaterial {
       id: json['id'] ?? 0,
       title: json['title'] ?? 'N/A',
       description: json['description'] ?? '',
+      classId: json['class_id'] ?? 0,
+      sectionId: json['section_id'] ?? 0,
       className: classMap[json['class_id']] ?? 'N/A',
       section: sectionMap[json['section_id']] ?? 'N/A',
       uploadedBy: teacherMap[json['user_id']] ?? 'N/A',
@@ -114,18 +121,12 @@ class _NotesPageState extends State<NotesPage> {
             classes = fetchedClasses;
             sections = fetchedSections;
             allMaterials = fetchedMaterials;
-            if (classes.isNotEmpty) {
-              selectedClass = classes.first.name;
-            }
-            if (sections.isNotEmpty) {
-              selectedSection = sections.first.name;
-            }
             _filterMaterials();
             isLoading = false;
           });
         }
       } else {
-        throw Exception('Failed to load data');
+        throw Exception(ApiService.errorMessage(response, 'Failed to load data'));
       }
     } catch (e) {
       if (mounted) {
@@ -133,7 +134,7 @@ class _NotesPageState extends State<NotesPage> {
           isLoading = false;
         });
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error fetching data: $e')),
+          SnackBar(content: Text('Error fetching data: ${e.toString().replaceFirst('Exception: ', '')}')),
         );
       }
     }
@@ -184,17 +185,12 @@ class _NotesPageState extends State<NotesPage> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
+    final theme = context.theme;
     return Scaffold(
       backgroundColor: theme.scaffoldBackgroundColor,
       appBar: AppBar(
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        leading: BackButton(color: theme.colorScheme.onSurface),
-        title: Text(
-          "Study Material List",
-          style: TextStyle(color: theme.colorScheme.onSurface),
-        ),
+        leading: const BackButton(),
+        title: const Text("Study Material List"),
       ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () async {
@@ -209,19 +205,17 @@ class _NotesPageState extends State<NotesPage> {
       body: isLoading
           ? const Center(child: CircularProgressIndicator())
           : Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16.0),
+              padding: context.pagePadding.copyWith(bottom: 0),
               child: Column(
                 children: [
                   _buildFilterSection(theme),
-                  const SizedBox(height: 20),
+                  SizedBox(height: context.md),
                   Expanded(
-                    child: LayoutBuilder(builder: (context, constraints) {
-                      if (constraints.maxWidth > 600) {
-                        return _buildGridView();
-                      } else {
-                        return _buildListView();
-                      }
-                    }),
+                    child: context.responsive(
+                      _buildListView(),
+                      tablet: _buildGridView(),
+                      desktop: _buildGridView(),
+                    ),
                   ),
                 ],
               ),
@@ -233,33 +227,41 @@ class _NotesPageState extends State<NotesPage> {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: theme.colorScheme.surface,
-        borderRadius: BorderRadius.circular(20),
+        color: theme.colorScheme.surfaceContainerLow,
+        borderRadius: BorderRadius.circular(context.scale(20)),
+        border: Border.all(color: theme.colorScheme.outlineVariant),
       ),
       child: Row(
         children: [
           Expanded(
-            child: _buildDropdown(theme, "Select Class *", selectedClass, classes.map((c) => c.name).toSet().toList(), (v) {
-              if (v != null) {
+            child: _buildDropdown(
+              theme,
+              "Select Class",
+              selectedClass,
+              ["All", ...classes.map((c) => c.name)],
+              (v) {
                 setState(() {
-                  selectedClass = v;
-                  // Fix: Reset section when class changes to prevent state inconsistency
+                  selectedClass = v == "All" ? null : v;
                   selectedSection = null;
                   _filterMaterials();
                 });
-              }
-            }),
+              },
+            ),
           ),
-          const SizedBox(width: 16),
+          SizedBox(width: context.md),
           Expanded(
-            child: _buildDropdown(theme, "Select Section *", selectedSection, sections.map((s) => s.name).toSet().toList(), (v) {
-              if (v != null) {
+            child: _buildDropdown(
+              theme,
+              "Select Section",
+              selectedSection,
+              ["All", ...sections.map((s) => s.name)],
+              (v) {
                 setState(() {
-                  selectedSection = v;
+                  selectedSection = v == "All" ? null : v;
                   _filterMaterials();
                 });
-              }
-            }),
+              },
+            ),
           ),
         ],
       ),
@@ -267,27 +269,29 @@ class _NotesPageState extends State<NotesPage> {
   }
 
   Widget _buildDropdown(ThemeData theme, String label, String? value, List<String> items, ValueChanged<String?> onChanged) {
-    // Defensive guard to prevent crash if value is not in items
     final uniqueItems = items.toSet().toList();
-    final isValueValid = value == null || uniqueItems.contains(value);
-    final String? dropdownValue = isValueValid ? value : null;
+    final String dropdownValue = (value == null || !uniqueItems.contains(value)) ? "All" : value;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(label, style: theme.textTheme.labelMedium?.copyWith(color: theme.colorScheme.onSurface.withOpacity(0.6))),
+        Text(label, style: theme.textTheme.labelMedium?.copyWith(color: theme.colorScheme.onSurface.withValues(alpha: 0.6))),
         const SizedBox(height: 6),
         DropdownButtonFormField<String>(
-          isExpanded: true, // Fix for overflow
-          value: dropdownValue, // Use the validated value
-          dropdownColor: theme.cardColor,
+          isExpanded: true,
+          value: dropdownValue,
+          dropdownColor: theme.colorScheme.surfaceContainerLow,
           style: theme.textTheme.bodyLarge,
           decoration: InputDecoration(
             filled: true,
             fillColor: theme.scaffoldBackgroundColor,
             border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-              borderSide: BorderSide.none,
+              borderRadius: BorderRadius.circular(context.scale(12)),
+              borderSide: BorderSide(color: theme.colorScheme.outlineVariant),
+            ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(context.scale(12)),
+              borderSide: BorderSide(color: theme.colorScheme.outlineVariant),
             ),
             contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
           ),
@@ -303,7 +307,7 @@ class _NotesPageState extends State<NotesPage> {
         ? ListView.separated(
             padding: const EdgeInsets.only(bottom: 80), // Adjusted for FAB
             itemCount: filteredMaterials.length,
-            separatorBuilder: (context, index) => const SizedBox(height: 16),
+            separatorBuilder: (context, index) => SizedBox(height: context.sm),
             itemBuilder: (context, index) => _StudyMaterialCard(material: filteredMaterials[index], onDelete: () => _deleteNote(filteredMaterials[index].id), onEdit: () async {
                  final result = await Navigator.push(context, MaterialPageRoute(builder: (context) => EditNotePage(material: filteredMaterials[index])));
                  if(result == true) {
@@ -320,10 +324,10 @@ class _NotesPageState extends State<NotesPage> {
     return filteredMaterials.isNotEmpty
         ? GridView.builder(
             padding: const EdgeInsets.only(bottom: 80), // Adjusted for FAB
-            gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
+            gridDelegate: SliverGridDelegateWithMaxCrossAxisExtent(
               maxCrossAxisExtent: 400,
-              mainAxisSpacing: 16,
-              crossAxisSpacing: 16,
+              mainAxisSpacing: context.sm,
+              crossAxisSpacing: context.sm,
               childAspectRatio: 1.8, // Adjust this for card height
             ),
             itemCount: filteredMaterials.length,
@@ -349,12 +353,13 @@ class _StudyMaterialCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
+    final theme = context.theme;
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: theme.colorScheme.surface,
-        borderRadius: BorderRadius.circular(18),
+        color: theme.colorScheme.surfaceContainerLow,
+        borderRadius: BorderRadius.circular(context.scale(18)),
+        border: Border.all(color: theme.colorScheme.outlineVariant),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -380,13 +385,13 @@ class _StudyMaterialCard extends StatelessWidget {
               ),
               Row(
                 children: [
-                  IconButton(icon: Icon(Icons.edit, size: 20, color: theme.colorScheme.onSurface.withOpacity(0.6)), onPressed: onEdit, constraints: const BoxConstraints()),
+                  IconButton(icon: Icon(Icons.edit, size: 20, color: theme.colorScheme.onSurface.withValues(alpha: 0.6)), onPressed: onEdit, constraints: const BoxConstraints()),
                   IconButton(icon: Icon(Icons.delete, size: 20, color: theme.colorScheme.error), onPressed: onDelete, constraints: const BoxConstraints()),
                 ],
               ),
             ],
           ),
-          const SizedBox(height: 4),
+          SizedBox(height: context.xs),
           Text(
             material.title,
             style: theme.textTheme.titleMedium?.copyWith(
@@ -397,7 +402,7 @@ class _StudyMaterialCard extends StatelessWidget {
           Text(
             "Uploaded by: ${material.uploadedBy} on ${material.date}",
             style: theme.textTheme.bodyMedium?.copyWith(
-              color: theme.colorScheme.onSurface.withOpacity(0.6),
+              color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
             ),
           ),
         ],

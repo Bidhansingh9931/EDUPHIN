@@ -1,7 +1,6 @@
 import 'dart:convert';
 import 'package:eduphin/services/api_service.dart';
 import 'package:flutter/foundation.dart';
-import 'package:flutter/material.dart';
 import 'dashboard_models.dart';
 
 class DashboardDataProvider {
@@ -62,17 +61,5 @@ class DashboardDataProvider {
       // Re-throw the exception to be handled by the FutureBuilder.
       throw Exception('An error occurred: $e');
     }
-  }
-
-  DashboardData _emptyDashboardData() {
-    return DashboardData(
-      gridItems: [],
-      reviews: [],
-      databaseCount: 'N/A',
-      dataUsage: 'N/A',
-      systemUptime: 'N/A',
-      recentActivities: [],
-      testimonials: [],
-    );
   }
 }

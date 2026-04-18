@@ -87,15 +87,26 @@ class Subject {
 }
 
 class Student {
+  final int id;
   final String name;
   final String? rollNumber;
+  final String? photo;
 
-  Student({required this.name, this.rollNumber});
+  Student({required this.id, required this.name, this.rollNumber, this.photo});
 
   factory Student.fromJson(Map<String, dynamic> json) {
+    // Try to get name from user relation first, then from direct fields
+    String studentName = json['user']?['name'] ?? 
+                         json['full_name'] ?? 
+                         (json['first_name'] != null ? "${json['first_name']} ${json['last_name'] ?? ''}" : null) ??
+                         json['name'] ?? 
+                         'Unnamed Student';
+
     return Student(
-      name: json['user']?['name'] ?? json['name'] ?? 'Unnamed Student',
-      rollNumber: json['roll_no']?.toString(),
+      id: json['id'] ?? 0,
+      name: studentName.trim(),
+      rollNumber: (json['roll_no'] ?? json['roll_number'] ?? json['roll'])?.toString(),
+      photo: json['user']?['photo'] ?? json['photo'],
     );
   }
 }

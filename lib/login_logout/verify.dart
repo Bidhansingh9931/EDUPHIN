@@ -3,6 +3,7 @@ import 'dart:convert';
 
 import 'package:eduphin/login_logout/updated_password.dart';
 import 'package:eduphin/services/api_service.dart';
+import 'package:eduphin/services/responsive_helper.dart';
 import 'package:flutter/material.dart';
 
 class VerifyPasswordPage extends StatefulWidget {
@@ -49,7 +50,7 @@ class _VerifyPasswordPageState extends State<VerifyPasswordPage> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: const Text('Please enter all 4 digits.'),
-          backgroundColor: Theme.of(context).colorScheme.error,
+          backgroundColor: context.theme.colorScheme.error,
         ),
       );
       return;
@@ -66,7 +67,7 @@ class _VerifyPasswordPageState extends State<VerifyPasswordPage> {
       });
 
       if (mounted) {
-        final theme = Theme.of(context);
+        final theme = context.theme;
         final responseData = jsonDecode(response.body);
         if (response.statusCode == 200 && responseData['status'] == true) {
            ScaffoldMessenger.of(context).showSnackBar(
@@ -84,7 +85,7 @@ class _VerifyPasswordPageState extends State<VerifyPasswordPage> {
       }
     } catch (e) {
       if (mounted) {
-        final theme = Theme.of(context);
+        final theme = context.theme;
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
               content: Text(e.toString().replaceFirst('Exception: ', '')),
@@ -108,7 +109,7 @@ class _VerifyPasswordPageState extends State<VerifyPasswordPage> {
       });
 
       if (mounted) {
-        final theme = Theme.of(context);
+        final theme = context.theme;
         final responseData = jsonDecode(response.body);
         if (response.statusCode == 200 && responseData['status'] == true) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -122,7 +123,7 @@ class _VerifyPasswordPageState extends State<VerifyPasswordPage> {
       }
     } catch (e) {
        if (mounted) {
-        final theme = Theme.of(context);
+        final theme = context.theme;
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
               content: Text(e.toString().replaceFirst('Exception: ', '')),
@@ -173,57 +174,63 @@ class _VerifyPasswordPageState extends State<VerifyPasswordPage> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
+    final theme = context.theme;
     return Scaffold(
+      backgroundColor: theme.scaffoldBackgroundColor,
       body: Center(
         child: SingleChildScrollView(
           child: Padding(
-            padding: const EdgeInsets.fromLTRB(25, 20, 25, 80),
+            padding: context.pagePadding,
             child: LayoutBuilder(
               builder: (context, constraints) {
                 return Container(
                   width: constraints.maxWidth > 500 ? 500 : constraints.maxWidth,
                   decoration: BoxDecoration(
                     color: theme.cardColor,
-                    borderRadius: BorderRadius.circular(20),
+                    borderRadius: BorderRadius.circular(context.scale(20)),
                   ),
                   child: Padding(
-                    padding: const EdgeInsets.all(25.0),
+                    padding: EdgeInsets.all(context.scale(25)),
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Icon(Icons.school, size: 100, color: theme.colorScheme.onSurface),
-                        const SizedBox(height: 10),
+                        Icon(Icons.school, size: context.scale(100), color: theme.colorScheme.onSurface),
+                        SizedBox(height: context.scale(10)),
 
                         Text(
                           "Verify Your Mail",
                           style: theme.textTheme.headlineSmall?.copyWith(
                             fontWeight: FontWeight.bold,
+                            fontSize: context.font(24),
                           ),
                         ),
 
-                        const SizedBox(height: 8),
+                        SizedBox(height: context.scale(8)),
                         Text(
                           "Please enter The 4 Digit Code Sent To Your Email",
                           textAlign: TextAlign.center,
-                          style: theme.textTheme.bodyMedium,
+                          style: theme.textTheme.bodyMedium?.copyWith(
+                            fontSize: context.font(14),
+                          ),
                         ),
 
-                        const SizedBox(height: 15),
+                        SizedBox(height: context.scale(15)),
 
                         Text(
                           "Code will expire in ${seconds}s",
-                          style: theme.textTheme.titleMedium,
+                          style: theme.textTheme.titleMedium?.copyWith(
+                            fontSize: context.font(16),
+                          ),
                         ),
 
-                        const SizedBox(height: 20),
+                        SizedBox(height: context.scale(20)),
 
                         Row(
                           mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                           children: List.generate(4, (index) => _buildOtpTextField(context, _otpControllers[index])),
                         ),
 
-                        const SizedBox(height: 10),
+                        SizedBox(height: context.scale(10)),
 
                         TextButton(
                           onPressed: isResendEnabled ? _resendCode : null,
@@ -231,24 +238,27 @@ class _VerifyPasswordPageState extends State<VerifyPasswordPage> {
                             isResendEnabled
                                 ? "Resend CODE"
                                 : "Resend in $resendSeconds s",
-                            style: theme.textTheme.titleMedium?.copyWith(color: isResendEnabled ? theme.colorScheme.primary : theme.disabledColor),
+                            style: theme.textTheme.titleMedium?.copyWith(
+                              color: isResendEnabled ? theme.colorScheme.primary : theme.disabledColor,
+                              fontSize: context.font(16),
+                            ),
                           ),
                         ),
 
-                        const SizedBox(height: 10),
+                        SizedBox(height: context.scale(10)),
 
                         SizedBox(
                           width: double.infinity,
-                          height: 50,
+                          height: context.scale(50),
                           child: ElevatedButton(
                             onPressed: _isLoading ? null : _verifyCode,
                             style: ElevatedButton.styleFrom(
                               backgroundColor: theme.colorScheme.primary,
                               foregroundColor: theme.colorScheme.onPrimary,
                               shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(15),
+                                borderRadius: BorderRadius.circular(context.scale(15)),
                               ),
-                              disabledBackgroundColor: theme.colorScheme.primary,
+                              disabledBackgroundColor: theme.colorScheme.primary.withValues(alpha: 0.5),
                             ),
                             child: _isLoading
                                 ? const SizedBox(
@@ -263,6 +273,7 @@ class _VerifyPasswordPageState extends State<VerifyPasswordPage> {
                                   style: theme.textTheme.titleMedium?.copyWith(
                                     color: theme.colorScheme.onPrimary,
                                     fontWeight: FontWeight.bold,
+                                    fontSize: context.font(16),
                                   ),
                             ),
                           ),
@@ -280,10 +291,10 @@ class _VerifyPasswordPageState extends State<VerifyPasswordPage> {
   }
 
   Widget _buildOtpTextField(BuildContext context, TextEditingController controller) {
-    final theme = Theme.of(context);
+    final theme = context.theme;
     return SizedBox(
-      width: 60,
-      height: 60,
+      width: context.scale(60),
+      height: context.scale(60),
       child: TextField(
         controller: controller,
         onChanged: (value) {
@@ -294,18 +305,20 @@ class _VerifyPasswordPageState extends State<VerifyPasswordPage> {
             focusScope.previousFocus();
           }
         },
-        style: theme.textTheme.headlineMedium,
+        style: theme.textTheme.headlineMedium?.copyWith(
+          fontSize: context.font(24),
+        ),
         keyboardType: TextInputType.number,
         textAlign: TextAlign.center,
         maxLength: 1,
         decoration: InputDecoration(
           counterText: '',
           border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(10),
+            borderRadius: BorderRadius.circular(context.scale(10)),
             borderSide: BorderSide(color: theme.dividerColor),
           ),
           focusedBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(10),
+            borderRadius: BorderRadius.circular(context.scale(10)),
             borderSide: BorderSide(color: theme.colorScheme.primary, width: 2),
           ),
         ),

@@ -1,10 +1,12 @@
 import 'dart:async';
-import 'dart:convert';
-import 'dart:io';
+import 'dart:typed_data';
 
 import 'package:eduphin/services/api_service.dart';
+import 'package:eduphin/models/new_student.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:file_picker/file_picker.dart';
 import 'package:intl/intl.dart';
 
 class AddNewStudentPage extends StatefulWidget {
@@ -37,10 +39,18 @@ class _AddNewStudentPageState extends State<AddNewStudentPage> {
   final _dobController = TextEditingController();
   final _addressController = TextEditingController();
   final _imageFileController = TextEditingController();
+  final _aadhaarController = TextEditingController();
 
   String? _selectedGender;
   DateTime? _selectedDate;
-  File? _imageFile;
+  Uint8List? _imageBytes;
+  String? _imageName;
+
+  AppFile? _aadhaarFile;
+  AppFile? _marksheet10;
+  AppFile? _marksheet12;
+  AppFile? _tcFile;
+  AppFile? _idProofFile;
 
   @override
   void dispose() {
@@ -55,6 +65,7 @@ class _AddNewStudentPageState extends State<AddNewStudentPage> {
     _dobController.dispose();
     _addressController.dispose();
     _imageFileController.dispose();
+    _aadhaarController.dispose();
     super.dispose();
   }
 
@@ -62,9 +73,41 @@ class _AddNewStudentPageState extends State<AddNewStudentPage> {
     final pickedFile = await ImagePicker().pickImage(source: ImageSource.gallery);
 
     if (pickedFile != null) {
+      final bytes = await pickedFile.readAsBytes();
       setState(() {
-        _imageFile = File(pickedFile.path);
+        _imageBytes = bytes;
+        _imageName = pickedFile.name;
         _imageFileController.text = pickedFile.name;
+      });
+    }
+  }
+
+  Future<void> _pickDocument(String type) async {
+    FilePickerResult? result = await FilePicker.platform.pickFiles();
+    if (result != null) {
+      final file = AppFile(
+        name: result.files.first.name,
+        path: kIsWeb ? null : result.files.first.path,
+        bytes: result.files.first.bytes,
+      );
+      setState(() {
+        switch (type) {
+          case 'aadhaar':
+            _aadhaarFile = file;
+            break;
+          case '10th':
+            _marksheet10 = file;
+            break;
+          case '12th':
+            _marksheet12 = file;
+            break;
+          case 'tc':
+            _tcFile = file;
+            break;
+          case 'id':
+            _idProofFile = file;
+            break;
+        }
       });
     }
   }
@@ -73,7 +116,7 @@ class _AddNewStudentPageState extends State<AddNewStudentPage> {
     if (!_formKey.currentState!.validate()) {
       return;
     }
-     if (_imageFile == null) {
+     if (_imageBytes == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: const Text('Please select an image.'),
@@ -86,64 +129,48 @@ class _AddNewStudentPageState extends State<AddNewStudentPage> {
     setState(() => _isLoading = true);
 
     try {
-      final studentData = {
-        'first_name': _firstNameController.text,
-        'middle_name': _middleNameController.text,
-        'last_name': _lastNameController.text,
-        'phone': _phoneController.text,
-        'address': _addressController.text,
-        'student_roll_no': _rollNoController.text,
-        'registration_no': _regNoController.text,
-        'email': _emailController.text,
-        'password': _passwordController.text,
-        'class_id': widget.classId.toString(),
-        'section_id': widget.sectionId.toString(),
-        'dob': _dobController.text,
-        'gender': _selectedGender!,
-      };
+      final student = NewStudent()
+        ..firstName = _firstNameController.text
+        ..middleName = _middleNameController.text
+        ..lastName = _lastNameController.text
+        ..phone = _phoneController.text
+        ..address = _addressController.text
+        ..rollNo = _rollNoController.text
+        ..registrationNo = _regNoController.text
+        ..aadhaarNumber = _aadhaarController.text
+        ..email = _emailController.text
+        ..password = _passwordController.text
+        ..classId = widget.classId
+        ..sectionId = widget.sectionId
+        ..dob = _selectedDate
+        ..gender = _selectedGender
+        ..profileImage = AppFile(
+          name: _imageName ?? 'profile.jpg',
+          bytes: _imageBytes,
+        )
+        ..aadhaarFile = _aadhaarFile
+        ..marksheet10 = _marksheet10
+        ..marksheet12 = _marksheet12
+        ..transferCertificate = _tcFile
+        ..idProof = _idProofFile;
 
-      final files = <String, File>{'image': _imageFile!};
-      final response = await ApiService.postMultipart('manager/students', studentData, files: files);
-      final responseBody = await response.stream.bytesToString();
-      final responseData = jsonDecode(responseBody);
-
+      await ApiService.addStudent(student);
 
       if (mounted) {
-        final theme = Theme.of(context);
-        if (response.statusCode == 201 && responseData['status'] == true) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(responseData['message'] ?? 'Student added successfully!'),
-              backgroundColor: theme.colorScheme.primary,
-            ),
-          );
-          Navigator.pop(context, true); // Pop with true to refresh previous page
-        } else {
-          String errorMessage = responseData['message'] ?? 'An unknown error occurred.';
-          if (responseData.containsKey('errors')) {
-            final errors = responseData['errors'] as Map<String, dynamic>;
-            errorMessage = errors.values.map((e) => e[0]).join('\n');
-          }
-          throw Exception(errorMessage);
-        }
-      }
-    } on TimeoutException {
-      if (mounted) {
-        final theme = Theme.of(context);
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: const Text('The connection timed out. Please check your network.'),
-            backgroundColor: theme.colorScheme.error,
+          const SnackBar(
+            content: Text('Student added successfully!'),
+            backgroundColor: Colors.green,
           ),
         );
+        Navigator.pop(context, true);
       }
     } on Exception catch (e) {
       if (mounted) {
-        final theme = Theme.of(context);
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(e.toString().replaceFirst('Exception: ', '')),
-            backgroundColor: theme.colorScheme.error,
+            backgroundColor: Theme.of(context).colorScheme.error,
           ),
         );
       }
@@ -206,6 +233,12 @@ class _AddNewStudentPageState extends State<AddNewStudentPage> {
                   _buildTextField(_phoneController, "Phone Number", keyboardType: TextInputType.phone),
                   _buildTextField(_rollNoController, "Roll Number", keyboardType: TextInputType.number),
                   _buildTextField(_regNoController, "Registration Number", keyboardType: TextInputType.number),
+                  _buildTextField(_aadhaarController, "Aadhaar Number", keyboardType: TextInputType.number, validator: (value) {
+                    if (value != null && value.isNotEmpty && value.length != 12) {
+                      return 'Aadhaar must be 12 digits';
+                    }
+                    return null;
+                  }),
                   _buildTextField(_emailController, "Email Address", keyboardType: TextInputType.emailAddress, validator: _validateEmail),
                   _buildTextField(_passwordController, "Password", obscureText: true, validator: (value) {
                     if (value == null || value.isEmpty) {
@@ -219,6 +252,14 @@ class _AddNewStudentPageState extends State<AddNewStudentPage> {
                   _buildTextField(_addressController, "Address (Optional)", isOptional: true, maxLines: 3),
                   _buildDateField(context, "Date of Birth", _dobController),
                   _buildGenderDropdown(),
+                  const SizedBox(height: 24),
+                  Text("Documents", style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
+                  const SizedBox(height: 12),
+                  _buildFilePickerItem("Aadhaar Card", _aadhaarFile, () => _pickDocument('aadhaar')),
+                  _buildFilePickerItem("10th Marksheet", _marksheet10, () => _pickDocument('10th')),
+                  _buildFilePickerItem("12th Marksheet", _marksheet12, () => _pickDocument('12th')),
+                  _buildFilePickerItem("Transfer Certificate", _tcFile, () => _pickDocument('tc')),
+                  _buildFilePickerItem("ID Proof", _idProofFile, () => _pickDocument('id')),
                   const SizedBox(height: 24),
                   ElevatedButton(
                     onPressed: _isLoading ? null : _addStudent,
@@ -371,11 +412,11 @@ class _AddNewStudentPageState extends State<AddNewStudentPage> {
           borderRadius: BorderRadius.circular(12),
           border: Border.all(color: theme.dividerColor),
         ),
-        child: _imageFile != null
+        child: _imageBytes != null
             ? ClipRRect(
                 borderRadius: BorderRadius.circular(12),
-                child: Image.file(
-                  _imageFile!,
+                child: Image.memory(
+                  _imageBytes!,
                   fit: BoxFit.cover,
                   width: 60,
                   height: 60,
@@ -386,4 +427,48 @@ class _AddNewStudentPageState extends State<AddNewStudentPage> {
     ],
   );
 }
+
+  Widget _buildFilePickerItem(String label, AppFile? file, VoidCallback onTap) {
+    final theme = Theme.of(context);
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12.0),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(12),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          decoration: BoxDecoration(
+            color: theme.colorScheme.surface,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: theme.dividerColor.withOpacity(0.1)),
+          ),
+          child: Row(
+            children: [
+              Icon(Icons.description_outlined, color: theme.colorScheme.primary),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(label, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                    Text(
+                      file?.name ?? "No file selected",
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: file != null ? theme.colorScheme.onSurface : theme.hintColor,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
+                ),
+              ),
+              Icon(file != null ? Icons.check_circle : Icons.add_circle_outline, 
+                   color: file != null ? Colors.green : theme.colorScheme.primary),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
 }

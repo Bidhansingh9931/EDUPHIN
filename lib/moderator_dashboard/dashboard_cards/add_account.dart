@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
 import 'package:eduphin/services/api_service.dart';
+import 'package:eduphin/services/responsive_helper.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 
@@ -112,65 +113,74 @@ class _AddAccountPageState extends State<AddAccountPage> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = context.theme;
+    final colorScheme = theme.colorScheme;
+
     return Scaffold(
-      backgroundColor: const Color(0xFF0D1B2A),
       appBar: AppBar(
-        title: const Text('Add New Account', style: TextStyle(color: Colors.white)),
-        backgroundColor: const Color(0xFF0D1B2A),
-        iconTheme: const IconThemeData(color: Colors.white),
+        title: Text('Add New Account', style: TextStyle(fontSize: context.font(20))),
       ),
       body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16.0),
-        child: Card(
-          color: const Color(0xFF1B263B),
-          elevation: 4,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
-          ),
-          child: Padding(
-            padding: const EdgeInsets.all(24.0),
-            child: Form(
-              key: _formKey,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  _buildTextFormField(_nameController, 'Name'),
-                  const SizedBox(height: 16),
-                  _buildTextFormField(_emailController, 'Email'),
-                  const SizedBox(height: 16),
-                  _buildTextFormField(_passwordController, 'Password', obscureText: true),
-                  const SizedBox(height: 16),
-                  _buildTextFormField(_employmentTypeController, 'Employment Type'),
-                  const SizedBox(height: 16),
-                  _buildTextFormField(_genderController, 'Gender'),
-                  const SizedBox(height: 16),
-                  _buildTextFormField(_dobController, 'Date of Birth (YYYY-MM-DD)'),
-                  const SizedBox(height: 16),
-                  _buildTextFormField(_aadharController, 'Aadhar Number'),
-                  const SizedBox(height: 16),
-                  _buildTextFormField(_phoneController, 'Phone'),
-                  const SizedBox(height: 16),
-                  _buildTextFormField(_altPhoneController, 'Alternate Phone'),
-                  const SizedBox(height: 16),
-                  _buildTextFormField(_bankAccountController, 'Bank Account Number'),
-                  const SizedBox(height: 24),
-                  _buildFileUploadSection(),
-                  const SizedBox(height: 24),
-                  ElevatedButton(
-                    onPressed: _submitForm,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF4A90E2),
-                      padding: const EdgeInsets.symmetric(vertical: 16),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(8),
+        padding: context.pagePadding,
+        child: Center(
+          child: ConstrainedBox(
+            constraints: BoxConstraints(maxWidth: context.scale(800)),
+            child: Card(
+              elevation: 0,
+              color: colorScheme.surfaceContainerLow,
+              surfaceTintColor: Colors.transparent,
+              shape: RoundedRectangleBorder(
+                side: BorderSide(color: colorScheme.outlineVariant, width: 1),
+                borderRadius: BorderRadius.circular(context.scale(12)),
+              ),
+              child: Padding(
+                padding: EdgeInsets.all(context.md),
+                child: Form(
+                  key: _formKey,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      _buildTextFormField(context, _nameController, 'Name'),
+                      SizedBox(height: context.md),
+                      _buildTextFormField(context, _emailController, 'Email'),
+                      SizedBox(height: context.md),
+                      _buildTextFormField(context, _passwordController, 'Password', obscureText: true),
+                      SizedBox(height: context.md),
+                      _buildTextFormField(context, _employmentTypeController, 'Employment Type'),
+                      SizedBox(height: context.md),
+                      _buildTextFormField(context, _genderController, 'Gender'),
+                      SizedBox(height: context.md),
+                      _buildTextFormField(context, _dobController, 'Date of Birth (YYYY-MM-DD)'),
+                      SizedBox(height: context.md),
+                      _buildTextFormField(context, _aadharController, 'Aadhar Number'),
+                      SizedBox(height: context.md),
+                      _buildTextFormField(context, _phoneController, 'Phone'),
+                      SizedBox(height: context.md),
+                      _buildTextFormField(context, _altPhoneController, 'Alternate Phone'),
+                      SizedBox(height: context.md),
+                      _buildTextFormField(context, _bankAccountController, 'Bank Account Number'),
+                      SizedBox(height: context.lg),
+                      _buildFileUploadSection(context),
+                      SizedBox(height: context.lg),
+                      ElevatedButton(
+                        onPressed: _submitForm,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: colorScheme.primary,
+                          foregroundColor: colorScheme.onPrimary,
+                          padding: EdgeInsets.symmetric(vertical: context.scale(16)),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(context.scale(12)),
+                          ),
+                          elevation: 0,
+                        ),
+                        child: Text(
+                          'Create Account',
+                          style: TextStyle(fontSize: context.font(16), fontWeight: FontWeight.bold),
+                        ),
                       ),
-                    ),
-                    child: const Text(
-                      'Create Account',
-                      style: TextStyle(fontSize: 16, color: Colors.white),
-                    ),
+                    ],
                   ),
-                ],
+                ),
               ),
             ),
           ),
@@ -179,78 +189,80 @@ class _AddAccountPageState extends State<AddAccountPage> {
     );
   }
 
-  Widget _buildTextFormField(TextEditingController controller, String label, {bool obscureText = false}) {
+  Widget _buildTextFormField(BuildContext context, TextEditingController controller, String label, {bool obscureText = false}) {
+    final colorScheme = Theme.of(context).colorScheme;
     return TextFormField(
       controller: controller,
       obscureText: obscureText,
-      style: const TextStyle(color: Colors.white),
+      style: TextStyle(fontSize: context.font(14), color: colorScheme.onSurface),
       decoration: InputDecoration(
         labelText: label,
-        labelStyle: const TextStyle(color: Colors.white70),
+        labelStyle: TextStyle(fontSize: context.font(14), color: colorScheme.onSurfaceVariant),
+        contentPadding: EdgeInsets.symmetric(horizontal: context.md, vertical: context.sm),
+        filled: true,
+        fillColor: colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(context.scale(8)),
+          borderSide: BorderSide(color: colorScheme.outlineVariant),
+        ),
         enabledBorder: OutlineInputBorder(
-          borderSide: const BorderSide(color: Colors.white38),
-          borderRadius: BorderRadius.circular(8),
+          borderRadius: BorderRadius.circular(context.scale(8)),
+          borderSide: BorderSide(color: colorScheme.outlineVariant),
         ),
         focusedBorder: OutlineInputBorder(
-          borderSide: const BorderSide(color: Color(0xFF4A90E2)),
-          borderRadius: BorderRadius.circular(8),
+          borderRadius: BorderRadius.circular(context.scale(8)),
+          borderSide: BorderSide(color: colorScheme.primary, width: 2),
         ),
-        errorBorder: OutlineInputBorder(
-          borderSide: const BorderSide(color: Colors.redAccent),
-          borderRadius: BorderRadius.circular(8),
-        ),
-        focusedErrorBorder: OutlineInputBorder(
-          borderSide: const BorderSide(color: Colors.redAccent),
-          borderRadius: BorderRadius.circular(8),
-        ),
-        filled: true,
-        fillColor: const Color(0x800D1B2A),
       ),
       validator: (value) => value!.isEmpty ? 'Please enter $label' : null,
     );
   }
 
-  Widget _buildFileUploadSection() {
+  Widget _buildFileUploadSection(BuildContext context) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text(
+        Text(
           'Upload Documents',
-          style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white),
+          style: TextStyle(
+            fontSize: context.font(18), 
+            fontWeight: FontWeight.bold,
+            color: Theme.of(context).colorScheme.onSurface,
+          ),
         ),
-        const SizedBox(height: 12),
-        _buildFileUploadButton('Photo', _photo, (file) => setState(() => _photo = file)),
-        _buildFileUploadButton('Aadhar Photo', _aadharPhoto, (file) => setState(() => _aadharPhoto = file)),
-        _buildFileUploadButton('X Marksheet', _xMarksheet, (file) => setState(() => _xMarksheet = file)),
-        _buildFileUploadButton('XII Marksheet', _xiiMarksheet, (file) => setState(() => _xiiMarksheet = file)),
-        _buildFileUploadButton('Resume', _resume, (file) => setState(() => _resume = file)),
+        SizedBox(height: context.md),
+        _buildFileUploadButton(context, 'Photo', _photo, (file) => setState(() => _photo = file)),
+        _buildFileUploadButton(context, 'Aadhar Photo', _aadharPhoto, (file) => setState(() => _aadharPhoto = file)),
+        _buildFileUploadButton(context, 'X Marksheet', _xMarksheet, (file) => setState(() => _xMarksheet = file)),
+        _buildFileUploadButton(context, 'XII Marksheet', _xiiMarksheet, (file) => setState(() => _xiiMarksheet = file)),
+        _buildFileUploadButton(context, 'Resume', _resume, (file) => setState(() => _resume = file)),
       ],
     );
   }
 
-  Widget _buildFileUploadButton(String title, File? file, Function(File) onSelect) {
+  Widget _buildFileUploadButton(BuildContext context, String title, File? file, Function(File) onSelect) {
+    final colorScheme = Theme.of(context).colorScheme;
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8.0),
+      padding: EdgeInsets.symmetric(vertical: context.sm),
       child: Row(
         children: [
-          ElevatedButton.icon(
+          OutlinedButton.icon(
             onPressed: () => _pickImage(onSelect),
-            icon: const Icon(Icons.upload_file),
-            label: Text('Upload $title'),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xCC4A90E2),
-              foregroundColor: Colors.white,
-              minimumSize: const Size(0, 46),
+            icon: Icon(Icons.upload_file, size: context.scale(20)),
+            label: Text('Upload $title', style: TextStyle(fontSize: context.font(13))),
+            style: OutlinedButton.styleFrom(
+              minimumSize: Size(0, context.scale(46)),
               shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(8),
+                borderRadius: BorderRadius.circular(context.scale(8)),
               ),
+              side: BorderSide(color: colorScheme.outlineVariant),
             ),
           ),
-          const SizedBox(width: 16),
+          SizedBox(width: context.md),
           Expanded(
             child: Text(
               file?.path.split('/').last ?? 'No file selected',
-              style: const TextStyle(color: Colors.white70),
+              style: TextStyle(color: colorScheme.onSurfaceVariant, fontSize: context.font(12)),
               overflow: TextOverflow.ellipsis,
             ),
           ),
@@ -258,4 +270,5 @@ class _AddAccountPageState extends State<AddAccountPage> {
       ),
     );
   }
+
 }

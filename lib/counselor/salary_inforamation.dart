@@ -27,23 +27,22 @@ class _SalaryBankPageState extends State<SalaryBankPage> {
     if (!mounted) return;
     try {
       final response = await ApiService.get('counselor/salaries');
+      if (!mounted) return;
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body)['data'];
-        if (mounted) {
-          setState(() {
-            if (data['account'] != null) {
-              _userDetail = UserDetail.fromJson(data['account']);
-            }
-            if (data['salaries'] != null) {
-              _salaryHistory = (data['salaries'] as List)
-                  .map((json) => Salary.fromJson(json))
-                  .toList();
-            }
-            _isLoading = false;
-          });
-        }
+        setState(() {
+          if (data['account'] != null) {
+            _userDetail = UserDetail.fromJson(data['account']);
+          }
+          if (data['salaries'] != null) {
+            _salaryHistory = (data['salaries'] as List)
+                .map((json) => Salary.fromJson(json))
+                .toList();
+          }
+          _isLoading = false;
+        });
       } else {
-        if (mounted) setState(() => _isLoading = false);
+        setState(() => _isLoading = false);
       }
     } catch (e) {
       if (mounted) setState(() => _isLoading = false);
@@ -52,7 +51,7 @@ class _SalaryBankPageState extends State<SalaryBankPage> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
+    final theme = context.theme;
     final colorScheme = theme.colorScheme;
 
     if (_isLoading) {
@@ -65,7 +64,7 @@ class _SalaryBankPageState extends State<SalaryBankPage> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text("Salary & Bank"),
+        title: Text("Salary & Bank", style: TextStyle(fontSize: context.font(20))),
       ),
       body: RefreshIndicator(
         onRefresh: _fetchSalaryData,
@@ -80,11 +79,16 @@ class _SalaryBankPageState extends State<SalaryBankPage> {
                 children: [
                   /// SALARY SUMMARY CARD
                   Card(
+                    elevation: 0,
                     color: colorScheme.primary,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(context.scale(16)),
+                    ),
                     child: InkWell(
+                      borderRadius: BorderRadius.circular(context.scale(16)),
                       onTap: lastSalary != null ? () => Navigator.push(context, MaterialPageRoute(builder: (_) => SalaryDetailPage(salaryId: lastSalary.id))) : null,
                       child: Padding(
-                        padding: const EdgeInsets.all(24),
+                        padding: EdgeInsets.all(context.scale(24)),
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
@@ -93,31 +97,39 @@ class _SalaryBankPageState extends State<SalaryBankPage> {
                               children: [
                                 Text(
                                   "Last Paid Amount",
-                                  style: TextStyle(color: colorScheme.onPrimary.withValues(alpha: 0.8), fontSize: 14, fontWeight: FontWeight.w500),
+                                  style: TextStyle(
+                                    color: colorScheme.onPrimary.withValues(alpha: 0.8),
+                                    fontSize: context.font(14),
+                                    fontWeight: FontWeight.w500,
+                                  ),
                                 ),
                                 Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                                  padding: EdgeInsets.symmetric(horizontal: context.scale(12), vertical: context.scale(6)),
                                   decoration: BoxDecoration(
                                     color: colorScheme.onPrimary.withValues(alpha: 0.2),
-                                    borderRadius: BorderRadius.circular(20),
+                                    borderRadius: BorderRadius.circular(context.scale(20)),
                                   ),
                                   child: Text(
                                     lastSalary?.status.toUpperCase() ?? "N/A",
-                                    style: TextStyle(color: colorScheme.onPrimary, fontSize: 10, fontWeight: FontWeight.bold),
+                                    style: TextStyle(
+                                      color: colorScheme.onPrimary,
+                                      fontSize: context.font(10),
+                                      fontWeight: FontWeight.bold,
+                                    ),
                                   ),
                                 ),
                               ],
                             ),
-                            const SizedBox(height: 12),
+                            SizedBox(height: context.scale(12)),
                             Text(
                               lastSalary != null ? "₹${lastSalary.amount}" : "₹0.00",
                               style: TextStyle(
                                 color: colorScheme.onPrimary,
-                                fontSize: 36,
+                                fontSize: context.font(36),
                                 fontWeight: FontWeight.bold,
                               ),
                             ),
-                            const SizedBox(height: 32),
+                            SizedBox(height: context.scale(32)),
                             Row(
                               children: [
                                 _buildMiniInfo(context, "Payment Date", lastSalary?.paymentDate ?? "N/A"),
@@ -131,13 +143,19 @@ class _SalaryBankPageState extends State<SalaryBankPage> {
                     ),
                   ),
 
-                  const SizedBox(height: 32),
+                  SizedBox(height: context.scale(32)),
 
                   _buildSectionTitle(context, "Bank Account Details"),
-                  const SizedBox(height: 16),
+                  SizedBox(height: context.scale(16)),
                   Card(
+                    elevation: 0,
+                    color: colorScheme.surfaceContainerLow,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(context.scale(16)),
+                      side: BorderSide(color: colorScheme.outlineVariant),
+                    ),
                     child: Padding(
-                      padding: const EdgeInsets.all(8),
+                      padding: EdgeInsets.all(context.scale(8)),
                       child: Column(
                         children: [
                           _buildDetailRow(context, Icons.person_outline, "Account Holder", _userDetail?.fullName ?? "N/A"),
@@ -150,10 +168,10 @@ class _SalaryBankPageState extends State<SalaryBankPage> {
                     ),
                   ),
 
-                  const SizedBox(height: 32),
+                  SizedBox(height: context.scale(32)),
 
                   _buildSectionTitle(context, "Salary History"),
-                  const SizedBox(height: 16),
+                  SizedBox(height: context.scale(16)),
                   _salaryHistory.isEmpty
                       ? _buildEmptyState(context)
                       : ListView.builder(
@@ -163,17 +181,37 @@ class _SalaryBankPageState extends State<SalaryBankPage> {
                           itemBuilder: (context, index) {
                             final salary = _salaryHistory[index];
                             return Card(
-                              margin: const EdgeInsets.only(bottom: 12),
+                              elevation: 0,
+                              color: colorScheme.surfaceContainerLow,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(context.scale(12)),
+                                side: BorderSide(color: colorScheme.outlineVariant),
+                              ),
+                              margin: EdgeInsets.only(bottom: context.scale(12)),
                               child: ListTile(
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(context.scale(12))),
                                 onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => SalaryDetailPage(salaryId: salary.id))),
-                                contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+                                contentPadding: EdgeInsets.symmetric(horizontal: context.scale(20), vertical: context.scale(8)),
                                 leading: CircleAvatar(
                                   backgroundColor: colorScheme.primary.withValues(alpha: 0.1),
-                                  child: Icon(Icons.receipt_long, color: colorScheme.primary, size: 20),
+                                  child: Icon(Icons.receipt_long, color: colorScheme.primary, size: context.scale(20)),
                                 ),
-                                title: Text("Salary for ${salary.month}", style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
-                                subtitle: Text("Paid on ${salary.paymentDate}", style: const TextStyle(fontSize: 12)),
-                                trailing: Text("₹${salary.amount}", style: TextStyle(color: colorScheme.primary, fontWeight: FontWeight.bold, fontSize: 16)),
+                                title: Text(
+                                  "Salary for ${salary.month}",
+                                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: context.font(14)),
+                                ),
+                                subtitle: Text(
+                                  "Paid on ${salary.paymentDate}",
+                                  style: TextStyle(fontSize: context.font(12)),
+                                ),
+                                trailing: Text(
+                                  "₹${salary.amount}",
+                                  style: TextStyle(
+                                    color: colorScheme.primary,
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: context.font(16),
+                                  ),
+                                ),
                               ),
                             );
                           },
@@ -188,51 +226,86 @@ class _SalaryBankPageState extends State<SalaryBankPage> {
   }
 
   Widget _buildMiniInfo(BuildContext context, String label, String value) {
-    final colorScheme = Theme.of(context).colorScheme;
+    final colorScheme = context.theme.colorScheme;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(label, style: TextStyle(color: colorScheme.onPrimary.withValues(alpha: 0.7), fontSize: 11)),
-        const SizedBox(height: 4),
-        Text(value, style: TextStyle(color: colorScheme.onPrimary, fontWeight: FontWeight.bold, fontSize: 14)),
+        Text(
+          label,
+          style: TextStyle(
+            color: colorScheme.onPrimary.withValues(alpha: 0.7),
+            fontSize: context.font(11),
+          ),
+        ),
+        SizedBox(height: context.scale(4)),
+        Text(
+          value,
+          style: TextStyle(
+            color: colorScheme.onPrimary,
+            fontWeight: FontWeight.bold,
+            fontSize: context.font(14),
+          ),
+        ),
       ],
     );
   }
 
   Widget _buildSectionTitle(BuildContext context, String title) {
     return Padding(
-      padding: const EdgeInsets.only(left: 4),
+      padding: EdgeInsets.only(left: context.scale(4)),
       child: Text(
         title,
-        style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+        style: context.theme.textTheme.titleMedium?.copyWith(
+          fontWeight: FontWeight.bold,
+          fontSize: context.font(16),
+        ),
       ),
     );
   }
 
   Widget _buildDetailRow(BuildContext context, IconData icon, String label, String value, {bool isLast = false}) {
-    final theme = Theme.of(context);
+    final theme = context.theme;
     return Column(
       children: [
         Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+          padding: EdgeInsets.symmetric(horizontal: context.scale(16), vertical: context.scale(16)),
           child: Row(
             children: [
-              Icon(icon, color: theme.colorScheme.primary, size: 22),
-              const SizedBox(width: 16),
+              Icon(icon, color: theme.colorScheme.primary, size: context.scale(22)),
+              SizedBox(width: context.scale(16)),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(label, style: theme.textTheme.labelSmall?.copyWith(color: theme.hintColor)),
-                    const SizedBox(height: 4),
-                    Text(value, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15), overflow: TextOverflow.ellipsis),
+                    Text(
+                      label,
+                      style: theme.textTheme.labelSmall?.copyWith(
+                        color: theme.hintColor,
+                        fontSize: context.font(11),
+                      ),
+                    ),
+                    SizedBox(height: context.scale(4)),
+                    Text(
+                      value,
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: context.font(15),
+                      ),
+                      overflow: TextOverflow.ellipsis,
+                    ),
                   ],
                 ),
               )
             ],
           ),
         ),
-        if (!isLast) Divider(indent: 54, endIndent: 16, color: theme.dividerColor.withValues(alpha: 0.5), height: 1),
+        if (!isLast)
+          Divider(
+            indent: context.scale(54),
+            endIndent: context.scale(16),
+            color: theme.dividerColor.withValues(alpha: 0.5),
+            height: 1,
+          ),
       ],
     );
   }
@@ -240,12 +313,19 @@ class _SalaryBankPageState extends State<SalaryBankPage> {
   Widget _buildEmptyState(BuildContext context) {
     return Center(
       child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 60),
+        padding: EdgeInsets.symmetric(vertical: context.scale(60)),
         child: Column(
           children: [
-            Icon(Icons.history_toggle_off, size: 64, color: Theme.of(context).hintColor.withValues(alpha: 0.3)),
-            const SizedBox(height: 16),
-            Text("No Records Yet", style: TextStyle(color: Theme.of(context).hintColor)),
+            Icon(
+              Icons.history_toggle_off,
+              size: context.scale(64),
+              color: context.theme.hintColor.withValues(alpha: 0.3),
+            ),
+            SizedBox(height: context.scale(16)),
+            Text(
+              "No Records Yet",
+              style: TextStyle(color: context.theme.hintColor, fontSize: context.font(14)),
+            ),
           ],
         ),
       ),

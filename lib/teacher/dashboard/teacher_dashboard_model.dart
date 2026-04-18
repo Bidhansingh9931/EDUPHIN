@@ -86,7 +86,11 @@ class UserDetail {
     return UserDetail(
       id: json['id'] ?? 0,
       name: detectedName,
-      photo: json['photo'],
+      photo: json['photo']?.toString() ?? 
+             json['profile_image']?.toString() ?? 
+             json['image']?.toString() ?? 
+             json['avatar']?.toString() ?? 
+             (json['user'] != null ? (json['user']['photo']?.toString() ?? json['user']['profile_image']?.toString()) : null),
       roleName: json['role_name'] ?? (json['role'] is Map ? json['role']['name'] : 'Teacher'),
       employeeId: json['employee_id']?.toString() ?? json['id']?.toString() ?? 'N/A',
       phone: json['phone']?.toString() ?? 'N/A',

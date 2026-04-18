@@ -4,6 +4,8 @@ import 'dart:convert';
 import 'package:eduphin/manager_dashboard/manageClasses/classList/section/studentList/remarks.dart';
 import 'package:eduphin/manager_dashboard/manageClasses/classList/section/studentList/view_attendence.dart';
 import 'package:eduphin/services/api_service.dart';
+import 'package:eduphin/services/common_widgets.dart';
+import 'package:eduphin/services/responsive_helper.dart';
 import 'package:flutter/material.dart';
 
 // Data model for a Student
@@ -11,14 +13,16 @@ class Student {
   final int id;
   final String name;
   final String regNo;
+  final String? photo;
 
-  const Student({required this.id, required this.name, required this.regNo});
+  const Student({required this.id, required this.name, required this.regNo, this.photo});
 
   factory Student.fromJson(Map<String, dynamic> json) {
     return Student(
       id: json['id'] ?? 0,
       name: "${json['first_name'] ?? ''} ${json['last_name'] ?? ''}".trim(),
       regNo: json['registration_no'] ?? 'N/A',
+      photo: json['photo'],
     );
   }
 }
@@ -177,31 +181,50 @@ class StudentCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
+    final theme = context.theme;
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: EdgeInsets.all(context.scale(16)),
       decoration: BoxDecoration(
         color: theme.colorScheme.surface,
-        borderRadius: BorderRadius.circular(10),
+        borderRadius: BorderRadius.circular(context.scale(10)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Text(
-            student.name,
-            style: theme.textTheme.titleLarge?.copyWith(
-              color: theme.colorScheme.onSurface,
-            ),
+          Row(
+            children: [
+              ProfileAvatar(
+                imageUrl: ApiService.getStorageUrl(student.photo),
+                radius: context.scale(24),
+                borderWidth: 1,
+              ),
+              SizedBox(width: context.scale(12)),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      student.name,
+                      style: theme.textTheme.titleLarge?.copyWith(
+                        color: theme.colorScheme.onSurface,
+                        fontSize: context.font(18),
+                      ),
+                    ),
+                    const SizedBox(height: 1),
+                    Text(
+                      "Reg No: ${student.regNo}",
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        color: theme.colorScheme.onSurface.withAlpha(150),
+                        fontSize: context.font(14),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
           ),
-          const SizedBox(height: 1),
-          Text(
-            "Reg No: ${student.regNo}",
-            style: theme.textTheme.bodyMedium?.copyWith(
-              color: theme.colorScheme.onSurface.withAlpha(150),
-            ),
-          ),
-          const SizedBox(height: 12),
+          SizedBox(height: context.scale(12)),
           Row(
             children: [
               Expanded(

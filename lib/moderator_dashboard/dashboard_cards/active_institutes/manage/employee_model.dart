@@ -12,7 +12,7 @@ class Employee {
     }
 
     return Employee(
-      id: json['id'].toString(),
+      id: (json['encrypted_id'] ?? json['id']).toString(),
       name: json['name'] ?? 'N/A',
       role: roleName,
     );

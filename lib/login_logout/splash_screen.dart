@@ -2,7 +2,9 @@ import 'dart:math';
 
 import 'package:eduphin/login_logout/login.dart';
 import 'package:eduphin/manager_dashboard/manager_dashboard.dart';
+import 'package:eduphin/counselor/counselor_dashboard.dart';
 import 'package:eduphin/moderator_dashboard/moderator_dashboard.dart';
+import 'package:eduphin/services/responsive_helper.dart';
 import 'package:eduphin/student/student_dashboard.dart';
 import 'package:eduphin/teacher/dashboard/teacher_dashboard.dart';
 import 'package:eduphin/librarian/librarian_dashboard.dart';
@@ -40,13 +42,6 @@ class _SplashScreenState extends State<SplashScreen>
       duration: const Duration(seconds: 4),
     );
 
-    moveUp = Tween<double>(begin: 250, end: 0).animate(
-      CurvedAnimation(
-        parent: _controller,
-        curve: const Interval(0.0, 0.35, curve: Curves.easeOut),
-      ),
-    );
-
     rotate = Tween<double>(begin: 0, end: pi / 4).animate(
       CurvedAnimation(
         parent: _controller,
@@ -80,6 +75,27 @@ class _SplashScreenState extends State<SplashScreen>
     });
   }
 
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+
+    // Initialize moveUp here where context is available for scaling if needed, 
+    // but better to keep it in initState and use a fixed value or scale later.
+    // Actually, scaling the animation start value:
+    moveUp = Tween<double>(begin: context.scale(250), end: 0).animate(
+      CurvedAnimation(
+        parent: _controller,
+        curve: const Interval(0.0, 0.35, curve: Curves.easeOut),
+      ),
+    );
+
+    // ✅ ADDED: Preload image to avoid asset crash
+    precacheImage(
+      const AssetImage("assets/images/eduphin_logo_bg.png"),
+      context,
+    );
+  }
+
   /// ✅ FULLY SAFE AUTH CHECK (NO CRASH)
   Future<void> _checkAuthStatusAndNavigate() async {
     try {
@@ -98,6 +114,7 @@ class _SplashScreenState extends State<SplashScreen>
           case 1: nextScreen = const SuperAdminDashboard(); break;
           case 2: nextScreen = const ModeratorDashboardPage(); break;
           case 3: nextScreen = const ManagerDashboardPage(); break;
+          case 4: nextScreen = const CounselorDashboardPage(); break;
           case 5: nextScreen = const TeacherDashboardPage(); break;
           case 6: nextScreen = const StudentDashboard(); break;
           case 7: nextScreen = const LibrarianDashboard(); break;
@@ -122,7 +139,7 @@ class _SplashScreenState extends State<SplashScreen>
       }
     } catch (e) {
       // ✅ FAIL-SAFE: never crash on splash
-      debugPrint('Splash auth error: $e');
+      debugPrint('Splash Screen Error: $e');
 
       if (!mounted) return;
 
@@ -136,17 +153,6 @@ class _SplashScreenState extends State<SplashScreen>
   }
 
   @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-
-    // ✅ ADDED: Preload image to avoid asset crash
-    precacheImage(
-      const AssetImage("assets/images/eduphin_logo_bg.png"),
-      context,
-    );
-  }
-
-  @override
   void dispose() {
     _controller.removeStatusListener((_) {}); // ✅ extra safety
     _controller.dispose();
@@ -155,7 +161,7 @@ class _SplashScreenState extends State<SplashScreen>
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
+    final theme = context.theme;
 
     return Scaffold(
       backgroundColor: theme.scaffoldBackgroundColor,
@@ -172,11 +178,11 @@ class _SplashScreenState extends State<SplashScreen>
                     child: Transform.scale(
                       scale: scale.value,
                       child: Container(
-                        height: 60,
-                        width: 60,
+                        height: context.scale(60),
+                        width: context.scale(60),
                         decoration: BoxDecoration(
                           color: theme.primaryColor,
-                          borderRadius: BorderRadius.circular(12),
+                          borderRadius: BorderRadius.circular(context.scale(12)),
                         ),
                       ),
                     ),
@@ -194,13 +200,13 @@ class _SplashScreenState extends State<SplashScreen>
                         position: textSlide,
                         child: Image.asset(
                           "assets/images/eduphin_logo_bg.png",
-                          height: 150,
+                          height: context.scale(150),
                           errorBuilder: (_, __, ___) =>
-                          const SizedBox(height: 150), // ✅ NO CRASH
+                          SizedBox(height: context.scale(150)), // ✅ NO CRASH
                         ),
                       ),
                     ),
-                    const SizedBox(height: 20),
+                    SizedBox(height: context.scale(20)),
                     FadeTransition(
                       opacity: textFade,
                       child: SlideTransition(
@@ -208,7 +214,7 @@ class _SplashScreenState extends State<SplashScreen>
                         child: Text(
                           "EDUPHIN",
                           style: TextStyle(
-                            fontSize: 48,
+                            fontSize: context.font(48),
                             fontWeight: FontWeight.bold,
                             color: theme.colorScheme.onPrimary,
                           ),

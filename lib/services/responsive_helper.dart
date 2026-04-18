@@ -43,9 +43,18 @@ extension ResponsiveExtension on BuildContext {
   double get screenWidth => MediaQuery.of(this).size.width;
   double get screenHeight => MediaQuery.of(this).size.height;
 
+  ThemeData get theme => Theme.of(this);
+  bool get isDarkMode => theme.brightness == Brightness.dark;
+
   // Adaptive spacing
   double get spacing => isMobile ? 16.0 : 24.0;
-  
+
+  double get xs => spacing * 0.25;
+  double get sm => spacing * 0.5;
+  double get md => spacing;
+  double get lg => spacing * 1.5;
+  double get xl => spacing * 2.0;
+
   // Adaptive padding
   EdgeInsets get pagePadding => EdgeInsets.all(spacing);
 
@@ -55,4 +64,11 @@ extension ResponsiveExtension on BuildContext {
     if (isTablet && tablet != null) return tablet;
     return mobile;
   }
+
+  // Scaling helpers
+  double scale(double size) => isMobile ? size : (isTablet ? size * 1.2 : size * 1.4);
+  double font(double size) => isMobile ? size : (isTablet ? size * 1.15 : size * 1.3);
+  
+  double get relativeWidth => screenWidth / (isMobile ? 375 : (isTablet ? 768 : 1440));
+  double w(double width) => width * relativeWidth;
 }

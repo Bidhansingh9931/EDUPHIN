@@ -6,7 +6,9 @@ import 'package:eduphin/teacher/dashboard/class_models.dart';
 import 'package:eduphin/teacher/dashboard/event_models.dart' as teacher_event;
 import 'package:eduphin/teacher/dashboard/student_leave_model.dart' as leave_model;
 import 'package:eduphin/teacher/dashboard/teacher_dashboard_model.dart' hide StudentLeave;
-import 'package:eduphin/moderator_dashboard/dashboard_cards/active_institutes/manage/new_employee_model.dart';
+import 'package:eduphin/moderator_dashboard/dashboard_cards/active_institutes/manage/new_employee_model.dart' as moderator_employee;
+import 'package:eduphin/models/new_student.dart' as global_student;
+import 'package:eduphin/models/new_employee.dart' as global_employee;
 import 'package:eduphin/librarian/librarian_models.dart' as librarian_model;
 import 'package:eduphin/teacher/dashboard/library_models.dart' as teacher_library;
 import 'package:eduphin/teacher/dashboard/ticket_details_models.dart' as teacher_ticket_details;
@@ -39,14 +41,14 @@ import 'package:eduphin/superAdmin/superadmin_models.dart' as super_admin;
 class ApiService {
   static const String _envUrl = String.fromEnvironment(
     'API_BASE_URL',
-    defaultValue: 'http://127.0.0.1:8000',
+    defaultValue: 'https://demo.eduphin.com'
   );
 
   static String get baseUrl {
     if (kIsWeb) {
       return _envUrl;
     } else if (Platform.isAndroid) {
-      return 'http://10.41.172.42:8000';
+      return 'https://demo.eduphin.com';
     } else {
       return _envUrl;
     }
@@ -132,6 +134,23 @@ class ApiService {
     } catch (e) {
       throw Exception('Login failed: $e');
     }
+  }
+
+  static String errorMessage(http.Response response, String defaultMessage) {
+    try {
+      final data = jsonDecode(response.body);
+      if (data['message'] != null) return data['message'];
+      if (data['error'] != null) return data['error'];
+      if (data['errors'] != null) {
+        final errors = data['errors'];
+        if (errors is Map && errors.isNotEmpty) {
+          final firstError = errors.values.first;
+          if (firstError is List && firstError.isNotEmpty) return firstError.first.toString();
+          return firstError.toString();
+        }
+      }
+    } catch (_) {}
+    return defaultMessage;
   }
 
   static Future<http.Response> get(String endpoint, [Map<String, dynamic>? queryParameters]) async {
@@ -227,37 +246,49 @@ class ApiService {
     }
   }
 
-  static Future<http.StreamedResponse> postMultipart(String endpoint, Map<String, String> fields, {Map<String, File>? files}) async {
+  static Future<http.StreamedResponse> postMultipart(String endpoint, Map<String, dynamic> fields, {Map<String, File>? files, bool forceMultipart = false}) async {
     try {
       final headers = await _getHeaders();
       headers.remove('Content-Type');
       final request = http.MultipartRequest('POST', _uri(endpoint));
       request.headers.addAll(headers);
-      request.fields.addAll(fields);
+      
+      fields.forEach((key, value) {
+        if (value != null) {
+          request.fields[key] = value.toString();
+        }
+      });
+
       if (files != null) {
         for (final entry in files.entries) {
           request.files.add(await http.MultipartFile.fromPath(entry.key, entry.value.path));
         }
       }
-      return await request.send().timeout(const Duration(seconds: 30));
+      return await request.send().timeout(const Duration(minutes: 5));
     } catch (e) {
       throw Exception('Multipart failed: $e');
     }
   }
 
-  static Future<http.StreamedResponse> postMultipartFromBytes(String endpoint, Map<String, String> fields, {Map<String, Uint8List>? files, Map<String, String>? fileNames}) async {
+  static Future<http.StreamedResponse> postMultipartFromBytes(String endpoint, Map<String, dynamic> fields, {Map<String, Uint8List>? files, Map<String, String>? fileNames, bool forceMultipart = false}) async {
     try {
       final headers = await _getHeaders();
       headers.remove('Content-Type');
       final request = http.MultipartRequest('POST', _uri(endpoint));
       request.headers.addAll(headers);
-      request.fields.addAll(fields);
+      
+      fields.forEach((key, value) {
+        if (value != null) {
+          request.fields[key] = value.toString();
+        }
+      });
+
       if (files != null) {
         for (final entry in files.entries) {
           request.files.add(http.MultipartFile.fromBytes(entry.key, entry.value, filename: fileNames?[entry.key]));
         }
       }
-      return await request.send().timeout(const Duration(seconds: 30));
+      return await request.send().timeout(const Duration(minutes: 5));
     } catch (e) {
       throw Exception('Multipart failed: $e');
     }
@@ -271,7 +302,7 @@ class ApiService {
       request.headers.addAll(headers);
       request.fields.addAll(data);
       request.files.add(await http.MultipartFile.fromPath(fileField, file.path));
-      return await request.send().timeout(const Duration(seconds: 30));
+      return await request.send().timeout(const Duration(minutes: 5));
     } catch (e) {
       throw Exception('Upload failed: $e');
     }
@@ -306,7 +337,7 @@ class ApiService {
     throw Exception('Failed to load employees');
   }
 
-  static Future<void> addEmployee(NewEmployee employee) async {
+  static Future<void> addEmployee(moderator_employee.NewEmployee employee) async {
     final fields = employee.toApiData();
     final files = employee.profileImage != null ? {'profile_image': employee.profileImage!} : null;
     final response = await postMultipart('moderator/accounts', fields, files: files);
@@ -365,13 +396,13 @@ class ApiService {
     final fields = {'schedule_id': scheduleId.toString(), 'title': title, 'due_date': dueDate, if (description != null) 'description': description};
     final files = {'attachment': attachment};
     final response = await postMultipart('teacher/assignments', fields, files: files);
-    if (response.statusCode != 200) throw Exception('Failed to create assignment');
+    if (response.statusCode != 200 && response.statusCode != 201) throw Exception('Failed to create assignment');
   }
 
   static Future<void> createAssignmentFromBytes(int scheduleId, String title, String? description, String dueDate, Uint8List attachmentBytes, String fileName) async {
     final fields = {'schedule_id': scheduleId.toString(), 'title': title, 'due_date': dueDate, if (description != null) 'description': description};
     final response = await postMultipartFromBytes('teacher/assignments', fields, files: {'attachment': attachmentBytes}, fileNames: {'attachment': fileName});
-    if (response.statusCode != 200) throw Exception('Failed to create assignment');
+    if (response.statusCode != 200 && response.statusCode != 201) throw Exception('Failed to create assignment');
   }
 
   static Future<void> updateAssignment(int assignmentId, String title, String? description, String dueDate, File? attachment) async {
@@ -1367,15 +1398,6 @@ class ApiService {
     throw Exception('Failed to load fees (Status: ${response.statusCode})');
   }
 
-  static Future<List<staff_model.Fee>> getTeacherFees() async {
-    final response = await get('teacher/fees');
-    if (response.statusCode == 200) {
-      final data = jsonDecode(response.body);
-      if (data['success'] == true || data['status'] == true) return (data['data'] as List).map((f) => staff_model.Fee.fromJson(f)).toList();
-    }
-    throw Exception('Failed to load fees');
-  }
-
   static Future<staff_model.StudentFeeDetail> getStaffStudentFeeDetail(String studentId) async {
     final response = await get('staff/student-fee/$studentId');
     if (response.statusCode == 200) {
@@ -1446,20 +1468,55 @@ class ApiService {
   }
 
   static Future<Map<String, dynamic>> getStaffSalarySlip(String salaryId) async {
-    // Try teacher endpoint first
-    var response = await get('teacher/salary/slip/$salaryId');
-    if (response.statusCode == 200) {
-      final data = jsonDecode(response.body);
-      if (data['success'] == true || data['status'] == true) return data['data'];
-    }
+    // 1. Try teacher specific endpoint first
+    try {
+      final response = await get('teacher/salary/$salaryId');
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        if (data['status'] == true || data['success'] == true) {
+          final mainData = data['data'] ?? data;
+          if (mainData.containsKey('salary')) return mainData;
+        }
+      }
+    } catch (_) {}
 
-    // Fallback to staff endpoint
-    response = await get('staff/salary/slip/$salaryId');
-    if (response.statusCode == 200) {
-      final data = jsonDecode(response.body);
-      if (data['success'] == true || data['status'] == true) return data['data'];
-    }
-    throw Exception('Failed to load salary slip');
+    // 2. Fallback: If specific fetch fails (common due to server intl extension missing or 404),
+    // fetch the index list and find the record. We know 'teacher/salary' works because the table is populated.
+    try {
+      final response = await get('teacher/salary');
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        // Handle nested 'data' or flat 'salaries'
+        final list = data['salaries'] ?? data['data']?['salaries'] ?? data['data'];
+        
+        if (list is List) {
+          final record = list.firstWhere(
+            (s) => s['id'].toString() == salaryId, 
+            orElse: () => null
+          );
+          
+          if (record != null) {
+            // Transform list record into the detail format expected by SalaryDetailData
+            return {
+              'salary': record,
+              'amount_in_words': 'Unavailable (Detailed view fallback)',
+              'status': true
+            };
+          }
+        }
+      }
+    } catch (_) {}
+
+    // 3. Final fallback to staff endpoint
+    try {
+      final staffResponse = await get('staff/salary/slip/$salaryId');
+      if (staffResponse.statusCode == 200) {
+        final data = jsonDecode(staffResponse.body);
+        if (data['success'] == true || data['status'] == true) return data['data'] ?? data;
+      }
+    } catch (_) {}
+
+    throw Exception('Salary slip details are currently unavailable on the server. Please try again later.');
   }
 
   // Accountant APIs
@@ -1524,17 +1581,17 @@ class ApiService {
     throw Exception('Failed to load profile');
   }
 
-  static Future<void> updateAccountantProfile(Map<String, String> data, {File? photo}) async {
+  static Future<void> updateAccountantProfile(Map<String, dynamic> data, {File? photo}) async {
     final files = photo != null ? {'photo': photo} : null;
     final response = await postMultipart('accountants/profile/update', data, files: files);
-    if (response.statusCode != 200) throw Exception(jsonDecode(await response.stream.bytesToString())['message'] ?? 'Failed to update profile');
+    if (response.statusCode != 200) throw Exception(errorMessage(await http.Response.fromStream(response), 'Failed to update profile'));
   }
 
-  static Future<accountant_model.UserDetail> getAccountantVirtualIdCard() async {
+  static Future<accountant_model.AccountantVirtualIdCardData> getAccountantVirtualIdCard() async {
     final response = await get('accountants/virtual-id-card');
     if (response.statusCode == 200) {
       final data = jsonDecode(response.body);
-      if (data['success'] == true || data['status'] == true) return accountant_model.UserDetail.fromJson(data['data']);
+      if (data['success'] == true || data['status'] == true) return accountant_model.AccountantVirtualIdCardData.fromJson(data['data']);
     }
     throw Exception('Failed to load virtual ID card');
   }
@@ -1825,9 +1882,10 @@ class ApiService {
     throw Exception('Failed to load super admin profile');
   }
 
-  static Future<void> updateSuperAdminProfile(Map<String, String> data) async {
-    final response = await post('superadmin/profile/update', data);
-    if (response.statusCode != 200) throw Exception('Failed to update super admin profile');
+  static Future<void> updateSuperAdminProfile(Map<String, dynamic> data, {File? photo}) async {
+    final files = photo != null ? {'photo': photo} : null;
+    final response = await postMultipart('superadmin/profile/update', data, files: files);
+    if (response.statusCode != 200) throw Exception(errorMessage(await http.Response.fromStream(response), 'Failed to update profile'));
   }
 
   static Future<List<moderator_institute.Institute>> getSuperAdminInstitutes() async {
@@ -1845,14 +1903,24 @@ class ApiService {
     throw Exception('Failed to load institute details');
   }
 
-  static Future<void> storeSuperAdminInstitute(Map<String, String> data, {File? logo}) async {
-    final response = await postMultipart('superadmin/institutes', data, files: logo != null ? {'logo': logo} : null);
-    if (response.statusCode != 200 && response.statusCode != 201) throw Exception('Failed to create institute');
+  static Future<void> storeSuperAdminInstitute(Map<String, dynamic> data, {File? logo, Uint8List? logoBytes, String? fileName}) async {
+    http.StreamedResponse response;
+    if (logoBytes != null && fileName != null) {
+      response = await postMultipartFromBytes('superadmin/institutes', data, files: {'logo': logoBytes}, fileNames: {'logo': fileName});
+    } else {
+      response = await postMultipart('superadmin/institutes', data, files: logo != null ? {'logo': logo} : null);
+    }
+    if (response.statusCode != 200 && response.statusCode != 201) throw Exception(errorMessage(await http.Response.fromStream(response), 'Failed to create institute'));
   }
 
-  static Future<void> updateSuperAdminInstitute(String id, Map<String, String> data, {File? logo}) async {
-    final response = await postMultipart('superadmin/institutes/update/$id', data, files: logo != null ? {'logo': logo} : null);
-    if (response.statusCode != 200) throw Exception('Failed to update institute');
+  static Future<void> updateSuperAdminInstitute(String id, Map<String, dynamic> data, {File? logo, Uint8List? logoBytes, String? fileName}) async {
+    http.StreamedResponse response;
+    if (logoBytes != null && fileName != null) {
+      response = await postMultipartFromBytes('superadmin/institutes/update/$id', data, files: {'logo': logoBytes}, fileNames: {'logo': fileName});
+    } else {
+      response = await postMultipart('superadmin/institutes/update/$id', data, files: logo != null ? {'logo': logo} : null);
+    }
+    if (response.statusCode != 200) throw Exception(errorMessage(await http.Response.fromStream(response), 'Failed to update institute'));
   }
 
   static Future<List<dynamic>> getModerates() async {
@@ -1934,6 +2002,259 @@ class ApiService {
   static Future<void> updateCancellationPolicy(String content) async {
     final response = await post('superadmin/cancellation-policy', {'content': content});
     if (response.statusCode != 200) throw Exception('Failed to update cancellation policy');
+  }
+
+  // Helper for profile byte updates
+  static Map<String, Uint8List> _wrapFile(Uint8List? bytes, String key) {
+    return bytes != null ? {key: bytes} : {};
+  }
+
+  static Map<String, String> _wrapFileName(String? fileName, String key) {
+    return fileName != null ? {key: fileName} : {};
+  }
+
+  // --- Profile Updates ---
+
+  static Future<void> updateCounselorProfile(Map<String, dynamic> fields, {File? photo}) async {
+    final response = await postMultipart('counselor/profile/update', fields, files: photo != null ? {'photo': photo} : null);
+    if (response.statusCode != 200) throw Exception(errorMessage(await http.Response.fromStream(response), 'Failed to update profile'));
+  }
+
+  static Future<void> updateCounselorProfileFromBytes(Map<String, dynamic> fields, Uint8List? bytes, String? fileName) async {
+    final response = await postMultipartFromBytes('counselor/profile/update', fields, files: _wrapFile(bytes, 'photo'), fileNames: _wrapFileName(fileName, 'photo'));
+    if (response.statusCode != 200) throw Exception(errorMessage(await http.Response.fromStream(response), 'Failed to update profile'));
+  }
+
+  static Future<Map<String, dynamic>> getCounselorProfile() async {
+    final response = await get('counselor/profile');
+    if (response.statusCode == 200) return jsonDecode(response.body)['data'];
+    throw Exception('Failed to load profile');
+  }
+
+  static Future<Map<String, dynamic>> getCounselorVirtualIdCard() async {
+    final response = await get('counselor/virtual-id-card');
+    if (response.statusCode == 200) return jsonDecode(response.body)['data'];
+    throw Exception('Failed to load virtual ID card');
+  }
+
+  static Future<void> updateLibrarianProfileFromBytes(Map<String, dynamic> fields, Uint8List? bytes, String? fileName) async {
+    final response = await postMultipartFromBytes('librarians/profile/update', fields, files: _wrapFile(bytes, 'photo'), fileNames: _wrapFileName(fileName, 'photo'));
+    if (response.statusCode != 200) throw Exception(errorMessage(await http.Response.fromStream(response), 'Failed to update profile'));
+  }
+
+  static Future<Map<String, dynamic>> getManagerProfile() async {
+    final response = await get('manager/profile');
+    if (response.statusCode == 200) return jsonDecode(response.body)['data'];
+    throw Exception('Failed to load profile');
+  }
+
+  static Future<void> updateManagerProfile(Map<String, dynamic> fields, {File? photo}) async {
+    final response = await postMultipart('manager/profile/update', fields, files: photo != null ? {'photo': photo} : null);
+    if (response.statusCode != 200) throw Exception(errorMessage(await http.Response.fromStream(response), 'Failed to update profile'));
+  }
+
+  static Future<void> updateManagerProfileFromBytes(Map<String, dynamic> fields, Uint8List? bytes, String? fileName) async {
+    final response = await postMultipartFromBytes('manager/profile/update', fields, files: _wrapFile(bytes, 'photo'), fileNames: _wrapFileName(fileName, 'photo'));
+    if (response.statusCode != 200) throw Exception(errorMessage(await http.Response.fromStream(response), 'Failed to update profile'));
+  }
+
+  static Future<void> updateStudentProfileFromBytes(Map<String, dynamic> fields, Uint8List? bytes, String? fileName) async {
+    final response = await postMultipartFromBytes('students/profile/update', fields, files: _wrapFile(bytes, 'photo'), fileNames: _wrapFileName(fileName, 'photo'));
+    if (response.statusCode != 200) throw Exception(errorMessage(await http.Response.fromStream(response), 'Failed to update profile'));
+  }
+
+  static Future<void> updateStaffProfileFromBytes(Map<String, dynamic> fields, Uint8List? bytes, String? fileName) async {
+    final response = await postMultipartFromBytes('staff/profile/update', fields, files: _wrapFile(bytes, 'photo'), fileNames: _wrapFileName(fileName, 'photo'));
+    if (response.statusCode != 200) throw Exception(errorMessage(await http.Response.fromStream(response), 'Failed to update profile'));
+  }
+
+  static Future<void> updateSuperAdminProfileFromBytes(Map<String, dynamic> fields, Uint8List? bytes, String? fileName) async {
+    final response = await postMultipartFromBytes('superadmin/profile/update', fields, files: _wrapFile(bytes, 'photo'), fileNames: _wrapFileName(fileName, 'photo'));
+    if (response.statusCode != 200) throw Exception(errorMessage(await http.Response.fromStream(response), 'Failed to update profile'));
+  }
+
+  static Future<void> updateAccountantProfileFromBytes(Map<String, dynamic> fields, Uint8List? bytes, String? fileName) async {
+    final response = await postMultipartFromBytes('accountants/profile/update', fields, files: _wrapFile(bytes, 'photo'), fileNames: _wrapFileName(fileName, 'photo'));
+    if (response.statusCode != 200) throw Exception(errorMessage(await http.Response.fromStream(response), 'Failed to update profile'));
+  }
+
+  static Future<void> updateModeratorProfile(Map<String, dynamic> fields, {File? photo}) async {
+    final response = await postMultipart('moderator/profile/update', fields, files: photo != null ? {'photo': photo} : null);
+    if (response.statusCode != 200) throw Exception(errorMessage(await http.Response.fromStream(response), 'Failed to update profile'));
+  }
+
+  static Future<void> updateModeratorProfileFromBytes(Map<String, dynamic> fields, Uint8List? bytes, String? fileName) async {
+    final response = await postMultipartFromBytes('moderator/profile/update', fields, files: _wrapFile(bytes, 'photo'), fileNames: _wrapFileName(fileName, 'photo'));
+    if (response.statusCode != 200) throw Exception(errorMessage(await http.Response.fromStream(response), 'Failed to update profile'));
+  }
+
+  static Future<List<dynamic>> getModeratorEvents() async {
+    final response = await get('moderator/events');
+    if (response.statusCode == 200) return jsonDecode(response.body)['data'];
+    throw Exception('Failed to load events');
+  }
+
+  // --- Add Entities ---
+
+  static Future<void> addStudent(global_student.NewStudent student) async {
+    final fields = {
+      'first_name': student.firstName,
+      'middle_name': student.middleName,
+      'last_name': student.lastName,
+      'aadhar_number': student.aadhaarNumber,
+      'student_roll_no': student.rollNo,
+      'registration_no': student.registrationNo,
+      'class_id': student.classId,
+      'section_id': student.sectionId,
+      'admission_date': student.admissionDate != null ? DateFormat('yyyy-MM-dd').format(student.admissionDate!) : null,
+      'lateral_admission': student.lateralAdmission,
+      'admission_category': student.admissionCategory,
+      'student_status': student.studentStatus,
+      'dob': student.dob != null ? DateFormat('yyyy-MM-dd').format(student.dob!) : null,
+      'gender': student.gender,
+      'blood_group': student.bloodGroup,
+      'nationality': student.nationality,
+      'phone': student.phone,
+      'alt_phone': student.altPhone,
+      'email': student.email,
+      'password': student.password,
+      'address': student.address,
+      'city': student.city,
+      'district': student.district,
+      'state': student.state,
+      'pincode': student.pincode,
+      'father_name': student.fatherName,
+      'father_occupation': student.fatherOccupation,
+      'father_phone': student.fatherPhone,
+      'mother_name': student.motherName,
+      'mother_occupation': student.motherOccupation,
+      'mother_phone': student.motherPhone,
+      'guardian_name': student.guardianName,
+      'guardian_relation': student.guardianRelation,
+      'guardian_phone': student.guardianPhone,
+      'allergies': student.allergies,
+      'medications': student.medications,
+    };
+
+    final files = <String, File>{};
+    final byteFiles = <String, Uint8List>{};
+    final byteFileNames = <String, String>{};
+
+    void addFile(String key, global_student.AppFile? file) {
+      if (file == null) return;
+      if (file.path != null) {
+        files[key] = File(file.path!);
+      } else if (file.bytes != null) {
+        byteFiles[key] = file.bytes!;
+        byteFileNames[key] = file.name;
+      }
+    }
+
+    addFile('profile_image', student.profileImage);
+    addFile('doc_aadhar_file', student.aadhaarFile);
+    addFile('doc_10th_marksheet', student.marksheet10);
+    addFile('doc_12th_marksheet', student.marksheet12);
+    addFile('doc_transfer_certificate', student.transferCertificate);
+    addFile('doc_id_proof', student.idProof);
+
+    http.StreamedResponse response;
+    if (byteFiles.isNotEmpty) {
+      response = await postMultipartFromBytes('manager/students/store', fields, files: byteFiles, fileNames: byteFileNames);
+    } else {
+      response = await postMultipart('manager/students/store', fields, files: files);
+    }
+
+    if (response.statusCode != 200 && response.statusCode != 201) {
+      throw Exception(errorMessage(await http.Response.fromStream(response), 'Failed to add student'));
+    }
+  }
+
+  static Future<void> addEmployeeUser(global_employee.NewEmployee employee) async {
+    final fields = {
+      'name': employee.name,
+      'email': employee.email,
+      'password': employee.password,
+      'role_id': employee.roleId,
+      'gender': employee.gender,
+      'dob': employee.dob?.toIso8601String(),
+      'relationship_status': employee.relationshipStatus,
+      'aadhar_number': employee.aadharNumber,
+      'phone': employee.phone,
+      'alternate_phone': employee.alternatePhone,
+      'address': employee.address,
+      'city': employee.city,
+      'state': employee.state,
+      'pincode': employee.pincode,
+      'position': employee.position,
+      'employment_type': employee.employmentType,
+      'joining_date': employee.joiningDate?.toIso8601String(),
+      'experience': employee.experience,
+      'status': employee.status,
+      'reference': employee.reference,
+      'qualification': employee.qualification,
+      'x_marks': employee.matricMarks,
+      'xii_marks': employee.interMarks,
+      'bank_account_number': employee.bankAccountNumber,
+      'ifsc_code': employee.ifscCode,
+      'bank_name': employee.bankName,
+      'branch_name': employee.branch,
+      'emergency_contact_name': employee.emergencyContactName,
+      'emergency_contact_number': employee.emergencyContactNumber,
+    };
+
+    final files = <String, File>{};
+    final byteFiles = <String, Uint8List>{};
+    final byteFileNames = <String, String>{};
+
+    void addFile(String key, global_student.AppFile? file) {
+      if (file == null) return;
+      if (file.path != null) {
+        files[key] = File(file.path!);
+      } else if (file.bytes != null) {
+        byteFiles[key] = file.bytes!;
+        byteFileNames[key] = file.name;
+      }
+    }
+
+    addFile('photo', employee.photo);
+    addFile('matriculation_marksheet', employee.matriculationMarksheet);
+    addFile('intermediate_marksheet', employee.intermediateMarksheet);
+    addFile('aadhar_photo', employee.aadharPhoto);
+    addFile('resume', employee.resume);
+
+    http.StreamedResponse response;
+    if (byteFiles.isNotEmpty) {
+      response = await postMultipartFromBytes('manager/employees/store', fields, files: byteFiles, fileNames: byteFileNames);
+    } else {
+      response = await postMultipart('manager/employees/store', fields, files: files);
+    }
+
+    if (response.statusCode != 200 && response.statusCode != 201) {
+      throw Exception(errorMessage(await http.Response.fromStream(response), 'Failed to add employee'));
+    }
+  }
+
+  static Future<void> addEvent(Map<String, dynamic> fields, {File? image, Uint8List? imageBytes, String? fileName, String? imageName}) async {
+    http.StreamedResponse response;
+    final finalFileName = fileName ?? imageName;
+
+    // Convert audience array to Laravel format if needed
+    if (fields['audience'] is List) {
+      final audienceList = fields['audience'] as List;
+      for (int i = 0; i < audienceList.length; i++) {
+        fields['audience[$i]'] = audienceList[i];
+      }
+      fields.remove('audience');
+    }
+
+    if (imageBytes != null && finalFileName != null) {
+      response = await postMultipartFromBytes('manager/events/store', fields, files: {'image': imageBytes}, fileNames: {'image': finalFileName});
+    } else {
+      response = await postMultipart('manager/events/store', fields, files: image != null ? {'image': image} : null);
+    }
+    if (response.statusCode != 200 && response.statusCode != 201) {
+      throw Exception(errorMessage(await http.Response.fromStream(response), 'Failed to add event'));
+    }
   }
 
   static Future<Map<String, dynamic>> getTermsOfService() async {

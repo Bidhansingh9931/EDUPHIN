@@ -1,5 +1,7 @@
 import 'dart:convert';
+import 'package:eduphin/services/common_widgets.dart';
 import 'package:eduphin/services/api_service.dart';
+import 'package:eduphin/services/responsive_helper.dart';
 import 'package:flutter/material.dart';
 
 import 'account_details.dart';
@@ -153,17 +155,16 @@ class _EmployeesSalaryPageState extends State<EmployeesSalaryPage> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
+    final theme = context.theme;
     return Scaffold(
       backgroundColor: theme.scaffoldBackgroundColor,
       appBar: AppBar(
-        backgroundColor: theme.appBarTheme.backgroundColor ?? theme.primaryColor,
         leading: const BackButton(),
         title: const Text("Employees Salary"),
         centerTitle: true,
       ),
       body: Padding(
-        padding: const EdgeInsets.fromLTRB(16, 16, 16, 0), // Removed bottom padding here
+        padding: context.pagePadding.copyWith(bottom: 0),
         child: Column(
           children: [
             /// Search Bar
@@ -174,28 +175,33 @@ class _EmployeesSalaryPageState extends State<EmployeesSalaryPage> {
                 hintText: "Search for employees...",
                 hintStyle: TextStyle(color: theme.hintColor),
                 filled: true,
-                fillColor: theme.cardColor,
+                fillColor: theme.colorScheme.surfaceContainerLow,
                 border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: BorderSide.none,
+                  borderRadius: BorderRadius.circular(context.scale(12)),
+                  borderSide: BorderSide(color: theme.colorScheme.outlineVariant),
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(context.scale(12)),
+                  borderSide: BorderSide(color: theme.colorScheme.outlineVariant),
                 ),
               ),
             ),
 
-            const SizedBox(height: 12),
+            SizedBox(height: context.sm),
 
             /// Filter
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 12),
               decoration: BoxDecoration(
-                color: theme.cardColor,
-                borderRadius: BorderRadius.circular(12),
+                color: theme.colorScheme.surfaceContainerLow,
+                borderRadius: BorderRadius.circular(context.scale(12)),
+                border: Border.all(color: theme.colorScheme.outlineVariant),
               ),
               child: DropdownButton<String>(
                 value: _selectedRole,
                 hint: Text("Filter by Role", style: TextStyle(color: theme.hintColor)),
                 isExpanded: true,
-                dropdownColor: theme.cardColor,
+                dropdownColor: theme.colorScheme.surfaceContainerLow,
                 underline: const SizedBox(),
                 icon: Icon(Icons.keyboard_arrow_down, color: theme.hintColor),
                 style: theme.textTheme.bodyLarge,
@@ -217,7 +223,7 @@ class _EmployeesSalaryPageState extends State<EmployeesSalaryPage> {
               ),
             ),
 
-            const SizedBox(height: 16),
+            SizedBox(height: context.md),
 
             /// Employee List
             Expanded(
@@ -225,13 +231,11 @@ class _EmployeesSalaryPageState extends State<EmployeesSalaryPage> {
                   ? const Center(child: CircularProgressIndicator())
                   : _filteredEmployees.isEmpty
                       ? const Center(child: Text("No employees found."))
-                      : LayoutBuilder(builder: (context, constraints) {
-                          if (constraints.maxWidth > 600) {
-                            return _buildGridView();
-                          } else {
-                            return _buildListView();
-                          }
-                        }),
+                      : context.responsive(
+                          _buildListView(),
+                          tablet: _buildGridView(),
+                          desktop: _buildGridView(),
+                        ),
             )
           ],
         ),
@@ -241,7 +245,7 @@ class _EmployeesSalaryPageState extends State<EmployeesSalaryPage> {
 
   Widget _buildListView() {
     return ListView.separated(
-      padding: const EdgeInsets.only(bottom: 50), // Added bottom padding
+      padding: const EdgeInsets.only(bottom: 24),
       itemCount: _filteredEmployees.length,
       itemBuilder: (context, index) {
         final employee = _filteredEmployees[index];
@@ -257,18 +261,18 @@ class _EmployeesSalaryPageState extends State<EmployeesSalaryPage> {
           ),
         );
       },
-      separatorBuilder: (context, index) => const SizedBox(height: 12),
+      separatorBuilder: (context, index) => SizedBox(height: context.sm),
     );
   }
 
   Widget _buildGridView() {
     return GridView.builder(
-      padding: const EdgeInsets.only(bottom: 50), // Added bottom padding
+      padding: const EdgeInsets.only(bottom: 24),
       itemCount: _filteredEmployees.length,
-      gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
+      gridDelegate: SliverGridDelegateWithMaxCrossAxisExtent(
         maxCrossAxisExtent: 400,
-        mainAxisSpacing: 12,
-        crossAxisSpacing: 12,
+        mainAxisSpacing: context.sm,
+        crossAxisSpacing: context.sm,
         childAspectRatio: 3.2, // Adjust for better card shape
       ),
       itemBuilder: (context, index) {
@@ -297,20 +301,19 @@ class EmployeeCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
+    final theme = context.theme;
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: theme.cardColor,
-        borderRadius: BorderRadius.circular(14),
+        color: theme.colorScheme.surfaceContainerLow,
+        borderRadius: BorderRadius.circular(context.scale(14)),
+        border: Border.all(color: theme.colorScheme.outlineVariant),
       ),
       child: Row(
         children: [
           /// Avatar
-          CircleAvatar(
-            radius: 26,
-            backgroundColor: theme.colorScheme.secondaryContainer,
-            child: Icon(Icons.person, size: 30, color: theme.colorScheme.onSecondaryContainer),
+          ProfileAvatar(
+            radius: context.scale(26),
           ),
           const SizedBox(width: 12),
 
@@ -324,12 +327,20 @@ class EmployeeCard extends StatelessWidget {
                 const SizedBox(height: 4),
                 Text(employee.info, style: theme.textTheme.bodySmall?.copyWith(color: theme.hintColor), overflow: TextOverflow.ellipsis),
                 const SizedBox(height: 8),
-                Chip(
-                  label: Text(employee.role),
-                  backgroundColor: employee.roleColor.withAlpha(35),
-                  labelStyle: TextStyle(color: employee.roleColor, fontWeight: FontWeight.bold, fontSize: 12),
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 0),
-                  materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: employee.roleColor.withAlpha(35),
+                    borderRadius: BorderRadius.circular(context.scale(8)),
+                  ),
+                  child: Text(
+                    employee.role,
+                    style: TextStyle(
+                      color: employee.roleColor,
+                      fontWeight: FontWeight.bold,
+                      fontSize: context.font(12),
+                    ),
+                  ),
                 ),
               ],
             ),

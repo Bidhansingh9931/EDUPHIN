@@ -51,70 +51,85 @@ class _AssignedTicketsPageState extends State<AssignedTicketsPage> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
+    final theme = context.theme;
 
     return Scaffold(
+      backgroundColor: theme.scaffoldBackgroundColor,
       appBar: AppBar(
-        title: const Text("Assigned Tickets"),
+        title: Text("Assigned Tickets", style: theme.appBarTheme.titleTextStyle?.copyWith(fontSize: context.font(20))),
       ),
-      body: Column(
-        children: [
-          _buildFilterSection(),
-          Expanded(
-            child: FutureBuilder(
-              future: _ticketsFuture,
-              builder: (context, snapshot) {
-                if (snapshot.connectionState == ConnectionState.waiting && _tickets.isEmpty) {
-                  return const Center(child: CircularProgressIndicator());
-                } else if (_error != null) {
-                  return Center(
-                    child: Padding(
-                      padding: const EdgeInsets.all(24.0),
-                      child: Text(_error!, textAlign: TextAlign.center, style: TextStyle(color: theme.colorScheme.error)),
-                    ),
-                  );
-                } else if (_tickets.isEmpty) {
-                  return const Center(child: Text("No tickets assigned to you."));
-                }
-                return RefreshIndicator(
-                  onRefresh: _loadAssignedTickets,
-                  child: ListView.builder(
-                    padding: context.pagePadding,
-                    itemCount: _tickets.length,
-                    itemBuilder: (context, index) => TicketCard(ticket: _tickets[index]),
-                  ),
-                );
-              },
-            ),
+      body: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 1200),
+          child: Column(
+            children: [
+              _buildFilterSection(),
+              Expanded(
+                child: FutureBuilder(
+                  future: _ticketsFuture,
+                  builder: (context, snapshot) {
+                    if (snapshot.connectionState == ConnectionState.waiting && _tickets.isEmpty) {
+                      return const Center(child: CircularProgressIndicator());
+                    } else if (_error != null) {
+                      return Center(
+                        child: Padding(
+                          padding: EdgeInsets.all(context.scale(24)),
+                          child: Text(_error!, textAlign: TextAlign.center, style: TextStyle(color: theme.colorScheme.error, fontSize: context.font(14))),
+                        ),
+                      );
+                    } else if (_tickets.isEmpty) {
+                      return Center(child: Text("No tickets assigned to you.", style: TextStyle(fontSize: context.font(14))));
+                    }
+                    return RefreshIndicator(
+                      onRefresh: _loadAssignedTickets,
+                      child: ListView.builder(
+                        padding: context.pagePadding,
+                        itemCount: _tickets.length,
+                        itemBuilder: (context, index) => TicketCard(ticket: _tickets[index]),
+                      ),
+                    );
+                  },
+                ),
+              ),
+            ],
           ),
-        ],
+        ),
       ),
     );
   }
 
   Widget _buildFilterSection() {
+    final theme = context.theme;
     return Card(
-      margin: const EdgeInsets.all(16),
+      elevation: 0,
+      margin: context.pagePadding.copyWith(bottom: 0),
+      color: theme.colorScheme.surfaceContainerLow,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(context.scale(16)),
+        side: BorderSide(color: theme.colorScheme.outlineVariant.withValues(alpha: 0.5), width: 0.5),
+      ),
       child: Padding(
-        padding: const EdgeInsets.all(16),
+        padding: EdgeInsets.all(context.spacing),
         child: Column(
           children: [
             TextField(
               onChanged: (value) => _filters['search'] = value,
               onSubmitted: (_) => _loadAssignedTickets(),
-              decoration: const InputDecoration(
+              style: TextStyle(fontSize: context.font(14)),
+              decoration: InputDecoration(
                 hintText: "Search by title...",
-                prefixIcon: Icon(Icons.search),
+                prefixIcon: Icon(Icons.search, size: context.scale(20)),
+                contentPadding: EdgeInsets.symmetric(horizontal: context.scale(12), vertical: context.scale(12)),
               ),
             ),
-            const SizedBox(height: 12),
+            SizedBox(height: context.md),
             Row(
               children: [
                 Expanded(child: _buildFilterDropdown('Priority', ['low', 'medium', 'high'], _filters['priority'] ?? '', (val) {
                   setState(() => _filters['priority'] = val ?? '');
                   _loadAssignedTickets();
                 })),
-                const SizedBox(width: 12),
+                SizedBox(width: context.md),
                 Expanded(child: _buildFilterDropdown('Status', ['open', 'in_progress', 'resolved', 'closed'], _filters['status'] ?? '', (val) {
                    setState(() => _filters['status'] = val ?? '');
                   _loadAssignedTickets();
@@ -129,13 +144,15 @@ class _AssignedTicketsPageState extends State<AssignedTicketsPage> {
 
    Widget _buildFilterDropdown(String label, List<String> items, String value, ValueChanged<String?> onChanged) {
      return DropdownButtonFormField<String>(
-        value: value.isEmpty ? null : value,
+        initialValue: value.isEmpty ? null : value,
+        style: TextStyle(fontSize: context.font(13), color: context.theme.colorScheme.onSurface),
         decoration: InputDecoration(
           labelText: label,
-          contentPadding: const EdgeInsets.symmetric(horizontal: 12),
+          labelStyle: TextStyle(fontSize: context.font(12)),
+          contentPadding: EdgeInsets.symmetric(horizontal: context.scale(12), vertical: context.scale(8)),
         ),
         items: items
-            .map((i) => DropdownMenuItem(value: i, child: Text(i.toUpperCase(), style: const TextStyle(fontSize: 12))))
+            .map((i) => DropdownMenuItem(value: i, child: Text(i.toUpperCase(), style: TextStyle(fontSize: context.font(11)))))
             .toList(),
         onChanged: onChanged,
       );
@@ -149,28 +166,39 @@ class TicketCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
+    final theme = context.theme;
+    final colorScheme = theme.colorScheme;
     return Card(
-      margin: const EdgeInsets.only(bottom: 12),
+      elevation: 0,
+      margin: EdgeInsets.only(bottom: context.spacing),
+      color: colorScheme.surfaceContainerLow,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(context.scale(16)),
+        side: BorderSide(color: colorScheme.outlineVariant.withValues(alpha: 0.5), width: 0.5),
+      ),
       child: Padding(
-        padding: const EdgeInsets.all(16.0),
+        padding: EdgeInsets.all(context.spacing),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(ticket.title, style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
-            const SizedBox(height: 8),
+            Text(ticket.title, style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold, fontSize: context.font(16))),
+            SizedBox(height: context.scale(12)),
             Row(
               children: [
                 _buildChip(context, ticket.status, _getStatusColor(ticket.status)),
-                const SizedBox(width: 8),
+                SizedBox(width: context.scale(8)),
                 _buildChip(context, ticket.priority, _getPriorityColor(ticket.priority)),
               ],
             ),
-            const Divider(height: 24),
+            Padding(
+              padding: EdgeInsets.symmetric(vertical: context.md),
+              child: Divider(height: 1, color: colorScheme.outlineVariant.withValues(alpha: 0.5)),
+            ),
             _infoRow(context, "Created:", _formatDate(ticket.createdAt)),
-            const SizedBox(height: 12),
+            SizedBox(height: context.scale(16)),
             SizedBox(
               width: double.infinity,
+              height: context.scale(48),
               child: ElevatedButton(
                 onPressed: () {
                    Navigator.push(
@@ -178,7 +206,13 @@ class TicketCard extends StatelessWidget {
                     MaterialPageRoute(builder: (_) => TicketPage(ticketId: ticket.id)),
                   );
                 },
-                child: const Text("VIEW DETAILS"),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: colorScheme.primary,
+                  foregroundColor: colorScheme.onPrimary,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(context.scale(12))),
+                  elevation: 0,
+                ),
+                child: Text("VIEW DETAILS", style: TextStyle(fontWeight: FontWeight.bold, fontSize: context.font(13), letterSpacing: 1)),
               ),
             )
           ],
@@ -189,22 +223,23 @@ class TicketCard extends StatelessWidget {
 
   Widget _buildChip(BuildContext context, String label, Color color) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      padding: EdgeInsets.symmetric(horizontal: context.scale(10), vertical: context.scale(4)),
       decoration: BoxDecoration(
         color: color.withValues(alpha: 0.1),
-        borderRadius: BorderRadius.circular(6),
+        borderRadius: BorderRadius.circular(context.scale(6)),
         border: Border.all(color: color.withValues(alpha: 0.3)),
       ),
-      child: Text(label.toUpperCase(), style: TextStyle(color: color, fontSize: 10, fontWeight: FontWeight.bold)),
+      child: Text(label.toUpperCase(), style: TextStyle(color: color, fontSize: context.font(10), fontWeight: FontWeight.bold)),
     );
   }
 
   Widget _infoRow(BuildContext context, String label, String value) {
+    final theme = context.theme;
     return Row(
       children: [
-        Text(label, style: TextStyle(color: Theme.of(context).hintColor, fontSize: 12)),
-        const SizedBox(width: 8),
-        Text(value, style: const TextStyle(fontWeight: FontWeight.w500, fontSize: 12)),
+        Text(label, style: TextStyle(color: theme.hintColor, fontSize: context.font(12))),
+        SizedBox(width: context.scale(8)),
+        Text(value, style: TextStyle(fontWeight: FontWeight.w600, fontSize: context.font(12), color: theme.colorScheme.onSurface)),
       ],
     );
   }
@@ -220,17 +255,17 @@ class TicketCard extends StatelessWidget {
   Color _getStatusColor(String status) {
     switch (status.toLowerCase()) {
       case 'open': return Colors.blue;
-      case 'in_progress': return Colors.orange;
+      case 'in_progress': return const Color(0xFFF59E0B);
       case 'resolved':
-      case 'closed': return Colors.green;
+      case 'closed': return const Color(0xFF10B981);
       default: return Colors.grey;
     }
   }
 
   Color _getPriorityColor(String priority) {
     switch (priority.toLowerCase()) {
-      case 'high': return Colors.red;
-      case 'medium': return Colors.amber;
+      case 'high': return const Color(0xFFEF4444);
+      case 'medium': return const Color(0xFFF59E0B);
       default: return Colors.grey;
     }
   }

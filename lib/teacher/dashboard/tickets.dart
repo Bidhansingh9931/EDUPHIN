@@ -57,24 +57,25 @@ class _TicketPageState extends State<TicketPage> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
             content: Text('Reply sent successfully!'),
-            backgroundColor: Colors.green));
+            backgroundColor: Color(0xFF10B981)));
       }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
             content: Text('Failed to send reply: $e'),
-            backgroundColor: Colors.red));
+            backgroundColor: const Color(0xFFEF4444)));
       }
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
+    final theme = context.theme;
 
     return Scaffold(
+      backgroundColor: theme.colorScheme.surface,
       appBar: AppBar(
-        title: const Text("Ticket Details"),
+        title: Text("Ticket Details", style: TextStyle(fontSize: context.font(20))),
       ),
       body: FutureBuilder<TicketDetails>(
         future: _detailsFuture,
@@ -84,21 +85,21 @@ class _TicketPageState extends State<TicketPage> {
           } else if (snapshot.hasError) {
             return Center(
               child: Padding(
-                padding: const EdgeInsets.all(24.0),
+                padding: EdgeInsets.all(context.lg),
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    const Icon(Icons.error_outline, size: 48, color: Colors.red),
-                    const SizedBox(height: 16),
-                    Text('Error: ${snapshot.error}', textAlign: TextAlign.center),
-                    const SizedBox(height: 16),
+                    Icon(Icons.error_outline, size: context.scale(48), color: theme.colorScheme.error),
+                    SizedBox(height: context.md),
+                    Text('Error: ${snapshot.error}', textAlign: TextAlign.center, style: TextStyle(fontSize: context.font(14))),
+                    SizedBox(height: context.md),
                     ElevatedButton(onPressed: _refreshTicketDetails, child: const Text("Retry")),
                   ],
                 ),
               ),
             );
           } else if (!snapshot.hasData) {
-            return const Center(child: Text("Ticket not found."));
+            return Center(child: Text("Ticket not found.", style: TextStyle(fontSize: context.font(14))));
           } else {
             return _buildContent(context, snapshot.data!);
           }
@@ -115,7 +116,7 @@ class _TicketPageState extends State<TicketPage> {
           child: details.replies.isEmpty
               ? Center(
                   child: Text("No replies yet. Start the conversation!", 
-                    style: TextStyle(color: Theme.of(context).hintColor)))
+                    style: TextStyle(color: context.theme.hintColor, fontSize: context.font(14))))
               : _buildRepliesList(context, details.replies),
         ),
         _buildReplySection(context),
@@ -124,10 +125,10 @@ class _TicketPageState extends State<TicketPage> {
   }
 
   Widget _buildHeader(BuildContext context, SupportTicket ticket) {
-    final theme = Theme.of(context);
+    final theme = context.theme;
     return Container(
         width: double.infinity,
-        padding: const EdgeInsets.all(20),
+        padding: EdgeInsets.all(context.spacing),
         decoration: BoxDecoration(
           color: theme.colorScheme.surface,
           border: Border(bottom: BorderSide(color: theme.dividerColor, width: 0.5)),
@@ -136,9 +137,9 @@ class _TicketPageState extends State<TicketPage> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(ticket.title,
-                style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold)),
-            const SizedBox(height: 12),
-            Wrap(spacing: 8, runSpacing: 8, children: [
+                style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold, fontSize: context.font(20))),
+            SizedBox(height: context.md),
+            Wrap(spacing: context.sm, runSpacing: context.sm, children: [
               _buildStatusChip(context, ticket.status),
               _buildPriorityChip(context, ticket.priority),
             ]),
@@ -147,6 +148,7 @@ class _TicketPageState extends State<TicketPage> {
   }
 
   Widget _buildRepliesList(BuildContext context, List<TicketReply> replies) {
+    final theme = context.theme;
     return ListView.builder(
       padding: context.pagePadding,
       itemCount: replies.length,
@@ -158,19 +160,19 @@ class _TicketPageState extends State<TicketPage> {
         return Align(
           alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
           child: Container(
-            margin: const EdgeInsets.only(bottom: 16),
-            padding: const EdgeInsets.all(12),
+            margin: EdgeInsets.only(bottom: context.md),
+            padding: EdgeInsets.all(context.md),
             constraints: BoxConstraints(
                 maxWidth: context.screenWidth * (context.isTablet ? 0.6 : 0.8)),
             decoration: BoxDecoration(
               color: isMe
-                  ? Theme.of(context).colorScheme.primaryContainer
-                  : Theme.of(context).colorScheme.surfaceContainerHighest,
+                  ? theme.colorScheme.primaryContainer
+                  : theme.colorScheme.surfaceContainerHighest,
               borderRadius: BorderRadius.only(
-                topLeft: const Radius.circular(16),
-                topRight: const Radius.circular(16),
-                bottomLeft: Radius.circular(isMe ? 16 : 0),
-                bottomRight: Radius.circular(isMe ? 0 : 16),
+                topLeft: Radius.circular(context.scale(16)),
+                topRight: Radius.circular(context.scale(16)),
+                bottomLeft: Radius.circular(isMe ? context.scale(16) : 0),
+                bottomRight: Radius.circular(isMe ? 0 : context.scale(16)),
               ),
             ),
             child: Column(
@@ -179,29 +181,29 @@ class _TicketPageState extends State<TicketPage> {
                 if (!isMe)
                   Text(
                     reply.userName ?? 'User',
-                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
+                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: context.font(12)),
                   ),
-                if (!isMe) const SizedBox(height: 4),
-                Text(reply.message),
+                if (!isMe) SizedBox(height: context.xs),
+                Text(reply.message, style: TextStyle(fontSize: context.font(14))),
                 if (reply.attachment != null)
                   Padding(
-                    padding: const EdgeInsets.only(top: 8.0),
+                    padding: EdgeInsets.only(top: context.sm),
                     child: InkWell(
                       onTap: () { /* Handle attachment tap */ },
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          Icon(Icons.attachment, size: 16, color: Theme.of(context).colorScheme.primary),
-                          const SizedBox(width: 4),
-                          const Text("View Attachment", style: TextStyle(fontSize: 12, decoration: TextDecoration.underline))
+                          Icon(Icons.attachment, size: context.scale(16), color: theme.colorScheme.primary),
+                          SizedBox(width: context.xs),
+                          Text("View Attachment", style: TextStyle(fontSize: context.font(12), decoration: TextDecoration.underline))
                         ],
                       ),
                     ),
                   ),
-                const SizedBox(height: 6),
+                SizedBox(height: context.sm),
                 Text(
                   DateFormat.yMMMd().add_jm().format(DateTime.parse(reply.createdAt)),
-                  style: TextStyle(fontSize: 10, color: Theme.of(context).hintColor),
+                  style: TextStyle(fontSize: context.font(10), color: theme.hintColor),
                 ),
               ],
             ),
@@ -212,13 +214,13 @@ class _TicketPageState extends State<TicketPage> {
   }
 
   Widget _buildReplySection(BuildContext context) {
-    final theme = Theme.of(context);
+    final theme = context.theme;
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: EdgeInsets.all(context.spacing),
       decoration: BoxDecoration(
         color: theme.colorScheme.surface,
         boxShadow: [
-          BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 10, offset: const Offset(0, -5))
+          BoxShadow(color: theme.colorScheme.shadow.withValues(alpha: 0.05), blurRadius: 10, offset: const Offset(0, -5))
         ],
       ),
       child: SafeArea(
@@ -227,18 +229,18 @@ class _TicketPageState extends State<TicketPage> {
           children: [
             if (_attachment != null)
               Container(
-                margin: const EdgeInsets.only(bottom: 10),
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                margin: EdgeInsets.only(bottom: context.sm),
+                padding: EdgeInsets.symmetric(horizontal: context.md, vertical: context.sm),
                 decoration: BoxDecoration(
                   color: theme.colorScheme.primary.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(8),
+                  borderRadius: BorderRadius.circular(context.scale(8)),
                 ),
                 child: Row(
                   children: [
-                    const Icon(Icons.description, size: 18),
-                    const SizedBox(width: 8),
-                    Expanded(child: Text(_attachment!.path.split('/').last, maxLines: 1, overflow: TextOverflow.ellipsis)),
-                    IconButton(onPressed: () => setState(() => _attachment = null), icon: const Icon(Icons.close, size: 18)),
+                    Icon(Icons.description, size: context.scale(18)),
+                    SizedBox(width: context.sm),
+                    Expanded(child: Text(_attachment!.path.split('/').last, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: context.font(13)))),
+                    IconButton(onPressed: () => setState(() => _attachment = null), icon: Icon(Icons.close, size: context.scale(18))),
                   ],
                 ),
               ),
@@ -251,7 +253,7 @@ class _TicketPageState extends State<TicketPage> {
                       setState(() => _attachment = File(result.files.single.path!));
                     }
                   },
-                  icon: const Icon(Icons.add_circle_outline),
+                  icon: Icon(Icons.add_circle_outline, size: context.scale(24)),
                   color: theme.colorScheme.primary,
                 ),
                 Expanded(
@@ -259,15 +261,18 @@ class _TicketPageState extends State<TicketPage> {
                     controller: _replyController,
                     maxLines: 4,
                     minLines: 1,
+                    style: TextStyle(fontSize: context.font(14)),
                     decoration: const InputDecoration(
                       hintText: "Type your reply...",
                       border: InputBorder.none,
+                      enabledBorder: InputBorder.none,
+                      focusedBorder: InputBorder.none,
                       filled: false,
                     ),
                   ),
                 ),
                 IconButton(
-                  icon: const Icon(Icons.send_rounded),
+                  icon: Icon(Icons.send_rounded, size: context.scale(24)),
                   color: theme.colorScheme.primary,
                   onPressed: _addReply,
                 ),
@@ -280,40 +285,51 @@ class _TicketPageState extends State<TicketPage> {
   }
 
   Widget _buildStatusChip(BuildContext context, String status) {
-    final theme = Theme.of(context);
     Color color;
     switch (status.toLowerCase()) {
-      case 'open': color = Colors.blue; break;
-      case 'in_progress': color = Colors.orange; break;
+      case 'open':
+        color = const Color(0xFF3B82F6); // Standard Blue for info/open
+        break;
+      case 'in_progress':
+        color = const Color(0xFFF59E0B); // Amber
+        break;
       case 'resolved':
-      case 'closed': color = Colors.green; break;
-      default: color = Colors.grey;
+      case 'closed':
+        color = const Color(0xFF10B981); // Emerald
+        break;
+      default:
+        color = context.theme.colorScheme.outline;
     }
     return Chip(
-        label: Text(status.replaceAll('_', ' ').toUpperCase(), 
-          style: TextStyle(color: color, fontSize: 10, fontWeight: FontWeight.bold)),
-        backgroundColor: color.withValues(alpha: 0.1),
-        side: BorderSide(color: color.withValues(alpha: 0.2)),
-        padding: EdgeInsets.zero,
-        materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+      label: Text(status.replaceAll('_', ' ').toUpperCase(), style: TextStyle(color: color, fontSize: context.font(10), fontWeight: FontWeight.bold)),
+      backgroundColor: color.withValues(alpha: 0.1),
+      side: BorderSide(color: color.withValues(alpha: 0.2)),
+      padding: EdgeInsets.zero,
+      materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(context.scale(8))),
     );
   }
 
   Widget _buildPriorityChip(BuildContext context, String priority) {
     Color color;
     switch (priority.toLowerCase()) {
-      case 'high': color = Colors.red; break;
-      case 'medium': color = Colors.amber; break;
+      case 'high':
+        color = const Color(0xFFEF4444); // Red
+        break;
+      case 'medium':
+        color = const Color(0xFFF59E0B); // Amber
+        break;
       case 'low':
-      default: color = Colors.grey;
+      default:
+        color = const Color(0xFF3B82F6); // Blue for low priority
     }
     return Chip(
-        label: Text(priority.toUpperCase(), 
-          style: TextStyle(color: color, fontSize: 10, fontWeight: FontWeight.bold)),
-        backgroundColor: color.withValues(alpha: 0.1),
-        side: BorderSide(color: color.withValues(alpha: 0.2)),
-        padding: EdgeInsets.zero,
-        materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+      label: Text(priority.toUpperCase(), style: TextStyle(color: color, fontSize: context.font(10), fontWeight: FontWeight.bold)),
+      backgroundColor: color.withValues(alpha: 0.1),
+      side: BorderSide(color: color.withValues(alpha: 0.2)),
+      padding: EdgeInsets.zero,
+      materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(context.scale(8))),
     );
   }
 }

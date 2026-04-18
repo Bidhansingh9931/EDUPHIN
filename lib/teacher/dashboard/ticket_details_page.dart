@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'package:eduphin/services/responsive_helper.dart';
 import 'package:flutter/material.dart';
 import 'package:eduphin/services/api_service.dart';
 import 'package:eduphin/teacher/dashboard/ticket_details_models.dart';
@@ -69,7 +70,7 @@ class _TicketDetailsPageState extends State<TicketDetailsPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text("Ticket Details"),
+        title: Text("Ticket Details", style: TextStyle(fontWeight: FontWeight.bold, fontSize: context.font(20))),
       ),
       body: FutureBuilder<TicketDetails>(
         future: _detailsFuture,
@@ -78,8 +79,18 @@ class _TicketDetailsPageState extends State<TicketDetailsPage> {
             return const Center(child: CircularProgressIndicator());
           } else if (snapshot.hasError) {
             return Center(child: Padding(
-              padding: const EdgeInsets.all(24.0),
-              child: Text("Error: ${snapshot.error}", textAlign: TextAlign.center),
+              padding: EdgeInsets.all(context.scale(24.0)),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.error_outline, size: context.scale(48), color: context.theme.colorScheme.error),
+                  SizedBox(height: context.scale(16)),
+                  Text("Error loading ticket details", style: TextStyle(fontWeight: FontWeight.bold, fontSize: context.font(16))),
+                  Text("${snapshot.error}", textAlign: TextAlign.center, style: TextStyle(fontSize: context.font(12))),
+                  SizedBox(height: context.scale(24)),
+                  ElevatedButton(onPressed: _loadDetails, child: const Text("Retry")),
+                ],
+              ),
             ));
           } else if (!snapshot.hasData) {
             return const Center(child: Text("No details found"));
@@ -88,20 +99,25 @@ class _TicketDetailsPageState extends State<TicketDetailsPage> {
           final data = snapshot.data!;
           final ticket = data.ticket;
 
-          return Column(
-            children: [
-              _buildHeader(ticket),
-              Expanded(
-                child: data.replies.isEmpty 
-                  ? _buildEmptyConversation() 
-                  : ListView.builder(
-                      padding: const EdgeInsets.all(16),
-                      itemCount: data.replies.length,
-                      itemBuilder: (context, index) => _buildReplyBubble(data.replies[index]),
-                    ),
+          return Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 1000),
+              child: Column(
+                children: [
+                  _buildHeader(ticket),
+                  Expanded(
+                    child: data.replies.isEmpty 
+                      ? _buildEmptyConversation() 
+                      : ListView.builder(
+                          padding: EdgeInsets.all(context.scale(16)),
+                          itemCount: data.replies.length,
+                          itemBuilder: (context, index) => _buildReplyBubble(data.replies[index]),
+                        ),
+                  ),
+                  _buildReplySection(ticket.status),
+                ],
               ),
-              _buildReplySection(ticket.status),
-            ],
+            ),
           );
         },
       ),
@@ -109,55 +125,93 @@ class _TicketDetailsPageState extends State<TicketDetailsPage> {
   }
 
   Widget _buildHeader(SupportTicket ticket) {
-    final theme = Theme.of(context);
+    final theme = context.theme;
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(16),
+      padding: EdgeInsets.all(context.spacing),
       decoration: BoxDecoration(
-        color: theme.colorScheme.surfaceContainerHighest.withOpacity(0.3),
-        border: Border(bottom: BorderSide(color: theme.dividerColor.withOpacity(0.1))),
+        color: theme.colorScheme.surface,
+        border: Border(bottom: BorderSide(color: theme.colorScheme.outlineVariant.withValues(alpha: 0.5), width: 0.5)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              _statusBadge(ticket.status),
-              const SizedBox(width: 8),
+              _statusBadge(ticket.status ?? 'open'),
+              SizedBox(width: context.scale(8)),
               _priorityBadge(ticket.priority),
             ],
           ),
-          const SizedBox(height: 12),
+          SizedBox(height: context.scale(16)),
           Text(
-            ticket.title, 
-            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
+            ticket.title,
+            style: theme.textTheme.titleMedium?.copyWith(
+              fontWeight: FontWeight.bold,
+              fontSize: context.font(18),
+              color: theme.colorScheme.onSurface,
+            ),
           ),
-          const SizedBox(height: 4),
-          Text(
-            ticket.description ?? 'No description provided.', 
-            style: TextStyle(fontSize: 13, color: theme.hintColor),
-          ),
+          if (ticket.description != null) ...[
+            SizedBox(height: context.scale(8)),
+            Text(
+              ticket.description!,
+              style: TextStyle(
+                fontSize: context.font(14),
+                color: theme.colorScheme.onSurfaceVariant,
+                height: 1.4,
+              ),
+            ),
+          ],
         ],
       ),
     );
   }
 
   Widget _statusBadge(String status) {
+    final theme = context.theme;
+    Color color = theme.colorScheme.primary;
+    if (status.toLowerCase() == 'closed') color = theme.colorScheme.outline;
+    if (status.toLowerCase() == 'resolved') color = const Color(0xFF10B981);
+
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-      decoration: BoxDecoration(color: Colors.blueGrey.withOpacity(0.15), borderRadius: BorderRadius.circular(6)),
-      child: Text(status.toUpperCase(), style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.blueGrey)),
+      padding: EdgeInsets.symmetric(horizontal: context.scale(10), vertical: context.scale(4)),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(context.scale(12)),
+      ),
+      child: Text(
+        status.toUpperCase().replaceAll('_', ' '),
+        style: TextStyle(
+          fontSize: context.font(10),
+          fontWeight: FontWeight.bold,
+          color: color,
+        ),
+      ),
     );
   }
 
   Widget _priorityBadge(String priority) {
-    Color color = priority.toLowerCase() == 'high' ? Colors.red : priority.toLowerCase() == 'medium' ? Colors.orange : Colors.green;
+    final theme = context.theme;
+    Color color = theme.colorScheme.outline;
+    if (priority.toLowerCase() == 'high') color = theme.colorScheme.error;
+    else if (priority.toLowerCase() == 'medium') color = const Color(0xFFF59E0B);
+    else if (priority.toLowerCase() == 'low') color = Colors.blue;
+
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-      decoration: BoxDecoration(color: color.withOpacity(0.15), borderRadius: BorderRadius.circular(6)),
-      child: Text(priority.toUpperCase(), style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: color)),
+      padding: EdgeInsets.symmetric(horizontal: context.scale(10), vertical: context.scale(4)),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(context.scale(12)),
+      ),
+      child: Text(
+        priority.toUpperCase(),
+        style: TextStyle(
+          fontSize: context.font(10),
+          fontWeight: FontWeight.bold,
+          color: color,
+        ),
+      ),
     );
   }
 
@@ -166,49 +220,91 @@ class _TicketDetailsPageState extends State<TicketDetailsPage> {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(Icons.forum_outlined, size: 64, color: Theme.of(context).hintColor.withOpacity(0.2)),
-          const SizedBox(height: 16),
-          const Text("No replies yet. Start the conversation!", style: TextStyle(fontWeight: FontWeight.bold)),
+          Icon(Icons.forum_outlined, size: context.scale(64), color: context.theme.hintColor.withValues(alpha: 0.2)),
+          SizedBox(height: context.scale(16)),
+          Text("No replies yet. Start the conversation!", style: TextStyle(fontWeight: FontWeight.bold, fontSize: context.font(14))),
         ],
       ),
     );
   }
 
   Widget _buildReplyBubble(TicketReply reply) {
+    final theme = context.theme;
+    final isMe = reply.userRole?.toLowerCase() == 'teacher' || reply.userName?.toLowerCase() == 'you';
+
     return Align(
-      alignment: Alignment.centerLeft,
+      alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
       child: Container(
-        margin: const EdgeInsets.only(bottom: 16, right: 48),
-        padding: const EdgeInsets.all(12),
+        margin: EdgeInsets.only(
+          bottom: context.scale(16),
+          left: isMe ? context.scale(64) : 0,
+          right: isMe ? 0 : context.scale(64),
+        ),
+        padding: EdgeInsets.all(context.scale(16)),
         decoration: BoxDecoration(
-          color: Theme.of(context).cardColor,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: Theme.of(context).dividerColor.withOpacity(0.1)),
+          color: isMe ? theme.colorScheme.primaryContainer.withValues(alpha: 0.3) : theme.colorScheme.surfaceContainerLow,
+          borderRadius: BorderRadius.only(
+            topLeft: Radius.circular(context.scale(20)),
+            topRight: Radius.circular(context.scale(20)),
+            bottomLeft: Radius.circular(isMe ? context.scale(20) : 0),
+            bottomRight: Radius.circular(isMe ? 0 : context.scale(20)),
+          ),
+          border: Border.all(color: theme.colorScheme.outlineVariant.withValues(alpha: 0.5), width: 0.5),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(reply.message),
+            if (!isMe) ...[
+              Text(reply.userName ?? "User", style: TextStyle(fontWeight: FontWeight.bold, fontSize: context.font(12), color: theme.colorScheme.primary)),
+              SizedBox(height: context.scale(4)),
+            ],
+            Text(
+              reply.message,
+              style: TextStyle(
+                fontSize: context.font(14),
+                color: isMe ? theme.colorScheme.onPrimaryContainer : theme.colorScheme.onSurface,
+                height: 1.4,
+              ),
+            ),
             if (reply.attachment != null) ...[
-              const SizedBox(height: 8),
+              SizedBox(height: context.scale(12)),
               InkWell(
                 onTap: () {}, // Open attachment logic
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const Icon(Icons.attach_file, size: 14, color: Colors.blue),
-                    const SizedBox(width: 4),
-                    Flexible(
-                      child: Text(
-                        "View Attachment", 
-                        style: TextStyle(fontSize: 11, color: Colors.blue.shade700),
-                        overflow: TextOverflow.ellipsis,
+                child: Container(
+                  padding: EdgeInsets.symmetric(horizontal: context.scale(12), vertical: context.scale(8)),
+                  decoration: BoxDecoration(
+                    color: theme.colorScheme.primary.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(context.scale(8)),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.attach_file, size: context.scale(14), color: theme.colorScheme.primary),
+                      SizedBox(width: context.scale(8)),
+                      Flexible(
+                        child: Text(
+                          "View Attachment",
+                          style: TextStyle(
+                            fontSize: context.font(12),
+                            fontWeight: FontWeight.w600,
+                            color: theme.colorScheme.primary,
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                        ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               )
             ],
+            SizedBox(height: context.scale(8)),
+            Text(
+              reply.createdAt,
+              style: TextStyle(
+                fontSize: context.font(10),
+                color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.6),
+              ),
+            ),
           ],
         ),
       ),
@@ -216,44 +312,69 @@ class _TicketDetailsPageState extends State<TicketDetailsPage> {
   }
 
   Widget _buildReplySection(String status) {
+    final theme = context.theme;
     if (status.toLowerCase() == 'closed') {
       return Container(
-        padding: const EdgeInsets.all(20),
+        padding: EdgeInsets.all(context.scale(20)),
         width: double.infinity,
-        color: Colors.grey.withOpacity(0.1),
-        child: const Text("This ticket is closed. No more replies allowed.", textAlign: TextAlign.center, style: TextStyle(fontStyle: FontStyle.italic)),
+        color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.1),
+        child: Text("This ticket is closed. No more replies allowed.",
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              fontStyle: FontStyle.italic,
+              fontSize: context.font(14),
+              color: theme.colorScheme.onSurfaceVariant,
+            )),
       );
     }
 
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: EdgeInsets.all(context.spacing),
       decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surface,
-        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 10, offset: const Offset(0, -5))],
+        color: theme.colorScheme.surface,
+        border: Border(top: BorderSide(color: theme.colorScheme.outlineVariant.withValues(alpha: 0.5), width: 0.5)),
       ),
       child: SafeArea(
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            TextField(
-              controller: _replyController,
-              decoration: const InputDecoration(hintText: "Type your reply...", border: InputBorder.none),
-              maxLines: null,
+            Container(
+              decoration: BoxDecoration(
+                color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
+                borderRadius: BorderRadius.circular(context.scale(12)),
+                border: Border.all(color: theme.colorScheme.outlineVariant.withValues(alpha: 0.5), width: 0.5),
+              ),
+              padding: EdgeInsets.symmetric(horizontal: context.scale(16)),
+              child: TextField(
+                controller: _replyController,
+                decoration: InputDecoration(
+                  hintText: "Type your reply...",
+                  border: InputBorder.none,
+                  hintStyle: TextStyle(fontSize: context.font(14), color: theme.colorScheme.onSurfaceVariant),
+                ),
+                style: TextStyle(fontSize: context.font(14), color: theme.colorScheme.onSurface),
+                maxLines: null,
+              ),
             ),
-            const SizedBox(height: 12),
+            SizedBox(height: context.scale(12)),
             InkWell(
               onTap: _pickFile,
+              borderRadius: BorderRadius.circular(context.scale(12)),
               child: Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(border: Border.all(color: Theme.of(context).dividerColor), borderRadius: BorderRadius.circular(8)),
+                padding: EdgeInsets.all(context.scale(12)),
+                decoration: BoxDecoration(
+                  border: Border.all(color: theme.colorScheme.outlineVariant.withValues(alpha: 0.5), width: 0.5),
+                  borderRadius: BorderRadius.circular(context.scale(12)),
+                  color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.1),
+                ),
                 child: Row(
                   children: [
-                    Icon(Icons.add_circle_outline, size: 18, color: Theme.of(context).colorScheme.primary),
-                    const SizedBox(width: 12),
+                    Icon(Icons.add_circle_outline, size: context.scale(20), color: theme.colorScheme.primary),
+                    SizedBox(width: context.scale(12)),
                     Expanded(
                       child: Text(
-                        _selectedFile == null ? "Attach file" : _selectedFile!.path.split('/').last, 
-                        style: const TextStyle(fontSize: 12),
+                        _selectedFile == null ? "Attach file" : _selectedFile!.path.split('/').last,
+                        style: TextStyle(fontSize: context.font(13), color: _selectedFile != null ? theme.colorScheme.onSurface : theme.colorScheme.onSurfaceVariant),
                         overflow: TextOverflow.ellipsis,
                       ),
                     ),
@@ -261,12 +382,21 @@ class _TicketDetailsPageState extends State<TicketDetailsPage> {
                 ),
               ),
             ),
-            const SizedBox(height: 16),
+            SizedBox(height: context.scale(16)),
             SizedBox(
               width: double.infinity,
               child: ElevatedButton(
                 onPressed: _isSending ? null : _sendReply,
-                child: _isSending ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white)) : const Text("SEND REPLY"),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: theme.colorScheme.primary,
+                  foregroundColor: theme.colorScheme.onPrimary,
+                  minimumSize: Size(double.infinity, context.scale(52)),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(context.scale(12))),
+                  elevation: 0,
+                ),
+                child: _isSending
+                    ? SizedBox(height: context.scale(20), width: context.scale(20), child: CircularProgressIndicator(strokeWidth: 2, color: theme.colorScheme.onPrimary))
+                    : Text("SEND REPLY", style: TextStyle(fontSize: context.font(14), fontWeight: FontWeight.bold, letterSpacing: 1.1)),
               ),
             ),
           ],

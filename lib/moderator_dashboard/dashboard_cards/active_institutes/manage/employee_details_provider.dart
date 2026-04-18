@@ -1,4 +1,7 @@
 import 'dart:convert';
+import 'dart:io';
+import 'dart:typed_data';
+import 'package:http/http.dart' as http;
 import 'package:eduphin/services/api_service.dart';
 import 'employee_details.dart';
 
@@ -9,11 +12,11 @@ class EmployeeDetailsProvider {
 
       if (response.statusCode == 200) {
         final responseData = json.decode(response.body);
-        final data = responseData['data'];
+        final data = responseData['account'] ?? responseData['data'];
         if (data != null && data is Map<String, dynamic>) {
           return EmployeeDetails.fromJson(data);
         } else {
-          return null; // Return null if data is not found
+          return null;
         }
       } else {
         throw Exception('Failed to load employee details. Status: ${response.statusCode}');
@@ -25,10 +28,44 @@ class EmployeeDetailsProvider {
 
   Future<void> saveEmployeeDetails(EmployeeDetails details) async {
     try {
-      final response = await ApiService.post('moderator/accounts/${details.id}', details.toJson());
+      final fields = details.toApiData();
+      fields['_method'] = 'PUT'; // Laravel method spoofing for multipart update
 
-      if (response.statusCode != 200 && response.statusCode != 201) {
-        throw Exception('Failed to save employee details. Status: ${response.statusCode}');
+      http.StreamedResponse response;
+      if (details.webImage != null) {
+        // Web flow
+        Map<String, Uint8List> files = {
+          'photo': details.webImage!,
+        };
+        response = await ApiService.postMultipartFromBytes(
+          'moderator/accounts/${details.id}/update',
+          fields,
+          files: files,
+          fileNames: {'photo': details.imageName ?? 'profile.jpg'},
+        );
+      } else if (details.profileImage != null) {
+        // Mobile flow
+        Map<String, File> files = {
+          'photo': details.profileImage!,
+        };
+        response = await ApiService.postMultipart(
+          'moderator/accounts/${details.id}/update',
+          fields,
+          files: files,
+        );
+      } else {
+        // No new image, but still use postMultipart with forceMultipart: true
+        // to ensure Laravel method spoofing (_method: PUT) works correctly.
+        response = await ApiService.postMultipart(
+          'moderator/accounts/${details.id}/update',
+          fields,
+          forceMultipart: true,
+        );
+      }
+
+      if (response.statusCode < 200 || response.statusCode >= 300) {
+        final respStr = await response.stream.bytesToString();
+        throw Exception('Failed to save employee details. Status: ${response.statusCode}, Body: $respStr');
       }
     } catch (e) {
       throw Exception('An error occurred while saving employee details: $e');

@@ -1,5 +1,7 @@
 import 'dart:convert';
 import 'package:eduphin/services/api_service.dart';
+import 'package:eduphin/services/responsive_helper.dart';
+import 'package:eduphin/services/common_widgets.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
@@ -14,6 +16,7 @@ class Testimonial {
   final String designation;
   final String message;
   final String? image;
+  final int status;
   final DateTime? createdAt;
   final DateTime? updatedAt;
 
@@ -23,6 +26,7 @@ class Testimonial {
     required this.designation,
     required this.message,
     this.image,
+    this.status = 1,
     this.createdAt,
     this.updatedAt,
   });
@@ -42,6 +46,7 @@ class Testimonial {
       designation: json['designation'] ?? 'N/A',
       message: json['message'] ?? '',
       image: json['image'],
+      status: json['status'] ?? 1,
       createdAt: safeParseDateTime(json['created_at']),
       updatedAt: safeParseDateTime(json['updated_at']),
     );
@@ -51,20 +56,7 @@ class Testimonial {
 // Provider to interact with the testimonial API.
 class TestimonialProvider {
   Future<List<Testimonial>> fetchTestimonials() async {
-    final token = await ApiService.getToken();
-    if (token == null) throw Exception('Authentication token not found.');
-
-    final response = await http.get(
-      Uri.parse('${ApiService.baseUrl}/api/moderator/testimonials'),
-      headers: {
-        'Authorization': 'Bearer $token',
-        'Accept': 'application/json',
-      },
-    );
-
-    if (kDebugMode) {
-      print('Testimonials API Response: ${response.body}');
-    }
+    final response = await ApiService.get('moderator/testimonials');
 
     if (response.statusCode == 200) {
       final body = jsonDecode(response.body);
@@ -92,16 +84,7 @@ class TestimonialProvider {
   }
 
   Future<void> deleteTestimonial(int id) async {
-    final token = await ApiService.getToken();
-    if (token == null) throw Exception('Authentication token not found.');
-
-    final response = await http.delete(
-      Uri.parse('${ApiService.baseUrl}/api/moderator/testimonials/$id'),
-      headers: {
-        'Authorization': 'Bearer $token',
-        'Accept': 'application/json',
-      },
-    );
+    final response = await ApiService.delete('moderator/testimonials/$id');
 
     if (response.statusCode != 200) {
       throw Exception('Failed to delete testimonial.');
@@ -153,18 +136,25 @@ class _TestimonialsPageState extends State<TestimonialsPage> {
       await _provider.deleteTestimonial(id);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-              content: Text('Testimonial deleted successfully'),
-              backgroundColor: Colors.green),
+          SnackBar(
+            content: const Text('Testimonial deleted successfully'),
+            backgroundColor: Colors.green,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(context.sm)),
+          ),
         );
         _fetchData(); // Refresh the list
       }
     } catch (e) {
       if (mounted) {
+        final theme = context.theme;
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-              content: Text('Failed to delete: $e'),
-              backgroundColor: Colors.red),
+            content: Text('Failed to delete: $e'),
+            backgroundColor: theme.colorScheme.error,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(context.sm)),
+          ),
         );
       }
     }
@@ -174,22 +164,26 @@ class _TestimonialsPageState extends State<TestimonialsPage> {
     showDialog(
       context: context,
       builder: (BuildContext context) {
+        final theme = context.theme;
         return AlertDialog(
-          backgroundColor: const Color(0xFF1B263B),
-          title: const Text('Confirm Delete',
-              style: TextStyle(color: Colors.white)),
-          content: const Text(
+          backgroundColor: theme.colorScheme.surfaceContainerLow,
+          surfaceTintColor: Colors.transparent,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(context.md),
+            side: BorderSide(color: theme.colorScheme.outlineVariant),
+          ),
+          title: Text('Confirm Delete', style: TextStyle(fontSize: context.font(20), fontWeight: FontWeight.bold, color: theme.colorScheme.onSurface)),
+          content: Text(
               'Are you sure you want to delete this testimonial?',
-              style: TextStyle(color: Colors.white70)),
+              style: TextStyle(fontSize: context.font(16), color: theme.colorScheme.onSurfaceVariant)),
           actions: <Widget>[
             TextButton(
-              child: const Text('Cancel',
-                  style: TextStyle(color: Colors.white70)),
+              child: Text('Cancel', style: TextStyle(fontSize: context.font(14), color: theme.colorScheme.primary)),
               onPressed: () => Navigator.of(context).pop(),
             ),
             TextButton(
-              child: const Text('Delete',
-                  style: TextStyle(color: Colors.redAccent)),
+              child: Text('Delete',
+                  style: TextStyle(color: theme.colorScheme.error, fontSize: context.font(14), fontWeight: FontWeight.bold)),
               onPressed: () {
                 Navigator.of(context).pop();
                 _deleteItem(id);
@@ -203,42 +197,66 @@ class _TestimonialsPageState extends State<TestimonialsPage> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = context.theme;
     return Scaffold(
-      backgroundColor: const Color(0xFF0D1B2A),
+      backgroundColor: theme.scaffoldBackgroundColor,
       appBar: AppBar(
-        title:
-            const Text('Testimonials', style: TextStyle(color: Colors.white)),
-        backgroundColor: const Color(0xFF0D1B2A),
-        iconTheme: const IconThemeData(color: Colors.white),
+        title: Text('Testimonials', style: TextStyle(fontSize: context.font(20), fontWeight: FontWeight.bold)),
         actions: [
           IconButton(
-            icon:
-                const Icon(Icons.add_comment_outlined, color: Colors.white),
+            icon: Icon(Icons.add_comment_outlined, size: context.scale(24)),
             onPressed: () => _navigateAndRefresh(),
           ),
+          SizedBox(width: context.md),
         ],
       ),
       body: FutureBuilder<List<Testimonial>>(
         future: _testimonialsFuture,
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
+            return Center(child: CircularProgressIndicator(color: theme.colorScheme.primary));
           }
           if (snapshot.hasError) {
             return Center(
-                child: Text('Error: ${snapshot.error}',
-                    style: const TextStyle(color: Colors.redAccent)));
+              child: Padding(
+                padding: context.pagePadding,
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(Icons.error_outline_rounded, size: context.scale(48), color: theme.colorScheme.error),
+                    SizedBox(height: context.md),
+                    Text('Error: ${snapshot.error}', textAlign: TextAlign.center, style: TextStyle(color: theme.colorScheme.onSurface, fontSize: context.font(14))),
+                    SizedBox(height: context.lg),
+                    ElevatedButton(
+                      onPressed: _fetchData,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: theme.colorScheme.primary,
+                        foregroundColor: theme.colorScheme.onPrimary,
+                      ),
+                      child: Text("Retry", style: TextStyle(fontSize: context.font(16))),
+                    ),
+                  ],
+                ),
+              ),
+            );
           }
           if (!snapshot.hasData || snapshot.data!.isEmpty) {
-            return const Center(
-                child: Text('No testimonials found.',
-                    style: TextStyle(color: Colors.white70)));
+            return Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.reviews_outlined, size: context.scale(64), color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.3)),
+                  SizedBox(height: context.md),
+                  Text('No testimonials found.', style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: context.font(16), fontWeight: FontWeight.bold)),
+                ],
+              ),
+            );
           }
 
           final testimonials = snapshot.data!;
 
           return ListView.builder(
-            padding: const EdgeInsets.all(16.0),
+            padding: context.pagePadding,
             itemCount: testimonials.length,
             itemBuilder: (context, index) {
               return TestimonialCard(
@@ -269,70 +287,65 @@ class TestimonialCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    String? imageUrl;
-    if (testimonial.image != null) {
-      imageUrl = '${ApiService.baseImageUrl}/storage/${testimonial.image}';
-    }
+    final theme = context.theme;
+    final colorScheme = theme.colorScheme;
+    final imageUrl = ApiService.getStorageUrl(testimonial.image);
 
     return Card(
-      color: const Color(0xFF1B263B),
-      margin: const EdgeInsets.only(bottom: 16),
-      elevation: 4,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      margin: EdgeInsets.only(bottom: context.md),
+      color: theme.colorScheme.surfaceContainerLow,
+      elevation: 0,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(context.md),
+        side: BorderSide(color: theme.colorScheme.outlineVariant),
+      ),
       child: Padding(
-        padding: const EdgeInsets.all(16.0),
+        padding: EdgeInsets.all(context.md),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
+              crossAxisAlignment: CrossAxisAlignment.center,
               children: [
-                CircleAvatar(
-                  radius: 30,
-                  backgroundColor: const Color(0xFF0D1B2A),
-                  backgroundImage:
-                      imageUrl != null ? NetworkImage(imageUrl) : null,
-                  child: imageUrl == null
-                      ? const Icon(Icons.person,
-                          color: Colors.white70, size: 30)
-                      : null,
+                ProfileAvatar(
+                  imageUrl: imageUrl,
+                  radius: context.scale(24),
                 ),
-                const SizedBox(width: 16),
+                SizedBox(width: context.md),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(testimonial.name,
-                          style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 18,
-                              fontWeight: FontWeight.bold)),
-                      const SizedBox(height: 4),
+                          style: TextStyle(
+                              fontSize: context.font(16),
+                              fontWeight: FontWeight.bold,
+                              color: theme.colorScheme.onSurface)),
                       Text(testimonial.designation,
-                          style: const TextStyle(
-                              color: Colors.white70,
+                          style: TextStyle(
+                              color: theme.colorScheme.onSurfaceVariant,
+                              fontSize: context.font(13),
                               fontStyle: FontStyle.italic)),
                     ],
                   ),
                 ),
               ],
             ),
-            const SizedBox(height: 16),
+            SizedBox(height: context.md),
             Text(
               '"${testimonial.message}"',
-              style:
-                  const TextStyle(color: Colors.white, fontSize: 16, height: 1.5),
+              style: TextStyle(fontSize: context.font(15), height: 1.5, color: theme.colorScheme.onSurface),
             ),
-            const SizedBox(height: 12),
+            SizedBox(height: context.md),
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 if (testimonial.createdAt != null)
                   Text(
                     DateFormat.yMMMd().format(testimonial.createdAt!),
-                    style: const TextStyle(
-                      color: Colors.white60,
-                      fontSize: 12,
+                    style: TextStyle(
+                      color: theme.colorScheme.onSurfaceVariant,
+                      fontSize: context.font(12),
                     ),
                   )
                 else
@@ -340,14 +353,16 @@ class TestimonialCard extends StatelessWidget {
                 Row(
                   children: [
                     IconButton(
-                      icon: const Icon(Icons.edit_outlined,
-                          color: Colors.white70, size: 20),
+                      icon: Icon(Icons.edit_outlined,
+                          color: theme.colorScheme.onSurfaceVariant, size: context.scale(20)),
                       onPressed: onEdit,
+                      visualDensity: VisualDensity.compact,
                     ),
                     IconButton(
-                      icon: const Icon(Icons.delete_outline,
-                          color: Colors.redAccent, size: 20),
+                      icon: Icon(Icons.delete_outline,
+                          color: theme.colorScheme.error, size: context.scale(20)),
                       onPressed: onDelete,
+                      visualDensity: VisualDensity.compact,
                     ),
                   ],
                 ),

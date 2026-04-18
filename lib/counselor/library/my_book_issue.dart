@@ -77,7 +77,6 @@ class _MyBookIssuePageState extends State<MyBookIssuePage> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
     return Scaffold(
       appBar: AppBar(
         title: const Text("My Issued Books"),
@@ -93,91 +92,177 @@ class _MyBookIssuePageState extends State<MyBookIssuePage> {
               child: Column(
                 children: [
                   Card(
+                    elevation: 0,
+                    color: context.theme.colorScheme.surfaceContainerLow,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(context.scale(12)),
+                      side: BorderSide(
+                        color: context.theme.colorScheme.outlineVariant,
+                        width: 1,
+                      ),
+                    ),
                     child: Padding(
-                      padding: const EdgeInsets.all(20),
+                      padding: EdgeInsets.all(context.lg),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text("Search Filters", style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
-                          const SizedBox(height: 20),
+                          Text("Search Filters",
+                              style: context.theme.textTheme.titleMedium?.copyWith(
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: context.font(18))),
+                          SizedBox(height: context.md),
                           _buildResponsiveRow(context, [
                             _buildTextField(context, "Book Title", _bookTitleController),
                             _buildDateField(context, "Due Date From", _dueFromController),
                           ]),
-                          const SizedBox(height: 24),
+                          SizedBox(height: context.md),
                           Row(
                             children: [
-                              Expanded(child: ElevatedButton(onPressed: _fetchLendingHistory, child: const Text("APPLY"))),
-                              const SizedBox(width: 12),
-                              Expanded(child: OutlinedButton(
-                                onPressed: () {
-                                  _bookTitleController.clear();
-                                  _dueFromController.clear();
-                                  _dueToController.clear();
-                                  _fetchLendingHistory();
-                                },
-                                child: const Text("RESET"),
-                              )),
+                              Expanded(
+                                child: ElevatedButton(
+                                  onPressed: _fetchLendingHistory,
+                                  style: ElevatedButton.styleFrom(
+                                    padding: EdgeInsets.symmetric(
+                                        vertical: context.sm),
+                                  ),
+                                  child: const Text("APPLY"),
+                                ),
+                              ),
+                              SizedBox(width: context.sm),
+                              Expanded(
+                                child: OutlinedButton(
+                                  onPressed: () {
+                                    _bookTitleController.clear();
+                                    _dueFromController.clear();
+                                    _dueToController.clear();
+                                    _fetchLendingHistory();
+                                  },
+                                  style: OutlinedButton.styleFrom(
+                                    padding: EdgeInsets.symmetric(
+                                        vertical: context.sm),
+                                  ),
+                                  child: const Text("RESET"),
+                                ),
+                              ),
                             ],
                           ),
                         ],
                       ),
                     ),
                   ),
-                  const SizedBox(height: 32),
+                  SizedBox(height: context.xl),
                   Card(
+                    elevation: 0,
+                    color: context.theme.colorScheme.surfaceContainerLow,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(context.scale(12)),
+                      side: BorderSide(
+                        color: context.theme.colorScheme.outlineVariant,
+                        width: 1,
+                      ),
+                    ),
                     child: Column(
                       children: [
                         Padding(
-                          padding: const EdgeInsets.all(16),
+                          padding: EdgeInsets.all(context.md),
                           child: TextField(
                             controller: _searchController,
                             onChanged: (v) => setState(() {}),
-                            decoration: const InputDecoration(
+                            decoration: InputDecoration(
                               hintText: "Quick search...",
-                              prefixIcon: Icon(Icons.search),
+                              hintStyle: TextStyle(fontSize: context.font(14)),
+                              prefixIcon: Icon(Icons.search, size: context.scale(20)),
                             ),
                           ),
                         ),
                         if (_isLoading)
-                          const Padding(padding: EdgeInsets.all(40.0), child: CircularProgressIndicator())
+                          Padding(
+                              padding: EdgeInsets.all(context.xl),
+                              child: const CircularProgressIndicator())
                         else if (_issuedBooks.isEmpty)
-                          const Padding(padding: EdgeInsets.all(40.0), child: Center(child: Text("No records found")))
+                          Padding(
+                              padding: EdgeInsets.all(context.xl),
+                              child: const Center(child: Text("No records found")))
                         else
                           SingleChildScrollView(
                             scrollDirection: Axis.horizontal,
                             child: DataTable(
-                              columnSpacing: 24,
-                              headingRowColor: WidgetStateProperty.all(theme.colorScheme.primary.withValues(alpha: 0.05)),
-                              columns: const [
-                                DataColumn(label: Text("#", style: TextStyle(fontWeight: FontWeight.bold))),
-                                DataColumn(label: Text("Title", style: TextStyle(fontWeight: FontWeight.bold))),
-                                DataColumn(label: Text("Issued", style: TextStyle(fontWeight: FontWeight.bold))),
-                                DataColumn(label: Text("Due Date", style: TextStyle(fontWeight: FontWeight.bold))),
-                                DataColumn(label: Text("Status", style: TextStyle(fontWeight: FontWeight.bold))),
+                              columnSpacing: context.lg,
+                              headingRowColor: WidgetStateProperty.all(context
+                                  .theme.colorScheme.primary
+                                  .withValues(alpha: 0.05)),
+                              columns: [
+                                DataColumn(
+                                    label: Text("#",
+                                        style: TextStyle(
+                                            fontWeight: FontWeight.bold,
+                                            fontSize: context.font(14)))),
+                                DataColumn(
+                                    label: Text("Title",
+                                        style: TextStyle(
+                                            fontWeight: FontWeight.bold,
+                                            fontSize: context.font(14)))),
+                                DataColumn(
+                                    label: Text("Issued",
+                                        style: TextStyle(
+                                            fontWeight: FontWeight.bold,
+                                            fontSize: context.font(14)))),
+                                DataColumn(
+                                    label: Text("Due Date",
+                                        style: TextStyle(
+                                            fontWeight: FontWeight.bold,
+                                            fontSize: context.font(14)))),
+                                DataColumn(
+                                    label: Text("Status",
+                                        style: TextStyle(
+                                            fontWeight: FontWeight.bold,
+                                            fontSize: context.font(14)))),
                               ],
-                              rows: _issuedBooks.where((b) => b.book.title.toLowerCase().contains(_searchController.text.toLowerCase())).toList().asMap().entries.map((entry) {
+                              rows: _issuedBooks
+                                  .where((b) => b.book.title
+                                      .toLowerCase()
+                                      .contains(_searchController.text.toLowerCase()))
+                                  .toList()
+                                  .asMap()
+                                  .entries
+                                  .map((entry) {
                                 int idx = entry.key;
                                 IssuedBook issue = entry.value;
                                 bool isReturned = issue.returnedAt != null;
                                 return DataRow(cells: [
-                                  DataCell(Text("${idx + 1}")),
-                                  DataCell(SizedBox(width: 150, child: Text(issue.book.title, style: const TextStyle(fontWeight: FontWeight.w500)))),
-                                  DataCell(Text(issue.issuedAt ?? "-")),
-                                  DataCell(Text(issue.dueDate ?? "-")),
+                                  DataCell(Text("${idx + 1}",
+                                      style: TextStyle(fontSize: context.font(14)))),
+                                  DataCell(SizedBox(
+                                      width: context.scale(150),
+                                      child: Text(issue.book.title,
+                                          style: TextStyle(
+                                              fontWeight: FontWeight.w500,
+                                              fontSize: context.font(14))))),
+                                  DataCell(Text(issue.issuedAt ?? "-",
+                                      style: TextStyle(fontSize: context.font(14)))),
+                                  DataCell(Text(issue.dueDate ?? "-",
+                                      style: TextStyle(fontSize: context.font(14)))),
                                   DataCell(
                                     Container(
-                                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                      padding: EdgeInsets.symmetric(
+                                          horizontal: context.sm,
+                                          vertical: context.xs),
                                       decoration: BoxDecoration(
-                                        color: (isReturned ? Colors.green : Colors.orange).withValues(alpha: 0.1),
-                                        borderRadius: BorderRadius.circular(6),
-                                        border: Border.all(color: (isReturned ? Colors.green : Colors.orange).withValues(alpha: 0.5)),
+                                        color: (isReturned ? Colors.green : Colors.orange)
+                                            .withValues(alpha: 0.1),
+                                        borderRadius:
+                                            BorderRadius.circular(context.scale(6)),
+                                        border: Border.all(
+                                            color: (isReturned
+                                                    ? Colors.green
+                                                    : Colors.orange)
+                                                .withValues(alpha: 0.5)),
                                       ),
                                       child: Text(
                                         isReturned ? "Returned" : "Pending",
                                         style: TextStyle(
                                           color: isReturned ? Colors.green : Colors.orange,
-                                          fontSize: 10,
+                                          fontSize: context.font(10),
                                           fontWeight: FontWeight.bold,
                                         ),
                                       ),
@@ -190,7 +275,7 @@ class _MyBookIssuePageState extends State<MyBookIssuePage> {
                       ],
                     ),
                   ),
-                  const SizedBox(height: 40),
+                  SizedBox(height: context.xl),
                 ],
               ),
             ),
@@ -201,34 +286,55 @@ class _MyBookIssuePageState extends State<MyBookIssuePage> {
   }
 
   Widget _buildResponsiveRow(BuildContext context, List<Widget> children) {
-    if (!context.isTablet) return Column(children: children);
-    return Row(children: children.map((c) => Expanded(child: Padding(padding: const EdgeInsets.only(right: 12), child: c))).toList());
+    if (context.isMobile) return Column(children: children);
+    return Row(
+        children: children
+            .map((c) => Expanded(
+                child: Padding(
+                    padding: EdgeInsets.only(right: context.sm), child: c)))
+            .toList());
   }
 
-  Widget _buildTextField(BuildContext context, String label, TextEditingController controller) {
+  Widget _buildTextField(
+      BuildContext context, String label, TextEditingController controller) {
     return Padding(
-      padding: const EdgeInsets.only(bottom: 16),
+      padding: EdgeInsets.only(bottom: context.md),
       child: TextField(
         controller: controller,
-        decoration: InputDecoration(labelText: label, contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8)),
+        style: TextStyle(fontSize: context.font(14)),
+        decoration: InputDecoration(
+            labelText: label,
+            labelStyle: TextStyle(fontSize: context.font(14)),
+            contentPadding: EdgeInsets.symmetric(
+                horizontal: context.sm, vertical: context.xs)),
       ),
     );
   }
 
-  Widget _buildDateField(BuildContext context, String label, TextEditingController controller) {
+  Widget _buildDateField(
+      BuildContext context, String label, TextEditingController controller) {
     return Padding(
-      padding: const EdgeInsets.only(bottom: 16),
+      padding: EdgeInsets.only(bottom: context.md),
       child: TextField(
         controller: controller,
         readOnly: true,
+        style: TextStyle(fontSize: context.font(14)),
         onTap: () async {
-          DateTime? picked = await showDatePicker(context: context, initialDate: DateTime.now(), firstDate: DateTime(2000), lastDate: DateTime(2101));
-          if (picked != null) controller.text = DateFormat("yyyy-MM-dd").format(picked);
+          DateTime? picked = await showDatePicker(
+              context: context,
+              initialDate: DateTime.now(),
+              firstDate: DateTime(2000),
+              lastDate: DateTime(2101));
+          if (picked != null) {
+            controller.text = DateFormat("yyyy-MM-dd").format(picked);
+          }
         },
         decoration: InputDecoration(
           labelText: label,
-          suffixIcon: const Icon(Icons.calendar_today, size: 18),
-          contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          labelStyle: TextStyle(fontSize: context.font(14)),
+          suffixIcon: Icon(Icons.calendar_today, size: context.scale(18)),
+          contentPadding: EdgeInsets.symmetric(
+              horizontal: context.sm, vertical: context.xs),
         ),
       ),
     );

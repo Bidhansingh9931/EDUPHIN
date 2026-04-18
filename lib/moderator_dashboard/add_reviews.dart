@@ -1,5 +1,6 @@
 import 'package:eduphin/services/responsive_helper.dart';
 import 'package:flutter/material.dart';
+import 'package:eduphin/services/common_widgets.dart';
 import 'add_review_model.dart';
 import 'add_review_provider.dart';
 
@@ -65,7 +66,7 @@ class _AddReviewsPageState extends State<AddReviewsPage> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
+    final theme = context.theme;
     final colorScheme = theme.colorScheme;
 
     return Scaffold(
@@ -76,24 +77,32 @@ class _AddReviewsPageState extends State<AddReviewsPage> {
         padding: context.pagePadding,
         child: Center(
           child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 800),
+            constraints: BoxConstraints(maxWidth: context.scale(800)),
             child: Form(
               key: _formKey,
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  _buildPhotoSection(theme),
-                  const SizedBox(height: 32),
+                  Center(
+                    child: ProfileAvatar(
+                      radius: context.scale(50),
+                      imageUrl: null, // No image yet
+                      onCameraTap: () {
+                        // Image picking logic would go here
+                      },
+                    ),
+                  ),
+                  SizedBox(height: context.scale(32)),
                   Card(
                     child: Padding(
-                      padding: const EdgeInsets.all(24.0),
+                      padding: EdgeInsets.all(context.scale(24.0)),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text("Reviewer Information", style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
-                          const SizedBox(height: 24),
+                          Text("Reviewer Information", style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold, fontSize: context.font(16))),
+                          SizedBox(height: context.scale(24)),
                           _buildFieldLabel(theme, "Full Name"),
-                          const SizedBox(height: 8),
+                          SizedBox(height: context.scale(8)),
                           TextFormField(
                             controller: _fullNameController,
                             validator: (value) => value == null || value.isEmpty ? 'Required' : null,
@@ -102,9 +111,9 @@ class _AddReviewsPageState extends State<AddReviewsPage> {
                               hintText: "e.g. Amelia Johnson",
                             ),
                           ),
-                          const SizedBox(height: 24),
+                          SizedBox(height: context.scale(24)),
                           _buildFieldLabel(theme, "Designation / Role"),
-                          const SizedBox(height: 8),
+                          SizedBox(height: context.scale(8)),
                           TextFormField(
                             controller: _designationController,
                             validator: (value) => value == null || value.isEmpty ? 'Required' : null,
@@ -117,15 +126,15 @@ class _AddReviewsPageState extends State<AddReviewsPage> {
                       ),
                     ),
                   ),
-                  const SizedBox(height: 24),
+                  SizedBox(height: context.scale(24)),
                   Card(
                     child: Padding(
-                      padding: const EdgeInsets.all(24.0),
+                      padding: EdgeInsets.all(context.scale(24.0)),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text("Your Feedback", style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
-                          const SizedBox(height: 24),
+                          Text("Your Feedback", style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold, fontSize: context.font(16))),
+                          SizedBox(height: context.scale(24)),
                           TextFormField(
                             controller: _messageController,
                             validator: (value) => value == null || value.isEmpty ? 'Required' : null,
@@ -139,60 +148,26 @@ class _AddReviewsPageState extends State<AddReviewsPage> {
                       ),
                     ),
                   ),
-                  const SizedBox(height: 32),
+                  SizedBox(height: context.scale(32)),
                   SizedBox(
                     width: double.infinity,
                     child: ElevatedButton.icon(
                       onPressed: _isLoading ? null : _submitReview,
-                      icon: _isLoading 
-                        ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                        : const Icon(Icons.send_rounded),
-                      label: Text(_isLoading ? "Submitting..." : "SUBMIT REVIEW"),
+                      icon: _isLoading
+                        ? SizedBox(width: context.scale(20), height: context.scale(20), child: CircularProgressIndicator(strokeWidth: 2, color: colorScheme.onPrimary))
+                        : Icon(Icons.send_rounded, size: context.scale(20)),
+                      label: Text(_isLoading ? "Submitting..." : "SUBMIT REVIEW", style: TextStyle(fontSize: context.font(14))),
                       style: ElevatedButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(vertical: 18),
+                        padding: EdgeInsets.symmetric(vertical: context.scale(18)),
                       ),
                     ),
                   ),
-                  const SizedBox(height: 50),
+                  SizedBox(height: context.scale(50)),
                 ],
               ),
             ),
           ),
         ),
-      ),
-    );
-  }
-
-  Widget _buildPhotoSection(ThemeData theme) {
-    return Center(
-      child: Stack(
-        alignment: Alignment.bottomRight,
-        children: [
-          Container(
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              border: Border.all(color: theme.colorScheme.primary.withOpacity(0.2), width: 4),
-            ),
-            child: CircleAvatar(
-              radius: 50,
-              backgroundColor: theme.colorScheme.surfaceVariant,
-              backgroundImage: const AssetImage("assets/images/girl_image.webp"),
-            ),
-          ),
-          Container(
-            padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(
-              color: theme.colorScheme.primary,
-              shape: BoxShape.circle,
-              border: Border.all(color: theme.scaffoldBackgroundColor, width: 2),
-            ),
-            child: const Icon(
-              Icons.camera_alt_rounded,
-              color: Colors.white,
-              size: 18,
-            ),
-          ),
-        ],
       ),
     );
   }
@@ -204,6 +179,7 @@ class _AddReviewsPageState extends State<AddReviewsPage> {
         fontWeight: FontWeight.bold,
         color: theme.hintColor,
         letterSpacing: 1.1,
+        fontSize: context.font(12),
       ),
     );
   }

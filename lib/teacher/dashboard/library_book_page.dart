@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:eduphin/services/api_service.dart';
+import 'package:eduphin/services/responsive_helper.dart';
 import 'package:eduphin/teacher/dashboard/library_models.dart';
 import 'common_widgets.dart';
 
@@ -61,20 +62,25 @@ class _LibraryBookPageState extends State<LibraryBookPage> {
           if (snapshot.connectionState == ConnectionState.waiting && !snapshot.hasData) {
             return const Center(child: CircularProgressIndicator());
           }
-          
+
           final filters = snapshot.hasData ? snapshot.data!.filters : null;
           final books = snapshot.hasData ? snapshot.data!.books : <Book>[];
 
           return SingleChildScrollView(
-            child: Column(
-              children: [
-                _buildFilterSection(filters),
-                if (snapshot.hasError) 
-                  Center(child: Padding(padding: const EdgeInsets.all(20), child: Text("Error: ${snapshot.error}")))
-                else
-                  _buildBooksTable(books, snapshot.data),
-                const SizedBox(height: 32),
-              ],
+            child: Center(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 1200),
+                child: Column(
+                  children: [
+                    _buildFilterSection(filters),
+                    if (snapshot.hasError)
+                      Center(child: Padding(padding: EdgeInsets.all(context.spacing), child: Text("Error: ${snapshot.error}", style: TextStyle(color: context.theme.colorScheme.error))))
+                    else
+                      _buildBooksTable(books, snapshot.data),
+                    SizedBox(height: context.spacing * 2),
+                  ],
+                ),
+              ),
             ),
           );
         },
@@ -83,54 +89,83 @@ class _LibraryBookPageState extends State<LibraryBookPage> {
   }
 
   Widget _buildFilterSection(BookFilters? availableFilters) {
+    final theme = context.theme;
     return buildFilterCard(
       context,
       children: [
         Row(
           children: [
-            const Icon(Icons.filter_list, size: 18),
-            const SizedBox(width: 8),
-            Text("Filter & Search", style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold)),
+            Icon(Icons.filter_list, size: context.scale(18), color: theme.colorScheme.primary),
+            SizedBox(width: context.scale(8)),
+            Text(
+              "Filter & Search",
+              style: theme.textTheme.titleMedium?.copyWith(
+                fontWeight: FontWeight.bold,
+                fontSize: context.font(16),
+              ),
+            ),
           ],
         ),
-        const SizedBox(height: 16),
-        _fieldLabel("Title"),
-        buildTextField(context, _titleController, "Search Title"),
-        _fieldLabel("Author"),
-        buildTextField(context, _authorController, "Search Author"),
-        
-        const SizedBox(height: 12),
+        SizedBox(height: context.spacing),
+        buildResponsiveRow(context, [
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _fieldLabel("Title"),
+              buildTextField(context, _titleController, "Search Title"),
+            ],
+          ),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _fieldLabel("Author"),
+              buildTextField(context, _authorController, "Search Author"),
+            ],
+          ),
+        ]),
+        SizedBox(height: context.spacing / 2),
+        buildResponsiveRow(context, [
+          _dropdownGroup("Category", ['All', ...(availableFilters?.categories ?? [])], 'category'),
+          _dropdownGroup("Language", ['All', ...(availableFilters?.languages ?? [])], 'language'),
+        ]),
+        SizedBox(height: context.spacing / 2),
+        buildResponsiveRow(context, [
+          _dropdownGroup("Format", ['All', ...(availableFilters?.formats ?? [])], 'format'),
+          _dropdownGroup("Year", ['All', ...(availableFilters?.years ?? [])], 'year'),
+        ]),
+        SizedBox(height: context.scale(24)),
         Row(
+          mainAxisAlignment: MainAxisAlignment.end,
           children: [
-            Expanded(child: _dropdownGroup("Category", ['All', ...(availableFilters?.categories ?? [])], 'category')),
-            const SizedBox(width: 12),
-            Expanded(child: _dropdownGroup("Language", ['All', ...(availableFilters?.languages ?? [])], 'language')),
+            SizedBox(
+              width: context.scale(120),
+              child: buildActionButton(
+                context,
+                "RESET",
+                () => setState(() {
+                  _titleController.clear();
+                  _authorController.clear();
+                  _isbnController.clear();
+                  _filters.updateAll((k, v) => null);
+                  _currentPage = 1;
+                  _loadBooks();
+                }),
+                isPrimary: false,
+              ),
+            ),
+            SizedBox(width: context.scale(12)),
+            SizedBox(
+              width: context.scale(120),
+              child: buildActionButton(
+                context,
+                "SEARCH",
+                () => setState(() {
+                  _currentPage = 1;
+                  _loadBooks();
+                }),
+              ),
+            ),
           ],
-        ),
-        const SizedBox(height: 12),
-        Row(
-          children: [
-            Expanded(child: _dropdownGroup("Format", ['All', ...(availableFilters?.formats ?? [])], 'format')),
-            const SizedBox(width: 12),
-            Expanded(child: _dropdownGroup("Year", ['All', ...(availableFilters?.years ?? [])], 'year')),
-          ],
-        ),
-
-        const SizedBox(height: 20),
-        buildActionButton(context, "SEARCH", () => setState(() { _currentPage = 1; _loadBooks(); })),
-        const SizedBox(height: 10),
-        buildActionButton(
-          context, 
-          "RESET", 
-          () => setState(() {
-            _titleController.clear();
-            _authorController.clear();
-            _isbnController.clear();
-            _filters.updateAll((k, v) => null);
-            _currentPage = 1;
-            _loadBooks();
-          }),
-          isPrimary: false
         ),
       ],
     );
@@ -138,8 +173,14 @@ class _LibraryBookPageState extends State<LibraryBookPage> {
 
   Widget _fieldLabel(String text) {
     return Padding(
-      padding: const EdgeInsets.only(top: 12, bottom: 4),
-      child: Text(text, style: Theme.of(context).textTheme.labelSmall?.copyWith(fontWeight: FontWeight.bold)),
+      padding: EdgeInsets.only(top: context.spacing / 2, bottom: context.spacing / 4),
+      child: Text(
+        text,
+        style: context.theme.textTheme.labelSmall?.copyWith(
+          fontWeight: FontWeight.bold,
+          fontSize: context.font(12),
+        ),
+      ),
     );
   }
 
@@ -156,96 +197,124 @@ class _LibraryBookPageState extends State<LibraryBookPage> {
   }
 
   Widget _buildBooksTable(List<Book> books, BookPagination? pagination) {
-    final theme = Theme.of(context);
+    final theme = context.theme;
+    final colorScheme = theme.colorScheme;
     return Card(
-      margin: const EdgeInsets.all(16),
+      elevation: 0,
+      margin: context.pagePadding,
+      color: colorScheme.surfaceContainerLow,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(context.scale(16)),
+        side: BorderSide(color: colorScheme.outlineVariant.withValues(alpha: 0.5), width: 1),
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Padding(
-            padding: const EdgeInsets.all(16.0),
-            child: Text("${books.length} Books Found", style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold)),
+            padding: EdgeInsets.all(context.spacing),
+            child: Text(
+              "${books.length} Books Found",
+              style: theme.textTheme.titleSmall?.copyWith(
+                fontWeight: FontWeight.bold,
+                fontSize: context.font(14),
+                color: colorScheme.onSurface,
+              ),
+            ),
           ),
-          const Divider(height: 1),
-          _buildTableHeader(),
-          const Divider(height: 1),
+          Divider(height: 1, color: colorScheme.outlineVariant.withValues(alpha: 0.5)),
+          Theme(
+            data: theme.copyWith(dividerColor: Colors.transparent),
+            child: SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: DataTable(
+                columnSpacing: context.scale(24),
+                headingRowHeight: context.scale(56),
+                dataRowMinHeight: context.scale(56),
+                dataRowMaxHeight: context.scale(64),
+                headingRowColor: WidgetStateProperty.all(colorScheme.surfaceContainerHighest.withValues(alpha: 0.3)),
+                columns: [
+                  DataColumn(label: Text("Title", style: TextStyle(fontWeight: FontWeight.bold, fontSize: context.font(13), color: colorScheme.onSurfaceVariant))),
+                  DataColumn(label: Text("Author", style: TextStyle(fontWeight: FontWeight.bold, fontSize: context.font(13), color: colorScheme.onSurfaceVariant))),
+                  DataColumn(label: Text("Qty (Avail)", style: TextStyle(fontWeight: FontWeight.bold, fontSize: context.font(13), color: colorScheme.onSurfaceVariant))),
+                ],
+                rows: books.isEmpty 
+                  ? []
+                  : books.map((book) => DataRow(cells: [
+                      DataCell(Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Text(book.title, style: TextStyle(fontWeight: FontWeight.bold, fontSize: context.font(13), color: colorScheme.onSurface)),
+                          if (book.category != null)
+                            Text(book.category!, style: TextStyle(fontSize: context.font(11), color: colorScheme.onSurfaceVariant)),
+                        ],
+                      )),
+                      DataCell(Text(book.author, style: TextStyle(fontSize: context.font(13), color: colorScheme.onSurface))),
+                      DataCell(Center(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Text("${book.availableCopies}",
+                                style: TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: context.font(13),
+                                    color: book.availableCopies > 0 ? const Color(0xFF10B981) : colorScheme.error)),
+                            Text("Avail", style: TextStyle(fontSize: context.font(10), color: colorScheme.onSurfaceVariant)),
+                          ],
+                        ),
+                      )),
+                    ])).toList(),
+              ),
+            ),
+          ),
           if (books.isEmpty)
-            const Padding(padding: EdgeInsets.all(32), child: Center(child: Text("No books found")))
-          else
-            ...books.map((book) => Column(
-              children: [
-                _buildBookRow(book),
-                const Divider(height: 1),
-              ],
-            )),
-          
-          if (pagination != null && pagination.lastPage > 1)
-            _buildPagination(pagination),
+            Padding(
+              padding: EdgeInsets.all(context.spacing * 2),
+              child: Center(child: Text("No books found", style: TextStyle(fontSize: context.font(14), color: colorScheme.onSurfaceVariant))),
+            ),
+          if (pagination != null && pagination.lastPage > 1) _buildPagination(pagination),
         ],
       ),
     );
   }
 
   Widget _buildPagination(BookPagination pagination) {
+    final colorScheme = Theme.of(context).colorScheme;
     return Padding(
-      padding: const EdgeInsets.all(16.0),
+      padding: EdgeInsets.all(context.spacing),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           IconButton(
-            onPressed: pagination.currentPage > 1 ? () { setState(() { _currentPage--; _loadBooks(); }); } : null,
-            icon: const Icon(Icons.chevron_left),
+            onPressed: pagination.currentPage > 1
+                ? () {
+                    setState(() {
+                      _currentPage--;
+                      _loadBooks();
+                    });
+                  }
+                : null,
+            icon: Icon(Icons.chevron_left, size: context.scale(24), color: colorScheme.primary),
           ),
-          Text("Page ${pagination.currentPage} of ${pagination.lastPage}"),
+          Text(
+            "Page ${pagination.currentPage} of ${pagination.lastPage}",
+            style: TextStyle(fontSize: context.font(13), fontWeight: FontWeight.w500, color: colorScheme.onSurface),
+          ),
           IconButton(
-            onPressed: pagination.currentPage < pagination.lastPage ? () { setState(() { _currentPage++; _loadBooks(); }); } : null,
-            icon: const Icon(Icons.chevron_right),
+            onPressed: pagination.currentPage < pagination.lastPage
+                ? () {
+                    setState(() {
+                      _currentPage++;
+                      _loadBooks();
+                    });
+                  }
+                : null,
+            icon: Icon(Icons.chevron_right, size: context.scale(24), color: colorScheme.primary),
           ),
         ],
       ),
     );
   }
 
-  Widget _buildTableHeader() {
-    return const Padding(
-      padding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-      child: Row(
-        children: [
-          Expanded(flex: 2, child: Text("Title", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12))),
-          Expanded(child: Text("Author", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12))),
-          SizedBox(width: 60, child: Text("Qty", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12), textAlign: TextAlign.center)),
-        ],
-      ),
-    );
-  }
 
-  Widget _buildBookRow(Book book) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-      child: Row(
-        children: [
-          Expanded(
-            flex: 2, 
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(book.title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
-                if (book.category != null) Text(book.category!, style: const TextStyle(fontSize: 10, color: Colors.grey)),
-              ],
-            )
-          ),
-          Expanded(child: Text(book.author, style: const TextStyle(fontSize: 12))),
-          SizedBox(
-            width: 60, 
-            child: Column(
-              children: [
-                Text("${book.availableCopies}", style: TextStyle(fontWeight: FontWeight.bold, color: book.availableCopies > 0 ? Colors.green : Colors.red)),
-                const Text("Avail", style: TextStyle(fontSize: 8, color: Colors.grey)),
-              ],
-            )
-          ),
-        ],
-      ),
-    );
-  }
 }
