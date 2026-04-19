@@ -58,16 +58,16 @@ class _InstituteListScreenState extends State<InstituteListScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
+    final theme = context.theme;
     return Scaffold(
       appBar: AppBar(
-        title: const Text("Institutes Overview"),
+        title: Text("Institutes Overview", style: TextStyle(fontSize: context.font(20), fontWeight: FontWeight.bold)),
         actions: [
           IconButton(
             onPressed: () {
               Navigator.push(context, MaterialPageRoute(builder: (context) => const AddInstituteScreen())).then((_) => _fetchInstitutes());
             },
-            icon: const Icon(Icons.add_circle_outline),
+            icon: Icon(Icons.add_circle_outline, size: context.scale(24)),
             tooltip: "Add New Institute",
           ),
         ],
@@ -78,12 +78,17 @@ class _InstituteListScreenState extends State<InstituteListScreen> {
               onRefresh: _fetchInstitutes,
               child: SingleChildScrollView(
                 padding: context.pagePadding,
-                child: Column(
-                  children: [
-                    _buildFilterSection(context),
-                    const SizedBox(height: 24),
-                    _buildInstituteDirectory(context),
-                  ],
+                child: Center(
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 1200),
+                    child: Column(
+                      children: [
+                        _buildFilterSection(context),
+                        SizedBox(height: context.spacing),
+                        _buildInstituteDirectory(context),
+                      ],
+                    ),
+                  ),
                 ),
               ),
             ),
@@ -91,41 +96,81 @@ class _InstituteListScreenState extends State<InstituteListScreen> {
   }
 
   Widget _buildFilterSection(BuildContext context) {
-    final theme = Theme.of(context);
+    final theme = context.theme;
     final states = ["All States", ..._institutes.map((e) => e.state).toSet().toList()];
 
     return Card(
+      elevation: 0,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(context.scale(12)),
+        side: BorderSide(color: theme.dividerColor.withValues(alpha: 0.1)),
+      ),
       child: Padding(
-        padding: const EdgeInsets.all(16),
+        padding: EdgeInsets.all(context.spacing),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(
               children: [
-                Icon(Icons.filter_alt, color: theme.colorScheme.primary, size: 20),
-                const SizedBox(width: 8),
+                Icon(Icons.filter_alt, color: theme.colorScheme.primary, size: context.scale(20)),
+                SizedBox(width: context.scale(8)),
                 Text("Filter Institutes",
-                    style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
+                    style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold, fontSize: context.font(16))),
               ],
             ),
-            const SizedBox(height: 16),
-            _buildDropdownFilter(context, "Filter by State", states, _selectedState, (v) {
-              setState(() => _selectedState = v!);
-              _filterInstitutes();
-            }),
-            const SizedBox(height: 16),
-            SizedBox(
-              width: double.infinity,
-              child: OutlinedButton(
-                onPressed: () {
-                  setState(() {
-                    _selectedState = "All States";
-                    _searchController.clear();
-                  });
-                  _filterInstitutes();
-                },
-                child: const Text("RESET FILTERS"),
-              ),
+            SizedBox(height: context.spacing),
+            LayoutBuilder(
+              builder: (context, constraints) {
+                if (constraints.maxWidth > 600) {
+                  return Row(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      Expanded(
+                        child: _buildDropdownFilter(context, "Filter by State", states, _selectedState, (v) {
+                          setState(() => _selectedState = v!);
+                          _filterInstitutes();
+                        }),
+                      ),
+                      SizedBox(width: context.spacing),
+                      SizedBox(
+                        height: context.scale(48),
+                        child: OutlinedButton(
+                          onPressed: () {
+                            setState(() {
+                              _selectedState = "All States";
+                              _searchController.clear();
+                            });
+                            _filterInstitutes();
+                          },
+                          child: const Text("RESET FILTERS"),
+                        ),
+                      ),
+                    ],
+                  );
+                }
+                return Column(
+                  children: [
+                    _buildDropdownFilter(context, "Filter by State", states, _selectedState, (v) {
+                      setState(() => _selectedState = v!);
+                      _filterInstitutes();
+                    }),
+                    SizedBox(height: context.spacing),
+                    SizedBox(
+                      width: double.infinity,
+                      child: OutlinedButton(
+                        onPressed: () {
+                          setState(() {
+                            _selectedState = "All States";
+                            _searchController.clear();
+                          });
+                          _filterInstitutes();
+                        },
+                        child: const Text("RESET FILTERS"),
+                      ),
+                    ),
+                  ],
+                );
+              },
             ),
           ],
         ),
@@ -134,19 +179,19 @@ class _InstituteListScreenState extends State<InstituteListScreen> {
   }
 
   Widget _buildDropdownFilter(BuildContext context, String label, List<String> items, String value, ValueChanged<String?> onChanged) {
-    final theme = Theme.of(context);
+    final theme = context.theme;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(label, style: theme.textTheme.labelMedium?.copyWith(color: theme.hintColor)),
-        const SizedBox(height: 8),
+        Text(label, style: theme.textTheme.labelMedium?.copyWith(color: theme.hintColor, fontSize: context.font(12))),
+        SizedBox(height: context.scale(8)),
         DropdownButtonFormField<String>(
           isExpanded: true,
           value: value,
-          items: items.map((e) => DropdownMenuItem(value: e, child: Text(e))).toList(),
+          items: items.map((e) => DropdownMenuItem(value: e, child: Text(e, style: TextStyle(fontSize: context.font(14))))).toList(),
           onChanged: onChanged,
-          decoration: const InputDecoration(
-            contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          decoration: InputDecoration(
+            contentPadding: EdgeInsets.symmetric(horizontal: context.scale(12), vertical: context.scale(8)),
           ),
         ),
       ],
@@ -154,34 +199,41 @@ class _InstituteListScreenState extends State<InstituteListScreen> {
   }
 
   Widget _buildInstituteDirectory(BuildContext context) {
-    final theme = Theme.of(context);
+    final theme = context.theme;
     return Card(
+      elevation: 0,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(context.scale(12)),
+        side: BorderSide(color: theme.dividerColor.withValues(alpha: 0.1)),
+      ),
       child: Padding(
-        padding: const EdgeInsets.all(16),
+        padding: EdgeInsets.all(context.spacing),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(
               children: [
-                Icon(Icons.list, color: theme.colorScheme.primary, size: 20),
-                const SizedBox(width: 8),
+                Icon(Icons.list, color: theme.colorScheme.primary, size: context.scale(20)),
+                SizedBox(width: context.scale(8)),
                 Text("Institute Directory",
-                    style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
+                    style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold, fontSize: context.font(16))),
               ],
             ),
-            const SizedBox(height: 4),
+            SizedBox(height: context.scale(4)),
             Text("Manage all registered institutes within the system.",
-                style: theme.textTheme.bodySmall?.copyWith(color: theme.hintColor)),
-            const SizedBox(height: 16),
+                style: theme.textTheme.bodySmall?.copyWith(color: theme.hintColor, fontSize: context.font(12))),
+            SizedBox(height: context.spacing),
             TextField(
               controller: _searchController,
               onChanged: (v) => _filterInstitutes(),
-              decoration: const InputDecoration(
+              style: TextStyle(fontSize: context.font(14)),
+              decoration: InputDecoration(
                 hintText: "Search by Name or Code",
-                prefixIcon: Icon(Icons.search),
+                prefixIcon: Icon(Icons.search, size: context.scale(20)),
+                contentPadding: EdgeInsets.all(context.scale(12)),
               ),
             ),
-            const SizedBox(height: 16),
+            SizedBox(height: context.spacing),
             _buildTable(context),
           ],
         ),
@@ -190,36 +242,43 @@ class _InstituteListScreenState extends State<InstituteListScreen> {
   }
 
   Widget _buildTable(BuildContext context) {
-    final theme = Theme.of(context);
-    return SingleChildScrollView(
-      scrollDirection: Axis.horizontal,
-      child: ConstrainedBox(
-        constraints: BoxConstraints(minWidth: MediaQuery.of(context).size.width - (context.isTablet ? 100 : 64)),
-        child: DataTable(
-          columnSpacing: 24,
-          columns: const [
-            DataColumn(label: Text("#", style: TextStyle(fontWeight: FontWeight.bold))),
-            DataColumn(label: Text("Name", style: TextStyle(fontWeight: FontWeight.bold))),
-            DataColumn(label: Text("Code", style: TextStyle(fontWeight: FontWeight.bold))),
-          ],
-          rows: _filteredInstitutes.asMap().entries.map((entry) {
-            final index = entry.key + 1;
-            final inst = entry.value;
-            return DataRow(
-              cells: [
-                DataCell(Text(index.toString())),
-                DataCell(
-                  InkWell(
-                    onTap: () {
-                      Navigator.push(context, MaterialPageRoute(builder: (context) => InstituteDetailsScreen(instituteId: inst.id.toString())));
-                    },
-                    child: Text(inst.name, style: TextStyle(color: theme.colorScheme.primary, fontWeight: FontWeight.bold)),
+    final theme = context.theme;
+    return Scrollbar(
+      thumbVisibility: true,
+      child: SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        child: ConstrainedBox(
+          constraints: BoxConstraints(minWidth: context.screenWidth - (context.isMobile ? context.scale(64) : context.scale(100))),
+          child: DataTable(
+            columnSpacing: context.scale(24),
+            horizontalMargin: context.scale(12),
+            dataRowMinHeight: context.scale(48),
+            dataRowMaxHeight: context.scale(60),
+            headingRowHeight: context.scale(56),
+            columns: [
+              DataColumn(label: Text("#", style: TextStyle(fontWeight: FontWeight.bold, fontSize: context.font(14)))),
+              DataColumn(label: Text("Name", style: TextStyle(fontWeight: FontWeight.bold, fontSize: context.font(14)))),
+              DataColumn(label: Text("Code", style: TextStyle(fontWeight: FontWeight.bold, fontSize: context.font(14)))),
+            ],
+            rows: _filteredInstitutes.asMap().entries.map((entry) {
+              final index = entry.key + 1;
+              final inst = entry.value;
+              return DataRow(
+                cells: [
+                  DataCell(Text(index.toString(), style: TextStyle(fontSize: context.font(13)))),
+                  DataCell(
+                    InkWell(
+                      onTap: () {
+                        Navigator.push(context, MaterialPageRoute(builder: (context) => InstituteDetailsScreen(instituteId: inst.id.toString())));
+                      },
+                      child: Text(inst.name, style: TextStyle(color: theme.colorScheme.primary, fontWeight: FontWeight.bold, fontSize: context.font(13))),
+                    ),
                   ),
-                ),
-                DataCell(Text(inst.code, style: const TextStyle(fontStyle: FontStyle.italic))),
-              ],
-            );
-          }).toList(),
+                  DataCell(Text(inst.code, style: TextStyle(fontStyle: FontStyle.italic, fontSize: context.font(13)))),
+                ],
+              );
+            }).toList(),
+          ),
         ),
       ),
     );

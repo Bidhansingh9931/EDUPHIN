@@ -1,12 +1,13 @@
 import 'dart:io';
-import 'package:eduphin/services/responsive_helper.dart';
-import 'package:flutter/material.dart';
-import 'package:file_picker/file_picker.dart';
 import 'package:eduphin/services/api_service.dart';
-import 'package:eduphin/moderator_dashboard/institute/institute_model.dart';
+import 'package:eduphin/services/responsive_helper.dart';
+import 'package:file_picker/file_picker.dart';
+import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart';
+import 'package:eduphin/moderator_dashboard/institute/institute_model.dart' as moderator_institute;
 
 class AddInstituteScreen extends StatefulWidget {
-  final Institute? institute;
+  final moderator_institute.Institute? institute;
   const AddInstituteScreen({super.key, this.institute});
 
   @override
@@ -15,23 +16,26 @@ class AddInstituteScreen extends StatefulWidget {
 
 class _AddInstituteScreenState extends State<AddInstituteScreen> {
   final _formKey = GlobalKey<FormState>();
-  final TextEditingController _nameController = TextEditingController();
-  final TextEditingController _codeController = TextEditingController();
-  final TextEditingController _yearController = TextEditingController();
-  final TextEditingController _addressController = TextEditingController();
-  final TextEditingController _cityController = TextEditingController();
-  final TextEditingController _stateController = TextEditingController();
-  final TextEditingController _pincodeController = TextEditingController();
-  final TextEditingController _emailController = TextEditingController();
-  final TextEditingController _phoneController = TextEditingController();
-  final TextEditingController _websiteController = TextEditingController();
-  final TextEditingController _chairmanController = TextEditingController();
-  final TextEditingController _affiliationController = TextEditingController();
-  final TextEditingController _gstController = TextEditingController();
-  final TextEditingController _panController = TextEditingController();
+
+  final _nameController = TextEditingController();
+  final _codeController = TextEditingController();
+  final _yearController = TextEditingController();
+  final _addressController = TextEditingController();
+  final _cityController = TextEditingController();
+  final _stateController = TextEditingController();
+  final _pincodeController = TextEditingController();
+  final _emailController = TextEditingController();
+  final _phoneController = TextEditingController();
+  final _websiteController = TextEditingController();
+  final _chairmanController = TextEditingController();
+  final _affiliationController = TextEditingController();
+  final _gstController = TextEditingController();
+  final _panController = TextEditingController();
 
   String _status = "Active";
   File? _logoFile;
+  Uint8List? _webLogo;
+  String? _fileName;
   bool _isSaving = false;
 
   @override
@@ -61,181 +65,243 @@ class _AddInstituteScreenState extends State<AddInstituteScreen> {
     final result = await FilePicker.platform.pickFiles(type: FileType.image);
     if (result != null) {
       setState(() {
-        _logoFile = File(result.files.single.path!);
+        _fileName = result.files.first.name;
+        if (kIsWeb) {
+          _webLogo = result.files.first.bytes;
+        } else {
+          _logoFile = File(result.files.first.path!);
+        }
       });
     }
   }
 
   Future<void> _save() async {
     if (!_formKey.currentState!.validate()) return;
-    if (widget.institute == null && _logoFile == null) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Please select a logo")));
-      return;
-    }
 
     setState(() => _isSaving = true);
+
+    final data = {
+      'name': _nameController.text.trim(),
+      'code': _codeController.text.trim(),
+      'established_year': _yearController.text.trim(),
+      'address': _addressController.text.trim(),
+      'city': _cityController.text.trim(),
+      'state': _stateController.text.trim(),
+      'pincode': _pincodeController.text.trim(),
+      'contact_email': _emailController.text.trim(),
+      'contact_phone': _phoneController.text.trim(),
+      'website': _websiteController.text.trim().isEmpty ? null : _websiteController.text.trim(),
+      'chairman_name': _chairmanController.text.trim(),
+      'affiliation_details': _affiliationController.text.trim(),
+      'gst_number': _gstController.text.trim(),
+      'pan_number': _panController.text.trim(),
+      'status': _status,
+    };
+
     try {
-      final data = {
-        'name': _nameController.text.trim(),
-        'code': _codeController.text.trim(),
-        'established_year': _yearController.text.trim(),
-        'address': _addressController.text.trim(),
-        'city': _cityController.text.trim(),
-        'state': _stateController.text.trim(),
-        'pincode': _pincodeController.text.trim(),
-        'contact_email': _emailController.text.trim(),
-        'contact_phone': _phoneController.text.trim(),
-        'website': _websiteController.text.trim(),
-        'chairman_name': _chairmanController.text.trim(),
-        'affiliation_details': _affiliationController.text.trim(),
-        'gst_number': _gstController.text.trim(),
-        'pan_number': _panController.text.trim(),
-        'status': _status,
-      };
-
-      if (widget.institute != null) {
-        await ApiService.updateSuperAdminInstitute(widget.institute!.id.toString(), data, logo: _logoFile);
+      if (widget.institute == null) {
+        await ApiService.storeSuperAdminInstitute(data, logo: _logoFile, logoBytes: _webLogo, fileName: _fileName);
       } else {
-        await ApiService.storeSuperAdminInstitute(data, logo: _logoFile);
+        await ApiService.updateSuperAdminInstitute(widget.institute!.id.toString(), data, logo: _logoFile, logoBytes: _webLogo, fileName: _fileName);
       }
-
-      Navigator.pop(context, true);
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Institute ${widget.institute != null ? 'updated' : 'created'} successfully")));
+      if (mounted) {
+        Navigator.pop(context, true);
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(widget.institute == null ? "Institute added" : "Institute updated")));
+      }
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString())));
+      if (mounted) {
+        String msg = e.toString().replaceFirst('Exception: ', '');
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(msg),
+            backgroundColor: Colors.red,
+            behavior: SnackBarBehavior.floating,
+            duration: const Duration(seconds: 4),
+          ),
+        );
+      }
     } finally {
-      setState(() => _isSaving = false);
+      if (mounted) setState(() => _isSaving = false);
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
+    final theme = context.theme;
     return Scaffold(
-      appBar: AppBar(
-        title: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(widget.institute != null ? "Edit Institute" : "Institute Information", style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-            Text("Register a new institute platform-wide.", style: theme.textTheme.bodySmall?.copyWith(color: theme.hintColor)),
-          ],
-        ),
-      ),
+      appBar: AppBar(title: Text(widget.institute == null ? "Add Institute" : "Edit Institute")),
       body: _isSaving
           ? const Center(child: CircularProgressIndicator())
           : SingleChildScrollView(
-              padding: context.pagePadding,
-              child: Center(
-                child: ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 800),
-                  child: Form(
-                    key: _formKey,
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        _buildSectionHeader(context, "Basic Details", Icons.info_outline),
-                        _buildResponsiveRow(context, [
-                          _buildTextField(context, "Institute Name *", "e.g., ABC College", Icons.business, _nameController),
-                          _buildTextField(context, "Institute Code *", "e.g., INST001", Icons.tag, _codeController),
-                        ]),
-                        _buildFilePicker(context, "Institute Logo *"),
-                        _buildTextField(context, "Established Year *", "2026", Icons.calendar_today, _yearController, keyboardType: TextInputType.number),
-
-                        const SizedBox(height: 24),
-                        _buildSectionHeader(context, "Location & Contact", Icons.location_on_outlined),
-                        _buildTextField(context, "Address *", "Full Address", Icons.map, _addressController, maxLines: 2),
-                        _buildResponsiveRow(context, [
-                          _buildTextField(context, "City *", "e.g., Jaipur", Icons.location_city, _cityController),
-                          _buildTextField(context, "State *", "Rajasthan", Icons.map, _stateController),
-                        ]),
-                        _buildResponsiveRow(context, [
-                          _buildTextField(context, "Pincode *", "302001", Icons.pin_drop, _pincodeController, keyboardType: TextInputType.number),
-                          _buildTextField(context, "Contact Email *", "info@example.com", Icons.email, _emailController, keyboardType: TextInputType.emailAddress),
-                        ]),
-                        _buildResponsiveRow(context, [
-                          _buildTextField(context, "Contact Phone *", "9876543210", Icons.phone, _phoneController, keyboardType: TextInputType.phone),
-                          _buildTextField(context, "Website", "https://example.com", Icons.language, _websiteController),
-                        ]),
-
-                        const SizedBox(height: 24),
-                        _buildSectionHeader(context, "Legal & Compliance", Icons.gavel_outlined),
-                        _buildResponsiveRow(context, [
-                          _buildTextField(context, "Chairman Name *", "Dr. John Doe", Icons.person, _chairmanController),
-                          _buildTextField(context, "GST Number *", "07ABCDE1234F1Z5", Icons.receipt_long, _gstController),
-                        ]),
-                        _buildResponsiveRow(context, [
-                          _buildTextField(context, "PAN Number *", "ABCDE1234F", Icons.badge, _panController),
-                          _buildStatusDropdown(context),
-                        ]),
-                        _buildTextField(context, "Affiliation Details *", "Enter details", Icons.handshake, _affiliationController, maxLines: 2),
-
-                        const SizedBox(height: 40),
-                        Row(
-                          children: [
-                            Expanded(
-                              child: OutlinedButton(
-                                onPressed: () => Navigator.pop(context),
-                                child: const Text("CANCEL"),
-                              ),
-                            ),
-                            const SizedBox(width: 16),
-                            Expanded(
-                              child: ElevatedButton(
-                                onPressed: _save,
-                                child: Text(widget.institute != null ? "UPDATE" : "CREATE"),
-                              ),
-                            ),
-                          ],
+              padding: EdgeInsets.all(context.scale(16)),
+              child: Form(
+                key: _formKey,
+                child: Column(
+                  children: [
+                    _buildSection(context, title: "Basic Details", icon: Icons.info_outline, children: [
+                      _buildTextField(context, "Institute Name *", "Name", Icons.business, _nameController),
+                      _buildTextField(context, "Institute Code *", "Code", Icons.qr_code, _codeController),
+                      _buildDatePickerField(context, "Established Year *", "YYYY", Icons.calendar_today, _yearController),
+                    ]),
+                    _buildSection(context, title: "Contact Information", icon: Icons.contact_page_outlined, children: [
+                      _buildTextField(
+                        context,
+                        "Contact Email *",
+                        "Email",
+                        Icons.email,
+                        _emailController,
+                        keyboardType: TextInputType.emailAddress,
+                        validator: (v) {
+                          if (v == null || v.trim().isEmpty) return "Required";
+                          if (!RegExp(r"^[a-zA-Z0-9.a-zA-Z0-9.!#$%&'*+-/=?^_`{|}~]+@[a-zA-Z0-9]+\.[a-zA-Z]+")
+                              .hasMatch(v.trim())) {
+                            return "Invalid email format";
+                          }
+                          return null;
+                        },
+                      ),
+                      _buildTextField(context, "Contact Phone *", "Phone", Icons.phone, _phoneController, keyboardType: TextInputType.phone),
+                      _buildTextField(
+                        context,
+                        "Website",
+                        "URL (e.g., https://example.com)",
+                        Icons.language,
+                        _websiteController,
+                        validator: (v) {
+                          if (v != null && v.isNotEmpty && !v.trim().startsWith("http")) {
+                            return "URL must start with http:// or https://";
+                          }
+                          return null;
+                        },
+                      ),
+                      _buildTextField(context, "Chairman Name *", "Name", Icons.person, _chairmanController),
+                    ]),
+                    _buildSection(context, title: "Location Details", icon: Icons.location_on_outlined, children: [
+                      _buildTextField(context, "Address *", "Address", Icons.home, _addressController, maxLines: 2),
+                      Row(
+                        children: [
+                          Expanded(child: _buildTextField(context, "City *", "City", Icons.location_city, _cityController)),
+                          SizedBox(width: context.scale(12)),
+                          Expanded(child: _buildTextField(context, "State *", "State", Icons.map, _stateController)),
+                        ],
+                      ),
+                      _buildTextField(context, "Pincode *", "6-digit pincode", Icons.pin_drop, _pincodeController, keyboardType: TextInputType.number),
+                    ]),
+                    _buildSection(context, title: "Legal & Other", icon: Icons.gavel_outlined, children: [
+                      _buildTextField(context, "GST Number *", "GST No.", Icons.description, _gstController),
+                      _buildTextField(context, "PAN Number *", "PAN No.", Icons.badge, _panController),
+                      _buildTextField(context, "Affiliation Details", "Details", Icons.history_edu, _affiliationController),
+                      _buildStatusDropdown(context),
+                      _buildFilePicker(context, "Institute Logo"),
+                    ]),
+                    SizedBox(height: context.scale(24)),
+                    SizedBox(
+                      width: double.infinity,
+                      height: context.scale(50),
+                      child: ElevatedButton(
+                        onPressed: _save,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: theme.colorScheme.primary,
+                          foregroundColor: theme.colorScheme.onPrimary,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(context.scale(12))),
                         ),
-                        const SizedBox(height: 40),
-                      ],
+                        child: Text(widget.institute == null ? "SAVE INSTITUTE" : "UPDATE INSTITUTE", style: const TextStyle(fontWeight: FontWeight.bold)),
+                      ),
                     ),
-                  ),
+                  ],
                 ),
               ),
             ),
     );
   }
 
-  Widget _buildResponsiveRow(BuildContext context, List<Widget> children) {
-    if (!context.isTablet) return Column(children: children);
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: children.map((c) => Expanded(child: Padding(padding: const EdgeInsets.only(right: 12), child: c))).toList(),
+  Widget _buildSection(BuildContext context, {required String title, required IconData icon, required List<Widget> children}) {
+    final theme = context.theme;
+    return Card(
+      margin: EdgeInsets.only(bottom: context.scale(20)),
+      elevation: 0,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(context.scale(16)),
+        side: BorderSide(color: theme.dividerColor.withValues(alpha: 0.1)),
+      ),
+      child: Padding(
+        padding: EdgeInsets.all(context.scale(16)),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(icon, size: context.scale(20), color: theme.colorScheme.primary),
+                SizedBox(width: context.scale(8)),
+                Text(title, style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold, color: theme.colorScheme.primary)),
+              ],
+            ),
+            Divider(height: context.scale(24)),
+            ...children,
+          ],
+        ),
+      ),
     );
   }
 
-  Widget _buildSectionHeader(BuildContext context, String title, IconData icon) {
-    final theme = Theme.of(context);
+  Widget _buildDatePickerField(BuildContext context, String label, String hint, IconData icon, TextEditingController controller) {
+    final theme = context.theme;
     return Padding(
-      padding: const EdgeInsets.only(bottom: 16, top: 8),
-      child: Row(
+      padding: EdgeInsets.only(bottom: context.scale(16)),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(icon, color: theme.colorScheme.primary, size: 20),
-          const SizedBox(width: 8),
-          Text(title, style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
+          Text(label, style: theme.textTheme.labelMedium?.copyWith(color: theme.hintColor, fontSize: context.font(12))),
+          SizedBox(height: context.scale(8)),
+          TextFormField(
+            controller: controller,
+            readOnly: true,
+            style: TextStyle(fontSize: context.font(14)),
+            validator: (v) => v == null || v.isEmpty ? "Required" : null,
+            onTap: () async {
+              final DateTime? picked = await showDatePicker(
+                context: context,
+                initialDate: DateTime.now(),
+                firstDate: DateTime(1800),
+                lastDate: DateTime.now(),
+                initialDatePickerMode: DatePickerMode.year,
+              );
+              if (picked != null) {
+                setState(() {
+                  controller.text = picked.year.toString();
+                });
+              }
+            },
+            decoration: InputDecoration(
+              hintText: hint,
+              prefixIcon: Icon(icon, size: context.scale(18)),
+              contentPadding: EdgeInsets.all(context.scale(12)),
+            ),
+          ),
         ],
       ),
     );
   }
 
-  Widget _buildTextField(BuildContext context, String label, String hint, IconData icon, TextEditingController controller, {int maxLines = 1, TextInputType? keyboardType}) {
-    final theme = Theme.of(context);
+  Widget _buildTextField(BuildContext context, String label, String hint, IconData icon, TextEditingController controller, {int maxLines = 1, TextInputType keyboardType = TextInputType.text, String? Function(String?)? validator}) {
+    final theme = context.theme;
     return Padding(
-      padding: const EdgeInsets.only(bottom: 16),
+      padding: EdgeInsets.only(bottom: context.scale(16)),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(label, style: theme.textTheme.labelMedium?.copyWith(color: theme.hintColor)),
-          const SizedBox(height: 8),
+          Text(label, style: theme.textTheme.labelMedium?.copyWith(color: theme.hintColor, fontSize: context.font(12))),
+          SizedBox(height: context.scale(8)),
           TextFormField(
             controller: controller,
             maxLines: maxLines,
             keyboardType: keyboardType,
-            validator: (v) => v == null || v.isEmpty ? "Required" : null,
+            style: TextStyle(fontSize: context.font(14)),
+            validator: validator ?? (v) => v == null || v.isEmpty ? "Required" : null,
             decoration: InputDecoration(
               hintText: hint,
-              prefixIcon: Icon(icon, size: 18),
+              prefixIcon: Icon(icon, size: context.scale(18)),
+              contentPadding: EdgeInsets.all(context.scale(12)),
             ),
           ),
         ],
@@ -244,19 +310,23 @@ class _AddInstituteScreenState extends State<AddInstituteScreen> {
   }
 
   Widget _buildStatusDropdown(BuildContext context) {
-    final theme = Theme.of(context);
+    final theme = context.theme;
     return Padding(
-      padding: const EdgeInsets.only(bottom: 16),
+      padding: EdgeInsets.only(bottom: context.scale(16)),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text("Institute Status", style: theme.textTheme.labelMedium?.copyWith(color: theme.hintColor)),
-          const SizedBox(height: 8),
+          Text("Institute Status", style: theme.textTheme.labelMedium?.copyWith(color: theme.hintColor, fontSize: context.font(12))),
+          SizedBox(height: context.scale(8)),
           DropdownButtonFormField<String>(
-            value: _status,
+            initialValue: _status,
+            style: TextStyle(fontSize: context.font(14), color: theme.textTheme.bodyMedium?.color),
             items: ["Active", "Inactive"].map((e) => DropdownMenuItem(value: e, child: Text(e))).toList(),
             onChanged: (v) => setState(() => _status = v!),
-            decoration: const InputDecoration(prefixIcon: Icon(Icons.check_circle_outline, size: 18)),
+            decoration: InputDecoration(
+              prefixIcon: Icon(Icons.check_circle_outline, size: context.scale(18)),
+              contentPadding: EdgeInsets.all(context.scale(12)),
+            ),
           ),
         ],
       ),
@@ -264,40 +334,44 @@ class _AddInstituteScreenState extends State<AddInstituteScreen> {
   }
 
   Widget _buildFilePicker(BuildContext context, String label) {
-    final theme = Theme.of(context);
+    final theme = context.theme;
     final colorScheme = theme.colorScheme;
+    String displayText = _fileName ?? "No Logo Chosen";
+
     return Padding(
-      padding: const EdgeInsets.only(bottom: 16),
+      padding: EdgeInsets.only(bottom: context.scale(16)),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(label, style: theme.textTheme.labelMedium?.copyWith(color: theme.hintColor)),
-          const SizedBox(height: 8),
+          Text(label, style: theme.textTheme.labelMedium?.copyWith(color: theme.hintColor, fontSize: context.font(12))),
+          SizedBox(height: context.scale(8)),
           InkWell(
             onTap: _pickLogo,
-            borderRadius: BorderRadius.circular(12),
+            borderRadius: BorderRadius.circular(context.scale(12)),
             child: Container(
-              height: 56,
+              height: context.scale(56),
               decoration: BoxDecoration(
                 color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: BorderRadius.circular(context.scale(12)),
                 border: Border.all(color: colorScheme.outline.withValues(alpha: 0.2)),
               ),
               child: Row(
                 children: [
                   Container(
-                    width: 120,
+                    width: context.scale(120),
                     decoration: BoxDecoration(
                       color: colorScheme.primary.withValues(alpha: 0.1),
-                      borderRadius: const BorderRadius.only(topLeft: Radius.circular(12), bottomLeft: Radius.circular(12)),
+                      borderRadius: BorderRadius.only(topLeft: Radius.circular(context.scale(12)), bottomLeft: Radius.circular(context.scale(12))),
                     ),
                     alignment: Alignment.center,
-                    child: Text("Choose Logo", style: TextStyle(color: colorScheme.primary, fontWeight: FontWeight.bold, fontSize: 13)),
+                    child: Text("Choose Logo", style: TextStyle(color: colorScheme.primary, fontWeight: FontWeight.bold, fontSize: context.font(13))),
                   ),
                   Expanded(
                     child: Padding(
-                      padding: const EdgeInsets.only(left: 12),
-                      child: Text(_logoFile != null ? _logoFile!.path.split('/').last : "No file chosen", style: TextStyle(color: theme.hintColor, fontSize: 13), overflow: TextOverflow.ellipsis),
+                      padding: EdgeInsets.only(left: context.scale(12)),
+                      child: Text(displayText, 
+                          style: TextStyle(color: theme.hintColor, fontSize: context.font(13)),
+                          overflow: TextOverflow.ellipsis),
                     ),
                   ),
                 ],

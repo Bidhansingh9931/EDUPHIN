@@ -1,4 +1,5 @@
 import '../../services/responsive_helper.dart';
+import 'package:eduphin/teacher/dashboard/app_drawer.dart';
 import 'package:flutter/material.dart';
 import '../../services/api_service.dart';
 import 'package:eduphin/teacher/dashboard/library_models.dart';
@@ -99,9 +100,11 @@ class _AddNewBookPageState extends State<AddNewBookPage> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    
+    final theme = context.theme;
+
     return Scaffold(
+      backgroundColor: theme.colorScheme.surface,
+      drawer: const AppDrawer(),
       appBar: AppBar(
         title: Text(widget.book == null ? "Add New Book" : "Edit Book"),
       ),
@@ -116,78 +119,89 @@ class _AddNewBookPageState extends State<AddNewBookPage> {
                   constraints: const BoxConstraints(maxWidth: 800),
                   child: Column(
                     children: [
-                      buildSectionContainer(
+                      _buildSectionContainer(
                         context,
-                        icon: Icons.info_outline,
+                        icon: Icons.info_outline_rounded,
                         title: "Book Details",
-                        subtitle: "Core information about the resource.",
                         children: [
                           _buildResponsiveRow(context, [
-                            buildInputField(context, "Title *", _titleController, required: true),
-                            buildInputField(context, "Author *", _authorController, required: true),
+                            _buildInputField(context, "Title *", _titleController, required: true),
+                            _buildInputField(context, "Author *", _authorController, required: true),
                           ]),
                           _buildResponsiveRow(context, [
-                            buildInputField(context, "Edition", _editionController),
-                            buildInputField(context, "Volume", _volumeController),
+                            _buildInputField(context, "Edition", _editionController),
+                            _buildInputField(context, "Volume", _volumeController),
                           ]),
                           _buildResponsiveRow(context, [
-                            buildInputField(context, "Publisher", _publisherController),
-                            buildInputField(context, "Year", _yearController, isNumber: true),
+                            _buildInputField(context, "Publisher", _publisherController),
+                            _buildInputField(context, "Publication Year", _yearController, isNumber: true),
                           ]),
                         ],
                       ),
-
-                      const SizedBox(height: 24),
-
-                      buildSectionContainer(
+                      SizedBox(height: context.lg),
+                      _buildSectionContainer(
                         context,
-                        icon: Icons.sell_outlined,
+                        icon: Icons.inventory_2_outlined,
                         title: "Catalog & Inventory",
                         children: [
                           _buildResponsiveRow(context, [
-                            buildInputField(context, "ISBN", _isbnController),
-                            buildInputField(context, "Category", _categoryController),
+                            _buildInputField(context, "ISBN", _isbnController),
+                            _buildInputField(context, "Category", _categoryController),
                           ]),
                           _buildResponsiveRow(context, [
-                            buildInputField(context, "Language", _languageController),
-                            buildDropdownField(context, "Format", selectedFormat, ["Hardcover", "Paperback", "eBook"], (val) {
+                            _buildInputField(context, "Language", _languageController),
+                            _buildDropdownField(context, "Format", selectedFormat, ["Hardcover", "Paperback", "eBook"], (val) {
                               setState(() => selectedFormat = val!);
                             }),
                           ]),
-                          buildInputField(context, "Quantity *", _quantityController, isNumber: true, required: true),
-                          const SizedBox(height: 32),
-                          SizedBox(
-                            width: double.infinity,
-                            child: ElevatedButton(
-                              onPressed: _isLoading ? null : _submit,
-                              child: Text(widget.book == null ? "ADD BOOK" : "UPDATE BOOK"),
-                            ),
-                          ),
-                          const SizedBox(height: 12),
-                          if (widget.book == null)
-                            SizedBox(
-                              width: double.infinity,
-                              child: OutlinedButton(
-                                onPressed: _isLoading ? null : () {
-                                  _formKey.currentState?.reset();
-                                  _titleController.clear();
-                                  _authorController.clear();
-                                  _editionController.clear();
-                                  _volumeController.clear();
-                                  _publisherController.clear();
-                                  _yearController.clear();
-                                  _isbnController.clear();
-                                  _categoryController.clear();
-                                  _languageController.text = "English";
-                                  _quantityController.text = "1";
-                                  setState(() => selectedFormat = "Hardcover");
-                                },
-                                child: const Text("RESET"),
-                              ),
-                            ),
+                          _buildInputField(context, "Quantity *", _quantityController, isNumber: true, required: true),
                         ],
                       ),
-                      const SizedBox(height: 40),
+                      SizedBox(height: context.xl),
+                      Row(
+                        children: [
+                          if (widget.book == null) ...[
+                            Expanded(
+                              child: FilledButton.tonalIcon(
+                                onPressed: _isLoading
+                                    ? null
+                                    : () {
+                                        _formKey.currentState?.reset();
+                                        _titleController.clear();
+                                        _authorController.clear();
+                                        _editionController.clear();
+                                        _volumeController.clear();
+                                        _publisherController.clear();
+                                        _yearController.clear();
+                                        _isbnController.clear();
+                                        _categoryController.clear();
+                                        _languageController.text = "English";
+                                        _quantityController.text = "1";
+                                        setState(() => selectedFormat = "Hardcover");
+                                      },
+                                icon: const Icon(Icons.refresh_rounded),
+                                label: const Text("RESET"),
+                                style: FilledButton.styleFrom(
+                                  minimumSize: Size(0, context.scale(48)),
+                                ),
+                              ),
+                            ),
+                            SizedBox(width: context.md),
+                          ],
+                          Expanded(
+                            flex: 2,
+                            child: FilledButton.icon(
+                              onPressed: _isLoading ? null : _submit,
+                              icon: Icon(widget.book == null ? Icons.add_rounded : Icons.save_rounded),
+                              label: Text(widget.book == null ? "ADD BOOK" : "UPDATE BOOK"),
+                              style: FilledButton.styleFrom(
+                                minimumSize: Size(0, context.scale(48)),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      SizedBox(height: context.xl),
                     ],
                   ),
                 ),
@@ -195,43 +209,65 @@ class _AddNewBookPageState extends State<AddNewBookPage> {
             ),
           ),
           if (_isLoading)
-            const Center(child: CircularProgressIndicator())
+            Container(
+              color: Colors.black26,
+              child: const Center(child: CircularProgressIndicator()),
+            ),
         ],
       ),
     );
   }
 
   Widget _buildResponsiveRow(BuildContext context, List<Widget> children) {
-    if (!context.isTablet) return Column(children: children);
+    if (!context.isTablet && !context.isDesktop) return Column(children: children);
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
-      children: children.map((c) => Expanded(child: Padding(padding: const EdgeInsets.only(right: 12), child: c))).toList(),
+      children: children
+          .asMap()
+          .entries
+          .map((entry) => Expanded(
+                child: Padding(
+                  padding: EdgeInsets.only(
+                    right: entry.key != children.length - 1 ? context.md : 0,
+                  ),
+                  child: entry.value,
+                ),
+              ))
+          .toList(),
     );
   }
 
-  Widget buildSectionContainer(BuildContext context, {required IconData icon, required String title, String? subtitle, required List<Widget> children}) {
-    final theme = Theme.of(context);
+  Widget _buildSectionContainer(BuildContext context, {required IconData icon, required String title, required List<Widget> children}) {
+    final theme = context.theme;
     return Card(
+      elevation: 0,
+      color: theme.colorScheme.surfaceContainerLow,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(context.scale(20)),
+        side: BorderSide(color: theme.colorScheme.outlineVariant.withValues(alpha: 0.5), width: 0.5),
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: theme.colorScheme.primary.withOpacity(0.05),
-              borderRadius: const BorderRadius.only(topLeft: Radius.circular(16), topRight: Radius.circular(16)),
-            ),
+          Padding(
+            padding: EdgeInsets.all(context.spacing),
             child: Row(
               children: [
-                Icon(icon, color: theme.colorScheme.primary, size: 20),
-                const SizedBox(width: 10),
-                Text(title, style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold, color: theme.colorScheme.primary)),
+                Icon(icon, color: theme.colorScheme.primary, size: context.scale(20)),
+                SizedBox(width: context.xs),
+                Text(
+                  title,
+                  style: theme.textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.bold,
+                    color: theme.colorScheme.primary,
+                  ),
+                ),
               ],
             ),
           ),
+          Divider(height: 1, color: theme.colorScheme.outlineVariant.withValues(alpha: 0.5)),
           Padding(
-            padding: const EdgeInsets.all(16),
+            padding: EdgeInsets.all(context.spacing),
             child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: children),
           ),
         ],
@@ -239,21 +275,31 @@ class _AddNewBookPageState extends State<AddNewBookPage> {
     );
   }
 
-  Widget buildInputField(BuildContext context, String label, TextEditingController controller, {bool required = false, bool isNumber = false}) {
-    final theme = Theme.of(context);
+  Widget _buildInputField(BuildContext context, String label, TextEditingController controller, {bool required = false, bool isNumber = false}) {
+    final theme = context.theme;
     return Padding(
-      padding: const EdgeInsets.only(bottom: 16),
+      padding: EdgeInsets.only(bottom: context.md),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(label, style: theme.textTheme.labelMedium?.copyWith(color: theme.hintColor)),
-          const SizedBox(height: 8),
+          Text(
+            label,
+            style: theme.textTheme.labelMedium?.copyWith(
+              color: theme.colorScheme.outline,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          SizedBox(height: context.xs),
           TextFormField(
             controller: controller,
             keyboardType: isNumber ? TextInputType.number : TextInputType.text,
-            validator: required ? (val) => val == null || val.isEmpty ? "Required" : null : null,
-            decoration: const InputDecoration(
-              contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+            validator: required ? (val) => val == null || val.isEmpty ? "Required field" : null : null,
+            style: theme.textTheme.bodyMedium,
+            decoration: InputDecoration(
+              filled: true,
+              fillColor: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
+              hintText: "Enter $label",
+              contentPadding: EdgeInsets.all(context.spacing),
             ),
           ),
         ],
@@ -261,20 +307,31 @@ class _AddNewBookPageState extends State<AddNewBookPage> {
     );
   }
 
-  Widget buildDropdownField(BuildContext context, String label, String value, List<String> items, Function(String?) onChanged) {
-    final theme = Theme.of(context);
+  Widget _buildDropdownField(BuildContext context, String label, String value, List<String> items, Function(String?) onChanged) {
+    final theme = context.theme;
     return Padding(
-      padding: const EdgeInsets.only(bottom: 16),
+      padding: EdgeInsets.only(bottom: context.md),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(label, style: theme.textTheme.labelMedium?.copyWith(color: theme.hintColor)),
-          const SizedBox(height: 8),
+          Text(
+            label,
+            style: theme.textTheme.labelMedium?.copyWith(
+              color: theme.colorScheme.outline,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          SizedBox(height: context.xs),
           DropdownButtonFormField<String>(
             value: value,
             isExpanded: true,
-            decoration: const InputDecoration(contentPadding: EdgeInsets.symmetric(horizontal: 12)),
-            items: items.map((e) => DropdownMenuItem(value: e, child: Text(e, style: const TextStyle(fontSize: 14)))).toList(),
+            style: theme.textTheme.bodyMedium,
+            decoration: InputDecoration(
+              filled: true,
+              fillColor: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
+              contentPadding: EdgeInsets.symmetric(horizontal: context.spacing),
+            ),
+            items: items.map((e) => DropdownMenuItem(value: e, child: Text(e))).toList(),
             onChanged: onChanged,
           ),
         ],

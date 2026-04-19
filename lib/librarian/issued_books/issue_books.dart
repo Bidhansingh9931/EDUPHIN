@@ -1,6 +1,7 @@
 import '../../services/responsive_helper.dart';
 import 'package:flutter/material.dart';
 import '../../../services/api_service.dart';
+import '../../teacher/dashboard/app_drawer.dart';
 import 'issue_list.dart';
 import 'package:intl/intl.dart';
 
@@ -90,14 +91,15 @@ class _IssueBookPageState extends State<IssueBookPage> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
+    final theme = context.theme;
 
     return Scaffold(
+      backgroundColor: theme.colorScheme.surface,
       appBar: AppBar(
         title: const Text("Issue New Book"),
         actions: [
           Padding(
-            padding: const EdgeInsets.only(right: 16.0),
+            padding: EdgeInsets.only(right: context.scale(8)),
             child: TextButton.icon(
               onPressed: () {
                 Navigator.push(
@@ -105,82 +107,117 @@ class _IssueBookPageState extends State<IssueBookPage> {
                   MaterialPageRoute(builder: (_) => const IssuedBooksListPage()),
                 );
               },
-              icon: const Icon(Icons.list_alt, size: 18),
-              label: const Text("View List"),
+              icon: const Icon(Icons.list_alt_rounded, size: 18),
+              label: const Text("VIEW LIST"),
             ),
           )
         ],
       ),
-      body: _isLoading 
+      drawer: const AppDrawer(),
+      body: _isLoading
           ? const Center(child: CircularProgressIndicator())
           : SingleChildScrollView(
               padding: context.pagePadding,
               child: Center(
                 child: ConstrainedBox(
                   constraints: const BoxConstraints(maxWidth: 800),
-                  child: Card(
-                    child: Padding(
-                      padding: const EdgeInsets.all(24.0),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Center(
-                            child: Column(
-                              children: [
-                                Icon(Icons.assignment_turned_in_outlined, size: 48, color: theme.colorScheme.primary),
-                                const SizedBox(height: 16),
-                                Text("Issue Book Details", style: theme.textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold)),
-                                const SizedBox(height: 8),
-                                Text("Select the resource and the user to assign it to.", style: TextStyle(color: theme.hintColor)),
-                              ],
-                            ),
+                  child: Column(
+                    children: [
+                      Card(
+                        elevation: 0,
+                        color: theme.colorScheme.surfaceContainerLow,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(context.md),
+                          side: BorderSide(color: theme.colorScheme.outlineVariant, width: 0.5),
+                        ),
+                        child: Padding(
+                          padding: EdgeInsets.all(context.lg),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              Center(
+                                child: Column(
+                                  children: [
+                                    Container(
+                                      padding: EdgeInsets.all(context.md),
+                                      decoration: BoxDecoration(
+                                        color: theme.colorScheme.primaryContainer,
+                                        shape: BoxShape.circle,
+                                      ),
+                                      child: Icon(Icons.assignment_turned_in_rounded, size: context.scale(40), color: theme.colorScheme.onPrimaryContainer),
+                                    ),
+                                    SizedBox(height: context.md),
+                                    Text(
+                                      "Issue Book Details",
+                                      style: theme.textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold, fontSize: context.font(24)),
+                                    ),
+                                    SizedBox(height: context.sm),
+                                    Text(
+                                      "Assign a library resource to a registered user.",
+                                      textAlign: TextAlign.center,
+                                      style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.outline, fontSize: context.font(14)),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              SizedBox(height: context.xl),
+
+                              _buildResponsiveRow(context, [
+                                _buildDropdownField(
+                                  context,
+                                  "Select Book",
+                                  selectedBookId,
+                                  _books.map((b) => DropdownMenuItem<String>(
+                                    value: b['id'].toString(),
+                                    child: Text(b['title'] ?? "N/A"),
+                                  )).toList(),
+                                  (val) => setState(() => selectedBookId = val)
+                                ),
+                                _buildDropdownField(
+                                  context,
+                                  "Issue To (User)",
+                                  selectedUserId,
+                                  _users.map((u) => DropdownMenuItem<String>(
+                                    value: u['id'].toString(),
+                                    child: Text("${u['name']} (${u['role']?['name'] ?? 'User'})"),
+                                  )).toList(),
+                                  (val) => setState(() => selectedUserId = val)
+                                ),
+                              ]),
+
+                              _buildResponsiveRow(context, [
+                                _buildDateField(context, "Issued Date", _issuedDateController),
+                                _buildDateField(context, "Due Date", _dueDateController),
+                              ]),
+
+                              SizedBox(height: context.md),
+
+                              FilledButton.icon(
+                                onPressed: _isSubmitting ? null : _issueBook,
+                                icon: _isSubmitting 
+                                  ? SizedBox(width: context.md, height: context.md, child: CircularProgressIndicator(color: theme.colorScheme.onPrimary, strokeWidth: 2))
+                                  : const Icon(Icons.check_circle_rounded),
+                                label: const Text("ISSUE BOOK"),
+                                style: FilledButton.styleFrom(
+                                  minimumSize: Size(double.infinity, context.scale(56)),
+                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(context.sm)),
+                                ),
+                              ),
+                              SizedBox(height: context.md),
+                              FilledButton.tonal(
+                                onPressed: () => Navigator.pop(context),
+                                style: FilledButton.styleFrom(
+                                  minimumSize: Size(double.infinity, context.scale(56)),
+                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(context.sm)),
+                                ),
+                                child: const Text("CANCEL"),
+                              ),
+                            ],
                           ),
-                          const SizedBox(height: 32),
-
-                          _buildResponsiveRow(context, [
-                            _buildDropdownField(
-                              context,
-                              "Select Book",
-                              selectedBookId, 
-                              _books.map((b) => DropdownMenuItem<String>(
-                                value: b['id'].toString(),
-                                child: Text(b['title'] ?? "N/A"),
-                              )).toList(), 
-                              (val) => setState(() => selectedBookId = val)
-                            ),
-                            _buildDropdownField(
-                              context,
-                              "Issue To (User)",
-                              selectedUserId, 
-                              _users.map((u) => DropdownMenuItem<String>(
-                                value: u['id'].toString(),
-                                child: Text("${u['name']} (${u['role']?['name'] ?? 'User'})"),
-                              )).toList(), 
-                              (val) => setState(() => selectedUserId = val)
-                            ),
-                          ]),
-
-                          _buildResponsiveRow(context, [
-                            _buildDateField(context, "Issued Date", _issuedDateController),
-                            _buildDateField(context, "Due Date", _dueDateController),
-                          ]),
-
-                          const SizedBox(height: 32),
-
-                          ElevatedButton(
-                            onPressed: _isSubmitting ? null : _issueBook,
-                            child: _isSubmitting 
-                              ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
-                              : const Text("ISSUE BOOK"),
-                          ),
-                          const SizedBox(height: 12),
-                          OutlinedButton(
-                            onPressed: () => Navigator.pop(context),
-                            child: const Text("CANCEL"),
-                          ),
-                        ],
+                        ),
                       ),
-                    ),
+                      SizedBox(height: context.xl),
+                    ],
                   ),
                 ),
               ),
@@ -189,26 +226,61 @@ class _IssueBookPageState extends State<IssueBookPage> {
   }
 
   Widget _buildResponsiveRow(BuildContext context, List<Widget> children) {
-    if (!context.isTablet) return Column(children: children);
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: children.map((c) => Expanded(child: Padding(padding: const EdgeInsets.only(right: 12), child: c))).toList(),
+    if (!context.isTablet && !context.isDesktop) return Column(children: children);
+    return Padding(
+      padding: EdgeInsets.only(bottom: context.sm),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: children
+            .asMap()
+            .entries
+            .map((entry) => Expanded(
+                  child: Padding(
+                    padding: EdgeInsets.only(
+                      right: entry.key != children.length - 1 ? context.md : 0,
+                    ),
+                    child: entry.value,
+                  ),
+                ))
+            .toList(),
+      ),
     );
   }
 
   Widget _buildDropdownField(BuildContext context, String label, String? value, List<DropdownMenuItem<String>> items, Function(String?) onChanged) {
-    final theme = Theme.of(context);
+    final theme = context.theme;
     return Padding(
-      padding: const EdgeInsets.only(bottom: 20),
+      padding: EdgeInsets.only(bottom: context.md),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(label, style: theme.textTheme.labelMedium?.copyWith(color: theme.hintColor)),
-          const SizedBox(height: 8),
+          Text(
+            label,
+            style: theme.textTheme.labelMedium?.copyWith(
+              color: theme.colorScheme.outline,
+              fontWeight: FontWeight.bold,
+              fontSize: context.font(12),
+            ),
+          ),
+          SizedBox(height: context.xs),
           DropdownButtonFormField<String>(
             value: value,
             isExpanded: true,
             hint: const Text("Select option"),
+            style: theme.textTheme.bodyMedium?.copyWith(fontSize: context.font(14)),
+            decoration: InputDecoration(
+              filled: true,
+              fillColor: theme.colorScheme.surface,
+              contentPadding: EdgeInsets.symmetric(horizontal: context.sm, vertical: context.sm),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(context.sm),
+                borderSide: BorderSide(color: theme.colorScheme.outlineVariant),
+              ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(context.sm),
+                borderSide: BorderSide(color: theme.colorScheme.outlineVariant),
+              ),
+            ),
             items: items,
             onChanged: onChanged,
           ),
@@ -218,23 +290,44 @@ class _IssueBookPageState extends State<IssueBookPage> {
   }
 
   Widget _buildDateField(BuildContext context, String label, TextEditingController controller) {
-    final theme = Theme.of(context);
+    final theme = context.theme;
     return Padding(
-      padding: const EdgeInsets.only(bottom: 20),
+      padding: EdgeInsets.only(bottom: context.md),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(label, style: theme.textTheme.labelMedium?.copyWith(color: theme.hintColor)),
-          const SizedBox(height: 8),
+          Text(
+            label,
+            style: theme.textTheme.labelMedium?.copyWith(
+              color: theme.colorScheme.outline,
+              fontWeight: FontWeight.bold,
+              fontSize: context.font(12),
+            ),
+          ),
+          SizedBox(height: context.xs),
           InkWell(
             onTap: () => _selectDate(context, controller),
-            child: IgnorePointer(
-              child: TextField(
-                controller: controller,
-                decoration: const InputDecoration(
-                  hintText: "yyyy-mm-dd",
-                  suffixIcon: Icon(Icons.calendar_month, size: 20),
-                ),
+            borderRadius: BorderRadius.circular(context.sm),
+            child: Container(
+              padding: EdgeInsets.symmetric(horizontal: context.sm, vertical: context.md),
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(context.sm),
+                color: theme.colorScheme.surface,
+                border: Border.all(color: theme.colorScheme.outlineVariant),
+              ),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      controller.text.isEmpty ? "yyyy-mm-dd" : controller.text,
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        color: controller.text.isEmpty ? theme.colorScheme.outline : null,
+                        fontSize: context.font(14),
+                      ),
+                    ),
+                  ),
+                  Icon(Icons.calendar_today_rounded, size: context.scale(18), color: theme.colorScheme.primary),
+                ],
               ),
             ),
           ),

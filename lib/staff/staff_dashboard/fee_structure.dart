@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../services/api_service.dart';
+import '../../services/responsive_helper.dart';
 import 'staff_models.dart';
 
 class StaffFeeStructurePage extends StatefulWidget {
@@ -10,9 +11,6 @@ class StaffFeeStructurePage extends StatefulWidget {
 }
 
 class _StaffFeeStructurePageState extends State<StaffFeeStructurePage> {
-  static const Color bgColor = Color(0xFF0F1630);
-  static const Color cardColor = Color(0xFF1D2645);
-
   late Future<List<Fee>> _feesFuture;
 
   @override
@@ -29,67 +27,143 @@ class _StaffFeeStructurePageState extends State<StaffFeeStructurePage> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = context.theme;
     return Scaffold(
-      backgroundColor: bgColor,
+      backgroundColor: theme.colorScheme.surface,
       appBar: AppBar(
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        title: const Text("Fees Structure", style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white)),
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white, size: 20),
-          onPressed: () => Navigator.pop(context),
-        ),
+        title: const Text("Fees Structure"),
+        centerTitle: true,
       ),
       body: RefreshIndicator(
         onRefresh: () async => _loadFees(),
-        child: FutureBuilder<List<Fee>>(
-          future: _feesFuture,
-          builder: (context, snapshot) {
-            if (snapshot.connectionState == ConnectionState.waiting) {
-              return const Center(child: CircularProgressIndicator());
-            } else if (snapshot.hasError) {
-              return Center(child: Text("Error: ${snapshot.error}", style: const TextStyle(color: Colors.white70)));
-            } else if (!snapshot.hasData || snapshot.data!.isEmpty) {
-              return const Center(child: Text("No fee structure available", style: TextStyle(color: Colors.white38)));
-            }
+        child: SingleChildScrollView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          padding: context.pagePadding,
+          child: Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 1200),
+              child: FutureBuilder<List<Fee>>(
+                future: _feesFuture,
+                builder: (context, snapshot) {
+                  if (snapshot.connectionState == ConnectionState.waiting) {
+                    return Padding(
+                      padding: EdgeInsets.symmetric(vertical: context.scale(100)),
+                      child: const Center(child: CircularProgressIndicator()),
+                    );
+                  } else if (snapshot.hasError) {
+                    return Padding(
+                      padding: EdgeInsets.symmetric(vertical: context.scale(100)),
+                      child: Center(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(Icons.error_outline, size: context.scale(48), color: theme.colorScheme.error),
+                            SizedBox(height: context.scale(16)),
+                            Text("Error: ${snapshot.error}",
+                              textAlign: TextAlign.center,
+                              style: TextStyle(color: theme.colorScheme.error)),
+                            SizedBox(height: context.scale(16)),
+                            FilledButton.tonal(onPressed: _loadFees, child: const Text("Retry")),
+                          ],
+                        ),
+                      ),
+                    );
+                  } else if (!snapshot.hasData || snapshot.data!.isEmpty) {
+                    return Padding(
+                      padding: EdgeInsets.symmetric(vertical: context.scale(100)),
+                      child: Center(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(Icons.account_balance_wallet_outlined, size: context.scale(64), color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.5)),
+                            SizedBox(height: context.scale(16)),
+                            Text("No fee structure available",
+                              style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: context.font(16), fontWeight: FontWeight.bold)),
+                          ],
+                        ),
+                      ),
+                    );
+                  }
 
-            final fees = snapshot.data!;
-            return ListView.separated(
-              padding: const EdgeInsets.all(16.0),
-              itemCount: fees.length,
-              separatorBuilder: (context, index) => const SizedBox(height: 16),
-              itemBuilder: (context, index) {
-                final fee = fees[index];
-                return _buildFeeCard(fee.name, "₹${fee.amount}", fee.description ?? "");
-              },
-            );
-          },
+                  final fees = snapshot.data!;
+                  return LayoutBuilder(
+                    builder: (context, constraints) {
+                      final crossAxisCount = constraints.maxWidth > 900 ? 3 : (constraints.maxWidth > 600 ? 2 : 1);
+                      return GridView.builder(
+                        shrinkWrap: true,
+                        physics: const NeverScrollableScrollPhysics(),
+                        itemCount: fees.length,
+                        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                          crossAxisCount: crossAxisCount,
+                          crossAxisSpacing: context.spacing,
+                          mainAxisSpacing: context.spacing,
+                          mainAxisExtent: context.scale(140),
+                        ),
+                        itemBuilder: (context, index) {
+                          final fee = fees[index];
+                          return _buildFeeCard(context, fee.name, "₹${fee.amount}", fee.description ?? "");
+                        },
+                      );
+                    },
+                  );
+                },
+              ),
+            ),
+          ),
         ),
       ),
     );
   }
 
-  Widget _buildFeeCard(String name, String amount, String desc) {
+  Widget _buildFeeCard(BuildContext context, String name, String amount, String desc) {
+    final theme = context.theme;
     return Container(
-      padding: const EdgeInsets.all(20),
+      padding: EdgeInsets.all(context.scale(20)),
       decoration: BoxDecoration(
-        color: cardColor,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
+        color: theme.colorScheme.surfaceContainerLow,
+        borderRadius: BorderRadius.circular(context.scale(20)),
+        border: Border.all(color: theme.colorScheme.outlineVariant, width: 0.5),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Expanded(child: Text(name, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16))),
-              Text(amount, style: const TextStyle(color: Color(0xFF00D1FF), fontWeight: FontWeight.bold, fontSize: 16)),
+              Expanded(
+                child: Text(
+                  name, 
+                  style: theme.textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.bold,
+                    fontSize: context.font(16),
+                  ),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+              SizedBox(width: context.scale(8)),
+              Text(
+                amount, 
+                style: TextStyle(
+                  color: theme.colorScheme.primary, 
+                  fontWeight: FontWeight.bold,
+                  fontSize: context.font(18),
+                ),
+              ),
             ],
           ),
+          const Spacer(),
           if (desc.isNotEmpty) ...[
-            const SizedBox(height: 8),
-            Text(desc, style: const TextStyle(color: Colors.white38, fontSize: 13)),
+            Text(
+              desc, 
+              style: TextStyle(
+                color: theme.colorScheme.onSurfaceVariant,
+                fontSize: context.font(13),
+              ),
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+            ),
           ],
         ],
       ),

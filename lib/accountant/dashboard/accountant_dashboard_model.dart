@@ -29,7 +29,7 @@ class AccountantDashboardData {
 
   factory AccountantDashboardData.fromJson(Map<String, dynamic> json) {
     return AccountantDashboardData(
-      userDetail: UserDetail.fromJson(json['user_detail']),
+      userDetail: UserDetail.fromJson(json['user_detail'] ?? {}),
       lastSalary: json['last_salary'] != null ? Salary.fromJson(json['last_salary']) : null,
       salaryList: (json['salary_list'] as List? ?? []).map((e) => Salary.fromJson(e)).toList(),
       fines: (json['fines'] as List? ?? []).map((e) => Fine.fromJson(e)).toList(),
@@ -40,7 +40,16 @@ class AccountantDashboardData {
       assignedTickets: (json['assigned_tickets'] as List? ?? []).map((e) => Ticket.fromJson(e)).toList(),
       instituteFees: (json['institute_fees'] as List? ?? []).map((e) => Fee.fromJson(e)).toList(),
       classFees: (json['class_fees'] as List? ?? []).map((e) => Fee.fromJson(e)).toList(),
-      roles: Map<String, String>.from(json['roles'] ?? {}),
+      roles: json['roles'] != null 
+          ? Map<String, String>.from(json['roles']) 
+          : {
+              '3': "Managers",
+              '4': "Counselors",
+              '5': "Teachers",
+              '7': "Librarians",
+              '8': "Accountants",
+              '9': "Staff",
+            },
     );
   }
 }
@@ -111,37 +120,41 @@ class UserDetail {
   });
 
   factory UserDetail.fromJson(Map<String, dynamic> json) {
+    // If the record is nested inside 'user_detail' or 'user'
+    final Map<String, dynamic> data = json.containsKey('user_detail') ? json['user_detail'] : json;
+    final Map<String, dynamic>? user = json['user'] is Map ? json['user'] : null;
+
     return UserDetail(
-      id: json['id'] ?? 0,
-      userId: json['user_id'] ?? 0,
-      name: json['name']?.toString() ?? '',
-      photo: json['photo']?.toString(),
-      gender: json['gender']?.toString(),
-      dateOfBirth: json['date_of_birth']?.toString(),
-      phone: json['phone']?.toString(),
-      alternatePhone: json['alternate_phone']?.toString(),
-      relationshipStatus: json['relationship_status']?.toString(),
-      address: json['address']?.toString(),
-      city: json['city']?.toString(),
-      state: json['state']?.toString(),
-      pincode: json['pincode']?.toString(),
-      bankAccountNumber: json['bank_account_number']?.toString(),
-      ifscCode: json['ifsc_code']?.toString(),
-      bankName: json['bank_name']?.toString(),
-      branchName: json['branch_name']?.toString(),
-      emergencyContactName: json['emergency_contact_name']?.toString(),
-      emergencyContactNumber: json['emergency_contact_number']?.toString(),
-      email: json['email']?.toString(),
-      position: json['position']?.toString(),
-      employmentType: json['employment_type']?.toString(),
-      joiningDate: json['joining_date']?.toString(),
-      experience: json['experience']?.toString(),
-      status: json['status']?.toString(),
-      qualification: json['qualification']?.toString(),
-      xMarks: json['x_marks']?.toString(),
-      xiiMarks: json['xii_marks']?.toString(),
-      aadhaarNumber: json['aadhaar_number']?.toString(),
-      encryptedId: json['encrypted_id']?.toString(),
+      id: data['id'] ?? 0,
+      userId: data['user_id'] ?? user?['id'] ?? 0,
+      name: data['name']?.toString() ?? user?['name']?.toString() ?? '',
+      photo: data['photo']?.toString() ?? user?['photo']?.toString(),
+      gender: data['gender']?.toString(),
+      dateOfBirth: data['date_of_birth']?.toString(),
+      phone: data['phone']?.toString() ?? user?['phone']?.toString(),
+      alternatePhone: data['alternate_phone']?.toString(),
+      relationshipStatus: data['relationship_status']?.toString(),
+      address: data['address']?.toString(),
+      city: data['city']?.toString(),
+      state: data['state']?.toString(),
+      pincode: data['pincode']?.toString(),
+      bankAccountNumber: data['bank_account_number']?.toString(),
+      ifscCode: data['ifsc_code']?.toString(),
+      bankName: data['bank_name']?.toString(),
+      branchName: data['branch_name']?.toString(),
+      emergencyContactName: data['emergency_contact_name']?.toString(),
+      emergencyContactNumber: data['emergency_contact_number']?.toString(),
+      email: data['email']?.toString() ?? user?['email']?.toString(),
+      position: data['position']?.toString(),
+      employmentType: data['employment_type']?.toString(),
+      joiningDate: data['joining_date']?.toString(),
+      experience: data['experience']?.toString(),
+      status: data['status']?.toString(),
+      qualification: data['qualification']?.toString(),
+      xMarks: data['x_marks']?.toString(),
+      xiiMarks: data['xii_marks']?.toString(),
+      aadhaarNumber: data['aadhaar_number']?.toString(),
+      encryptedId: data['encrypted_id']?.toString(),
     );
   }
 
@@ -251,6 +264,9 @@ class Event {
   final dynamic id;
   final String title;
   final String date;
+  final String? startTime;
+  final String? endTime;
+  final String? venue;
   final String? description;
   final bool isTicketed;
   final String? ticketPrice;
@@ -261,6 +277,9 @@ class Event {
     required this.id,
     required this.title,
     required this.date,
+    this.startTime,
+    this.endTime,
+    this.venue,
     this.description,
     this.isTicketed = false,
     this.ticketPrice,
@@ -273,6 +292,9 @@ class Event {
       id: json['id'],
       title: json['title']?.toString() ?? '',
       date: json['event_date']?.toString() ?? '',
+      startTime: json['start_time']?.toString(),
+      endTime: json['end_time']?.toString(),
+      venue: json['venue']?.toString(),
       description: json['description']?.toString(),
       isTicketed: json['is_ticketed'] == 1 || json['is_ticketed'] == true,
       ticketPrice: json['ticket_price']?.toString(),
@@ -433,6 +455,7 @@ class Fee {
 class AccountantVirtualIdCardData {
   final UserDetail userDetail;
   final String? instituteName;
+  final String? instituteLogo;
   final String? instituteAddress;
   final String name;
   final String? photoUrl;
@@ -445,10 +468,13 @@ class AccountantVirtualIdCardData {
   final String? fullAddress;
   final String? emergencyContactName;
   final String? emergencyContactPhone;
+  final String? institutePhone;
+  final String? instituteWebsite;
 
   AccountantVirtualIdCardData({
     required this.userDetail,
     this.instituteName,
+    this.instituteLogo,
     this.instituteAddress,
     required this.name,
     this.photoUrl,
@@ -461,24 +487,32 @@ class AccountantVirtualIdCardData {
     this.fullAddress,
     this.emergencyContactName,
     this.emergencyContactPhone,
+    this.institutePhone,
+    this.instituteWebsite,
   });
 
   factory AccountantVirtualIdCardData.fromJson(Map<String, dynamic> json) {
+    final detail = json['user_detail'] ?? {};
+    final user = json['user'] ?? {};
+
     return AccountantVirtualIdCardData(
-      userDetail: UserDetail.fromJson(json['user_detail'] ?? {}),
-      instituteName: json['institute_name'],
+      userDetail: UserDetail.fromJson(detail),
+      instituteName: json['institute_name'] ?? "EDUPHIN ACADEMY",
+      instituteLogo: json['institute_logo'],
       instituteAddress: json['institute_address'],
-      name: json['name'] ?? '',
-      photoUrl: json['photo_url'],
-      employeeId: json['employee_id'],
-      position: json['position'],
-      employmentType: json['employment_type'],
-      joiningDate: json['joining_date'],
-      phone: json['phone'],
-      email: json['email'],
-      fullAddress: json['full_address'],
-      emergencyContactName: json['emergency_contact_name'],
-      emergencyContactPhone: json['emergency_contact_phone'],
+      name: user['name']?.toString() ?? detail['name']?.toString() ?? '',
+      photoUrl: detail['photo']?.toString() ?? user['photo']?.toString(),
+      employeeId: (detail['user_id'] ?? user['id'] ?? detail['id'])?.toString(),
+      position: detail['position']?.toString() ?? 'Accountant',
+      employmentType: detail['employment_type']?.toString() ?? 'Full Time',
+      joiningDate: detail['joining_date']?.toString(),
+      phone: detail['phone']?.toString() ?? user['phone']?.toString(),
+      email: user['email']?.toString() ?? detail['email']?.toString(),
+      fullAddress: detail['address']?.toString(),
+      emergencyContactName: detail['emergency_contact_name']?.toString(),
+      emergencyContactPhone: detail['emergency_contact_number']?.toString(),
+      institutePhone: json['institute_phone']?.toString(),
+      instituteWebsite: json['institute_website']?.toString(),
     );
   }
 }

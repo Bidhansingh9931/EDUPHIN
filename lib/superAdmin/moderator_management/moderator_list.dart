@@ -1,4 +1,6 @@
 import 'package:eduphin/services/responsive_helper.dart';
+import 'package:eduphin/services/theme_service.dart';
+import 'package:eduphin/services/common_widgets.dart';
 import 'package:flutter/material.dart';
 import '../../services/api_service.dart';
 import 'add_moderators.dart';
@@ -67,15 +69,16 @@ class _ModeratorListScreenState extends State<ModeratorListScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = context.theme;
     return Scaffold(
       appBar: AppBar(
-        title: const Text("Moderators Management"),
+        title: Text("Moderators Management", style: TextStyle(fontSize: context.font(20), fontWeight: FontWeight.bold)),
         actions: [
           IconButton(
             onPressed: () {
               Navigator.push(context, MaterialPageRoute(builder: (context) => const AddModeratorScreen())).then((_) => _fetchModerators());
             },
-            icon: const Icon(Icons.person_add_alt),
+            icon: Icon(Icons.person_add_alt, size: context.scale(24)),
             tooltip: "Add New Moderator",
           ),
         ],
@@ -86,32 +89,42 @@ class _ModeratorListScreenState extends State<ModeratorListScreen> {
               onRefresh: _fetchModerators,
               child: SingleChildScrollView(
                 padding: context.pagePadding,
-                child: Column(
-                  children: [
-                    Card(
-                      child: Padding(
-                        padding: const EdgeInsets.all(16),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
+                child: Center(
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 1000),
+                    child: Column(
+                      children: [
+                        Card(
+                          elevation: 0,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(context.scale(12)),
+                            side: BorderSide(color: theme.dividerColor.withValues(alpha: 0.1)),
+                          ),
+                          child: Padding(
+                            padding: EdgeInsets.all(context.spacing),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Icon(Icons.list, color: Theme.of(context).colorScheme.primary, size: 20),
-                                const SizedBox(width: 8),
-                                const Text("Moderator Directory",
-                                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                                Row(
+                                  children: [
+                                    Icon(Icons.list, color: theme.colorScheme.primary, size: context.scale(20)),
+                                    SizedBox(width: context.scale(8)),
+                                    Text("Moderator Directory",
+                                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: context.font(16))),
+                                  ],
+                                ),
+                                SizedBox(height: context.scale(4)),
+                                Text("View and manage all registered moderators.",
+                                    style: TextStyle(color: theme.hintColor, fontSize: context.font(12))),
+                                SizedBox(height: context.spacing),
+                                _buildTable(context),
                               ],
                             ),
-                            const SizedBox(height: 4),
-                            Text("View and manage all registered moderators.",
-                                style: TextStyle(color: Theme.of(context).hintColor, fontSize: 12)),
-                            const SizedBox(height: 16),
-                            _buildTable(context),
-                          ],
+                          ),
                         ),
-                      ),
+                      ],
                     ),
-                  ],
+                  ),
                 ),
               ),
             ),
@@ -119,51 +132,54 @@ class _ModeratorListScreenState extends State<ModeratorListScreen> {
   }
 
   Widget _buildTable(BuildContext context) {
-    final theme = Theme.of(context);
+    final theme = context.theme;
     return SingleChildScrollView(
       scrollDirection: Axis.horizontal,
       child: ConstrainedBox(
-        constraints: BoxConstraints(minWidth: MediaQuery.of(context).size.width - (context.isTablet ? 100 : 64)),
+        constraints: BoxConstraints(minWidth: context.screenWidth - (context.isMobile ? context.scale(64) : context.scale(100))),
         child: DataTable(
-          columnSpacing: 24,
-          columns: const [
-            DataColumn(label: Text("#", style: TextStyle(fontWeight: FontWeight.bold))),
-            DataColumn(label: Text("Photo", style: TextStyle(fontWeight: FontWeight.bold))),
-            DataColumn(label: Text("Name", style: TextStyle(fontWeight: FontWeight.bold))),
-            DataColumn(label: Text("Action", style: TextStyle(fontWeight: FontWeight.bold))),
+          columnSpacing: context.scale(24),
+          horizontalMargin: context.scale(12),
+          dataRowMinHeight: context.scale(48),
+          dataRowMaxHeight: context.scale(60),
+          headingRowHeight: context.scale(56),
+          columns: [
+            DataColumn(label: Text("#", style: TextStyle(fontWeight: FontWeight.bold, fontSize: context.font(14)))),
+            DataColumn(label: Text("Photo", style: TextStyle(fontWeight: FontWeight.bold, fontSize: context.font(14)))),
+            DataColumn(label: Text("Name", style: TextStyle(fontWeight: FontWeight.bold, fontSize: context.font(14)))),
+            DataColumn(label: Text("Action", style: TextStyle(fontWeight: FontWeight.bold, fontSize: context.font(14)))),
           ],
           rows: _moderators.asMap().entries.map((entry) {
             final index = entry.key + 1;
             final mod = entry.value;
             return DataRow(
               cells: [
-                DataCell(Text(index.toString())),
+                DataCell(Text(index.toString(), style: TextStyle(fontSize: context.font(13)))),
                 DataCell(
                   Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 4),
-                    child: CircleAvatar(
-                      radius: 18,
-                      backgroundColor: theme.colorScheme.primary.withValues(alpha: 0.1),
-                      backgroundImage: mod['photo'] != null
-                          ? NetworkImage("${ApiService.baseUrl}/storage/${mod['photo']}")
+                    padding: EdgeInsets.symmetric(vertical: context.scale(4)),
+                    child: ProfileAvatar(
+                      radius: context.scale(18),
+                      imageUrl: mod['photo'] != null
+                          ? ApiService.getStorageUrl(mod['photo'])
                           : null,
-                      child: mod['photo'] == null ? Icon(Icons.person, color: theme.colorScheme.primary, size: 18) : null,
+                      borderWidth: 0,
                     ),
                   ),
                 ),
-                DataCell(Text(mod['name'] ?? '', style: const TextStyle(fontWeight: FontWeight.w600))),
+                DataCell(Text(mod['name'] ?? '', style: TextStyle(fontWeight: FontWeight.w600, fontSize: context.font(13)))),
                 DataCell(
                   Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       IconButton(
-                        icon: const Icon(Icons.edit_outlined, color: Colors.blue, size: 20),
+                        icon: Icon(Icons.edit_outlined, color: Colors.blue, size: context.scale(20)),
                         onPressed: () {
                           Navigator.push(context, MaterialPageRoute(builder: (context) => AddModeratorScreen(moderator: mod))).then((_) => _fetchModerators());
                         },
                       ),
                       IconButton(
-                        icon: const Icon(Icons.delete_outline, color: Colors.red, size: 20),
+                        icon: Icon(Icons.delete_outline, color: Colors.red, size: context.scale(20)),
                         onPressed: () => _deleteModerator(mod['id'].toString()),
                       ),
                     ],

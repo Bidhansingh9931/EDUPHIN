@@ -97,11 +97,12 @@ class _TicketDetailsPageState extends State<TicketDetailsPage> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
+    final theme = context.theme;
     
     return Scaffold(
       appBar: AppBar(
         title: Text(_details != null ? "Ticket #${_details!.ticket.id}" : "Ticket Details"),
+        centerTitle: true,
         actions: [
           if (_details != null && _details!.ticket.status != 'resolved' && _details!.ticket.status != 'closed')
             _buildStatusMenu(context),
@@ -116,49 +117,55 @@ class _TicketDetailsPageState extends State<TicketDetailsPage> {
                   children: [
                     _buildHeader(context),
                     Expanded(
-                      child: ListView.builder(
-                        padding: context.pagePadding,
-                        itemCount: _details!.replies.length,
-                        itemBuilder: (context, index) {
-                          final reply = _details!.replies[index];
-                          // Show replies on the right if they are from the ticket creator
-                          final isRightAligned = reply.userId == _details!.ticket.userId; 
-                          return _buildReplyBubble(context, reply, isRightAligned);
-                        },
+                      child: Center(
+                        child: ConstrainedBox(
+                          constraints: BoxConstraints(maxWidth: context.scale(1000)),
+                          child: ListView.builder(
+                            padding: context.pagePadding,
+                            itemCount: _details!.replies.length,
+                            itemBuilder: (context, index) {
+                              final reply = _details!.replies[index];
+                              // Show replies on the right if they are from the ticket creator
+                              final isRightAligned = reply.userId == _details!.ticket.userId; 
+                              return _buildReplyBubble(context, reply, isRightAligned);
+                            },
+                          ),
+                        ),
                       ),
                     ),
-                    if (_details!.ticket.status != 'resolved' && _details!.ticket.status != 'closed') _buildInputArea(context),
+                    if (_details!.ticket.status != 'resolved' && _details!.ticket.status != 'closed') 
+                      _buildInputArea(context),
                   ],
                 ),
     );
   }
 
   Widget _buildErrorState(BuildContext context) {
-    final theme = Theme.of(context);
+    final theme = context.theme;
     return Center(
       child: Padding(
-        padding: const EdgeInsets.all(32.0),
+        padding: EdgeInsets.all(context.scale(32)),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.error_outline, size: 64, color: theme.colorScheme.error),
-            const SizedBox(height: 16),
-            const Text(
+            Icon(Icons.error_outline, size: context.scale(64), color: theme.colorScheme.error),
+            SizedBox(height: context.scale(16)),
+            Text(
               "Failed to Load Ticket Details",
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              style: TextStyle(fontSize: context.font(18), fontWeight: FontWeight.bold),
             ),
-            const SizedBox(height: 8),
+            SizedBox(height: context.scale(8)),
             Text(
               "The server returned an error (500). This often happens if the ticket ID is not correctly encrypted.",
               textAlign: TextAlign.center,
               style: TextStyle(color: theme.hintColor),
             ),
-            const SizedBox(height: 8),
+            SizedBox(height: context.scale(8)),
             Text(
               "ID Used: ${widget.ticketId}",
-              style: TextStyle(fontFamily: 'monospace', fontSize: 12, color: theme.colorScheme.primary),
+              style: TextStyle(fontFamily: 'monospace', fontSize: context.font(12), color: theme.colorScheme.primary),
             ),
-            const SizedBox(height: 24),
+            SizedBox(height: context.scale(24)),
             ElevatedButton.icon(
               onPressed: _fetchDetails,
               icon: const Icon(Icons.refresh),
@@ -188,76 +195,96 @@ class _TicketDetailsPageState extends State<TicketDetailsPage> {
   }
 
   Widget _buildHeader(BuildContext context) {
-    final theme = Theme.of(context);
-    return Card(
-      margin: const EdgeInsets.all(16),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(_details!.ticket.title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-            const SizedBox(height: 12),
-            Row(
+    final theme = context.theme;
+    return Center(
+      child: ConstrainedBox(
+        constraints: BoxConstraints(maxWidth: context.scale(1000)),
+        child: Card(
+          elevation: 0,
+          color: theme.colorScheme.surfaceContainerLow,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(context.scale(16)),
+            side: BorderSide(color: theme.colorScheme.outlineVariant, width: 0.5),
+          ),
+          margin: EdgeInsets.all(context.spacing),
+          child: Padding(
+            padding: EdgeInsets.all(context.spacing),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                _buildTag(context, _details!.ticket.status.toUpperCase(), _getStatusColor(_details!.ticket.status)),
-                const SizedBox(width: 8),
-                _buildTag(context, _details!.ticket.priority.toUpperCase(), _getPriorityColor(_details!.ticket.priority)),
-                const Spacer(),
-                if (_details!.ticket.status != 'resolved' && _details!.ticket.status != 'closed')
-                  TextButton.icon(
-                    onPressed: () => _updateStatus('resolved'),
-                    icon: const Icon(Icons.check_circle_outline, size: 16),
-                    label: const Text("CLOSE TICKET", style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold)),
-                    style: TextButton.styleFrom(foregroundColor: Colors.green),
-                  ),
+                Text(
+                  _details!.ticket.title, 
+                  style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold, fontSize: context.font(16))
+                ),
+                SizedBox(height: context.scale(12)),
+                Row(
+                  children: [
+                    _buildTag(context, _details!.ticket.status.toUpperCase(), _getStatusColor(_details!.ticket.status)),
+                    SizedBox(width: context.scale(8)),
+                    _buildTag(context, _details!.ticket.priority.toUpperCase(), _getPriorityColor(_details!.ticket.priority)),
+                    const Spacer(),
+                    if (_details!.ticket.status != 'resolved' && _details!.ticket.status != 'closed')
+                      TextButton.icon(
+                        onPressed: () => _updateStatus('resolved'),
+                        icon: Icon(Icons.check_circle_outline, size: context.scale(16)),
+                        label: Text(
+                          "CLOSE TICKET", 
+                          style: TextStyle(fontSize: context.font(10), fontWeight: FontWeight.bold)
+                        ),
+                        style: TextButton.styleFrom(foregroundColor: Colors.green),
+                      ),
+                  ],
+                ),
               ],
             ),
-          ],
+          ),
         ),
       ),
     );
   }
 
   Widget _buildReplyBubble(BuildContext context, TicketReply reply, bool isMe) {
-    final theme = Theme.of(context);
+    final theme = context.theme;
     final displayName = reply.userName ?? 'User';
     
     return Align(
       alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
       child: Container(
-        margin: const EdgeInsets.only(bottom: 16),
-        padding: const EdgeInsets.all(12),
-        constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.75),
+        margin: EdgeInsets.only(bottom: context.spacing),
+        padding: EdgeInsets.all(context.scale(12)),
+        constraints: BoxConstraints(maxWidth: context.scale(MediaQuery.of(context).size.width * 0.75)),
         decoration: BoxDecoration(
           color: isMe ? theme.colorScheme.primaryContainer : theme.colorScheme.surfaceContainerHighest,
           borderRadius: BorderRadius.only(
-            topLeft: const Radius.circular(16),
-            topRight: const Radius.circular(16),
-            bottomLeft: Radius.circular(isMe ? 16 : 0),
-            bottomRight: Radius.circular(isMe ? 0 : 16),
+            topLeft: Radius.circular(context.scale(16)),
+            topRight: Radius.circular(context.scale(16)),
+            bottomLeft: Radius.circular(isMe ? context.scale(16) : 0),
+            bottomRight: Radius.circular(isMe ? 0 : context.scale(16)),
           ),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(displayName, style: TextStyle(color: theme.hintColor, fontSize: 10, fontWeight: FontWeight.bold)),
-            const SizedBox(height: 4),
-            Text(reply.message, style: const TextStyle(fontSize: 13)),
+            Text(displayName, style: TextStyle(color: theme.hintColor, fontSize: context.font(10), fontWeight: FontWeight.bold)),
+            SizedBox(height: context.scale(4)),
+            Text(reply.message, style: TextStyle(fontSize: context.font(13))),
             if (reply.attachment != null)
               Padding(
-                padding: const EdgeInsets.only(top: 8.0),
+                padding: EdgeInsets.only(top: context.scale(8)),
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Icon(Icons.attach_file, size: 14, color: theme.colorScheme.primary),
-                    const SizedBox(width: 4),
-                    const Text("Attachment", style: TextStyle(fontSize: 11, decoration: TextDecoration.underline)),
+                    Icon(Icons.attach_file, size: context.scale(14), color: theme.colorScheme.primary),
+                    SizedBox(width: context.scale(4)),
+                    Text(
+                      "Attachment", 
+                      style: TextStyle(fontSize: context.font(11), decoration: TextDecoration.underline)
+                    ),
                   ],
                 ),
               ),
-            const SizedBox(height: 4),
-            Text(reply.createdAt, style: TextStyle(color: theme.hintColor, fontSize: 9)),
+            SizedBox(height: context.scale(4)),
+            Text(reply.createdAt, style: TextStyle(color: theme.hintColor, fontSize: context.font(9))),
           ],
         ),
       ),
@@ -265,63 +292,72 @@ class _TicketDetailsPageState extends State<TicketDetailsPage> {
   }
 
   Widget _buildInputArea(BuildContext context) {
-    final theme = Theme.of(context);
+    final theme = context.theme;
     return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(color: theme.colorScheme.surface, border: Border(top: BorderSide(color: theme.dividerColor, width: 0.5))),
+      padding: EdgeInsets.all(context.spacing),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surface, 
+        border: Border(top: BorderSide(color: theme.dividerColor, width: 0.5))
+      ),
       child: SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextField(
-              controller: _replyController,
-              maxLines: 3,
-              decoration: const InputDecoration(hintText: "Type reply..."),
-            ),
-            const SizedBox(height: 12),
-            Row(
+        child: Center(
+          child: ConstrainedBox(
+            constraints: BoxConstraints(maxWidth: context.scale(1000)),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
               children: [
-                Expanded(
-                  child: InkWell(
-                    onTap: _pickFile,
-                    child: Container(
-                      height: 48,
-                      padding: const EdgeInsets.symmetric(horizontal: 12),
-                      decoration: BoxDecoration(
-                        border: Border.all(color: theme.dividerColor),
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min, // Constrain inner row
-                        children: [
-                          Icon(Icons.image_outlined, size: 18, color: theme.hintColor),
-                          const SizedBox(width: 8),
-                          Flexible( // Using Flexible instead of Expanded for safer sizing
-                            child: Text(
-                              _selectedFile?.path.split('/').last ?? "Choose File",
-                              style: TextStyle(color: theme.hintColor, fontSize: 12),
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
+                TextField(
+                  controller: _replyController,
+                  maxLines: 3,
+                  decoration: const InputDecoration(hintText: "Type reply..."),
                 ),
-                const SizedBox(width: 12),
-                SizedBox( 
-                  height: 48,
-                  child: ElevatedButton(
-                    style: ElevatedButton.styleFrom(
-                      minimumSize: const Size(80, 48), // Prevent infinite width crash from global themes
+                SizedBox(height: context.scale(12)),
+                Row(
+                  children: [
+                    Expanded(
+                      child: InkWell(
+                        onTap: _pickFile,
+                        child: Container(
+                          height: context.scale(48),
+                          padding: EdgeInsets.symmetric(horizontal: context.scale(12)),
+                          decoration: BoxDecoration(
+                            border: Border.all(color: theme.dividerColor),
+                            borderRadius: BorderRadius.circular(context.scale(12)),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(Icons.image_outlined, size: context.scale(18), color: theme.hintColor),
+                              SizedBox(width: context.scale(8)),
+                              Flexible(
+                                child: Text(
+                                  _selectedFile?.path.split('/').last ?? "Choose File",
+                                  style: TextStyle(color: theme.hintColor, fontSize: context.font(12)),
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
                     ),
-                    onPressed: _isLoading ? null : _sendReply,
-                    child: const Text("SEND"),
-                  ),
+                    SizedBox(width: context.scale(12)),
+                    SizedBox( 
+                      height: context.scale(48),
+                      child: ElevatedButton(
+                        style: ElevatedButton.styleFrom(
+                          minimumSize: Size(context.scale(80), context.scale(48)),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(context.scale(12))),
+                        ),
+                        onPressed: _isLoading ? null : _sendReply,
+                        child: const Text("SEND"),
+                      ),
+                    ),
+                  ],
                 ),
               ],
             ),
-          ],
+          ),
         ),
       ),
     );
@@ -329,9 +365,16 @@ class _TicketDetailsPageState extends State<TicketDetailsPage> {
 
   Widget _buildTag(BuildContext context, String text, Color color) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-      decoration: BoxDecoration(color: color.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(6), border: Border.all(color: color.withValues(alpha: 0.5))),
-      child: Text(text, style: TextStyle(color: color, fontWeight: FontWeight.bold, fontSize: 10)),
+      padding: EdgeInsets.symmetric(horizontal: context.scale(10), vertical: context.scale(4)),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.1), 
+        borderRadius: BorderRadius.circular(context.scale(6)), 
+        border: Border.all(color: color.withValues(alpha: 0.5))
+      ),
+      child: Text(
+        text, 
+        style: TextStyle(color: color, fontWeight: FontWeight.bold, fontSize: context.font(10))
+      ),
     );
   }
 

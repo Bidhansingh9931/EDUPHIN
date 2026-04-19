@@ -1,4 +1,5 @@
 import 'package:eduphin/services/responsive_helper.dart';
+import 'package:eduphin/services/theme_service.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_widget_from_html/flutter_widget_from_html.dart';
 import '../services/api_service.dart';
@@ -30,6 +31,7 @@ class _CancellationPolicyScreenState extends State<CancellationPolicyScreen> {
 
   Future<void> _fetchPolicy() async {
     if (!mounted) return;
+    setState(() => _isLoading = true);
     try {
       final data = await ApiService.getCancellationPolicy();
       if (mounted) {
@@ -67,22 +69,22 @@ class _CancellationPolicyScreenState extends State<CancellationPolicyScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
+    final theme = context.theme;
     return Scaffold(
       appBar: AppBar(
-        title: const Text("Cancellation Policy"),
+        title: Text("Cancellation Policy", style: TextStyle(fontSize: context.font(20), fontWeight: FontWeight.bold)),
         actions: [
           IconButton(
             onPressed: () => setState(() => _isPreviewMode = !_isPreviewMode),
-            icon: Icon(_isPreviewMode ? Icons.edit : Icons.visibility),
+            icon: Icon(_isPreviewMode ? Icons.edit : Icons.visibility, size: context.scale(24)),
             tooltip: _isPreviewMode ? "Switch to Editor" : "Switch to Preview",
           ),
           if (!_isLoading)
             IconButton(
               onPressed: _isSaving ? null : _updatePolicy,
               icon: _isSaving
-                  ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                  : const Icon(Icons.save),
+                  ? SizedBox(width: context.scale(20), height: context.scale(20), child: CircularProgressIndicator(strokeWidth: 2, color: theme.colorScheme.onSurface))
+                  : Icon(Icons.save, size: context.scale(24)),
             ),
         ],
       ),
@@ -94,8 +96,13 @@ class _CancellationPolicyScreenState extends State<CancellationPolicyScreen> {
                 child: ConstrainedBox(
                   constraints: const BoxConstraints(maxWidth: 900),
                   child: Card(
+                    elevation: 0,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(context.scale(16)),
+                      side: BorderSide(color: theme.dividerColor.withValues(alpha: 0.1)),
+                    ),
                     child: Padding(
-                      padding: const EdgeInsets.all(24.0),
+                      padding: EdgeInsets.all(context.spacing * 1.5),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
@@ -104,59 +111,62 @@ class _CancellationPolicyScreenState extends State<CancellationPolicyScreen> {
                             children: [
                               Row(
                                 children: [
-                                  Icon(Icons.cancel_outlined, color: theme.colorScheme.primary, size: 24),
-                                  const SizedBox(width: 12),
+                                  Icon(Icons.cancel_outlined, color: theme.colorScheme.primary, size: context.scale(24)),
+                                  SizedBox(width: context.scale(12)),
                                   Text(
                                     _isPreviewMode ? "Preview Policy" : "Cancellation & Refund Policy",
-                                    style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
+                                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: context.font(18)),
                                   ),
                                 ],
                               ),
                               Switch(
-                                value: _isPreviewMode, 
+                                value: _isPreviewMode,
                                 onChanged: (v) => setState(() => _isPreviewMode = v)
                               ),
                             ],
                           ),
-                          const SizedBox(height: 8),
+                          SizedBox(height: context.scale(8)),
                           Text(
-                            _isPreviewMode 
-                              ? "Viewing the rendered version of your policy." 
-                              : "Manage refund terms and order cancellation rules using HTML.", 
-                            style: theme.textTheme.bodySmall?.copyWith(color: theme.hintColor)),
-                          const Divider(height: 48),
-                          
-                          _isPreviewMode 
+                            _isPreviewMode
+                              ? "Viewing the rendered version of your policy."
+                              : "Manage refund terms and order cancellation rules using HTML.",
+                            style: TextStyle(color: theme.hintColor, fontSize: context.font(12))),
+                          Divider(height: context.scale(48)),
+
+                          _isPreviewMode
                             ? Container(
                                 width: double.infinity,
-                                padding: const EdgeInsets.all(16),
+                                padding: EdgeInsets.all(context.scale(16)),
                                 decoration: BoxDecoration(
-                                  border: Border.all(color: theme.dividerColor),
-                                  borderRadius: BorderRadius.circular(8),
+                                  border: Border.all(color: theme.dividerColor.withValues(alpha: 0.2)),
+                                  borderRadius: BorderRadius.circular(context.scale(8)),
                                 ),
                                 child: HtmlWidget(
                                   _contentController.text.isEmpty ? "<em>No content</em>" : _contentController.text,
-                                  textStyle: theme.textTheme.bodyMedium,
+                                  textStyle: TextStyle(fontSize: context.font(14), color: theme.textTheme.bodyMedium?.color),
                                 ),
                               )
                             : TextField(
                                 controller: _contentController,
                                 maxLines: 25,
-                                style: const TextStyle(fontFamily: 'monospace', fontSize: 13),
-                                decoration: const InputDecoration(
+                                style: TextStyle(fontFamily: 'monospace', fontSize: context.font(13)),
+                                decoration: InputDecoration(
                                   hintText: "Enter policy content (HTML supported)...",
-                                  contentPadding: EdgeInsets.all(16),
-                                  border: OutlineInputBorder(),
+                                  contentPadding: EdgeInsets.all(context.scale(16)),
+                                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(context.scale(8))),
                                 ),
                               ),
 
-                          const SizedBox(height: 24),
+                          SizedBox(height: context.scale(24)),
                           SizedBox(
                             width: double.infinity,
                             child: ElevatedButton.icon(
                               onPressed: _isSaving ? null : _updatePolicy,
-                              icon: const Icon(Icons.cloud_upload_outlined),
-                              label: const Text("UPDATE POLICY"),
+                              style: ElevatedButton.styleFrom(
+                                padding: EdgeInsets.symmetric(vertical: context.scale(12)),
+                              ),
+                              icon: Icon(Icons.cloud_upload_outlined, size: context.scale(20)),
+                              label: Text("UPDATE POLICY", style: TextStyle(fontSize: context.font(14))),
                             ),
                           ),
                         ],

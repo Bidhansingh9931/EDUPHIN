@@ -71,8 +71,11 @@ class _EmployeeListPageState extends State<EmployeeListPage> {
       }
     } catch (e) {
       if (mounted) {
+        String msg = e.toString();
+        if (msg.startsWith('Exception: ')) msg = msg.replaceFirst('Exception: ', '');
+        
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content: Text("Error: $e"),
+          content: Text(msg),
           action: SnackBarAction(label: "Retry", onPressed: _fetchEmployees),
         ));
       }
@@ -92,7 +95,7 @@ class _EmployeeListPageState extends State<EmployeeListPage> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    
+
     return Scaffold(
       appBar: AppBar(
         title: const Text("Employee Directory"),

@@ -1,4 +1,6 @@
+import 'package:eduphin/services/common_widgets.dart';
 import 'dart:io';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import '../../services/api_service.dart';
@@ -22,13 +24,23 @@ class _StaffProfilePageState extends State<StaffProfilePage> {
   final _dobController = TextEditingController();
   final _phoneController = TextEditingController();
   final _altPhoneController = TextEditingController();
-  final _relationController = TextEditingController();
   final _addressController = TextEditingController();
   final _cityController = TextEditingController();
   final _stateController = TextEditingController();
   final _pincodeController = TextEditingController();
+  final _relationshipController = TextEditingController();
+  final _bankNameController = TextEditingController();
+  final _accountNumberController = TextEditingController();
+  final _ifscController = TextEditingController();
+  final _branchController = TextEditingController();
+  final _emergencyNameController = TextEditingController();
+  final _emergencyNumberController = TextEditingController();
+  final _passwordController = TextEditingController();
+  final _confirmPasswordController = TextEditingController();
   
   File? _imageFile;
+  Uint8List? _webImage;
+  String? _fileName;
   UserDetail? _currentDetail;
 
   @override
@@ -47,47 +59,88 @@ class _StaffProfilePageState extends State<StaffProfilePage> {
           _dobController.text = detail.dateOfBirth ?? '';
           _phoneController.text = detail.phone ?? '';
           _altPhoneController.text = detail.alternatePhone ?? '';
-          _relationController.text = detail.relationshipStatus ?? '';
           _addressController.text = detail.address ?? '';
           _cityController.text = detail.city ?? '';
           _stateController.text = detail.state ?? '';
           _pincodeController.text = detail.pincode ?? '';
+          _relationshipController.text = detail.relationshipStatus ?? 'Single';
+          _bankNameController.text = detail.bankName ?? '';
+          _accountNumberController.text = detail.bankAccountNumber ?? '';
+          _ifscController.text = detail.ifscCode ?? '';
+          _branchController.text = detail.branchName ?? '';
+          _emergencyNameController.text = detail.emergencyContactName ?? '';
+          _emergencyNumberController.text = detail.emergencyContactNumber ?? '';
         });
       }
     });
   }
 
   Future<void> _pickImage() async {
-    final pickedFile = await ImagePicker().pickImage(source: ImageSource.gallery);
+    final pickedFile = await ImagePicker().pickImage(
+      source: ImageSource.gallery,
+      imageQuality: 50,
+      maxWidth: 1024,
+      maxHeight: 1024,
+    );
     if (pickedFile != null) {
-      setState(() {
-        _imageFile = File(pickedFile.path);
-      });
+      if (kIsWeb) {
+        final bytes = await pickedFile.readAsBytes();
+        setState(() {
+          _webImage = bytes;
+          _fileName = pickedFile.name;
+        });
+      } else {
+        setState(() => _imageFile = File(pickedFile.path));
+      }
     }
   }
 
   Future<void> _saveChanges() async {
     if (_formKey.currentState!.validate()) {
+      if (_passwordController.text.isNotEmpty && _passwordController.text != _confirmPasswordController.text) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Passwords do not match')));
+        return;
+      }
+
       try {
         final Map<String, String> data = {
           'gender': _genderController.text,
           'date_of_birth': _dobController.text,
           'phone': _phoneController.text,
           'alternate_phone': _altPhoneController.text,
-          'relationship_status': _relationController.text,
+          'relationship_status': _relationshipController.text,
           'address': _addressController.text,
           'city': _cityController.text,
           'state': _stateController.text,
           'pincode': _pincodeController.text,
-          'bank_account_number': _currentDetail?.bankAccountNumber ?? '',
+          'bank_account_number': _accountNumberController.text,
+          'ifsc_code': _ifscController.text,
+          'bank_name': _bankNameController.text,
+          'branch_name': _branchController.text,
+          'emergency_contact_name': _emergencyNameController.text,
+          'emergency_contact_number': _emergencyNumberController.text,
         };
 
-        await ApiService.updateStaffProfile(data, photo: _imageFile);
+        if (_passwordController.text.isNotEmpty) {
+          data['password'] = _passwordController.text;
+          data['password_confirmation'] = _confirmPasswordController.text;
+        }
+
+        if (kIsWeb && _webImage != null) {
+          await ApiService.updateStaffProfileFromBytes(data, _webImage!, _fileName);
+        } else {
+          await ApiService.updateStaffProfile(data, photo: _imageFile);
+        }
+
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(content: Text('Profile updated successfully')),
           );
           _loadProfile();
+          setState(() {
+            _passwordController.clear();
+            _confirmPasswordController.clear();
+          });
         }
       } catch (e) {
         if (mounted) {
@@ -101,13 +154,10 @@ class _StaffProfilePageState extends State<StaffProfilePage> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = context.theme;
     return Scaffold(
       appBar: AppBar(
-        title: const Text("My Profile"),
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 20),
-          onPressed: () => Navigator.pop(context),
-        ),
+        title: Text("Staff Profile", style: TextStyle(fontSize: context.font(20))),
       ),
       body: FutureBuilder<UserDetail>(
         future: _profileFuture,
@@ -115,73 +165,145 @@ class _StaffProfilePageState extends State<StaffProfilePage> {
           if (snapshot.connectionState == ConnectionState.waiting) {
             return const Center(child: CircularProgressIndicator());
           } else if (snapshot.hasError) {
-            return Center(child: Text('Error: ${snapshot.error}'));
+            return Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.error_outline, color: theme.colorScheme.error, size: context.scale(48)),
+                  SizedBox(height: context.scale(16)),
+                  Text('Failed to load profile', style: TextStyle(fontSize: context.font(16))),
+                  TextButton(onPressed: _loadProfile, child: const Text("Retry")),
+                ],
+              ),
+            );
           } else if (!snapshot.hasData) {
-            return const Center(child: Text('No data found'));
+            return const Center(child: Text('No profile data found'));
           }
 
           final detail = snapshot.data!;
+
           return SingleChildScrollView(
-            physics: const BouncingScrollPhysics(),
             padding: context.pagePadding,
-            child: Form(
-              key: _formKey,
-              child: Column(
-                children: [
-                  const SizedBox(height: 20),
-                  _buildProfileHeader(context, detail),
-                  const SizedBox(height: 32),
-                  _buildSection(
-                    context,
-                    title: "Personal Information",
-                    subtitle: "Update your details.",
-                    tag: "Editable",
+            child: Center(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 900),
+                child: Form(
+                  key: _formKey,
+                  child: Column(
                     children: [
-                      _buildTextField(context, label: "GENDER *", controller: _genderController),
-                      _buildTextField(
-                        context,
-                        label: "Date of Birth *",
-                        controller: _dobController,
-                        suffixIcon: Icons.calendar_month_rounded,
+                      _buildHeader(context, detail),
+                      SizedBox(height: context.scale(32)),
+                      
+                      ProfileSection(
+                        title: "Personal Details",
+                        icon: Icons.person_outline_rounded,
+                        status: "Editable",
+                        children: [
+                          ProfileTextField(
+                            label: "Full Name",
+                            controller: TextEditingController(text: detail.user?.name ?? ''),
+                            enabled: false,
+                          ),
+                          AdaptiveFieldRow(children: [
+                            ProfileDropdown(
+                              label: "Gender *",
+                              value: _genderController.text.isEmpty ? null : _genderController.text,
+                              items: const ["Male", "Female", "Other"],
+                              onChanged: (v) => setState(() => _genderController.text = v ?? ''),
+                            ),
+                            ProfileTextField(
+                              label: "Date of Birth *",
+                              controller: _dobController,
+                              icon: Icons.calendar_today_rounded,
+                              readOnly: true,
+                              onTap: () async {
+                                final picked = await showDatePicker(
+                                  context: context,
+                                  initialDate: _dobController.text.isNotEmpty
+                                      ? DateTime.tryParse(_dobController.text) ?? DateTime.now()
+                                      : DateTime.now(),
+                                  firstDate: DateTime(1900),
+                                  lastDate: DateTime.now(),
+                                );
+                                if (picked != null) {
+                                  setState(() => _dobController.text = picked.toString().split(' ')[0]);
+                                }
+                              },
+                            ),
+                          ]),
+                          AdaptiveFieldRow(children: [
+                            ProfileTextField(label: "Phone Number *", controller: _phoneController, icon: Icons.phone_android_rounded),
+                            ProfileDropdown(
+                              label: "Relationship Status",
+                              value: _relationshipController.text.isEmpty ? "Single" : _relationshipController.text,
+                              items: const ["Single", "Married", "Divorced", "Widowed"],
+                              onChanged: (v) => setState(() => _relationshipController.text = v ?? 'Single'),
+                            ),
+                          ]),
+                          ProfileTextField(label: "Alternate Phone", controller: _altPhoneController),
+                        ],
                       ),
-                      _buildTextField(context, label: "Phone *", controller: _phoneController),
-                      _buildTextField(context, label: "Alternate Phone", controller: _altPhoneController),
-                      _buildTextField(context, label: "Relationship Status", controller: _relationController),
-                    ],
-                  ),
-                  const SizedBox(height: 20),
-                  _buildSection(
-                    context,
-                    title: "Address Information",
-                    subtitle: "Your current address",
-                    tag: "Editable",
-                    children: [
-                      _buildTextField(
-                        context,
-                        label: "Address *",
-                        controller: _addressController,
-                        maxLines: 2,
+
+                      ProfileSection(
+                        title: "Bank Details",
+                        icon: Icons.account_balance_outlined,
+                        status: "Editable",
+                        children: [
+                          AdaptiveFieldRow(children: [
+                            ProfileTextField(label: "Bank Name", controller: _bankNameController),
+                            ProfileTextField(label: "Account Number *", controller: _accountNumberController),
+                          ]),
+                          AdaptiveFieldRow(children: [
+                            ProfileTextField(label: "IFSC Code", controller: _ifscController),
+                            ProfileTextField(label: "Branch Name", controller: _branchController),
+                          ]),
+                        ],
                       ),
-                      _buildTextField(context, label: "City *", controller: _cityController),
-                      _buildTextField(context, label: "State *", controller: _stateController),
-                      _buildTextField(context, label: "Pincode *", controller: _pincodeController),
+
+                      ProfileSection(
+                        title: "Emergency Contact",
+                        icon: Icons.contact_phone_outlined,
+                        status: "Editable",
+                        children: [
+                          AdaptiveFieldRow(children: [
+                            ProfileTextField(label: "Contact Name", controller: _emergencyNameController),
+                            ProfileTextField(label: "Contact Number", controller: _emergencyNumberController),
+                          ]),
+                        ],
+                      ),
+
+                      ProfileSection(
+                        title: "Address Details",
+                        icon: Icons.location_on_outlined,
+                        status: "Editable",
+                        children: [
+                          ProfileTextField(label: "Full Address *", controller: _addressController, icon: Icons.home_outlined),
+                          AdaptiveFieldRow(children: [
+                            ProfileTextField(label: "City *", controller: _cityController),
+                            ProfileTextField(label: "State *", controller: _stateController),
+                          ]),
+                          ProfileTextField(label: "Pincode *", controller: _pincodeController),
+                        ],
+                      ),
+
+                      ProfileSection(
+                        title: "Security Settings",
+                        icon: Icons.lock_outline_rounded,
+                        status: "Editable",
+                        children: [
+                          AdaptiveFieldRow(children: [
+                            ProfileTextField(label: "New Password", controller: _passwordController, isPassword: true),
+                            ProfileTextField(label: "Confirm Password", controller: _confirmPasswordController, isPassword: true),
+                          ]),
+                        ],
+                      ),
+
+                      SizedBox(height: context.scale(32)),
+                      _buildActionButtons(context),
+                      SizedBox(height: context.scale(60)),
                     ],
                   ),
-                  const SizedBox(height: 20),
-                  _buildSection(
-                    context,
-                    title: "Account Details",
-                    subtitle: "System managed information",
-                    tag: "Read Only",
-                    children: [
-                      _buildTextField(context, label: "USER NAME", initialValue: detail.user?.name ?? '', isReadOnly: true),
-                      _buildTextField(context, label: "EMAIL ADDRESS", initialValue: detail.user?.email ?? '', isReadOnly: true),
-                    ],
-                  ),
-                  const SizedBox(height: 40),
-                  _buildSaveButton(),
-                  const SizedBox(height: 50),
-                ],
+                ),
               ),
             ),
           );
@@ -190,180 +312,121 @@ class _StaffProfilePageState extends State<StaffProfilePage> {
     );
   }
 
-  Widget _buildProfileHeader(BuildContext context, UserDetail detail) {
-    final theme = Theme.of(context);
-    return Column(
-      children: [
-        Stack(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(4),
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                border: Border.all(color: theme.colorScheme.primary, width: 2),
-              ),
-              child: CircleAvatar(
-                radius: 55,
-                backgroundColor: theme.cardTheme.color,
-                backgroundImage: _imageFile != null 
-                    ? FileImage(_imageFile!) 
-                    : (detail.photo != null ? NetworkImage('${ApiService.baseUrl}/storage/${detail.photo}') : null) as ImageProvider?,
-                child: (_imageFile == null && detail.photo == null) ? Icon(Icons.person, size: 65, color: theme.colorScheme.onSurface) : null,
-              ),
-            ),
-            Positioned(
-              bottom: 4,
-              right: 4,
-              child: InkWell(
-                onTap: _pickImage,
-                child: Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: theme.colorScheme.primary,
-                    shape: BoxShape.circle,
-                  ),
-                  child: const Icon(Icons.camera_alt_rounded, size: 18, color: Colors.white),
-                ),
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 20),
-        Text(
-          detail.user?.name ?? "Staff User",
-          style: theme.textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold),
-        ),
-        Text(
-          detail.user?.email ?? "staff@iias.com",
-          style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.secondary),
-        ),
-      ],
-    );
-  }
+  Widget _buildHeader(BuildContext context, UserDetail detail) {
+    final theme = context.theme;
+    final isMobile = context.isMobile;
 
-  Widget _buildSection(
-    BuildContext context, {
-    required String title,
-    required String subtitle,
-    required String tag,
-    required List<Widget> children,
-  }) {
-    final theme = Theme.of(context);
-    final bool isReadOnly = tag == "Read Only";
-
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+    return Container(
+      width: double.infinity,
+      padding: EdgeInsets.all(context.scale(isMobile ? 24 : 32)),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surfaceContainerLow,
+        borderRadius: BorderRadius.circular(context.scale(24)),
+        border: Border.all(color: theme.colorScheme.outlineVariant.withValues(alpha: 0.5)),
+      ),
+      child: Flex(
+        direction: isMobile ? Axis.vertical : Axis.horizontal,
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          ProfileAvatar(
+            radius: context.scale(isMobile ? 50 : 60),
+            imageUrl: ApiService.getStorageUrl(detail.photo),
+            localImage: _imageFile,
+            webImage: _webImage,
+            onCameraTap: _pickImage,
+          ),
+          SizedBox(
+            width: isMobile ? 0 : context.scale(32),
+            height: isMobile ? context.scale(24) : 0,
+          ),
+          Expanded(
+            flex: isMobile ? 0 : 1,
+            child: Column(
+              crossAxisAlignment: isMobile ? CrossAxisAlignment.center : CrossAxisAlignment.start,
               children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        title,
-                        style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
-                      ),
-                      Text(
-                        subtitle,
-                        style: theme.textTheme.bodySmall?.copyWith(color: theme.hintColor),
-                      ),
-                    ],
+                Text(
+                  detail.user?.name ?? "Staff Member",
+                  style: theme.textTheme.headlineSmall?.copyWith(
+                    fontWeight: FontWeight.w900,
+                    fontSize: context.font(24),
+                  ),
+                  textAlign: isMobile ? TextAlign.center : TextAlign.start,
+                ),
+                Text(
+                  detail.user?.email ?? "",
+                  style: theme.textTheme.bodyLarge?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
                   ),
                 ),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                  decoration: BoxDecoration(
-                    color: isReadOnly ? theme.dividerColor : theme.colorScheme.primary.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Text(
-                    tag,
+                SizedBox(height: context.scale(12)),
+                Chip(
+                  label: Text(
+                    "STAFF",
                     style: TextStyle(
-                      fontSize: 10,
+                      fontSize: context.font(12),
                       fontWeight: FontWeight.bold,
-                      color: isReadOnly ? theme.hintColor : theme.colorScheme.primary,
                     ),
                   ),
+                  backgroundColor: theme.colorScheme.secondaryContainer,
+                  labelStyle: TextStyle(color: theme.colorScheme.onSecondaryContainer),
+                  side: BorderSide.none,
                 ),
               ],
             ),
-            const SizedBox(height: 24),
-            ...children.expand((widget) => [widget, const SizedBox(height: 20)]).toList()..removeLast(),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
 
-  Widget _buildTextField(
-    BuildContext context, {
-    required String label,
-    TextEditingController? controller,
-    String? initialValue,
-    bool isReadOnly = false,
-    IconData? suffixIcon,
-    int maxLines = 1,
-  }) {
-    final theme = Theme.of(context);
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          label,
-          style: theme.textTheme.labelSmall?.copyWith(fontWeight: FontWeight.bold, color: theme.hintColor),
-        ),
-        const SizedBox(height: 10),
-        TextFormField(
-          controller: controller,
-          initialValue: initialValue,
-          readOnly: isReadOnly,
-          maxLines: maxLines,
-          style: theme.textTheme.bodyMedium?.copyWith(
-            color: isReadOnly ? theme.hintColor : null,
-          ),
-          decoration: InputDecoration(
-            suffixIcon: suffixIcon != null ? Icon(suffixIcon, size: 18) : null,
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildSaveButton() {
+  Widget _buildActionButtons(BuildContext context) {
+    final theme = context.theme;
     return Column(
       children: [
         SizedBox(
           width: double.infinity,
           child: ElevatedButton(
             onPressed: _saveChanges,
-            child: const Text("SAVE CHANGES"),
+            style: ElevatedButton.styleFrom(
+              padding: EdgeInsets.symmetric(vertical: context.scale(18)),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(context.scale(16))),
+            ),
+            child: const Text("UPDATE PROFILE"),
           ),
         ),
-        const SizedBox(height: 12),
+        SizedBox(height: context.scale(16)),
         SizedBox(
           width: double.infinity,
           child: OutlinedButton.icon(
             onPressed: () async {
-              await ApiService.logout();
-              if (mounted) {
-                Navigator.pushAndRemoveUntil(
-                  context,
-                  MaterialPageRoute(builder: (context) => const LoginPage()),
-                  (route) => false,
-                );
+              final confirmed = await showDialog<bool>(
+                context: context,
+                builder: (context) => AlertDialog(
+                  title: const Text("Logout"),
+                  content: const Text("Are you sure you want to log out?"),
+                  actions: [
+                    TextButton(onPressed: () => Navigator.pop(context, false), child: const Text("Cancel")),
+                    TextButton(onPressed: () => Navigator.pop(context, true), child: const Text("Logout", style: TextStyle(color: Colors.red))),
+                  ],
+                ),
+              );
+              if (confirmed == true) {
+                await ApiService.logout();
+                if (mounted) {
+                  Navigator.pushAndRemoveUntil(
+                    context,
+                    MaterialPageRoute(builder: (context) => const LoginPage()),
+                    (route) => false,
+                  );
+                }
               }
             },
-            icon: const Icon(Icons.logout_rounded, size: 20),
-            label: const Text("LOGOUT"),
+            icon: const Icon(Icons.logout_rounded, color: Colors.red),
+            label: const Text("LOGOUT", style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold)),
             style: OutlinedButton.styleFrom(
-              foregroundColor: Colors.red,
               side: const BorderSide(color: Colors.red),
-              padding: const EdgeInsets.symmetric(vertical: 16),
+              padding: EdgeInsets.symmetric(vertical: context.scale(16)),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(context.scale(12))),
             ),
           ),
         ),

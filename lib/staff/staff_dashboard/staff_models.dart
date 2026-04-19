@@ -32,6 +32,8 @@ class StaffDashboardData {
 class UserDetail {
   final dynamic id;
   final dynamic userId;
+  final String? position;
+  final String? employmentType;
   final String? photo;
   final String? gender;
   final String? dateOfBirth;
@@ -48,11 +50,14 @@ class UserDetail {
   final String? branchName;
   final String? emergencyContactName;
   final String? emergencyContactNumber;
+  final String? dateOfJoining;
   final User? user;
 
   UserDetail({
     required this.id,
     required this.userId,
+    this.position,
+    this.employmentType,
     this.photo,
     this.gender,
     this.dateOfBirth,
@@ -69,6 +74,7 @@ class UserDetail {
     this.branchName,
     this.emergencyContactName,
     this.emergencyContactNumber,
+    this.dateOfJoining,
     this.user,
   });
 
@@ -76,7 +82,13 @@ class UserDetail {
     return UserDetail(
       id: json['id'],
       userId: json['user_id'],
-      photo: json['photo'],
+      position: json['position'] ?? json['designation'],
+      employmentType: json['employment_type'],
+      photo: json['photo']?.toString() ?? 
+             json['profile_image']?.toString() ?? 
+             json['image']?.toString() ?? 
+             json['avatar']?.toString() ?? 
+             (json['user'] != null ? (json['user']['photo']?.toString() ?? json['user']['profile_image']?.toString()) : null),
       gender: json['gender'],
       dateOfBirth: json['date_of_birth'],
       address: json['address'],
@@ -92,7 +104,8 @@ class UserDetail {
       branchName: json['branch_name'],
       emergencyContactName: json['emergency_contact_name'],
       emergencyContactNumber: json['emergency_contact_number'],
-      user: json['user'] != null ? User.fromJson(json['user']) : null,
+      dateOfJoining: json['date_of_joining'] ?? json['joining_date'],
+      user: json['user'] != null ? User.fromJson(json['user']) : (json['name'] != null ? User.fromJson(json) : null),
     );
   }
 
@@ -420,16 +433,37 @@ class StudentFeeItem {
 class StaffVirtualIdCardData {
   final User user;
   final UserDetail userDetail;
+  final String? roleName;
+  final String? instituteName;
+  final String? instituteLogo;
+  final String? instituteAddress;
+  final String? institutePhone;
+  final String? instituteWebsite;
 
   StaffVirtualIdCardData({
     required this.user,
     required this.userDetail,
+    this.roleName,
+    this.instituteName,
+    this.instituteLogo,
+    this.instituteAddress,
+    this.institutePhone,
+    this.instituteWebsite,
   });
 
   factory StaffVirtualIdCardData.fromJson(Map<String, dynamic> json) {
+    final userData = json['user'] ?? json['userDetail']?['user'] ?? json['user_detail']?['user'] ?? {};
+    final detailData = json['user_detail'] ?? json['userDetail'] ?? {};
+    
     return StaffVirtualIdCardData(
-      user: User.fromJson(json['user'] ?? json['userDetail']?['user'] ?? {}),
-      userDetail: UserDetail.fromJson(json['user_detail'] ?? json['userDetail'] ?? {}),
+      user: User.fromJson(userData),
+      userDetail: UserDetail.fromJson(detailData),
+      roleName: json['role_name']?.toString() ?? json['role']?.toString(),
+      instituteName: json['institute_name']?.toString(),
+      instituteLogo: json['institute_logo']?.toString(),
+      instituteAddress: json['institute_address']?.toString(),
+      institutePhone: json['institute_phone']?.toString(),
+      instituteWebsite: json['institute_website']?.toString(),
     );
   }
 }

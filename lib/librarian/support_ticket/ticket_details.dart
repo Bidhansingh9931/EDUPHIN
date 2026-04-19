@@ -48,10 +48,14 @@ class _LibrarianTicketDetailsPageState extends State<LibrarianTicketDetailsPage>
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
+    final theme = context.theme;
+    final colorScheme = theme.colorScheme;
 
     return Scaffold(
-      appBar: AppBar(title: Text("Ticket #${widget.ticketId}")),
+      appBar: AppBar(
+        title: Text("Ticket #${widget.ticketId}"),
+        centerTitle: false,
+      ),
       body: FutureBuilder<TicketDetails>(
         future: _detailsFuture,
         builder: (context, snapshot) {
@@ -77,18 +81,28 @@ class _LibrarianTicketDetailsPageState extends State<LibrarianTicketDetailsPage>
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          _buildTicketHeader(ticket, theme),
-                          const SizedBox(height: 24),
-                          Text("Conversation", style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
-                          const SizedBox(height: 12),
-                          ...replies.map((reply) => _buildReplyCard(reply, theme)),
+                          _buildTicketHeader(context, ticket, theme),
+                          SizedBox(height: context.md),
+                          Padding(
+                            padding: EdgeInsets.symmetric(horizontal: context.xs),
+                            child: Text(
+                              "Conversation",
+                              style: theme.textTheme.titleMedium?.copyWith(
+                                fontWeight: FontWeight.bold,
+                                color: colorScheme.onSurface,
+                              ),
+                            ),
+                          ),
+                          SizedBox(height: context.sm),
+                          ...replies.map((reply) => _buildReplyCard(context, reply, theme)),
+                          SizedBox(height: context.md),
                         ],
                       ),
                     ),
                   ),
                 ),
               ),
-              _buildReplyInput(theme),
+              _buildReplyInput(context, theme),
             ],
           );
         },
@@ -96,38 +110,56 @@ class _LibrarianTicketDetailsPageState extends State<LibrarianTicketDetailsPage>
     );
   }
 
-  Widget _buildTicketHeader(SupportTicket ticket, ThemeData theme) {
+  Widget _buildTicketHeader(BuildContext context, SupportTicket ticket, ThemeData theme) {
+    final colorScheme = theme.colorScheme;
     return Card(
+      elevation: 0,
+      color: colorScheme.surfaceContainerLow,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(context.scale(20)),
+        side: BorderSide(color: colorScheme.outlineVariant.withValues(alpha: 0.5), width: 0.5),
+      ),
       child: Padding(
-        padding: const EdgeInsets.all(16.0),
+        padding: EdgeInsets.all(context.md),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                _buildBadge(ticket.priority, isPriority: true),
-                _buildBadge(ticket.status),
+                _buildBadge(context, ticket.priority, isPriority: true),
+                SizedBox(width: context.xs),
+                _buildBadge(context, ticket.status),
+                const Spacer(),
+                Icon(Icons.calendar_today_outlined, size: context.scale(14), color: colorScheme.onSurfaceVariant),
+                SizedBox(width: context.xs),
+                Text(
+                  ticket.createdAt.isNotEmpty ? DateFormat('MMM dd, yyyy').format(DateTime.parse(ticket.createdAt)) : "N/A",
+                  style: theme.textTheme.labelMedium?.copyWith(color: colorScheme.onSurfaceVariant),
+                ),
               ],
             ),
-            const SizedBox(height: 12),
-            Text(ticket.title, style: theme.textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold)),
-            const SizedBox(height: 8),
-            Text(ticket.description ?? "No description provided", style: theme.textTheme.bodyMedium),
-            const Divider(height: 32),
+            SizedBox(height: context.md),
+            Text(
+              ticket.title,
+              style: theme.textTheme.headlineSmall?.copyWith(
+                fontWeight: FontWeight.bold,
+                color: colorScheme.onSurface,
+              ),
+            ),
+            SizedBox(height: context.sm),
+            Text(
+              ticket.description ?? "No description provided",
+              style: theme.textTheme.bodyMedium?.copyWith(color: colorScheme.onSurfaceVariant, height: 1.5),
+            ),
+            Divider(height: context.lg, color: colorScheme.outlineVariant),
             Row(
               children: [
-                const Icon(Icons.category_outlined, size: 16, color: Colors.grey),
-                const SizedBox(width: 8),
-                Text("Category: ${ticket.category ?? 'N/A'}", style: theme.textTheme.bodySmall),
-                const Spacer(),
-                const Icon(Icons.calendar_today_outlined, size: 16, color: Colors.grey),
-                const SizedBox(width: 8),
+                Icon(Icons.category_outlined, size: context.scale(16), color: colorScheme.primary),
+                SizedBox(width: context.xs),
                 Text(
-                    ticket.createdAt.isNotEmpty
-                        ? DateFormat('MMM dd, yyyy').format(DateTime.parse(ticket.createdAt))
-                        : "N/A",
-                    style: theme.textTheme.bodySmall),
+                  "Category: ${ticket.category ?? 'N/A'}",
+                  style: theme.textTheme.labelLarge?.copyWith(fontWeight: FontWeight.bold, color: colorScheme.primary),
+                ),
               ],
             ),
           ],
@@ -136,49 +168,68 @@ class _LibrarianTicketDetailsPageState extends State<LibrarianTicketDetailsPage>
     );
   }
 
-  Widget _buildReplyCard(TicketReply reply, ThemeData theme) {
+  Widget _buildReplyCard(BuildContext context, TicketReply reply, ThemeData theme) {
+    final colorScheme = theme.colorScheme;
     final bool isMe = reply.userRole == "Librarian";
 
     return Align(
       alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
       child: Container(
-        margin: const EdgeInsets.symmetric(vertical: 8),
-        padding: const EdgeInsets.all(12),
+        margin: EdgeInsets.symmetric(vertical: context.xs),
+        padding: EdgeInsets.all(context.md),
         decoration: BoxDecoration(
-          color: isMe ? theme.colorScheme.primaryContainer.withValues(alpha: 0.3) : theme.cardColor,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: isMe ? theme.colorScheme.primary.withValues(alpha: 0.2) : theme.dividerColor),
+          color: isMe ? colorScheme.primaryContainer.withValues(alpha: 0.2) : colorScheme.surfaceContainerLow,
+          borderRadius: BorderRadius.only(
+            topLeft: Radius.circular(context.scale(16)),
+            topRight: Radius.circular(context.scale(16)),
+            bottomLeft: Radius.circular(isMe ? context.scale(16) : context.scale(4)),
+            bottomRight: Radius.circular(isMe ? context.scale(4) : context.scale(16)),
+          ),
+          border: Border.all(color: isMe ? colorScheme.primary.withValues(alpha: 0.2) : colorScheme.outlineVariant.withValues(alpha: 0.5)),
         ),
-        constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.75),
+        constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.8),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
           children: [
             Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Text(reply.userName ?? "Unknown", style: theme.textTheme.labelSmall?.copyWith(fontWeight: FontWeight.bold, color: theme.colorScheme.primary)),
-                const SizedBox(width: 8),
                 Text(
-                    reply.createdAt.isNotEmpty
-                        ? DateFormat('MMM dd, HH:mm').format(DateTime.parse(reply.createdAt))
-                        : "N/A",
-                    style: theme.textTheme.labelSmall?.copyWith(color: Colors.grey)),
+                  reply.userName ?? "Unknown",
+                  style: theme.textTheme.labelMedium?.copyWith(
+                    fontWeight: FontWeight.bold,
+                    color: isMe ? colorScheme.primary : colorScheme.onSurface,
+                  ),
+                ),
+                SizedBox(width: context.sm),
+                Text(
+                  reply.createdAt.isNotEmpty ? DateFormat('MMM dd, HH:mm').format(DateTime.parse(reply.createdAt)) : "N/A",
+                  style: theme.textTheme.labelSmall?.copyWith(color: colorScheme.onSurfaceVariant),
+                ),
               ],
             ),
-            const SizedBox(height: 4),
-            Text(reply.message, style: theme.textTheme.bodyMedium),
+            SizedBox(height: context.xs),
+            Text(
+              reply.message,
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: colorScheme.onSurface,
+                height: 1.4,
+              ),
+            ),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildReplyInput(ThemeData theme) {
+  Widget _buildReplyInput(BuildContext context, ThemeData theme) {
+    final colorScheme = theme.colorScheme;
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: EdgeInsets.all(context.md),
       decoration: BoxDecoration(
-        color: theme.cardColor,
-        boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 10, offset: const Offset(0, -5))],
+        color: colorScheme.surface,
+        border: Border(top: BorderSide(color: colorScheme.outlineVariant.withValues(alpha: 0.5), width: 0.5)),
       ),
       child: SafeArea(
         child: Row(
@@ -186,19 +237,43 @@ class _LibrarianTicketDetailsPageState extends State<LibrarianTicketDetailsPage>
             Expanded(
               child: TextField(
                 controller: _replyController,
-                decoration: const InputDecoration(
+                style: TextStyle(fontSize: context.font(14)),
+                decoration: InputDecoration(
                   hintText: "Type your message...",
-                  border: OutlineInputBorder(),
-                  contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  filled: true,
+                  fillColor: colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(context.scale(20)),
+                    borderSide: BorderSide(color: colorScheme.outlineVariant.withValues(alpha: 0.5)),
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(context.scale(20)),
+                    borderSide: BorderSide(color: colorScheme.outlineVariant.withValues(alpha: 0.5)),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(context.scale(20)),
+                    borderSide: BorderSide(color: colorScheme.primary, width: 1),
+                  ),
+                  contentPadding: EdgeInsets.symmetric(horizontal: context.scale(16), vertical: context.scale(12)),
                 ),
-                maxLines: null,
+                maxLines: 5,
+                minLines: 1,
               ),
             ),
-            const SizedBox(width: 12),
+            SizedBox(width: context.sm),
             _isSubmitting
-                ? const CircularProgressIndicator()
+                ? SizedBox(
+                    height: context.scale(24),
+                    width: context.scale(24),
+                    child: const CircularProgressIndicator(strokeWidth: 2),
+                  )
                 : IconButton.filled(
                     onPressed: _submitReply,
+                    style: IconButton.styleFrom(
+                      backgroundColor: colorScheme.primary,
+                      foregroundColor: colorScheme.onPrimary,
+                      padding: EdgeInsets.all(context.sm),
+                    ),
                     icon: const Icon(Icons.send),
                   ),
           ],
@@ -207,7 +282,7 @@ class _LibrarianTicketDetailsPageState extends State<LibrarianTicketDetailsPage>
     );
   }
 
-  Widget _buildBadge(String text, {bool isPriority = false}) {
+  Widget _buildBadge(BuildContext context, String text, {bool isPriority = false}) {
     Color color = Colors.grey;
     String lowerText = text.toLowerCase();
     if (isPriority) {
@@ -229,12 +304,21 @@ class _LibrarianTicketDetailsPageState extends State<LibrarianTicketDetailsPage>
     }
 
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      padding: EdgeInsets.symmetric(horizontal: context.sm, vertical: context.xs),
       decoration: BoxDecoration(
-          color: color.withValues(alpha: 0.1),
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: color.withValues(alpha: 0.2))),
-      child: Text(text.toUpperCase(), style: TextStyle(fontSize: 10, color: color, fontWeight: FontWeight.bold)),
+        color: color.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(context.xl),
+        border: Border.all(color: color.withValues(alpha: 0.2)),
+      ),
+      child: Text(
+        text.toUpperCase(),
+        style: TextStyle(
+          fontSize: context.font(10),
+          color: color,
+          fontWeight: FontWeight.bold,
+          letterSpacing: 0.5,
+        ),
+      ),
     );
   }
 }

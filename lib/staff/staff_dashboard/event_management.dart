@@ -98,7 +98,7 @@ class _StaffEventManagementPageState extends State<StaffEventManagementPage> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text("Filter Events", 
+              Text("Filter Events",
                 style: GoogleFonts.roboto(fontWeight: FontWeight.bold, fontSize: context.font(16))),
               SizedBox(height: context.scale(16)),
               context.responsive(
@@ -203,7 +203,7 @@ class _StaffEventManagementPageState extends State<StaffEventManagementPage> {
         children: [
           Padding(
             padding: EdgeInsets.all(context.scale(20)),
-            child: Text(title, 
+            child: Text(title,
               style: GoogleFonts.roboto(fontWeight: FontWeight.bold, fontSize: context.font(16))),
           ),
           Divider(color: theme.colorScheme.outlineVariant, height: 1),

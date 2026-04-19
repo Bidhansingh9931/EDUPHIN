@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../services/api_service.dart';
+import 'package:eduphin/services/responsive_helper.dart';
+import 'package:eduphin/teacher/dashboard/common_widgets.dart';
 
 class StaffCreateTicketPage extends StatefulWidget {
   const StaffCreateTicketPage({super.key});
@@ -9,10 +11,6 @@ class StaffCreateTicketPage extends StatefulWidget {
 }
 
 class _StaffCreateTicketPageState extends State<StaffCreateTicketPage> {
-  static const Color primaryColor = Color(0xFF6C63FF);
-  static const Color bgColor = Color(0xFF0F1630);
-  static const Color cardColor = Color(0xFF1D2645);
-
   final _titleController = TextEditingController();
   final _descriptionController = TextEditingController();
   final _categoryController = TextEditingController();
@@ -21,7 +19,9 @@ class _StaffCreateTicketPageState extends State<StaffCreateTicketPage> {
 
   Future<void> _submitTicket() async {
     if (_titleController.text.isEmpty || _descriptionController.text.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please fill all required fields')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please fill all required fields')),
+      );
       return;
     }
 
@@ -34,11 +34,17 @@ class _StaffCreateTicketPageState extends State<StaffCreateTicketPage> {
         'category': _categoryController.text.trim(),
       });
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Ticket created successfully')));
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Ticket created successfully')),
+        );
         Navigator.pop(context);
       }
     } catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error: $e')),
+        );
+      }
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
@@ -46,123 +52,173 @@ class _StaffCreateTicketPageState extends State<StaffCreateTicketPage> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = context.theme;
     return Scaffold(
-      backgroundColor: bgColor,
+      backgroundColor: theme.colorScheme.surface,
       appBar: AppBar(
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white, size: 20),
-          onPressed: () => Navigator.pop(context),
+        title: const Text("Create Ticket"),
+      ),
+      body: SingleChildScrollView(
+        padding: context.pagePadding,
+        child: Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 800),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _buildHeader(context),
+                SizedBox(height: context.scale(24)),
+                _buildForm(context),
+                SizedBox(height: context.scale(32)),
+                _buildActions(context),
+                SizedBox(height: context.scale(40)),
+              ],
+            ),
+          ),
         ),
-        title: const Row(
+      ),
+    );
+  }
+
+  Widget _buildHeader(BuildContext context) {
+    final theme = context.theme;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          "Submit a Support Request",
+          style: theme.textTheme.headlineSmall?.copyWith(
+            fontWeight: FontWeight.bold,
+            fontSize: context.font(20),
+          ),
+        ),
+        SizedBox(height: context.scale(4)),
+        Text(
+          "Describe your issue and we'll get back to you as soon as possible.",
+          style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: context.font(14)),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildForm(BuildContext context) {
+    final theme = context.theme;
+    return Card(
+      elevation: 0,
+      color: theme.colorScheme.surfaceContainerLow,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(context.scale(20)),
+        side: BorderSide(color: theme.colorScheme.outlineVariant, width: 0.5),
+      ),
+      child: Padding(
+        padding: EdgeInsets.all(context.scale(24)),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Icon(Icons.chat_bubble_outline_rounded, color: Colors.white, size: 20),
-            SizedBox(width: 12),
-            Text("Create New Support Ticket", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 18)),
+            _buildFieldLabel(context, "Issue Title *"),
+            buildTextField(context, _titleController, "What's the problem?", prefixIcon: Icons.title_rounded),
+
+            SizedBox(height: context.scale(20)),
+            _buildFieldLabel(context, "Description *"),
+            buildTextField(
+              context,
+              _descriptionController,
+              "Provide more details about the issue...",
+              maxLines: 5,
+              prefixIcon: Icons.description_rounded,
+            ),
+
+            SizedBox(height: context.scale(20)),
+            context.responsive(
+              Column(
+                children: [
+                  _buildPrioritySelector(context),
+                  SizedBox(height: context.scale(20)),
+                  _buildCategoryField(context),
+                ],
+              ),
+              tablet: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(child: _buildPrioritySelector(context)),
+                  SizedBox(width: context.scale(20)),
+                  Expanded(child: _buildCategoryField(context)),
+                ],
+              ),
+            ),
           ],
         ),
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(24.0),
-        child: Container(
-          padding: const EdgeInsets.all(24),
-          decoration: BoxDecoration(
-            color: cardColor,
-            borderRadius: BorderRadius.circular(16),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              _buildFieldLabel("Issue Title *"),
-              const SizedBox(height: 12),
-              _buildTextField(hintText: "Enter title", controller: _titleController),
-              const SizedBox(height: 24),
-              _buildFieldLabel("Issue Description *"),
-              const SizedBox(height: 12),
-              _buildTextField(hintText: "Describe your problem", maxLines: 5, controller: _descriptionController),
-              const SizedBox(height: 24),
-              _buildFieldLabel("Priority *"),
-              const SizedBox(height: 12),
-              _buildPriorityDropdown(),
-              const SizedBox(height: 24),
-              _buildFieldLabel("Category (Optional)"),
-              const SizedBox(height: 12),
-              _buildTextField(hintText: "e.g. , login, technical", controller: _categoryController),
-              const SizedBox(height: 32),
-              Row(
-                children: [
-                  Expanded(
-                    flex: 2,
-                    child: ElevatedButton(
-                      onPressed: _isLoading ? null : _submitTicket,
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: primaryColor,
-                        padding: const EdgeInsets.symmetric(vertical: 16),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                      ),
-                      child: _isLoading 
-                        ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                        : const Text("SUBMIT TICKET", style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white)),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    flex: 1,
-                    child: ElevatedButton(
-                      onPressed: () => Navigator.pop(context),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.white.withValues(alpha: 0.1),
-                        padding: const EdgeInsets.symmetric(vertical: 16),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                      ),
-                      child: const Text("BACK", style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white70)),
-                    ),
-                  ),
-                ],
-              ),
-            ],
-          ),
+    );
+  }
+
+  Widget _buildFieldLabel(BuildContext context, String label) {
+    return Padding(
+      padding: EdgeInsets.only(bottom: context.scale(8), left: context.scale(4)),
+      child: Text(
+        label.toUpperCase(),
+        style: TextStyle(
+          fontSize: context.font(11),
+          fontWeight: FontWeight.bold,
+          color: context.theme.colorScheme.primary,
+          letterSpacing: 1.1,
         ),
       ),
     );
   }
 
-  Widget _buildFieldLabel(String label) {
-    return Text(label, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14));
-  }
-
-  Widget _buildTextField({required String hintText, int maxLines = 1, required TextEditingController controller}) {
-    return TextField(
-      controller: controller,
-      maxLines: maxLines,
-      style: const TextStyle(color: Colors.white, fontSize: 14),
-      decoration: InputDecoration(
-        hintText: hintText,
-        hintStyle: const TextStyle(color: Colors.white24, fontSize: 14),
-        filled: true,
-        fillColor: Colors.white.withValues(alpha: 0.05),
-        border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide.none),
-        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-      ),
+  Widget _buildPrioritySelector(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _buildFieldLabel(context, "Priority *"),
+        buildDropdown(
+          context,
+          ["low", "medium", "high"],
+          _selectedPriority,
+          (val) => setState(() => _selectedPriority = val!),
+        ),
+      ],
     );
   }
 
-  Widget _buildPriorityDropdown() {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-      decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.05), borderRadius: BorderRadius.circular(8)),
-      child: DropdownButtonHideUnderline(
-        child: DropdownButton<String>(
-          value: _selectedPriority,
-          isExpanded: true,
-          dropdownColor: cardColor,
-          icon: const Icon(Icons.keyboard_arrow_down_rounded, color: Colors.white38),
-          style: const TextStyle(color: Colors.white70, fontSize: 14),
-          items: ["low", "medium", "high"].map((e) => DropdownMenuItem(value: e, child: Text(e.toUpperCase()))).toList(),
-          onChanged: (val) => setState(() => _selectedPriority = val!),
+  Widget _buildCategoryField(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _buildFieldLabel(context, "Category"),
+        buildTextField(context, _categoryController, "e.g. Technical", prefixIcon: Icons.category_outlined),
+      ],
+    );
+  }
+
+  Widget _buildActions(BuildContext context) {
+    return Column(
+      children: [
+        SizedBox(
+          width: double.infinity,
+          child: FilledButton.icon(
+            onPressed: _isLoading ? null : _submitTicket,
+            icon: _isLoading 
+                ? SizedBox(width: context.scale(20), height: context.scale(20), child: const CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                : const Icon(Icons.send_rounded),
+            label: Text(_isLoading ? "SUBMITTING..." : "SUBMIT TICKET"),
+            style: FilledButton.styleFrom(
+              padding: EdgeInsets.symmetric(vertical: context.scale(16)),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(context.scale(12))),
+            ),
+          ),
         ),
-      ),
+        SizedBox(height: context.scale(12)),
+        SizedBox(
+          width: double.infinity,
+          child: TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text("Discard and Return", style: TextStyle(fontSize: context.font(14))),
+          ),
+        ),
+      ],
     );
   }
 }
+

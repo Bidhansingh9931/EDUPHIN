@@ -27,6 +27,8 @@ class PdfService {
     String? address;
     String? emergency;
     String? employmentType;
+    String? gender;
+    String? website;
 
     if (data is counselor.CounselorVirtualIdCardData) {
       photoUrl = data.photoUrl;
@@ -39,17 +41,35 @@ class PdfService {
       phone = data.phone;
       email = data.email;
       address = data.fullAddress;
-      emergency = "${data.emergencyContactName ?? ""} ${data.emergencyContactPhone ?? ""}".trim();
-      if (emergency.isEmpty) emergency = null;
+      emergency = [data.emergencyContactName, data.emergencyContactPhone].where((s) => s != null && s!.isNotEmpty).join(' ');
+      if (emergency.isEmpty) emergency = data.institutePhone;
       employmentType = data.employmentType;
+      gender = data.gender;
+      website = data.instituteWebsite;
     } else if (data is staff.StaffVirtualIdCardData) {
       photoUrl = data.userDetail.photo;
       logoUrl = data.instituteLogo;
       name = data.user.name;
       position = data.roleName;
-      empId = data.user.id.toString();
+      empId = "STF-${data.user.id.toString().padLeft(4, '0')}";
       joinDate = data.userDetail.dateOfJoining;
       instName = data.instituteName;
+      phone = data.userDetail.phone;
+      email = data.user.email;
+      address = [
+        data.userDetail.address,
+        data.userDetail.city,
+        data.userDetail.state,
+        data.userDetail.pincode
+      ].where((s) => s != null && s!.isNotEmpty).join(', ');
+      emergency = [
+        data.userDetail.emergencyContactName,
+        data.userDetail.emergencyContactNumber
+      ].where((s) => s != null && s!.isNotEmpty).join(' ');
+      if (emergency.isEmpty) emergency = data.institutePhone;
+      employmentType = data.userDetail.employmentType;
+      gender = data.userDetail.gender;
+      website = data.instituteWebsite;
     } else if (data is StudentVirtualIdData) {
       photoUrl = data.student?.profileImage;
       logoUrl = data.instituteLogo;
@@ -58,6 +78,16 @@ class PdfService {
       empId = data.student?.studentRollNo;
       joinDate = data.student?.academicYear;
       instName = data.instituteName;
+      phone = data.student?.mobile;
+      email = data.user?.email;
+      address = [
+        data.student?.addressLine1,
+        data.student?.city,
+        data.student?.state,
+        data.student?.pincode
+      ].where((s) => s != null && s!.isNotEmpty).join(', ');
+      emergency = "Guardian: ${data.student?.guardianFirstName ?? "N/A"} (${data.student?.guardianMobile ?? "N/A"})";
+      website = data.instituteWebsite;
     } else if (data is AccountantVirtualIdCardData) {
       photoUrl = data.photoUrl;
       logoUrl = data.instituteLogo;
@@ -68,9 +98,17 @@ class PdfService {
       instName = data.instituteName;
       phone = data.phone;
       email = data.email;
-      address = data.fullAddress;
-      emergency = "${data.emergencyContactName ?? ""} ${data.emergencyContactPhone ?? ""}";
+      address = [
+        data.userDetail.address,
+        data.userDetail.city,
+        data.userDetail.state,
+        data.userDetail.pincode
+      ].where((s) => s != null && s!.isNotEmpty).join(', ');
+      emergency = [data.emergencyContactName, data.emergencyContactPhone].where((s) => s != null && s!.isNotEmpty).join(' ');
+      if (emergency.isEmpty) emergency = data.institutePhone;
       employmentType = data.employmentType;
+      gender = data.userDetail.gender;
+      website = data.instituteWebsite;
     } else if (data is VirtualIdCardData) {
       photoUrl = data.photoUrl;
       logoUrl = data.instituteLogo;
@@ -82,9 +120,12 @@ class PdfService {
       phone = data.phone;
       email = data.email;
       address = data.fullAddress;
-      emergency = "${data.emergencyContactName ?? ""} ${data.emergencyContactPhone ?? ""}".trim();
-      if (emergency.isEmpty) emergency = null;
+      emergency = [data.emergencyContactName, data.emergencyContactPhone].where((s) => s != null && s!.isNotEmpty).join(' ');
+      if (emergency.isEmpty) emergency = data.institutePhone;
       employmentType = data.employmentType;
+      // We don't have gender in VirtualIdCardData from teacher_profile_model.dart, 
+      // but let's check if we can get it from somewhere or leave it null.
+      website = data.instituteWebsite;
     }
 
     final profileImage = await _netImage(ApiService.getStorageUrl(photoUrl));
@@ -108,6 +149,7 @@ class PdfService {
                   empId: empId,
                   joinDate: joinDate,
                   employmentType: employmentType,
+                  gender: gender,
                 ),
                 // Back Side
                 _buildPdfCardBack(
@@ -116,6 +158,7 @@ class PdfService {
                   address: address,
                   emergency: emergency,
                   empId: empId,
+                  website: website,
                 ),
               ],
             ),
@@ -136,7 +179,9 @@ class PdfService {
     String? empId,
     String? joinDate,
     String? employmentType,
+    String? gender,
   }) {
+    final bool isStudent = position?.toUpperCase() == "STUDENT";
     return pw.Container(
       width: 200,
       height: 320,
@@ -167,7 +212,7 @@ class PdfService {
             ),
           ),
           pw.SizedBox(height: 5),
-          pw.Text("${position ?? 'COUNSELOR'} ID".toUpperCase(), style: pw.TextStyle(color: PdfColors.white, fontWeight: pw.FontWeight.bold, fontSize: 10)),
+          pw.Text("${isStudent ? 'STUDENT' : (position ?? 'STAFF')} ID".toUpperCase(), style: pw.TextStyle(color: PdfColors.white, fontWeight: pw.FontWeight.bold, fontSize: 10)),
           pw.SizedBox(height: 10),
           if (profile != null)
             pw.Container(
@@ -181,7 +226,7 @@ class PdfService {
             ),
           pw.SizedBox(height: 10),
           pw.Text(name.toUpperCase(), style: pw.TextStyle(color: PdfColors.white, fontWeight: pw.FontWeight.bold, fontSize: 12)),
-          pw.Text((position ?? "ACCOUNTANT").toUpperCase(), style: const pw.TextStyle(color: PdfColors.white, fontSize: 8)),
+          pw.Text((position ?? "STAFF MEMBER").toUpperCase(), style: const pw.TextStyle(color: PdfColors.white, fontSize: 8)),
           pw.Spacer(),
           pw.Container(
             margin: const pw.EdgeInsets.symmetric(horizontal: 10, vertical: 10),
@@ -192,10 +237,11 @@ class PdfService {
             ),
             child: pw.Column(
               children: [
-                _pdfIdRowSmall("POSITION", position ?? "N/A"),
-                _pdfIdRowSmall("EMPLOYEE ID", empId ?? "N/A"),
-                _pdfIdRowSmall("EMPLOYMENT", employmentType ?? "N/A"),
-                _pdfIdRowSmall("JOINING", joinDate ?? "N/A"),
+                _pdfIdRowSmall(isStudent ? "STUDENT ID" : "EMPLOYEE ID", empId ?? "N/A"),
+                if (gender != null && gender.isNotEmpty) _pdfIdRowSmall("GENDER", gender.toUpperCase()),
+                if (!isStudent) _pdfIdRowSmall("POSITION", position ?? "N/A"),
+                if (!isStudent && employmentType != null) _pdfIdRowSmall("EMPLOYMENT", employmentType),
+                _pdfIdRowSmall(isStudent ? "ACADEMIC YEAR" : "JOINING", joinDate ?? "N/A"),
               ],
             ),
           ),
@@ -213,6 +259,7 @@ class PdfService {
     String? address,
     String? emergency,
     String? empId,
+    String? website,
   }) {
     return pw.Container(
       width: 200,
@@ -256,6 +303,11 @@ class PdfService {
               ],
             ),
           ),
+          if (website != null && website.isNotEmpty)
+            pw.Padding(
+              padding: const pw.EdgeInsets.only(bottom: 10),
+              child: pw.Text(website, style: const pw.TextStyle(color: PdfColors.white, fontSize: 6)),
+            ),
         ],
       ),
     );
@@ -448,6 +500,127 @@ class PdfService {
     );
 
     await Printing.layoutPdf(onLayout: (PdfPageFormat format) async => doc.save());
+  }
+
+  static Future<void> generateResultReportPdf(dynamic data) async {
+    final doc = pw.Document();
+
+    final registration = data['registration'];
+    final student = data['student'];
+    final exam = data['exam'];
+    final results = data['results'] as List? ?? [];
+    final institute = data['institute'];
+
+    doc.addPage(
+      pw.MultiPage(
+        pageFormat: PdfPageFormat.a4,
+        margin: const pw.EdgeInsets.all(32),
+        build: (pw.Context context) {
+          return [
+            // Header
+            pw.Column(
+              crossAxisAlignment: pw.CrossAxisAlignment.center,
+              children: [
+                if (institute != null) ...[
+                  pw.Text(institute['name']?.toString().toUpperCase() ?? 'INSTITUTE NAME',
+                      style: pw.TextStyle(fontSize: 22, fontWeight: pw.FontWeight.bold)),
+                  pw.SizedBox(height: 4),
+                  pw.Text(institute['address'] ?? '', style: const pw.TextStyle(fontSize: 10)),
+                  pw.SizedBox(height: 20),
+                ],
+                pw.Container(
+                  padding: const pw.EdgeInsets.symmetric(vertical: 8, horizontal: 16),
+                  decoration: const pw.BoxDecoration(color: PdfColors.grey200),
+                  child: pw.Text("REPORT CARD", style: pw.TextStyle(fontSize: 16, fontWeight: pw.FontWeight.bold)),
+                ),
+                pw.SizedBox(height: 20),
+              ],
+            ),
+
+            // Student Info
+            pw.Row(
+              mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+              children: [
+                pw.Column(
+                  crossAxisAlignment: pw.CrossAxisAlignment.start,
+                  children: [
+                    _pdfReportRow("Student Name", "${student?['first_name'] ?? ''} ${student?['last_name'] ?? ''}"),
+                    _pdfReportRow("Roll Number", student?['student_roll_no']?.toString() ?? 'N/A'),
+                    _pdfReportRow("Exam", exam?['name'] ?? 'N/A'),
+                  ],
+                ),
+                pw.Column(
+                  crossAxisAlignment: pw.CrossAxisAlignment.start,
+                  children: [
+                    _pdfReportRow("Class", student?['class']?['name'] ?? 'N/A'),
+                    _pdfReportRow("Section", student?['section']?['name'] ?? 'N/A'),
+                    _pdfReportRow("Academic Year", student?['academic_year'] ?? 'N/A'),
+                  ],
+                ),
+              ],
+            ),
+            pw.SizedBox(height: 30),
+
+            // Results Table
+            pw.Table(
+              border: pw.TableBorder.all(color: PdfColors.grey400),
+              columnWidths: {
+                0: const pw.FlexColumnWidth(3),
+                1: const pw.FlexColumnWidth(1),
+                2: const pw.FlexColumnWidth(1),
+                3: const pw.FlexColumnWidth(1),
+              },
+              children: [
+                pw.TableRow(
+                  decoration: const pw.BoxDecoration(color: PdfColors.grey100),
+                  children: [
+                    _tableCell("Subject", bold: true),
+                    _tableCell("Marks", bold: true, align: pw.TextAlign.center),
+                    _tableCell("Grade", bold: true, align: pw.TextAlign.center),
+                    _tableCell("Result", bold: true, align: pw.TextAlign.right),
+                  ],
+                ),
+                ...results.map((res) {
+                  return pw.TableRow(
+                    children: [
+                      _tableCell(res['subject']?['name'] ?? 'N/A'),
+                      _tableCell(res['marks']?.toString() ?? '0', align: pw.TextAlign.center),
+                      _tableCell(res['grade']?.toString() ?? '-', align: pw.TextAlign.center),
+                      _tableCell(res['status']?.toString().toUpperCase() ?? '-', align: pw.TextAlign.right),
+                    ],
+                  );
+                }),
+              ],
+            ),
+          ];
+        },
+      ),
+    );
+
+    await Printing.layoutPdf(onLayout: (PdfPageFormat format) async => doc.save());
+  }
+
+  static pw.Widget _pdfReportRow(String label, String value) {
+    return pw.Padding(
+      padding: const pw.EdgeInsets.symmetric(vertical: 2),
+      child: pw.Row(
+        children: [
+          pw.SizedBox(width: 80, child: pw.Text("$label:", style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 10))),
+          pw.Text(value, style: const pw.TextStyle(fontSize: 10)),
+        ],
+      ),
+    );
+  }
+
+  static pw.Widget _tableCell(String text, {bool bold = false, pw.TextAlign align = pw.TextAlign.left}) {
+    return pw.Padding(
+      padding: const pw.EdgeInsets.all(8),
+      child: pw.Text(
+        text,
+        textAlign: align,
+        style: pw.TextStyle(fontSize: 10, fontWeight: bold ? pw.FontWeight.bold : pw.FontWeight.normal),
+      ),
+    );
   }
 
   static pw.Widget _pdfRow(String label, String value) {

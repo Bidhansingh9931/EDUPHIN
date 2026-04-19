@@ -2,6 +2,7 @@ import 'package:eduphin/services/responsive_helper.dart';
 import 'package:flutter/material.dart';
 import 'package:eduphin/services/api_service.dart';
 import 'package:eduphin/teacher/dashboard/library_models.dart' as teacher_library;
+import 'package:eduphin/teacher/dashboard/common_widgets.dart';
 import 'package:intl/intl.dart';
 
 class LibraryLendingPage extends StatefulWidget {
@@ -58,7 +59,14 @@ class _LibraryLendingPageState extends State<LibraryLendingPage> {
         });
       }
     } catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Error: $e")));
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text("Error: $e"),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
@@ -77,191 +85,285 @@ class _LibraryLendingPageState extends State<LibraryLendingPage> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    
+    final theme = context.theme;
+
     return Scaffold(
+      backgroundColor: theme.colorScheme.surface,
       appBar: AppBar(
         title: const Text("Lending History"),
+        centerTitle: true,
       ),
       body: Stack(
         children: [
-          SingleChildScrollView(
-            padding: context.pagePadding,
-            child: Center(
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 1000),
-                child: Column(
-                  children: [
-                    _buildFilterCard(context),
-                    const SizedBox(height: 24),
-                    _buildLendingList(context),
-                    const SizedBox(height: 24),
-                    _buildPagination(context),
-                    const SizedBox(height: 40),
-                  ],
+          RefreshIndicator(
+            onRefresh: () => _fetchLendingRecords(page: 1),
+            child: SingleChildScrollView(
+              physics: const AlwaysScrollableScrollPhysics(),
+              padding: EdgeInsets.zero,
+              child: Center(
+                child: ConstrainedBox(
+                  constraints: BoxConstraints(maxWidth: context.scale(1200)),
+                  child: Column(
+                    children: [
+                      _buildFilterSection(context),
+                      Padding(
+                        padding: context.pagePadding,
+                        child: Column(
+                          children: [
+                            _buildLendingList(context),
+                            SizedBox(height: context.spacing * 2),
+                            if (_totalPages > 1) _buildPagination(context),
+                            SizedBox(height: context.spacing * 2),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ),
             ),
           ),
-          if (_isLoading) const Center(child: CircularProgressIndicator()),
+          if (_isLoading)
+            Container(
+              color: theme.colorScheme.surface.withValues(alpha: 0.5),
+              child: const Center(child: CircularProgressIndicator()),
+            ),
         ],
       ),
     );
   }
 
-  Widget _buildFilterCard(BuildContext context) {
-    final theme = Theme.of(context);
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+  Widget _buildFilterSection(BuildContext context) {
+    final theme = context.theme;
+    return buildFilterCard(
+      context,
+      children: [
+        Row(
           children: [
-            Row(
-              children: [
-                Icon(Icons.filter_list, color: theme.colorScheme.primary),
-                const SizedBox(width: 8),
-                Text("Search Records", style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
-              ],
-            ),
-            const SizedBox(height: 20),
-            TextField(
-              controller: _bookTitleController,
-              decoration: const InputDecoration(hintText: "Book Title", prefixIcon: Icon(Icons.book, size: 18)),
-            ),
-            const SizedBox(height: 16),
-            if (context.isTablet)
-              Row(
-                children: [
-                  Expanded(child: _buildDateField(context, "Issued From", _issuedFromController)),
-                  const SizedBox(width: 12),
-                  Expanded(child: _buildStatusDropdown(context)),
-                ],
-              )
-            else ...[
-              _buildDateField(context, "Issued From", _issuedFromController),
-              const SizedBox(height: 12),
-              _buildStatusDropdown(context),
-            ],
-            const SizedBox(height: 24),
-            Row(
-              children: [
-                Expanded(child: ElevatedButton(onPressed: () => _fetchLendingRecords(), child: const Text("APPLY"))),
-                const SizedBox(width: 12),
-                Expanded(child: OutlinedButton(onPressed: _resetFilters, child: const Text("RESET"))),
-              ],
+            Icon(Icons.filter_list, color: theme.colorScheme.primary, size: context.scale(20)),
+            SizedBox(width: context.scale(8)),
+            Text(
+              "Filter Records",
+              style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold),
             ),
           ],
         ),
-      ),
-    );
-  }
-
-  Widget _buildDateField(BuildContext context, String label, TextEditingController controller) {
-    return TextField(
-      controller: controller,
-      readOnly: true,
-      decoration: InputDecoration(labelText: label, suffixIcon: const Icon(Icons.calendar_today, size: 18)),
-      onTap: () async {
-        DateTime? picked = await showDatePicker(context: context, initialDate: DateTime.now(), firstDate: DateTime(2000), lastDate: DateTime(2101));
-        if (picked != null) controller.text = DateFormat('yyyy-MM-dd').format(picked);
-      },
+        SizedBox(height: context.spacing),
+        buildResponsiveRow(context, [
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              buildLabel(context, "Book Title"),
+              buildTextField(context, _bookTitleController, "Enter title", prefixIcon: Icons.book),
+            ],
+          ),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              buildLabel(context, "Issued From"),
+              buildDateField(context, _issuedFromController, "Select date"),
+            ],
+          ),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              buildLabel(context, "Status"),
+              _buildStatusDropdown(context),
+            ],
+          ),
+        ]),
+        SizedBox(height: context.spacing * 1.5),
+        Row(
+          children: [
+            Expanded(
+              child: FilledButton.icon(
+                onPressed: () => _fetchLendingRecords(page: 1),
+                icon: Icon(Icons.search, size: context.scale(18)),
+                style: FilledButton.styleFrom(
+                  padding: EdgeInsets.symmetric(vertical: context.scale(14)),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(context.scale(12))),
+                ),
+                label: const Text("Apply Filters"),
+              ),
+            ),
+            SizedBox(width: context.spacing),
+            Expanded(
+              child: OutlinedButton.icon(
+                onPressed: _resetFilters,
+                icon: Icon(Icons.refresh, size: context.scale(18)),
+                style: OutlinedButton.styleFrom(
+                  padding: EdgeInsets.symmetric(vertical: context.scale(14)),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(context.scale(12))),
+                ),
+                label: const Text("Reset"),
+              ),
+            ),
+          ],
+        ),
+      ],
     );
   }
 
   Widget _buildStatusDropdown(BuildContext context) {
-    return DropdownButtonFormField<String>(
-      value: _selectedStatus,
-      isExpanded: true,
-      items: const [
-        DropdownMenuItem(value: 'all', child: Text("All Status")),
-        DropdownMenuItem(value: 'returned', child: Text("Returned")),
-        DropdownMenuItem(value: 'issued', child: Text("Issued")),
-      ],
-      onChanged: (val) => setState(() => _selectedStatus = val!),
-      decoration: const InputDecoration(labelText: "Status"),
+    return buildDropdown(
+      context,
+      ['all', 'returned', 'issued'],
+      _selectedStatus,
+      (val) => setState(() => _selectedStatus = val!),
+      hint: "Select Status",
     );
   }
 
   Widget _buildLendingList(BuildContext context) {
+    final theme = context.theme;
     if (_issuedBooks.isEmpty && !_isLoading) {
-      return Center(child: Padding(padding: const EdgeInsets.all(40), child: Text("No records found", style: TextStyle(color: Theme.of(context).hintColor))));
+      return Padding(
+        padding: EdgeInsets.symmetric(vertical: context.scale(60)),
+        child: Column(
+          children: [
+            Icon(Icons.library_books_outlined, size: context.scale(64), color: theme.colorScheme.outlineVariant),
+            SizedBox(height: context.scale(16)),
+            Text(
+              "No records found",
+              style: theme.textTheme.bodyLarge?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+            ),
+          ],
+        ),
+      );
     }
 
     return GridView.builder(
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
       gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: context.isTablet ? 2 : 1,
-        mainAxisExtent: 160,
-        crossAxisSpacing: 16,
-        mainAxisSpacing: 16,
+        crossAxisCount: context.isDesktop ? 3 : (context.isTablet ? 2 : 1),
+        mainAxisExtent: context.scale(180),
+        crossAxisSpacing: context.spacing,
+        mainAxisSpacing: context.spacing,
       ),
       itemCount: _issuedBooks.length,
       itemBuilder: (context, index) {
         final record = _issuedBooks[index];
-        final isReturned = record.returnedAt != null;
-        final theme = Theme.of(context);
-
-        return Card(
-          child: Padding(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Expanded(child: Text(record.book.title, style: const TextStyle(fontWeight: FontWeight.bold), maxLines: 1, overflow: TextOverflow.ellipsis)),
-                    _statusBadge(isReturned),
-                  ],
-                ),
-                const Spacer(),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    _infoCol(context, "Issued", record.issuedAt),
-                    _infoCol(context, "Due", record.dueDate, isEnd: true),
-                  ],
-                ),
-              ],
-            ),
-          ),
-        );
+        return _buildLendingCard(context, record);
       },
     );
   }
 
-  Widget _statusBadge(bool isReturned) {
+  Widget _buildLendingCard(BuildContext context, teacher_library.IssuedBook record) {
+    final theme = context.theme;
+    final isReturned = record.returnedAt != null;
+
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
-        color: (isReturned ? Colors.green : Colors.orange).withValues(alpha: 0.1),
-        borderRadius: BorderRadius.circular(6),
-        border: Border.all(color: (isReturned ? Colors.green : Colors.orange).withValues(alpha: 0.5)),
+        color: theme.colorScheme.surfaceContainerLow,
+        borderRadius: BorderRadius.circular(context.scale(16)),
+        border: Border.all(color: theme.colorScheme.outlineVariant),
       ),
-      child: Text(isReturned ? "RETURNED" : "ISSUED", 
-        style: TextStyle(color: isReturned ? Colors.green : Colors.orange, fontSize: 9, fontWeight: FontWeight.bold)),
+      padding: EdgeInsets.all(context.spacing),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      record.book.title,
+                      style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold, fontSize: context.font(16)),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    Text(
+                      "Book ID: ${record.book.id}",
+                      style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.secondary, fontSize: context.font(12)),
+                    ),
+                  ],
+                ),
+              ),
+              _statusBadge(context, isReturned),
+            ],
+          ),
+          const Spacer(),
+          Divider(color: theme.colorScheme.outlineVariant, height: context.scale(24)),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              _infoCol(context, "ISSUED", record.issuedAt),
+              _infoCol(context, "DUE DATE", record.dueDate, isEnd: true),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _statusBadge(BuildContext context, bool isReturned) {
+    final theme = context.theme;
+    final color = isReturned ? Colors.green : Colors.orange;
+    return Container(
+      padding: EdgeInsets.symmetric(horizontal: context.scale(10), vertical: context.scale(4)),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(context.scale(20)),
+        border: Border.all(color: color.withValues(alpha: 0.5)),
+      ),
+      child: Text(
+        isReturned ? "RETURNED" : "ISSUED",
+        style: theme.textTheme.labelSmall?.copyWith(
+          color: color,
+          fontWeight: FontWeight.bold,
+          letterSpacing: 0.5,
+          fontSize: context.font(10),
+        ),
+      ),
     );
   }
 
   Widget _infoCol(BuildContext context, String label, String value, {bool isEnd = false}) {
+    final theme = context.theme;
     return Column(
       crossAxisAlignment: isEnd ? CrossAxisAlignment.end : CrossAxisAlignment.start,
       children: [
-        Text(label, style: TextStyle(color: Theme.of(context).hintColor, fontSize: 10, fontWeight: FontWeight.bold)),
-        Text(value, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+        Text(
+          label,
+          style: theme.textTheme.labelSmall?.copyWith(
+            color: theme.colorScheme.outline,
+            fontWeight: FontWeight.bold,
+            fontSize: context.font(10),
+          ),
+        ),
+        SizedBox(height: context.scale(2)),
+        Text(
+          value,
+          style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.bold, fontSize: context.font(13)),
+        ),
       ],
     );
   }
 
   Widget _buildPagination(BuildContext context) {
+    final theme = context.theme;
     return Row(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
-        IconButton(onPressed: _currentPage > 1 ? () => _fetchLendingRecords(page: _currentPage - 1) : null, icon: const Icon(Icons.chevron_left)),
-        Text("$_currentPage / $_totalPages", style: const TextStyle(fontWeight: FontWeight.bold)),
-        IconButton(onPressed: _currentPage < _totalPages ? () => _fetchLendingRecords(page: _currentPage + 1) : null, icon: const Icon(Icons.chevron_right)),
+        IconButton.filledTonal(
+          onPressed: _currentPage > 1 ? () => _fetchLendingRecords(page: _currentPage - 1) : null,
+          icon: const Icon(Icons.chevron_left),
+        ),
+        Padding(
+          padding: EdgeInsets.symmetric(horizontal: context.spacing * 1.5),
+          child: Text(
+            "Page $_currentPage of $_totalPages",
+            style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.bold),
+          ),
+        ),
+        IconButton.filledTonal(
+          onPressed: _currentPage < _totalPages ? () => _fetchLendingRecords(page: _currentPage + 1) : null,
+          icon: const Icon(Icons.chevron_right),
+        ),
       ],
     );
   }

@@ -1,6 +1,9 @@
+import 'package:eduphin/services/common_widgets.dart';
+import 'package:eduphin/services/responsive_helper.dart';
 import 'package:flutter/material.dart';
 import 'dart:math';
 import '../../services/api_service.dart';
+import '../../services/pdf_service.dart';
 import 'staff_models.dart';
 
 class StaffVirtualIdCard extends StatefulWidget {
@@ -11,9 +14,6 @@ class StaffVirtualIdCard extends StatefulWidget {
 }
 
 class _StaffVirtualIdCardState extends State<StaffVirtualIdCard> {
-  static const Color primaryColor = Color(0xFF6C63FF);
-  static const Color bgColor = Color(0xFF0F1630);
-  
   late Future<StaffVirtualIdCardData> _idCardFuture;
   bool _isFront = true;
   double _rotation = 0;
@@ -22,13 +22,6 @@ class _StaffVirtualIdCardState extends State<StaffVirtualIdCard> {
   void initState() {
     super.initState();
     _idCardFuture = ApiService.getStaffVirtualIdCard();
-  }
-
-  String _getImageUrl(String? path) {
-    if (path == null || path.isEmpty) return "";
-    if (path.startsWith('http')) return path;
-    final cleanPath = path.startsWith('/') ? path.substring(1) : path;
-    return "${ApiService.baseUrl}/storage/$cleanPath";
   }
 
   void _toggleFlip() {
@@ -40,67 +33,76 @@ class _StaffVirtualIdCardState extends State<StaffVirtualIdCard> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = context.theme;
+    final colorScheme = theme.colorScheme;
+
     return Scaffold(
-      backgroundColor: bgColor,
+      backgroundColor: theme.colorScheme.surface,
       appBar: AppBar(
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white, size: 20),
-          onPressed: () => Navigator.pop(context),
-        ),
-        title: const Text(
-          "Staff ID Card",
-          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 18),
-        ),
-        centerTitle: true,
+        title: const Text("Staff ID Card"),
       ),
       body: FutureBuilder<StaffVirtualIdCardData>(
         future: _idCardFuture,
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator(color: primaryColor));
+            return Center(child: CircularProgressIndicator(color: colorScheme.primary));
           } else if (snapshot.hasError) {
-            return Center(child: Text('Error: ${snapshot.error}', style: const TextStyle(color: Colors.white70)));
+            return Center(
+              child: Padding(
+                padding: context.pagePadding,
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(Icons.error_outline, color: colorScheme.error, size: context.scale(48)),
+                    SizedBox(height: context.scale(16)),
+                    Text('Failed to load ID card details', style: TextStyle(color: colorScheme.onSurfaceVariant, fontSize: context.font(14))),
+                  ],
+                ),
+              ),
+            );
           } else if (!snapshot.hasData) {
-            return const Center(child: Text('No data found', style: TextStyle(color: Colors.white70)));
+            return Center(child: Text('No data found', style: TextStyle(color: colorScheme.onSurfaceVariant)));
           }
 
           final data = snapshot.data!;
           return SingleChildScrollView(
-            child: Column(
-              children: [
-                const SizedBox(height: 40),
-                
-                // 3D Flip Animation
-                Center(
-                  child: TweenAnimationBuilder<double>(
-                    tween: Tween<double>(begin: 0, end: _rotation),
-                    duration: const Duration(milliseconds: 600),
-                    curve: Curves.easeInOutBack,
-                    builder: (context, value, child) {
-                      final isBack = value > (pi / 2);
-                      return Transform(
-                        transform: Matrix4.identity()
-                          ..setEntry(3, 2, 0.001) // Perspective
-                          ..rotateY(value),
-                        alignment: Alignment.center,
-                        child: isBack
-                            ? Transform(
-                                alignment: Alignment.center,
-                                transform: Matrix4.identity()..rotateY(pi),
-                                child: _buildBackSide(data),
-                              )
-                            : _buildFrontSide(data),
-                      );
-                    },
-                  ),
-                ),
+            padding: context.pagePadding,
+            child: Center(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 800),
+                child: Column(
+                  children: [
+                    SizedBox(height: context.scale(20)),
+                    
+                    // 3D Flip Animation
+                    TweenAnimationBuilder<double>(
+                      tween: Tween<double>(begin: 0, end: _rotation),
+                      duration: const Duration(milliseconds: 600),
+                      curve: Curves.easeInOutBack,
+                      builder: (context, value, child) {
+                        final isBack = value > (pi / 2);
+                        return Transform(
+                          transform: Matrix4.identity()
+                            ..setEntry(3, 2, 0.001) // Perspective
+                            ..rotateY(value),
+                          alignment: Alignment.center,
+                          child: isBack
+                              ? Transform(
+                                  alignment: Alignment.center,
+                                  transform: Matrix4.identity()..rotateY(pi),
+                                  child: _buildBackSide(context, data),
+                                )
+                              : _buildFrontSide(context, data),
+                        );
+                      },
+                    ),
 
-                const SizedBox(height: 50),
-                _buildActionButtons(),
-                const SizedBox(height: 40),
-              ],
+                    SizedBox(height: context.scale(40)),
+                    _buildActionButtons(context, data),
+                    SizedBox(height: context.scale(40)),
+                  ],
+                ),
+              ),
             ),
           );
         },
@@ -108,24 +110,26 @@ class _StaffVirtualIdCardState extends State<StaffVirtualIdCard> {
     );
   }
 
-  Widget _buildFrontSide(StaffVirtualIdCardData data) {
+  Widget _buildFrontSide(BuildContext context, StaffVirtualIdCardData data) {
+    final theme = context.theme;
+    final colorScheme = theme.colorScheme;
     final user = data.user;
     final detail = data.userDetail;
-    final imageUrl = _getImageUrl(detail.photo);
+    final imageUrl = ApiService.getStorageUrl(detail.photo);
 
     return Container(
-      width: 310,
-      height: 480,
+      width: context.scale(320),
+      height: context.scale(550),
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(24),
-        gradient: const LinearGradient(
+        borderRadius: BorderRadius.circular(context.scale(24)),
+        gradient: LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
-          colors: [Color(0xFF2E3A59), Color(0xFF161D33)],
+          colors: [colorScheme.primary, colorScheme.primary.withValues(alpha: 0.9)],
         ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.5),
+            color: colorScheme.shadow.withValues(alpha: 0.2),
             blurRadius: 30,
             offset: const Offset(0, 15),
           ),
@@ -133,32 +137,40 @@ class _StaffVirtualIdCardState extends State<StaffVirtualIdCard> {
       ),
       child: Stack(
         children: [
-          // Decorative background icon
           Positioned(
-            right: -20,
-            top: -20,
-            child: Icon(Icons.security, size: 150, color: Colors.white.withValues(alpha: 0.03)),
+            right: -context.scale(20),
+            top: -context.scale(20),
+            child: Icon(Icons.security, size: context.scale(150), color: colorScheme.onPrimary.withValues(alpha: 0.05)),
           ),
           
           Column(
             children: [
-              // Header
               Container(
-                padding: const EdgeInsets.all(20),
+                padding: EdgeInsets.all(context.scale(24)),
                 decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.05),
-                  borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+                  color: colorScheme.onPrimary.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.vertical(top: Radius.circular(context.scale(24))),
                 ),
                 child: Row(
                   children: [
-                    Image.asset('assets/icon/app_icon.png', width: 35, height: 35, errorBuilder: (_, __, ___) => const Icon(Icons.school, color: Colors.white, size: 30)),
-                    const SizedBox(width: 12),
+                    Container(
+                      padding: EdgeInsets.all(context.scale(6)),
+                      decoration: BoxDecoration(
+                        color: colorScheme.onPrimary,
+                        borderRadius: BorderRadius.circular(context.scale(8)),
+                      ),
+                      child: InstituteLogo(
+                        logoUrl: data.instituteLogo,
+                        size: context.scale(24),
+                      ),
+                    ),
+                    SizedBox(width: context.scale(12)),
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const Text("EDUPHIN ACADEMY", style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 14, letterSpacing: 1)),
-                          Text("Staff Identification", style: TextStyle(color: Colors.white.withValues(alpha: 0.54), fontSize: 10, fontWeight: FontWeight.bold)),
+                          Text(data.instituteName ?? "EDUPHIN ACADEMY", style: TextStyle(color: colorScheme.onPrimary, fontWeight: FontWeight.w900, fontSize: context.font(14), letterSpacing: 1)),
+                          Text(data.instituteAddress ?? "STAFF IDENTIFICATION", style: TextStyle(color: colorScheme.onPrimary.withValues(alpha: 0.7), fontSize: context.font(9), fontWeight: FontWeight.bold, letterSpacing: 0.5)),
                         ],
                       ),
                     ),
@@ -166,59 +178,56 @@ class _StaffVirtualIdCardState extends State<StaffVirtualIdCard> {
                 ),
               ),
 
-              const SizedBox(height: 30),
+              SizedBox(height: context.scale(30)),
 
-              // Profile Image
-              Container(
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  border: Border.all(color: primaryColor, width: 3),
-                  boxShadow: [BoxShadow(color: primaryColor.withValues(alpha: 0.3), blurRadius: 15, spreadRadius: 2)],
-                ),
-                child: CircleAvatar(
-                  radius: 65,
-                  backgroundColor: const Color(0xFF0F1630),
-                  backgroundImage: imageUrl.isNotEmpty ? NetworkImage(imageUrl) : null,
-                  child: imageUrl.isEmpty ? const Icon(Icons.person, size: 70, color: Colors.white24) : null,
-                ),
+              ProfileAvatar(
+                imageUrl: imageUrl,
+                radius: context.scale(70),
               ),
 
-              const SizedBox(height: 20),
+              SizedBox(height: context.scale(24)),
 
               Text(
                 user.name.toUpperCase(),
                 textAlign: TextAlign.center,
-                style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 20, letterSpacing: 0.5),
+                style: TextStyle(color: colorScheme.onPrimary, fontWeight: FontWeight.bold, fontSize: context.font(20), letterSpacing: 0.5),
               ),
-              const SizedBox(height: 4),
-              const Text(
-                "STAFF MEMBER",
-                style: TextStyle(color: primaryColor, fontWeight: FontWeight.w800, fontSize: 13, letterSpacing: 2),
+              SizedBox(height: context.scale(4)),
+              Container(
+                padding: EdgeInsets.symmetric(horizontal: context.scale(12), vertical: context.scale(4)),
+                decoration: BoxDecoration(
+                  color: colorScheme.onPrimary.withValues(alpha: 0.15),
+                  borderRadius: BorderRadius.circular(context.scale(20)),
+                ),
+                child: Text(
+                  (data.roleName ?? "STAFF MEMBER").toUpperCase(),
+                  style: TextStyle(color: colorScheme.onPrimary, fontWeight: FontWeight.bold, fontSize: context.font(11), letterSpacing: 1.5),
+                ),
               ),
 
               const Spacer(),
 
-              // Details Grid
               Container(
-                margin: const EdgeInsets.all(20),
-                padding: const EdgeInsets.all(16),
+                margin: EdgeInsets.all(context.scale(24)),
+                padding: EdgeInsets.all(context.scale(20)),
                 decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.05),
-                  borderRadius: BorderRadius.circular(16),
+                  color: colorScheme.onPrimary.withValues(alpha: 0.15),
+                  borderRadius: BorderRadius.circular(context.scale(16)),
+                  border: Border.all(color: colorScheme.onPrimary.withValues(alpha: 0.1)),
                 ),
                 child: Column(
                   children: [
-                    _buildRowInfo("STAFF ID", "STF-${user.id.toString().padLeft(4, '0')}", "GENDER", detail.gender ?? "N/A"),
-                    const Padding(
-                      padding: EdgeInsets.symmetric(vertical: 10),
-                      child: Divider(color: Colors.white12, height: 1),
+                    _buildRowInfo(context, "STAFF ID", "STF-${user.id.toString().padLeft(4, '0')}", "GENDER", detail.gender ?? "N/A"),
+                    Padding(
+                      padding: EdgeInsets.symmetric(vertical: context.scale(12)),
+                      child: Divider(color: colorScheme.onPrimary.withValues(alpha: 0.2), height: 1),
                     ),
-                    _buildRowInfo("DOB", detail.dateOfBirth ?? "N/A", "PHONE", detail.phone ?? "N/A"),
+                    _buildRowInfo(context, "JOIN DATE", detail.dateOfJoining ?? "N/A", "PHONE", detail.phone ?? "N/A"),
                   ],
                 ),
               ),
               
-              const SizedBox(height: 10),
+              SizedBox(height: context.scale(8)),
             ],
           ),
         ],
@@ -226,59 +235,60 @@ class _StaffVirtualIdCardState extends State<StaffVirtualIdCard> {
     );
   }
 
-  Widget _buildBackSide(StaffVirtualIdCardData data) {
+  Widget _buildBackSide(BuildContext context, StaffVirtualIdCardData data) {
+    final colorScheme = context.theme.colorScheme;
+    
     return Container(
-      width: 310,
-      height: 480,
+      width: context.scale(320),
+      height: context.scale(550),
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(24),
-        gradient: const LinearGradient(
+        borderRadius: BorderRadius.circular(context.scale(24)),
+        gradient: LinearGradient(
           begin: Alignment.bottomRight,
           end: Alignment.topLeft,
-          colors: [Color(0xFF161D33), Color(0xFF2E3A59)],
+          colors: [colorScheme.primaryContainer, colorScheme.primary],
         ),
       ),
       child: Column(
         children: [
-          const SizedBox(height: 40),
-          const Text("TERMS & CONDITIONS", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14, letterSpacing: 1)),
-          const Padding(
-            padding: EdgeInsets.symmetric(horizontal: 30, vertical: 20),
+          SizedBox(height: context.scale(40)),
+          Text("TERMS & CONDITIONS", style: TextStyle(color: colorScheme.onPrimary, fontWeight: FontWeight.bold, fontSize: context.font(14), letterSpacing: 1)),
+          Padding(
+            padding: EdgeInsets.symmetric(horizontal: context.scale(32), vertical: context.scale(24)),
             child: Text(
-              "This card is the property of Eduphin Academy. If found, please return it to the nearest administration office.\n\nUnauthorized use or duplication of this document is a punishable offense under institutional policy.",
+              "This card is the property of ${data.instituteName ?? 'the Academy'}. If found, please return it to the nearest administration office.\n\nUnauthorized use or duplication of this document is a punishable offense under institutional policy.",
               textAlign: TextAlign.center,
-              style: TextStyle(color: Colors.white54, fontSize: 11, height: 1.6),
+              style: TextStyle(color: colorScheme.onPrimary.withValues(alpha: 0.7), fontSize: context.font(11), height: 1.6),
             ),
           ),
           const Spacer(),
           
-          // QR Code Placeholder
           Container(
-            padding: const EdgeInsets.all(12),
+            padding: EdgeInsets.all(context.scale(12)),
             decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(12),
+              color: colorScheme.onPrimary,
+              borderRadius: BorderRadius.circular(context.scale(12)),
             ),
-            child: const Icon(Icons.qr_code_2_rounded, size: 100, color: Color(0xFF0F1630)),
+            child: Icon(Icons.qr_code_2_rounded, size: context.scale(100), color: colorScheme.primary),
           ),
           
           const Spacer(),
           
-          const Text("EMERGENCY CONTACT", style: TextStyle(color: primaryColor, fontWeight: FontWeight.bold, fontSize: 11, letterSpacing: 1)),
-          const SizedBox(height: 5),
-          const Text("+1 234 567 890", style: TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold)),
+          Text("EMERGENCY CONTACT", style: TextStyle(color: colorScheme.onPrimary.withValues(alpha: 0.9), fontWeight: FontWeight.bold, fontSize: context.font(11), letterSpacing: 1)),
+          SizedBox(height: context.scale(4)),
+          Text(data.institutePhone ?? "+1 234 567 890", style: TextStyle(color: colorScheme.onPrimary, fontSize: context.font(16), fontWeight: FontWeight.bold)),
           
-          const SizedBox(height: 30),
+          SizedBox(height: context.scale(40)),
           
           Container(
             width: double.infinity,
-            padding: const EdgeInsets.symmetric(vertical: 20),
+            padding: EdgeInsets.symmetric(vertical: context.scale(24)),
             decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.05),
-              borderRadius: const BorderRadius.vertical(bottom: Radius.circular(24)),
+              color: colorScheme.onPrimary.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.vertical(bottom: Radius.circular(context.scale(24))),
             ),
-            child: const Center(
-              child: Text("www.eduphin.com", style: TextStyle(color: Colors.white38, fontSize: 12, letterSpacing: 1)),
+            child: Center(
+              child: Text(data.instituteWebsite ?? "www.eduphin.com", style: TextStyle(color: colorScheme.onPrimary.withValues(alpha: 0.5), fontSize: context.font(12), letterSpacing: 1)),
             ),
           ),
         ],
@@ -286,83 +296,81 @@ class _StaffVirtualIdCardState extends State<StaffVirtualIdCard> {
     );
   }
 
-  Widget _buildRowInfo(String label1, String value1, String label2, String value2) {
+  Widget _buildRowInfo(BuildContext context, String label1, String value1, String label2, String value2) {
+    final colorScheme = context.theme.colorScheme;
     return Row(
       children: [
-        Expanded(child: _buildInfoItem(label1, value1)),
-        Container(width: 1, height: 30, color: Colors.white10),
-        const SizedBox(width: 15),
-        Expanded(child: _buildInfoItem(label2, value2)),
+        Expanded(child: _buildInfoItem(context, label1, value1)),
+        Container(width: 1, height: context.scale(30), color: colorScheme.onPrimary.withValues(alpha: 0.2)),
+        SizedBox(width: context.scale(16)),
+        Expanded(child: _buildInfoItem(context, label2, value2)),
       ],
     );
   }
 
-  Widget _buildInfoItem(String label, String value) {
+  Widget _buildInfoItem(BuildContext context, String label, String value) {
+    final colorScheme = context.theme.colorScheme;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(label, style: const TextStyle(color: Colors.white38, fontSize: 9, fontWeight: FontWeight.bold, letterSpacing: 0.5)),
-        const SizedBox(height: 2),
-        Text(value, style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold), overflow: TextOverflow.ellipsis),
+        Text(label, style: TextStyle(color: colorScheme.onPrimary.withValues(alpha: 0.7), fontSize: context.font(9), fontWeight: FontWeight.bold, letterSpacing: 0.5)),
+        SizedBox(height: context.scale(2)),
+        Text(value, style: TextStyle(color: colorScheme.onPrimary, fontSize: context.font(12), fontWeight: FontWeight.bold), overflow: TextOverflow.ellipsis),
       ],
     );
   }
 
-  Widget _buildActionButtons() {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 40.0),
-      child: Column(
-        children: [
-          SizedBox(
-            width: double.infinity,
-            height: 55,
-            child: ElevatedButton.icon(
-              onPressed: _toggleFlip,
-              icon: const Icon(Icons.flip_camera_android_rounded),
-              label: Text(_isFront ? "VIEW BACK SIDE" : "VIEW FRONT SIDE", style: const TextStyle(fontWeight: FontWeight.bold, letterSpacing: 1.2)),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: primaryColor,
-                foregroundColor: Colors.white,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
-                elevation: 8,
-                shadowColor: primaryColor.withValues(alpha: 0.4),
-              ),
+  Widget _buildActionButtons(BuildContext context, StaffVirtualIdCardData data) {
+    final colorScheme = context.theme.colorScheme;
+    return Column(
+      children: [
+        SizedBox(
+          width: double.infinity,
+          child: FilledButton.icon(
+            onPressed: _toggleFlip,
+            icon: Icon(Icons.flip_camera_android_rounded, size: context.scale(20)),
+            label: Text(_isFront ? "VIEW BACK SIDE" : "VIEW FRONT SIDE"),
+            style: FilledButton.styleFrom(
+              backgroundColor: colorScheme.primaryContainer,
+              foregroundColor: colorScheme.onPrimaryContainer,
+              padding: EdgeInsets.symmetric(vertical: context.scale(16)),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(context.scale(12))),
             ),
           ),
-          const SizedBox(height: 20),
-          Row(
-            children: [
-              Expanded(
-                child: OutlinedButton.icon(
-                  onPressed: () {},
-                  icon: const Icon(Icons.download_for_offline_rounded, size: 20),
-                  label: const Text("DOWNLOAD"),
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: Colors.white70,
-                    side: const BorderSide(color: Colors.white24),
-                    padding: const EdgeInsets.symmetric(vertical: 15),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                  ),
+        ),
+        SizedBox(height: context.scale(16)),
+        Row(
+          children: [
+            Expanded(
+              child: OutlinedButton.icon(
+                onPressed: () => PdfService.generateAndPrintIdCard(data),
+                icon: Icon(Icons.download_for_offline_rounded, size: context.scale(20)),
+                label: const Text("DOWNLOAD"),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: colorScheme.primary,
+                  side: BorderSide(color: colorScheme.outline),
+                  padding: EdgeInsets.symmetric(vertical: context.scale(16)),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(context.scale(12))),
                 ),
               ),
-              const SizedBox(width: 15),
-              Expanded(
-                child: OutlinedButton.icon(
-                  onPressed: () {},
-                  icon: const Icon(Icons.share_rounded, size: 20),
-                  label: const Text("SHARE"),
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: Colors.white70,
-                    side: const BorderSide(color: Colors.white24),
-                    padding: const EdgeInsets.symmetric(vertical: 15),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                  ),
+            ),
+            SizedBox(width: context.scale(12)),
+            Expanded(
+              child: OutlinedButton.icon(
+                onPressed: () {},
+                icon: Icon(Icons.share_rounded, size: context.scale(20)),
+                label: const Text("SHARE"),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: colorScheme.primary,
+                  side: BorderSide(color: colorScheme.outline),
+                  padding: EdgeInsets.symmetric(vertical: context.scale(16)),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(context.scale(12))),
                 ),
               ),
-            ],
-          ),
-        ],
-      ),
+            ),
+          ],
+        ),
+      ],
     );
   }
 }

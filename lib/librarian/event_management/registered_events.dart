@@ -1,3 +1,4 @@
+import 'package:eduphin/services/responsive_helper.dart';
 import 'package:flutter/material.dart';
 import '../../services/api_service.dart';
 import '../librarian_models.dart' as librarian_model;
@@ -10,11 +11,6 @@ class MyRegisteredEventsPage extends StatefulWidget {
 }
 
 class _MyRegisteredEventsPageState extends State<MyRegisteredEventsPage> {
-  static const Color bgColor = Color(0xFF0B0D18);
-  static const Color cardColor = Color(0xFF1B2238);
-  static const Color fieldColor = Color(0xFF323B5C);
-  static const Color blueBtn = Color(0xFF2563EB);
-
   String selectedStatus = "All";
   String selectedType = "All";
   bool _isLoading = true;
@@ -79,193 +75,234 @@ class _MyRegisteredEventsPageState extends State<MyRegisteredEventsPage> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = context.theme;
+    final colorScheme = theme.colorScheme;
     final filtered = _filteredRegistrations;
     
     return Scaffold(
-      backgroundColor: bgColor,
       appBar: AppBar(
-        backgroundColor: bgColor,
-        elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.white),
-          onPressed: () => Navigator.pop(context),
-        ),
-        title: const Text("My Registered Events",
-            style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 18)),
+        title: const Text("My Registered Events"),
       ),
       body: _isLoading 
-          ? const Center(child: CircularProgressIndicator(color: blueBtn))
+          ? const Center(child: CircularProgressIndicator())
           : RefreshIndicator(
               onRefresh: _fetchRegisteredEvents,
-              color: blueBtn,
               child: SingleChildScrollView(
                 physics: const AlwaysScrollableScrollPhysics(),
-                padding: const EdgeInsets.all(16.0),
-                child: Column(
-                  children: [
-                    /// FILTER SECTION
-                    Container(
-                      padding: const EdgeInsets.all(16),
-                      decoration: BoxDecoration(
-                        color: cardColor,
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const Row(
-                            children: [
-                              Icon(Icons.filter_alt, color: Colors.white70, size: 18),
-                              SizedBox(width: 8),
-                              Text("Filter Events",
-                                  style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)),
-                            ],
+                padding: context.pagePadding,
+                child: Center(
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 1200),
+                    child: Column(
+                      children: [
+                        /// FILTER SECTION
+                        Card(
+                          elevation: 0,
+                          color: colorScheme.surfaceContainerLow,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(context.md),
+                            side: BorderSide(color: colorScheme.outlineVariant, width: 0.5),
                           ),
-                          const SizedBox(height: 20),
-                          buildLabel("Status"),
-                          buildDropdownField(selectedStatus, ["All", "Upcoming", "Completed"], (val) {
-                            setState(() => selectedStatus = val!);
-                          }),
-                          const SizedBox(height: 12),
-                          buildLabel("Type"),
-                          buildDropdownField(selectedType, ["All", "Free", "Paid"], (val) {
-                            setState(() => selectedType = val!);
-                          }),
-                          const SizedBox(height: 20),
-                          SizedBox(
-                            width: double.infinity,
-                            height: 45,
-                            child: ElevatedButton(
-                              onPressed: () {
-                                setState(() {
-                                  selectedStatus = "All";
-                                  selectedType = "All";
-                                });
-                              },
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: blueBtn,
-                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                              ),
-                              child: const Text("RESET", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                          child: Padding(
+                            padding: EdgeInsets.all(context.md),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  children: [
+                                    Icon(Icons.filter_alt, color: colorScheme.primary, size: context.scale(18)),
+                                    SizedBox(width: context.xs),
+                                    Text("Filter Events",
+                                        style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
+                                  ],
+                                ),
+                                SizedBox(height: context.md),
+                                _buildResponsiveRow(context, [
+                                  _buildDropdownField(context, "Status", selectedStatus, ["All", "Upcoming", "Completed"], (val) {
+                                    setState(() => selectedStatus = val!);
+                                  }),
+                                  _buildDropdownField(context, "Type", selectedType, ["All", "Free", "Paid"], (val) {
+                                    setState(() => selectedType = val!);
+                                  }),
+                                ]),
+                                SizedBox(height: context.sm),
+                                SizedBox(
+                                  width: double.infinity,
+                                  child: OutlinedButton(
+                                    onPressed: () {
+                                      setState(() {
+                                        selectedStatus = "All";
+                                        selectedType = "All";
+                                      });
+                                    },
+                                    style: OutlinedButton.styleFrom(
+                                      padding: EdgeInsets.symmetric(vertical: context.md),
+                                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(context.sm)),
+                                    ),
+                                    child: Text("RESET FILTERS", style: TextStyle(fontSize: context.font(14), fontWeight: FontWeight.bold)),
+                                  ),
+                                ),
+                              ],
                             ),
                           ),
-                        ],
-                      ),
-                    ),
+                        ),
 
-                    const SizedBox(height: 20),
+                        SizedBox(height: context.md),
 
-                    /// DATA TABLE SECTION
-                    Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.symmetric(vertical: 8),
-                      decoration: BoxDecoration(
-                        color: cardColor,
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: filtered.isEmpty
-                          ? const Center(child: Padding(
-                              padding: EdgeInsets.symmetric(vertical: 20),
-                              child: Text("No registered events found", style: TextStyle(color: Colors.white38)),
-                            ))
-                          : SingleChildScrollView(
-                              scrollDirection: Axis.horizontal,
-                              child: DataTable(
-                                headingRowColor: WidgetStateProperty.all(const Color(0xFF2D3748)),
-                                columnSpacing: 25,
-                                dataRowMinHeight: 60,
-                                dataRowMaxHeight: 80,
-                                columns: const [
-                                  DataColumn(label: Text("#", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold))),
-                                  DataColumn(label: Text("Image", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold))),
-                                  DataColumn(label: Text("Title", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold))),
-                                  DataColumn(label: Text("Date & Time", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold))),
-                                  DataColumn(label: Text("Venue", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold))),
-                                  DataColumn(label: Text("Ticket Info", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold))),
-                                  DataColumn(label: Text("Action", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold))),
-                                ],
-                                rows: filtered.asMap().entries.map((entry) {
-                                  int index = entry.key + 1;
-                                  librarian_model.EventRegistration registration = entry.value;
-                                  return buildDataRow(
-                                    index.toString(),
-                                    registration,
-                                  );
-                                }).toList(),
-                              ),
-                            ),
+                        /// DATA TABLE SECTION
+                        Card(
+                          elevation: 0,
+                          color: colorScheme.surfaceContainerLow,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(context.md),
+                            side: BorderSide(color: colorScheme.outlineVariant, width: 0.5),
+                          ),
+                          clipBehavior: Clip.antiAlias,
+                          child: filtered.isEmpty
+                              ? Center(child: Padding(
+                                  padding: EdgeInsets.symmetric(vertical: context.xl),
+                                  child: Text("No registered events found", style: TextStyle(fontSize: context.font(14))),
+                                ))
+                              : SingleChildScrollView(
+                                  scrollDirection: Axis.horizontal,
+                                  child: DataTable(
+                                    headingRowColor: WidgetStateProperty.all(colorScheme.surfaceContainer),
+                                    columnSpacing: context.md,
+                                    columns: [
+                                      DataColumn(label: Text("#", style: TextStyle(fontWeight: FontWeight.bold, fontSize: context.font(12)))),
+                                      DataColumn(label: Text("Image", style: TextStyle(fontWeight: FontWeight.bold, fontSize: context.font(12)))),
+                                      DataColumn(label: Text("Title", style: TextStyle(fontWeight: FontWeight.bold, fontSize: context.font(12)))),
+                                      DataColumn(label: Text("Date & Time", style: TextStyle(fontWeight: FontWeight.bold, fontSize: context.font(12)))),
+                                      DataColumn(label: Text("Venue", style: TextStyle(fontWeight: FontWeight.bold, fontSize: context.font(12)))),
+                                      DataColumn(label: Text("Ticket Info", style: TextStyle(fontWeight: FontWeight.bold, fontSize: context.font(12)))),
+                                      DataColumn(label: Text("Action", style: TextStyle(fontWeight: FontWeight.bold, fontSize: context.font(12)))),
+                                    ],
+                                    rows: filtered.asMap().entries.map((entry) {
+                                      int index = entry.key + 1;
+                                      librarian_model.EventRegistration registration = entry.value;
+                                      return buildDataRow(
+                                        context,
+                                        index.toString(),
+                                        registration,
+                                      );
+                                    }).toList(),
+                                  ),
+                                ),
+                        ),
+                      ],
                     ),
-                  ],
+                  ),
                 ),
               ),
             ),
     );
   }
 
-  Widget buildLabel(String text) {
+  Widget _buildResponsiveRow(BuildContext context, List<Widget> children) {
+    if (!context.isTablet && !context.isDesktop) return Column(children: children.map((c) => Padding(padding: EdgeInsets.only(bottom: context.sm), child: c)).toList());
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: children.map((c) => Expanded(child: Padding(padding: EdgeInsets.only(right: context.sm), child: c))).toList(),
+    );
+  }
+
+  Widget _buildDropdownField(BuildContext context, String label, String value, List<String> items, Function(String?) onChanged) {
+    final theme = context.theme;
+    final colorScheme = theme.colorScheme;
     return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
-      child: Text(text, style: const TextStyle(color: Colors.white70, fontSize: 14)),
+      padding: EdgeInsets.only(bottom: context.sm),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(label, style: theme.textTheme.labelMedium?.copyWith(color: colorScheme.onSurfaceVariant, fontSize: context.font(12), fontWeight: FontWeight.bold)),
+          SizedBox(height: context.xs),
+          DropdownButtonFormField<String>(
+            value: value,
+            isExpanded: true,
+            style: TextStyle(fontSize: context.font(14), color: colorScheme.onSurface),
+            decoration: InputDecoration(
+              filled: true,
+              fillColor: colorScheme.surface,
+              contentPadding: EdgeInsets.symmetric(horizontal: context.sm, vertical: context.xs),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(context.sm),
+                borderSide: BorderSide(color: colorScheme.outlineVariant),
+              ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(context.sm),
+                borderSide: BorderSide(color: colorScheme.outlineVariant),
+              ),
+            ),
+            items: items.map((e) => DropdownMenuItem(value: e, child: Text(e, style: TextStyle(fontSize: context.font(14))))).toList(),
+            onChanged: onChanged,
+          ),
+        ],
+      ),
     );
   }
 
-  Widget buildDropdownField(String value, List<String> items, Function(String?) onChanged) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12),
-      decoration: BoxDecoration(
-        color: fieldColor,
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: DropdownButtonHideUnderline(
-        child: DropdownButton<String>(
-          value: value,
-          isExpanded: true,
-          dropdownColor: fieldColor,
-          icon: const Icon(Icons.keyboard_arrow_down, color: Colors.white54),
-          style: const TextStyle(color: Colors.white, fontSize: 14),
-          items: items.map((e) => DropdownMenuItem(value: e, child: Text(e))).toList(),
-          onChanged: onChanged,
-        ),
-      ),
-    );
-  }
-
-  DataRow buildDataRow(String hash, librarian_model.EventRegistration registration) {
+  DataRow buildDataRow(BuildContext context, String hash, librarian_model.EventRegistration registration) {
+    final theme = context.theme;
+    final colorScheme = theme.colorScheme;
     final event = registration.event;
     return DataRow(cells: [
-      DataCell(Text(hash, style: const TextStyle(color: Colors.white70, fontSize: 12))),
+      DataCell(Text(hash, style: TextStyle(fontSize: context.font(12)))),
       DataCell(
-        event.image != null
-            ? Image.network("${ApiService.baseImageUrl}/storage/${event.image}", width: 40, height: 40, fit: BoxFit.cover, errorBuilder: (_, __, ___) => const Icon(Icons.image, color: Colors.white24))
-            : const Icon(Icons.image, color: Colors.white24, size: 30),
+        ClipRRect(
+          borderRadius: BorderRadius.circular(context.xs),
+          child: event.image != null
+              ? Image.network(
+                  "${ApiService.baseImageUrl}/storage/${event.image}",
+                  width: context.scale(40), height: context.scale(40), fit: BoxFit.cover,
+                  errorBuilder: (_, __, ___) => Icon(Icons.image, size: context.scale(20)),
+                )
+              : Icon(Icons.image, size: context.scale(20)),
+        ),
       ),
       DataCell(SizedBox(
-        width: 150,
+        width: context.scale(150),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Text(event.title, 
-                maxLines: 2,
+                maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12)),
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: context.font(12))),
             if (event.description != null)
               Text(event.description!, 
-                  maxLines: 2,
+                  maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(color: Colors.white54, fontSize: 10)),
+                  style: theme.textTheme.bodySmall?.copyWith(fontSize: context.font(10))),
           ],
         ),
       )),
-      DataCell(Text("${event.eventDate ?? ''}\n${event.startTime ?? ''} - ${event.endTime ?? ''}", style: const TextStyle(color: Colors.white70, fontSize: 11))),
-      DataCell(Text(event.venue ?? "N/A", style: const TextStyle(color: Colors.white70, fontSize: 11))),
+      DataCell(Text("${event.eventDate ?? ''}\n${event.startTime ?? ''}", style: TextStyle(fontSize: context.font(10)))),
+      DataCell(Text(event.venue ?? "N/A", style: TextStyle(fontSize: context.font(10)))),
       DataCell(Container(
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-        decoration: BoxDecoration(color: Colors.white12, borderRadius: BorderRadius.circular(4)),
-        child: Text(event.isTicketed ? "Paid: ${event.ticketPrice}" : "Free Event", style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold)),
+        padding: EdgeInsets.symmetric(horizontal: context.xs, vertical: context.xs / 2),
+        decoration: BoxDecoration(
+          color: colorScheme.primary.withValues(alpha: 0.1),
+          borderRadius: BorderRadius.circular(context.xs)
+        ),
+        child: Text(event.isTicketed ? "Paid: ${event.ticketPrice}" : "Free Event", 
+          style: TextStyle(color: colorScheme.primary, fontSize: context.font(9), fontWeight: FontWeight.bold)),
       )),
-      DataCell(ElevatedButton(
+      DataCell(TextButton(
         onPressed: registration.status == 'cancelled' ? null : () async {
+          final confirm = await showDialog<bool>(
+            context: context,
+            builder: (ctx) => AlertDialog(
+              title: const Text("Cancel Registration"),
+              content: const Text("Are you sure you want to cancel your registration for this event?"),
+              actions: [
+                TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text("NO")),
+                TextButton(onPressed: () => Navigator.pop(ctx, true), child: const Text("YES")),
+              ],
+            )
+          );
+          if (confirm != true) return;
+
           try {
             await ApiService.cancelLibrarianEventRegistration(registration.id.toString());
             if (!mounted) return;
@@ -276,15 +313,8 @@ class _MyRegisteredEventsPageState extends State<MyRegisteredEventsPage> {
             ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Error: $e")));
           }
         },
-        style: ElevatedButton.styleFrom(
-          backgroundColor: registration.status == 'cancelled' ? Colors.grey : const Color(0xFF374151),
-          padding: const EdgeInsets.symmetric(horizontal: 8),
-          minimumSize: const Size(0, 30),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
-        ),
-        child: Text(registration.status == 'cancelled' ? "CANCELLED" : "CANCEL\nREGISTRATION",
-            textAlign: TextAlign.center,
-            style: const TextStyle(color: Colors.white70, fontSize: 9)),
+        child: Text(registration.status == 'cancelled' ? "CANCELLED" : "CANCEL",
+            style: TextStyle(color: registration.status == 'cancelled' ? theme.hintColor : colorScheme.error, fontSize: context.font(11), fontWeight: FontWeight.bold)),
       )),
     ]);
   }

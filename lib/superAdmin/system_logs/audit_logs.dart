@@ -23,11 +23,23 @@ class _AuditLogsScreenState extends State<AuditLogsScreen> {
     _fetchLogs();
   }
 
+  String? _selectedInstituteId;
+  String? _selectedRoleId;
+
   Future<void> _fetchLogs() async {
     if (!mounted) return;
     setState(() => _isLoading = true);
     try {
-      final response = await ApiService.get('superadmin/audit');
+      String url = 'superadmin/audit';
+      List<String> params = [];
+      if (_selectedInstituteId != null) params.add('institute_id=$_selectedInstituteId');
+      if (_selectedRoleId != null) params.add('role_id=$_selectedRoleId');
+      
+      if (params.isNotEmpty) {
+        url += '?' + params.join('&');
+      }
+
+      final response = await ApiService.get(url);
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body)['data'];
         if (mounted) {
@@ -108,7 +120,13 @@ class _AuditLogsScreenState extends State<AuditLogsScreen> {
             SizedBox(
               width: double.infinity,
               child: OutlinedButton.icon(
-                onPressed: () {},
+                onPressed: () {
+                  setState(() {
+                    _selectedInstituteId = null;
+                    _selectedRoleId = null;
+                  });
+                  _fetchLogs();
+                },
                 icon: const Icon(Icons.refresh, size: 16),
                 label: const Text("RESET FILTERS"),
               ),
@@ -131,13 +149,23 @@ class _AuditLogsScreenState extends State<AuditLogsScreen> {
           DropdownButtonFormField<dynamic>(
             isExpanded: true,
             hint: const Text("All Options"),
+            value: label == "Institute" ? _selectedInstituteId : _selectedRoleId,
             items: items.map((item) {
               return DropdownMenuItem<dynamic>(
-                value: item[valueKey],
+                value: item[valueKey].toString(),
                 child: Text(item['name'] ?? '', style: const TextStyle(fontSize: 13)),
               );
             }).toList(),
-            onChanged: (v) {},
+            onChanged: (v) {
+              setState(() {
+                if (label == "Institute") {
+                  _selectedInstituteId = v;
+                } else {
+                  _selectedRoleId = v;
+                }
+              });
+              _fetchLogs();
+            },
             decoration: const InputDecoration(
               contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
             ),
@@ -191,7 +219,7 @@ class _AuditLogsScreenState extends State<AuditLogsScreen> {
             final log = entry.value;
             final user = log['user'] ?? {};
             final institute = user['institute'] ?? {};
-            
+
             return DataRow(
               cells: [
                 DataCell(Text(index.toString())),

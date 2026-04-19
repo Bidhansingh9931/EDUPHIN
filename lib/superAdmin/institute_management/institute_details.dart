@@ -1,4 +1,6 @@
 import 'package:eduphin/services/responsive_helper.dart';
+import 'package:eduphin/services/theme_service.dart';
+import 'package:eduphin/services/common_widgets.dart';
 import 'package:flutter/material.dart';
 import 'package:eduphin/services/api_service.dart';
 import 'package:eduphin/moderator_dashboard/institute/institute_model.dart';
@@ -50,23 +52,24 @@ class _InstituteDetailsScreenState extends State<InstituteDetailsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
+    final theme = context.theme;
     return Scaffold(
       appBar: AppBar(
-        title: Text(_institute != null ? "Details: ${_institute!.name}" : "Institute Details"),
+        title: Text(_institute != null ? "Details: ${_institute!.name}" : "Institute Details", 
+            style: TextStyle(fontSize: context.font(20), fontWeight: FontWeight.bold)),
         actions: [
-          IconButton(onPressed: () => Navigator.pop(context), icon: const Icon(Icons.close)),
+          IconButton(onPressed: () => Navigator.pop(context), icon: Icon(Icons.close, size: context.scale(24))),
         ],
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
           : _errorMessage != null
               ? Center(child: Padding(
-                  padding: const EdgeInsets.all(24.0),
-                  child: Text(_errorMessage!, textAlign: TextAlign.center, style: TextStyle(color: theme.colorScheme.error)),
+                  padding: EdgeInsets.all(context.scale(24.0)),
+                  child: Text(_errorMessage!, textAlign: TextAlign.center, style: TextStyle(color: theme.colorScheme.error, fontSize: context.font(14))),
                 ))
               : _institute == null
-                  ? const Center(child: Text("No data found"))
+                  ? Center(child: Text("No data found", style: TextStyle(fontSize: context.font(14))))
                   : SingleChildScrollView(
                       padding: context.pagePadding,
                       child: Center(
@@ -76,11 +79,11 @@ class _InstituteDetailsScreenState extends State<InstituteDetailsScreen> {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               _buildProfileHeader(context),
-                              const SizedBox(height: 32),
+                              SizedBox(height: context.scale(32)),
                               _buildDetailsCard(context),
-                              const SizedBox(height: 32),
+                              SizedBox(height: context.scale(32)),
                               _buildActionButtons(context),
-                              const SizedBox(height: 40),
+                              SizedBox(height: context.scale(40)),
                             ],
                           ),
                         ),
@@ -90,35 +93,37 @@ class _InstituteDetailsScreenState extends State<InstituteDetailsScreen> {
   }
 
   Widget _buildProfileHeader(BuildContext context) {
-    final theme = Theme.of(context);
+    final theme = context.theme;
     return Card(
+      elevation: 0,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(context.scale(16)),
+        side: BorderSide(color: theme.dividerColor.withValues(alpha: 0.1)),
+      ),
       child: Padding(
-        padding: const EdgeInsets.all(24.0),
+        padding: EdgeInsets.all(context.scale(24.0)),
         child: Column(
           children: [
             Center(
               child: Container(
-                padding: const EdgeInsets.all(4),
+                padding: EdgeInsets.all(context.scale(4)),
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  border: Border.all(color: theme.colorScheme.primary, width: 2),
+                  border: Border.all(color: theme.colorScheme.primary, width: context.scale(2)),
                 ),
-                child: CircleAvatar(
-                  radius: 50,
-                  backgroundColor: theme.colorScheme.surfaceContainerHighest,
-                  backgroundImage: _institute!.logo != null
-                      ? NetworkImage("${ApiService.baseImageUrl}/storage/${_institute!.logo}")
+                child: ProfileAvatar(
+                  radius: context.scale(50),
+                  imageUrl: _institute!.logo != null
+                      ? ApiService.getStorageUrl(_institute!.logo)
                       : null,
-                  child: _institute!.logo == null
-                      ? Icon(Icons.business, size: 50, color: theme.colorScheme.primary)
-                      : null,
+                  borderWidth: 0,
                 ),
               ),
             ),
-            const SizedBox(height: 20),
+            SizedBox(height: context.scale(20)),
             Text(_institute!.name,
-                style: theme.textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold), textAlign: TextAlign.center),
-            Text(_institute!.code, style: theme.textTheme.bodyMedium?.copyWith(color: theme.hintColor, fontStyle: FontStyle.italic)),
+                style: theme.textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold, fontSize: context.font(24)), textAlign: TextAlign.center),
+            Text(_institute!.code, style: theme.textTheme.bodyMedium?.copyWith(color: theme.hintColor, fontStyle: FontStyle.italic, fontSize: context.font(14))),
           ],
         ),
       ),
@@ -126,9 +131,15 @@ class _InstituteDetailsScreenState extends State<InstituteDetailsScreen> {
   }
 
   Widget _buildDetailsCard(BuildContext context) {
+    final theme = context.theme;
     return Card(
+      elevation: 0,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(context.scale(16)),
+        side: BorderSide(color: theme.dividerColor.withValues(alpha: 0.1)),
+      ),
       child: Padding(
-        padding: const EdgeInsets.all(24.0),
+        padding: EdgeInsets.all(context.scale(24.0)),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -139,7 +150,7 @@ class _InstituteDetailsScreenState extends State<InstituteDetailsScreen> {
             _buildDetailRow(context, "Chairman", _institute!.chairmanName),
             _buildDetailRow(context, "Website", _institute!.website ?? "N/A", isLink: true),
             _buildDetailRow(context, "Affiliation", _institute!.affiliationDetails ?? "N/A"),
-            const Divider(height: 32),
+            Divider(height: context.scale(32)),
             _buildStatusRow(context, "Status", _institute!.status),
           ],
         ),
@@ -148,21 +159,22 @@ class _InstituteDetailsScreenState extends State<InstituteDetailsScreen> {
   }
 
   Widget _buildDetailRow(BuildContext context, String label, String value, {bool isLink = false}) {
-    final theme = Theme.of(context);
+    final theme = context.theme;
     return Padding(
-      padding: const EdgeInsets.only(bottom: 16),
+      padding: EdgeInsets.only(bottom: context.scale(16)),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           SizedBox(
-            width: 120,
-            child: Text(label, style: theme.textTheme.labelMedium?.copyWith(color: theme.hintColor, fontWeight: FontWeight.bold)),
+            width: context.scale(120),
+            child: Text(label, style: theme.textTheme.labelMedium?.copyWith(color: theme.hintColor, fontWeight: FontWeight.bold, fontSize: context.font(12))),
           ),
           Expanded(
             child: Text(
               value,
               style: theme.textTheme.bodyMedium?.copyWith(
                 fontWeight: FontWeight.w500,
+                fontSize: context.font(14),
                 color: isLink ? theme.colorScheme.primary : null,
                 decoration: isLink ? TextDecoration.underline : null,
               ),
@@ -174,51 +186,61 @@ class _InstituteDetailsScreenState extends State<InstituteDetailsScreen> {
   }
 
   Widget _buildStatusRow(BuildContext context, String label, String status) {
-    final theme = Theme.of(context);
+    final theme = context.theme;
     final isGreen = status == "Active";
     return Row(
       children: [
         SizedBox(
-          width: 120,
-          child: Text(label, style: theme.textTheme.labelMedium?.copyWith(color: theme.hintColor, fontWeight: FontWeight.bold)),
+          width: context.scale(120),
+          child: Text(label, style: theme.textTheme.labelMedium?.copyWith(color: theme.hintColor, fontWeight: FontWeight.bold, fontSize: context.font(12))),
         ),
         Container(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+          padding: EdgeInsets.symmetric(horizontal: context.scale(12), vertical: context.scale(4)),
           decoration: BoxDecoration(
             color: (isGreen ? Colors.green : Colors.red).withValues(alpha: 0.1),
-            borderRadius: BorderRadius.circular(6),
+            borderRadius: BorderRadius.circular(context.scale(6)),
             border: Border.all(color: (isGreen ? Colors.green : Colors.red).withValues(alpha: 0.5)),
           ),
-          child: Text(status, 
-            style: TextStyle(color: isGreen ? Colors.green : Colors.red, fontSize: 11, fontWeight: FontWeight.bold)),
+          child: Text(status,
+            style: TextStyle(color: isGreen ? Colors.green : Colors.red, fontSize: context.font(11), fontWeight: FontWeight.bold)),
         ),
       ],
     );
   }
 
   Widget _buildActionButtons(BuildContext context) {
-    final theme = Theme.of(context);
+    final theme = context.theme;
     return Column(
       children: [
-        ElevatedButton.icon(
-          onPressed: () {
-            Navigator.push(context, MaterialPageRoute(builder: (context) => ManageAccountsScreen(instituteId: widget.instituteId)));
-          },
-          icon: const Icon(Icons.manage_accounts, size: 18),
-          label: const Text("MANAGE ACCOUNTS"),
-          style: ElevatedButton.styleFrom(
-            backgroundColor: theme.colorScheme.secondary,
-            foregroundColor: theme.colorScheme.onSecondary,
+        SizedBox(
+          width: double.infinity,
+          child: ElevatedButton.icon(
+            onPressed: () {
+              Navigator.push(context, MaterialPageRoute(builder: (context) => ManageAccountsScreen(instituteId: widget.instituteId)));
+            },
+            icon: Icon(Icons.manage_accounts, size: context.scale(18)),
+            label: Text("MANAGE ACCOUNTS", style: TextStyle(fontSize: context.font(14))),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: theme.colorScheme.secondary,
+              foregroundColor: theme.colorScheme.onSecondary,
+              padding: EdgeInsets.symmetric(vertical: context.scale(12)),
+            ),
           ),
         ),
-        const SizedBox(height: 12),
-        OutlinedButton.icon(
-          onPressed: () async {
-            final result = await Navigator.push(context, MaterialPageRoute(builder: (context) => AddInstituteScreen(institute: _institute)));
-            if (result == true) _fetchDetails();
-          },
-          icon: const Icon(Icons.edit, size: 18),
-          label: const Text("EDIT INSTITUTE"),
+        SizedBox(height: context.scale(12)),
+        SizedBox(
+          width: double.infinity,
+          child: OutlinedButton.icon(
+            onPressed: () async {
+              final result = await Navigator.push(context, MaterialPageRoute(builder: (context) => AddInstituteScreen(institute: _institute)));
+              if (result == true) _fetchDetails();
+            },
+            icon: Icon(Icons.edit, size: context.scale(18)),
+            label: Text("EDIT INSTITUTE", style: TextStyle(fontSize: context.font(14))),
+            style: OutlinedButton.styleFrom(
+              padding: EdgeInsets.symmetric(vertical: context.scale(12)),
+            ),
+          ),
         ),
       ],
     );

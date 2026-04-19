@@ -2,6 +2,7 @@ import 'package:eduphin/services/responsive_helper.dart';
 import 'package:flutter/material.dart';
 import 'package:eduphin/services/api_service.dart';
 import 'package:eduphin/teacher/dashboard/ticket_models.dart';
+import 'package:eduphin/teacher/dashboard/common_widgets.dart';
 import 'create_ticket.dart';
 import 'ticket_details.dart';
 
@@ -46,7 +47,15 @@ class _SupportTicketsPageState extends State<SupportTicketsPage> {
           : await ApiService.getAccountantTickets(filters);
       if (mounted) setState(() => _tickets = tickets);
     } catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Error: $e")));
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text("Error: $e"),
+            backgroundColor: context.theme.colorScheme.error,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
@@ -54,69 +63,84 @@ class _SupportTicketsPageState extends State<SupportTicketsPage> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
+    final theme = context.theme;
     
     return Scaffold(
+      backgroundColor: theme.colorScheme.surface,
       appBar: AppBar(
-        title: Text(widget.isAssigned ? "Assigned Tickets" : "Support Tickets"),
+        title: Text(
+          widget.isAssigned ? "Assigned Tickets" : "Support Center",
+          style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold, fontSize: context.font(20)),
+        ),
+        centerTitle: false,
       ),
-      body: Column(
-        children: [
-          _buildFilters(context),
-          Expanded(
-            child: _isLoading
-                ? const Center(child: CircularProgressIndicator())
-                : _tickets.isEmpty
-                    ? _buildEmptyState(context)
-                    : _buildTicketList(context),
-          ),
-          if (!widget.isAssigned) _buildCreateTicketButton(context),
-        ],
-      ),
+      body: _isLoading && _tickets.isEmpty
+          ? const Center(child: CircularProgressIndicator())
+          : RefreshIndicator(
+              onRefresh: _fetchTickets,
+              child: SingleChildScrollView(
+                physics: const AlwaysScrollableScrollPhysics(),
+                padding: EdgeInsets.symmetric(vertical: context.spacing),
+                child: Center(
+                  child: ConstrainedBox(
+                    constraints: BoxConstraints(maxWidth: context.scale(1000)),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        _buildFilterSection(context),
+                        SizedBox(height: context.spacing * 1.5),
+                        Padding(
+                          padding: EdgeInsets.symmetric(horizontal: context.pagePadding.left),
+                          child: Text(
+                            "Tickets (${_tickets.length})",
+                            style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+                          ),
+                        ),
+                        SizedBox(height: context.spacing),
+                        if (_tickets.isEmpty)
+                          _buildEmptyState(context)
+                        else
+                          _buildTicketList(context),
+                        SizedBox(height: context.spacing * 2),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+      floatingActionButton: !widget.isAssigned
+          ? FloatingActionButton.extended(
+              onPressed: () {
+                Navigator.push(context, MaterialPageRoute(builder: (context) => const CreateTicketPage()))
+                    .then((_) => _fetchTickets());
+              },
+              icon: const Icon(Icons.add),
+              label: const Text("New Ticket"),
+            )
+          : null,
     );
   }
 
   Widget _buildEmptyState(BuildContext context) {
+    final theme = context.theme;
     return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(Icons.confirmation_number_outlined, color: Theme.of(context).hintColor.withValues(alpha: 0.3), size: 64),
-          const SizedBox(height: 16),
-          Text("No tickets found", style: TextStyle(color: Theme.of(context).hintColor)),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildFilters(BuildContext context) {
-    return Card(
-      margin: const EdgeInsets.all(16),
       child: Padding(
-        padding: const EdgeInsets.all(16.0),
+        padding: EdgeInsets.symmetric(vertical: context.scale(80.0)),
         child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            TextField(
-              controller: _searchController,
-              onSubmitted: (_) => _fetchTickets(),
-              decoration: const InputDecoration(
-                hintText: "Search by ID or Title...",
-                prefixIcon: Icon(Icons.search),
-              ),
+            Icon(
+              Icons.confirmation_number_outlined,
+              color: theme.colorScheme.outlineVariant,
+              size: context.scale(80),
             ),
-            const SizedBox(height: 12),
-            Row(
-              children: [
-                Expanded(child: _buildSmallDropdown(context, _selectedPriority, (val) {
-                  setState(() => _selectedPriority = val!);
-                  _fetchTickets();
-                }, ['all', 'low', 'medium', 'high'], "Priority")),
-                const SizedBox(width: 12),
-                Expanded(child: _buildSmallDropdown(context, _selectedStatus, (val) {
-                  setState(() => _selectedStatus = val!);
-                  _fetchTickets();
-                }, ['all', 'open', 'in_progress', 'resolved', 'closed'], "Status")),
-              ],
+            SizedBox(height: context.spacing),
+            Text(
+              "No support tickets found",
+              style: theme.textTheme.titleMedium?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+                fontSize: context.font(16),
+              ),
             ),
           ],
         ),
@@ -124,70 +148,199 @@ class _SupportTicketsPageState extends State<SupportTicketsPage> {
     );
   }
 
-  Widget _buildSmallDropdown(BuildContext context, String value, ValueChanged<String?> onChanged, List<String> items, String label) {
-    return DropdownButtonFormField<String>(
-      value: value,
-      isExpanded: true,
-      items: items.map((e) => DropdownMenuItem(value: e, child: Text(e.toUpperCase(), style: const TextStyle(fontSize: 12)))).toList(),
-      onChanged: onChanged,
-      decoration: InputDecoration(labelText: label, contentPadding: const EdgeInsets.symmetric(horizontal: 12)),
+  Widget _buildFilterSection(BuildContext context) {
+    final theme = context.theme;
+    return buildFilterCard(
+      context,
+      children: [
+        Row(
+          children: [
+            Icon(Icons.filter_list_rounded, color: theme.colorScheme.primary, size: context.scale(20)),
+            SizedBox(width: context.scale(8)),
+            Text(
+              "Filter Tickets",
+              style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold, fontSize: context.font(16)),
+            ),
+          ],
+        ),
+        SizedBox(height: context.spacing),
+        buildLabel(context, "Search"),
+        buildTextField(
+          context, 
+          _searchController, 
+          "Search by ID or Title...", 
+          prefixIcon: Icons.search,
+        ),
+        SizedBox(height: context.spacing),
+        buildResponsiveRow(context, [
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              buildLabel(context, "Priority"),
+              buildDropdown(
+                context, 
+                ['all', 'low', 'medium', 'high'].map((e) => e.toUpperCase()).toList(), 
+                _selectedPriority.toUpperCase(), 
+                (val) {
+                  setState(() => _selectedPriority = val!.toLowerCase());
+                  _fetchTickets();
+                },
+              ),
+            ],
+          ),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              buildLabel(context, "Status"),
+              buildDropdown(
+                context, 
+                ['all', 'open', 'in_progress', 'resolved', 'closed'].map((e) => e.toUpperCase()).toList(), 
+                _selectedStatus.toUpperCase(), 
+                (val) {
+                  setState(() => _selectedStatus = val!.toLowerCase());
+                  _fetchTickets();
+                },
+              ),
+            ],
+          ),
+        ]),
+        SizedBox(height: context.spacing * 1.5),
+        Row(
+          children: [
+            Expanded(
+              flex: 2,
+              child: buildActionButton(context, "APPLY FILTERS", () => _fetchTickets()),
+            ),
+            SizedBox(width: context.spacing),
+            Expanded(
+              child: buildActionButton(
+                context, 
+                "RESET", 
+                () {
+                  _searchController.clear();
+                  setState(() {
+                    _selectedPriority = 'all';
+                    _selectedStatus = 'all';
+                  });
+                  _fetchTickets();
+                },
+                isPrimary: false,
+              ),
+            ),
+          ],
+        ),
+      ],
     );
   }
 
   Widget _buildTicketList(BuildContext context) {
-    return GridView.builder(
-      padding: context.pagePadding,
-      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: context.isTablet ? 2 : 1,
-        mainAxisExtent: 160,
-        crossAxisSpacing: 16,
-        mainAxisSpacing: 16,
-      ),
-      itemCount: _tickets.length,
-      itemBuilder: (context, index) {
-        final ticket = _tickets[index];
-        final priorityColor = _getPriorityColor(ticket.priority);
-        final statusColor = _getStatusColor(ticket.status);
-        final theme = Theme.of(context);
+    final theme = context.theme;
+    return Padding(
+      padding: EdgeInsets.symmetric(horizontal: context.pagePadding.left),
+      child: GridView.builder(
+        shrinkWrap: true,
+        physics: const NeverScrollableScrollPhysics(),
+        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+          crossAxisCount: context.isDesktop ? 3 : (context.isTablet ? 2 : 1),
+          mainAxisExtent: context.scale(180),
+          crossAxisSpacing: context.spacing,
+          mainAxisSpacing: context.spacing,
+        ),
+        itemCount: _tickets.length,
+        itemBuilder: (context, index) {
+          final ticket = _tickets[index];
+          final priorityColor = _getPriorityColor(ticket.priority);
+          final statusColor = _getStatusColor(ticket.status);
 
-        return Card(
-          child: ListTile(
-            onTap: () => Navigator.push(context, MaterialPageRoute(builder: (context) => TicketDetailsPage(ticketId: ticket.encryptedId ?? ticket.id.toString()))),
-            contentPadding: const EdgeInsets.all(16),
-            title: Row(
-              children: [
-                Text("#${ticket.id}", style: TextStyle(color: theme.colorScheme.primary, fontWeight: FontWeight.bold, fontSize: 13)),
-                const SizedBox(width: 8),
-                Expanded(child: Text(ticket.title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15), maxLines: 1, overflow: TextOverflow.ellipsis)),
-              ],
+          return Card(
+            elevation: 0,
+            color: theme.colorScheme.surfaceContainerLow,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(context.scale(16)),
+              side: BorderSide(color: theme.colorScheme.outlineVariant, width: 0.5),
             ),
-            subtitle: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const SizedBox(height: 12),
-                Row(
+            child: InkWell(
+              onTap: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                      builder: (context) => TicketDetailsPage(ticketId: ticket.encryptedId ?? ticket.id.toString()))),
+              borderRadius: BorderRadius.circular(context.scale(16)),
+              child: Padding(
+                padding: EdgeInsets.all(context.spacing),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    _buildBadge(ticket.priority.toUpperCase(), priorityColor),
-                    const SizedBox(width: 8),
-                    _buildBadge(ticket.status.toUpperCase(), statusColor),
+                    Row(
+                      children: [
+                        Container(
+                          padding: EdgeInsets.symmetric(horizontal: context.scale(10), vertical: context.scale(5)),
+                          decoration: BoxDecoration(
+                            color: theme.colorScheme.primaryContainer,
+                            borderRadius: BorderRadius.circular(context.scale(8)),
+                          ),
+                          child: Text(
+                            "#${ticket.id}",
+                            style: theme.textTheme.labelSmall?.copyWith(
+                              color: theme.colorScheme.onPrimaryContainer,
+                              fontWeight: FontWeight.bold,
+                              fontSize: context.font(11),
+                            ),
+                          ),
+                        ),
+                        const Spacer(),
+                        Icon(Icons.chevron_right, size: context.scale(20), color: theme.colorScheme.onSurfaceVariant),
+                      ],
+                    ),
+                    SizedBox(height: context.spacing),
+                    Text(
+                      ticket.title,
+                      style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold, fontSize: context.font(15)),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    const Spacer(),
+                    Row(
+                      children: [
+                        _buildBadge(context, ticket.priority.toUpperCase(), priorityColor),
+                        SizedBox(width: context.scale(8)),
+                        _buildBadge(context, ticket.status.toUpperCase(), statusColor),
+                      ],
+                    ),
+                    SizedBox(height: context.spacing / 2),
+                    Row(
+                      children: [
+                        Icon(Icons.access_time, size: context.scale(12), color: theme.colorScheme.onSurfaceVariant),
+                        SizedBox(width: context.scale(4)),
+                        Text(
+                          ticket.createdAt,
+                          style: theme.textTheme.labelSmall?.copyWith(
+                            color: theme.colorScheme.onSurfaceVariant,
+                            fontSize: context.font(11),
+                          ),
+                        ),
+                      ],
+                    ),
                   ],
                 ),
-                const Spacer(),
-                Text(ticket.createdAt, style: theme.textTheme.labelSmall?.copyWith(color: theme.hintColor)),
-              ],
+              ),
             ),
-            trailing: const Icon(Icons.chevron_right),
-          ),
-        );
-      },
+          );
+        },
+      ),
     );
   }
 
-  Widget _buildBadge(String text, Color color) {
+  Widget _buildBadge(BuildContext context, String text, Color color) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-      decoration: BoxDecoration(color: color.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(6), border: Border.all(color: color.withValues(alpha: 0.5))),
-      child: Text(text, style: TextStyle(color: color, fontSize: 9, fontWeight: FontWeight.bold)),
+      padding: EdgeInsets.symmetric(horizontal: context.scale(8), vertical: context.scale(4)),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(context.scale(6)),
+      ),
+      child: Text(
+        text,
+        style: TextStyle(color: color, fontSize: context.font(10), fontWeight: FontWeight.bold),
+      ),
     );
   }
 
@@ -208,21 +361,5 @@ class _SupportTicketsPageState extends State<SupportTicketsPage> {
       case 'closed': return Colors.grey;
       default: return Colors.orange;
     }
-  }
-
-  Widget _buildCreateTicketButton(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.all(16.0),
-      child: SizedBox(
-        width: double.infinity,
-        child: ElevatedButton.icon(
-          onPressed: () {
-            Navigator.push(context, MaterialPageRoute(builder: (context) => const CreateTicketPage())).then((_) => _fetchTickets());
-          },
-          icon: const Icon(Icons.add),
-          label: const Text("SUBMIT NEW TICKET"),
-        ),
-      ),
-    );
   }
 }

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:eduphin/services/api_service.dart';
+import 'package:eduphin/services/responsive_helper.dart';
 
 class LibraryBooksPage extends StatefulWidget {
   const LibraryBooksPage({super.key});
@@ -12,12 +13,6 @@ class _LibraryBooksPageState extends State<LibraryBooksPage> {
   List<dynamic> _books = [];
   bool _isLoading = true;
   String? _errorMessage;
-
-  // Theme Colors
-  final Color _bg = const Color(0xff0B1220);
-  final Color _card = const Color(0xff1E2746);
-  final Color _primary = const Color(0xff3366FF);
-  final Color _secondary = const Color(0xff3E4764);
 
   // Filters
   Map<String, String> _filters = {
@@ -103,223 +98,250 @@ class _LibraryBooksPageState extends State<LibraryBooksPage> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = context.theme;
+    final colorScheme = theme.colorScheme;
+    final isDark = context.isDarkMode;
+
     return Scaffold(
-      backgroundColor: _bg,
       appBar: AppBar(
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.white),
-          onPressed: () => Navigator.pop(context),
-        ),
-        title: const Text(
-          "Available Resources",
-          style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white),
-        ),
+        title: const Text("Available Resources"),
       ),
       body: SingleChildScrollView(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            /// FILTER CARD
-            Container(
-              padding: const EdgeInsets.all(20),
-              decoration: BoxDecoration(
-                color: _card,
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: Colors.white12),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Row(
-                    children: [
-                      Icon(Icons.filter_list, color: Colors.white70, size: 20),
-                      SizedBox(width: 8),
-                      Text(
-                        "Search Resources",
-                        style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
-                      ),
-                    ],
+        padding: context.pagePadding,
+        child: Center(
+          child: Container(
+            constraints: const BoxConstraints(maxWidth: 1100),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                /// FILTER CARD
+                Card(
+                  elevation: 0,
+                  color: colorScheme.surfaceContainerLow,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(context.scale(16)),
+                    side: BorderSide(color: colorScheme.outlineVariant.withValues(alpha: 0.5)),
                   ),
-                  const SizedBox(height: 20),
-
-                  buildLabel("Title"),
-                  buildTextField(_titleController, "Search Title"),
-
-                  buildLabel("Author"),
-                  buildTextField(_authorController, "Search Author"),
-
-                  buildLabel("ISBN"),
-                  buildTextField(_isbnController, "Search ISBN"),
-
-                  buildLabel("Category"),
-                  buildDropdown(_categories, 'category'),
-
-                  buildLabel("Language"),
-                  buildDropdown(_languages, 'language'),
-
-                  buildLabel("Format"),
-                  buildDropdown(_formats, 'format'),
-
-                  buildLabel("Year"),
-                  buildDropdown(_years, 'publication_year'),
-
-                  const SizedBox(height: 24),
-
-                  /// Apply & Reset
-                  Row(
-                    children: [
-                      Expanded(
-                        child: SizedBox(
-                          height: 48,
-                          child: ElevatedButton(
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: _primary,
-                              foregroundColor: Colors.white,
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                              elevation: 0,
+                  child: Padding(
+                    padding: EdgeInsets.all(context.scale(20)),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Icon(Icons.filter_list, color: colorScheme.primary, size: context.scale(20)),
+                            SizedBox(width: context.scale(8)),
+                            Text(
+                              "Search Resources",
+                              style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold, fontSize: context.font(20)),
                             ),
-                            onPressed: _applyFilters,
-                            child: const Text("APPLY FILTERS", style: TextStyle(fontWeight: FontWeight.bold)),
-                          ),
+                          ],
                         ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: SizedBox(
-                          height: 48,
-                          child: ElevatedButton(
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: _secondary,
-                              foregroundColor: Colors.white,
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                              elevation: 0,
+                        SizedBox(height: context.scale(20)),
+
+                        LayoutBuilder(
+                          builder: (context, constraints) {
+                            final double spacing = context.scale(16);
+                            final int crossAxisCount = context.responsive(1, tablet: 2, desktop: 3);
+                            final double itemWidth = (constraints.maxWidth - (spacing * (crossAxisCount - 1))) / crossAxisCount;
+
+                            return Wrap(
+                              spacing: spacing,
+                              runSpacing: spacing,
+                              children: [
+                                _buildFilterItem(context, "Title", buildTextField(context, _titleController, "Search Title"), itemWidth),
+                                _buildFilterItem(context, "Author", buildTextField(context, _authorController, "Search Author"), itemWidth),
+                                _buildFilterItem(context, "ISBN", buildTextField(context, _isbnController, "Search ISBN"), itemWidth),
+                                _buildFilterItem(context, "Category", buildDropdown(context, _categories, 'category'), itemWidth),
+                                _buildFilterItem(context, "Language", buildDropdown(context, _languages, 'language'), itemWidth),
+                                _buildFilterItem(context, "Format", buildDropdown(context, _formats, 'format'), itemWidth),
+                                _buildFilterItem(context, "Year", buildDropdown(context, _years, 'publication_year'), itemWidth),
+                              ],
+                            );
+                          },
+                        ),
+
+                        SizedBox(height: context.scale(24)),
+
+                        /// Apply & Reset
+                        Row(
+                          children: [
+                            Expanded(
+                              child: ElevatedButton(
+                                style: ElevatedButton.styleFrom(
+                                  padding: EdgeInsets.symmetric(vertical: context.scale(16)),
+                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(context.scale(12))),
+                                ),
+                                onPressed: _applyFilters,
+                                child: Text("APPLY FILTERS", style: TextStyle(fontSize: context.font(14))),
+                              ),
                             ),
-                            onPressed: _resetFilters,
-                            child: const Text("RESET", style: TextStyle(fontWeight: FontWeight.bold)),
-                          ),
+                            SizedBox(width: context.scale(12)),
+                            Expanded(
+                              child: ElevatedButton(
+                                style: ElevatedButton.styleFrom(
+                                  padding: EdgeInsets.symmetric(vertical: context.scale(16)),
+                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(context.scale(12))),
+                                  backgroundColor: colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
+                                  foregroundColor: colorScheme.onSurface,
+                                  elevation: 0,
+                                ),
+                                onPressed: _resetFilters,
+                                child: Text("RESET", style: TextStyle(fontSize: context.font(14))),
+                              ),
+                            ),
+                          ],
                         ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-
-            const SizedBox(height: 24),
-
-            /// RESULTS TABLE
-            Container(
-              decoration: BoxDecoration(
-                color: _card,
-                borderRadius: BorderRadius.circular(4),
-                border: Border.all(color: Colors.white12),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Padding(
-                    padding: EdgeInsets.all(16.0),
-                    child: Text(
-                      "Available Books",
-                      style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
+                      ],
                     ),
                   ),
-                  if (_isLoading)
-                    Center(child: Padding(padding: const EdgeInsets.all(40.0), child: CircularProgressIndicator(color: _primary)))
-                  else if (_errorMessage != null)
-                    Center(child: Padding(padding: const EdgeInsets.all(40.0), child: Text(_errorMessage!, style: const TextStyle(color: Colors.redAccent))))
-                  else if (_books.isEmpty)
-                    const Center(child: Padding(padding: const EdgeInsets.all(40.0), child: Text("No books found", style: TextStyle(color: Colors.white70))))
-                  else
-                    SingleChildScrollView(
-                      scrollDirection: Axis.horizontal,
-                      child: DataTable(
-                        headingRowColor: WidgetStateProperty.all(const Color(0xFF2A3450)),
-                        columnSpacing: 24,
-                        columns: const [
-                          DataColumn(label: Text("#", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold))),
-                          DataColumn(label: Text("TITLE", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold))),
-                          DataColumn(label: Text("AUTHOR", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold))),
-                          DataColumn(label: Text("ISBN", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold))),
-                          DataColumn(label: Text("COPIES", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold))),
-                        ],
-                        rows: _books.asMap().entries.map((entry) {
-                          int index = entry.key;
-                          var book = entry.value;
-                          return DataRow(cells: [
-                            DataCell(Text((index + 1).toString(), style: const TextStyle(color: Colors.white70))),
-                            DataCell(Text(book['title'] ?? 'N/A', style: const TextStyle(color: Colors.white))),
-                            DataCell(Text(book['author'] ?? 'N/A', style: const TextStyle(color: Colors.white70))),
-                            DataCell(Text(book['isbn'] ?? 'N/A', style: const TextStyle(color: Colors.white70))),
-                            DataCell(Text(book['available_copies']?.toString() ?? '0', style: const TextStyle(color: Colors.white))),
-                          ]);
-                        }).toList(),
+                ),
+
+                SizedBox(height: context.scale(24)),
+
+                /// RESULTS TABLE
+                Card(
+                  elevation: 0,
+                  color: colorScheme.surfaceContainerLow,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(context.scale(16)),
+                    side: BorderSide(color: colorScheme.outlineVariant.withValues(alpha: 0.5)),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Padding(
+                        padding: EdgeInsets.all(context.scale(20.0)),
+                        child: Text(
+                          "Available Books",
+                          style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold, fontSize: context.font(18)),
+                        ),
                       ),
-                    ),
-                ],
-              ),
+                      if (_isLoading)
+                        Center(child: Padding(padding: EdgeInsets.all(context.scale(40.0)), child: CircularProgressIndicator(color: colorScheme.primary)))
+                      else if (_errorMessage != null)
+                        Center(child: Padding(padding: EdgeInsets.all(context.scale(40.0)), child: Text(_errorMessage!, style: TextStyle(color: colorScheme.error, fontSize: context.font(14)))))
+                      else if (_books.isEmpty)
+                        Center(child: Padding(padding: EdgeInsets.all(context.scale(40.0)), child: Text("No books found", style: TextStyle(fontSize: context.font(14), color: colorScheme.onSurfaceVariant))))
+                      else
+                        SingleChildScrollView(
+                          scrollDirection: Axis.horizontal,
+                          child: ConstrainedBox(
+                            constraints: BoxConstraints(minWidth: context.screenWidth - context.scale(64)),
+                            child: Theme(
+                              data: theme.copyWith(dividerColor: colorScheme.outlineVariant.withValues(alpha: 0.5)),
+                              child: DataTable(
+                                headingRowColor: WidgetStateProperty.all(colorScheme.surfaceContainerHighest.withValues(alpha: 0.3)),
+                                columnSpacing: context.responsive(24.0, tablet: 48.0, desktop: 64.0),
+                                columns: [
+                                  DataColumn(label: Text("#", style: TextStyle(fontWeight: FontWeight.bold, fontSize: context.font(14)))),
+                                  DataColumn(label: Text("TITLE", style: TextStyle(fontWeight: FontWeight.bold, fontSize: context.font(14)))),
+                                  DataColumn(label: Text("AUTHOR", style: TextStyle(fontWeight: FontWeight.bold, fontSize: context.font(14)))),
+                                  DataColumn(label: Text("ISBN", style: TextStyle(fontWeight: FontWeight.bold, fontSize: context.font(14)))),
+                                  DataColumn(label: Text("COPIES", style: TextStyle(fontWeight: FontWeight.bold, fontSize: context.font(14)))),
+                                ],
+                                rows: _books.asMap().entries.map((entry) {
+                                  int index = entry.key;
+                                  var book = entry.value;
+                                  return DataRow(cells: [
+                                    DataCell(Text((index + 1).toString(), style: TextStyle(fontSize: context.font(14), color: colorScheme.onSurface))),
+                                    DataCell(Text(book['title'] ?? 'N/A', style: TextStyle(fontSize: context.font(14), color: colorScheme.onSurface))),
+                                    DataCell(Text(book['author'] ?? 'N/A', style: TextStyle(fontSize: context.font(14), color: colorScheme.onSurface))),
+                                    DataCell(Text(book['isbn'] ?? 'N/A', style: TextStyle(fontSize: context.font(14), color: colorScheme.onSurface))),
+                                    DataCell(Text(book['available_copies']?.toString() ?? '0', style: TextStyle(fontSize: context.font(14), color: colorScheme.onSurface))),
+                                  ]);
+                                }).toList(),
+                              ),
+                            ),
+                          ),
+                        ),
+                      SizedBox(height: context.scale(12)),
+                    ],
+                  ),
+                ),
+              ],
             ),
-          ],
+          ),
         ),
+      ),
+    );
+  }
+
+  Widget _buildFilterItem(BuildContext context, String label, Widget child, double width) {
+    final colorScheme = context.theme.colorScheme;
+    return SizedBox(
+      width: width,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: EdgeInsets.only(top: context.scale(8), bottom: context.scale(8)),
+            child: Text(
+              label,
+              style: TextStyle(fontSize: context.font(14), fontWeight: FontWeight.bold, color: colorScheme.onSurfaceVariant),
+            ),
+          ),
+          child,
+        ],
       ),
     );
   }
 
   /// ========== Common Widgets ==========
 
-  Widget buildLabel(String text) {
-    return Padding(
-      padding: const EdgeInsets.only(top: 15, bottom: 8),
-      child: Text(
-        text,
-        style: const TextStyle(fontSize: 14, color: Colors.white70),
-      ),
-    );
-  }
-
-  Widget buildTextField(TextEditingController controller, String hint) {
+  Widget buildTextField(BuildContext context, TextEditingController controller, String hint) {
+    final colorScheme = context.theme.colorScheme;
     return TextField(
       controller: controller,
-      style: const TextStyle(color: Colors.white),
+      style: TextStyle(fontSize: context.font(14), color: colorScheme.onSurface),
       decoration: InputDecoration(
         hintText: hint,
-        hintStyle: const TextStyle(color: Colors.white54, fontSize: 14),
+        hintStyle: TextStyle(fontSize: context.font(14), color: colorScheme.onSurfaceVariant),
+        isDense: true,
         filled: true,
-        fillColor: _secondary,
-        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-        border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide.none),
+        fillColor: colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
+        contentPadding: EdgeInsets.symmetric(horizontal: context.scale(16), vertical: context.scale(12)),
+        enabledBorder: OutlineInputBorder(
+          borderSide: BorderSide(color: colorScheme.outlineVariant),
+          borderRadius: BorderRadius.circular(context.scale(12)),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderSide: BorderSide(color: colorScheme.primary),
+          borderRadius: BorderRadius.circular(context.scale(12)),
+        ),
       ),
     );
   }
 
-  Widget buildDropdown(List<String> items, String filterKey) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.symmetric(horizontal: 16),
-      decoration: BoxDecoration(
-        color: _secondary,
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: DropdownButtonHideUnderline(
-        child: DropdownButton<String>(
-          isExpanded: true,
-          dropdownColor: _card,
-          value: _filters[filterKey],
-          icon: const Icon(Icons.keyboard_arrow_down, color: Colors.white70),
-          items: items.map((String value) {
-            return DropdownMenuItem<String>(
-              value: value,
-              child: Text(value, style: const TextStyle(color: Colors.white, fontSize: 14)),
-            );
-          }).toList(),
-          onChanged: (newValue) {
-            setState(() {
-              _filters[filterKey] = newValue!;
-            });
-          },
+  Widget buildDropdown(BuildContext context, List<String> items, String filterKey) {
+    final colorScheme = context.theme.colorScheme;
+    return DropdownButtonFormField<String>(
+      isExpanded: true,
+      value: _filters[filterKey],
+      dropdownColor: colorScheme.surfaceContainerLow,
+      items: items.map((String value) {
+        return DropdownMenuItem<String>(
+          value: value,
+          child: Text(value, style: TextStyle(fontSize: context.font(14), color: colorScheme.onSurface)),
+        );
+      }).toList(),
+      onChanged: (newValue) {
+        setState(() {
+          _filters[filterKey] = newValue!;
+        });
+      },
+      decoration: InputDecoration(
+        isDense: true,
+        filled: true,
+        fillColor: colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
+        contentPadding: EdgeInsets.symmetric(horizontal: context.scale(16), vertical: context.scale(12)),
+        enabledBorder: OutlineInputBorder(
+          borderSide: BorderSide(color: colorScheme.outlineVariant),
+          borderRadius: BorderRadius.circular(context.scale(12)),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderSide: BorderSide(color: colorScheme.primary),
+          borderRadius: BorderRadius.circular(context.scale(12)),
         ),
       ),
     );

@@ -4,6 +4,7 @@ import 'staff_models.dart';
 import 'create_ticket.dart';
 import 'ticket_details.dart';
 import 'package:eduphin/teacher/dashboard/ticket_models.dart' show SupportTicket;
+import 'package:eduphin/services/responsive_helper.dart';
 
 class StaffSupportTicketsPage extends StatefulWidget {
   const StaffSupportTicketsPage({super.key});
@@ -13,10 +14,6 @@ class StaffSupportTicketsPage extends StatefulWidget {
 }
 
 class _StaffSupportTicketsPageState extends State<StaffSupportTicketsPage> {
-  static const Color primaryColor = Color(0xFF6C63FF);
-  static const Color bgColor = Color(0xFF0F1630);
-  static const Color cardColor = Color(0xFF1D2645);
-
   late Future<List<SupportTicket>> _ticketsFuture;
   final TextEditingController _searchController = TextEditingController();
   String _selectedPriority = "all";
@@ -40,28 +37,288 @@ class _StaffSupportTicketsPageState extends State<StaffSupportTicketsPage> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = context.theme;
     return Scaffold(
-      backgroundColor: bgColor,
+      backgroundColor: theme.colorScheme.surface,
       appBar: AppBar(
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        title: const Text("Support Tickets", style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white)),
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white, size: 20),
-          onPressed: () => Navigator.pop(context),
-        ),
+        title: const Text("Support Tickets"),
+        actions: [
+          IconButton(
+            onPressed: _loadTickets,
+            icon: Icon(Icons.refresh_rounded, size: context.scale(20)),
+          ),
+        ],
       ),
       body: RefreshIndicator(
         onRefresh: () async => _loadTickets(),
+        child: SingleChildScrollView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          padding: context.pagePadding,
+          child: Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 1000),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _buildFilters(context),
+                  SizedBox(height: context.scale(24)),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        "Ticket History",
+                        style: theme.textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.bold,
+                          fontSize: context.font(16),
+                        ),
+                      ),
+                      FilledButton.icon(
+                        onPressed: () async {
+                          await Navigator.push(context, MaterialPageRoute(builder: (context) => const StaffCreateTicketPage()));
+                          _loadTickets();
+                        },
+                        icon: Icon(Icons.add_rounded, size: context.scale(18)),
+                        label: Text("NEW TICKET", style: TextStyle(fontSize: context.font(12))),
+                        style: FilledButton.styleFrom(
+                          padding: EdgeInsets.symmetric(horizontal: context.scale(16), vertical: context.scale(8)),
+                          minimumSize: Size.zero,
+                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                        ),
+                      ),
+                    ],
+                  ),
+                  SizedBox(height: context.scale(16)),
+                  _buildTicketList(context),
+                  SizedBox(height: context.scale(40)),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildFilters(BuildContext context) {
+    final theme = context.theme;
+    return Card(
+      elevation: 0,
+      color: theme.colorScheme.surfaceContainerLow,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(context.scale(20)),
+        side: BorderSide(color: theme.colorScheme.outlineVariant, width: 0.5),
+      ),
+      child: Padding(
+        padding: EdgeInsets.all(context.scale(20)),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              "Filter Tickets",
+              style: theme.textTheme.titleSmall?.copyWith(
+                fontWeight: FontWeight.bold,
+                fontSize: context.font(14),
+              ),
+            ),
+            SizedBox(height: context.scale(16)),
+            TextField(
+              controller: _searchController,
+              style: TextStyle(fontSize: context.font(14)),
+              decoration: InputDecoration(
+                hintText: "Search by subject...",
+                prefixIcon: Icon(Icons.search, size: context.scale(20)),
+                filled: true,
+                fillColor: theme.colorScheme.surface,
+              ),
+              onSubmitted: (_) => _loadTickets(),
+            ),
+            SizedBox(height: context.scale(12)),
+            context.responsive(
+              Column(
+                children: [
+                  _buildFilterDropdown(context, "PRIORITY", _selectedPriority, ["all", "low", "medium", "high"], (val) {
+                    setState(() => _selectedPriority = val!);
+                    _loadTickets();
+                  }),
+                  SizedBox(height: context.scale(12)),
+                  _buildFilterDropdown(context, "STATUS", _selectedStatus, ["all", "open", "closed"], (val) {
+                    setState(() => _selectedStatus = val!);
+                    _loadTickets();
+                  }),
+                ],
+              ),
+              tablet: Row(
+                children: [
+                  Expanded(
+                    child: _buildFilterDropdown(context, "PRIORITY", _selectedPriority, ["all", "low", "medium", "high"], (val) {
+                      setState(() => _selectedPriority = val!);
+                      _loadTickets();
+                    }),
+                  ),
+                  SizedBox(width: context.scale(12)),
+                  Expanded(
+                    child: _buildFilterDropdown(context, "STATUS", _selectedStatus, ["all", "open", "closed"], (val) {
+                      setState(() => _selectedStatus = val!);
+                      _loadTickets();
+                    }),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildFilterDropdown(BuildContext context, String label, String value, List<String> items, ValueChanged<String?> onChanged) {
+    final theme = context.theme;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: EdgeInsets.only(left: context.scale(4), bottom: context.scale(4)),
+          child: Text(label, style: TextStyle(fontSize: context.font(10), fontWeight: FontWeight.bold, color: theme.colorScheme.primary)),
+        ),
+        Container(
+          padding: EdgeInsets.symmetric(horizontal: context.scale(12)),
+          decoration: BoxDecoration(
+            color: theme.colorScheme.surface,
+            borderRadius: BorderRadius.circular(context.scale(12)),
+            border: Border.all(color: theme.colorScheme.outlineVariant, width: 0.5),
+          ),
+          child: DropdownButtonHideUnderline(
+            child: DropdownButton<String>(
+              value: value,
+              isExpanded: true,
+              dropdownColor: theme.colorScheme.surface,
+              icon: Icon(Icons.keyboard_arrow_down_rounded, color: theme.colorScheme.primary, size: context.scale(20)),
+              style: theme.textTheme.bodyMedium?.copyWith(fontSize: context.font(14)),
+              items: items.map((e) => DropdownMenuItem(value: e, child: Text(e.toUpperCase(), style: TextStyle(fontSize: context.font(13))))).toList(),
+              onChanged: onChanged,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildTicketList(BuildContext context) {
+    return FutureBuilder<List<SupportTicket>>(
+      future: _ticketsFuture,
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return Center(
+            child: Padding(
+              padding: EdgeInsets.all(context.scale(40)),
+              child: const CircularProgressIndicator(),
+            ),
+          );
+        } else if (snapshot.hasError) {
+          return _buildEmptyState(context, "Error loading tickets", Icons.error_outline);
+        } else if (!snapshot.hasData || snapshot.data!.isEmpty) {
+          return _buildEmptyState(context, "No support tickets found", Icons.confirmation_number_outlined);
+        }
+
+        final tickets = snapshot.data!;
+        return GridView.builder(
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: context.responsive<int>(1, tablet: 2, desktop: 2),
+            crossAxisSpacing: context.scale(16),
+            mainAxisSpacing: context.scale(16),
+            mainAxisExtent: context.scale(140),
+          ),
+          itemCount: tickets.length,
+          itemBuilder: (context, index) {
+            final ticket = tickets[index];
+            return _buildTicketCard(context, ticket);
+          },
+        );
+      },
+    );
+  }
+
+  Widget _buildEmptyState(BuildContext context, String message, IconData icon) {
+    return Center(
+      child: Padding(
+        padding: EdgeInsets.all(context.scale(40)),
+        child: Column(
+          children: [
+            Icon(icon, size: context.scale(48), color: context.theme.colorScheme.primary.withValues(alpha: 0.2)),
+            SizedBox(height: context.scale(16)),
+            Text(message, style: TextStyle(color: context.theme.hintColor, fontSize: context.font(14))),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildTicketCard(BuildContext context, SupportTicket ticket) {
+    final theme = context.theme;
+    return Card(
+      elevation: 0,
+      color: theme.colorScheme.surfaceContainerLow,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(context.scale(20)),
+        side: BorderSide(color: theme.colorScheme.outlineVariant, width: 0.5),
+      ),
+      child: InkWell(
+        onTap: () async {
+          await Navigator.push(context, MaterialPageRoute(builder: (context) => TicketDetailsPage(ticketId: ticket.id.toString())));
+          _loadTickets();
+        },
+        borderRadius: BorderRadius.circular(context.scale(20)),
         child: Padding(
-          padding: const EdgeInsets.all(16.0),
+          padding: EdgeInsets.all(context.scale(16)),
           child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              _buildFilters(),
-              const SizedBox(height: 24),
-              Expanded(child: _buildTicketList()),
-              const SizedBox(height: 20),
-              _buildCreateTicketButton(),
+              Row(
+                children: [
+                  Container(
+                    padding: EdgeInsets.symmetric(horizontal: context.scale(8), vertical: context.scale(4)),
+                    decoration: BoxDecoration(
+                      color: theme.colorScheme.primary.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(context.scale(6)),
+                    ),
+                    child: Text(
+                      "#${ticket.id}",
+                      style: TextStyle(
+                        color: theme.colorScheme.primary,
+                        fontWeight: FontWeight.bold,
+                        fontSize: context.font(11),
+                      ),
+                    ),
+                  ),
+                  const Spacer(),
+                  _buildPriorityBadge(context, ticket.priority),
+                ],
+              ),
+              SizedBox(height: context.scale(12)),
+              Text(
+                ticket.title,
+                style: theme.textTheme.titleSmall?.copyWith(
+                  fontWeight: FontWeight.bold,
+                  fontSize: context.font(14),
+                ),
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+              ),
+              const Spacer(),
+              Row(
+                children: [
+                  Icon(Icons.calendar_today_outlined, size: context.scale(12), color: theme.colorScheme.onSurfaceVariant),
+                  SizedBox(width: context.scale(6)),
+                  Text(
+                    "Oct 24, 2023", // Assuming created_at exists or mock it
+                    style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: context.font(11)),
+                  ),
+                  const Spacer(),
+                  Icon(Icons.chevron_right_rounded, size: context.scale(16), color: theme.colorScheme.primary),
+                ],
+              ),
             ],
           ),
         ),
@@ -69,152 +326,30 @@ class _StaffSupportTicketsPageState extends State<StaffSupportTicketsPage> {
     );
   }
 
-  Widget _buildFilters() {
+  Widget _buildPriorityBadge(BuildContext context, String priority) {
+    Color color;
+    switch (priority.toLowerCase()) {
+      case 'high': color = Colors.red; break;
+      case 'medium': color = Colors.orange; break;
+      case 'low': color = Colors.green; break;
+      default: color = Colors.blue;
+    }
+
     return Container(
-      padding: const EdgeInsets.all(20),
+      padding: EdgeInsets.symmetric(horizontal: context.scale(10), vertical: context.scale(4)),
       decoration: BoxDecoration(
-        color: cardColor,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
+        color: color.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(context.scale(8)),
+        border: Border.all(color: color.withValues(alpha: 0.2)),
       ),
-      child: Column(
-        children: [
-          TextField(
-            controller: _searchController,
-            style: const TextStyle(color: Colors.white, fontSize: 14),
-            decoration: InputDecoration(
-              hintText: "Search by Title...",
-              hintStyle: const TextStyle(color: Colors.white24, fontSize: 14),
-              prefixIcon: const Icon(Icons.search, color: Colors.white38, size: 20),
-              filled: true,
-              fillColor: Colors.white.withValues(alpha: 0.05),
-              border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
-            ),
-            onSubmitted: (_) => _loadTickets(),
-          ),
-          const SizedBox(height: 12),
-          _buildFilterDropdown("Priority", _selectedPriority, ["all", "low", "medium", "high"], (val) {
-            setState(() => _selectedPriority = val!);
-            _loadTickets();
-          }),
-          const SizedBox(height: 12),
-          _buildFilterDropdown("Status", _selectedStatus, ["all", "open", "closed"], (val) {
-            setState(() => _selectedStatus = val!);
-            _loadTickets();
-          }),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildFilterDropdown(String label, String value, List<String> items, ValueChanged<String?> onChanged) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-      decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.05),
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: DropdownButtonHideUnderline(
-        child: DropdownButton<String>(
-          value: value,
-          isExpanded: true,
-          dropdownColor: cardColor,
-          icon: const Icon(Icons.keyboard_arrow_down_rounded, color: Colors.white38),
-          style: const TextStyle(color: Colors.white70, fontSize: 14),
-          items: items.map((e) => DropdownMenuItem(value: e, child: Text(e.toUpperCase()))).toList(),
-          onChanged: onChanged,
-        ),
-      ),
-    );
-  }
-
-  Widget _buildTicketList() {
-    return Container(
-      decoration: BoxDecoration(
-        color: cardColor,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
-      ),
-      child: Column(
-        children: [
-          const Padding(
-            padding: EdgeInsets.all(16.0),
-            child: Row(
-              children: [
-                SizedBox(width: 40, child: Text("#ID", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13))),
-                Expanded(flex: 3, child: Text("Title", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13))),
-                Expanded(flex: 2, child: Text("Priority", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13))),
-              ],
-            ),
-          ),
-          const Divider(color: Colors.white10, height: 1),
-          Expanded(
-            child: FutureBuilder<List<SupportTicket>>(
-              future: _ticketsFuture,
-              builder: (context, snapshot) {
-                if (snapshot.connectionState == ConnectionState.waiting) {
-                  return const Center(child: CircularProgressIndicator());
-                } else if (snapshot.hasError) {
-                  return Center(child: Text("Error: ${snapshot.error}", style: const TextStyle(color: Colors.white70)));
-                } else if (!snapshot.hasData || snapshot.data!.isEmpty) {
-                  return const Center(child: Text("No tickets found", style: TextStyle(color: Colors.white38)));
-                }
-
-                final tickets = snapshot.data!;
-                return ListView.separated(
-                  itemCount: tickets.length,
-                  separatorBuilder: (context, index) => const Divider(color: Colors.white10, height: 1),
-                  itemBuilder: (context, index) {
-                    final ticket = tickets[index];
-                    return ListTile(
-                      onTap: () async {
-                        await Navigator.push(context, MaterialPageRoute(builder: (context) => TicketDetailsPage(ticketId: ticket.id.toString())));
-                        _loadTickets();
-                      },
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                      leading: SizedBox(width: 40, child: Text(ticket.id.toString(), style: const TextStyle(color: Colors.white70, fontSize: 14))),
-                      title: Text(ticket.title, style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w500)),
-                      trailing: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                        decoration: BoxDecoration(
-                          color: ticket.priority.toLowerCase() == "high" ? Colors.red.withValues(alpha: 0.1) : Colors.white.withValues(alpha: 0.05),
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: Text(
-                          ticket.priority.toUpperCase(),
-                          style: TextStyle(
-                            color: ticket.priority.toLowerCase() == "high" ? Colors.redAccent : Colors.white54,
-                            fontSize: 12,
-                            fontWeight: FontWeight.bold
-                          )
-                        ),
-                      ),
-                    );
-                  },
-                );
-              },
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildCreateTicketButton() {
-    return SizedBox(
-      width: double.infinity,
-      height: 55,
-      child: ElevatedButton.icon(
-        onPressed: () async {
-          await Navigator.push(context, MaterialPageRoute(builder: (context) => const StaffCreateTicketPage()));
-          _loadTickets();
-        },
-        icon: const Icon(Icons.add_rounded, color: Colors.white),
-        label: const Text("CREATE NEW TICKET", style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white)),
-        style: ElevatedButton.styleFrom(
-          backgroundColor: primaryColor,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        ),
+      child: Text(
+        priority.toUpperCase(),
+        style: TextStyle(
+          color: color,
+          fontSize: context.font(10),
+          fontWeight: FontWeight.bold,
+          letterSpacing: 0.5,
+        )
       ),
     );
   }

@@ -85,20 +85,20 @@ class _FAQManagementScreenState extends State<FAQManagementScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
+    final theme = context.theme;
     return Scaffold(
       appBar: AppBar(
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text("FAQ Management"),
-            Text("Manage frequently asked questions", style: theme.textTheme.labelSmall?.copyWith(color: theme.hintColor)),
+            Text("FAQ Management", style: TextStyle(fontSize: context.font(18))),
+            Text("Manage frequently asked questions", style: theme.textTheme.labelSmall?.copyWith(color: theme.hintColor, fontSize: context.font(11))),
           ],
         ),
         actions: [
           IconButton(
             onPressed: () => _showFAQModal(),
-            icon: const Icon(Icons.add_circle_outline),
+            icon: Icon(Icons.add_circle_outline, size: context.scale(20)),
             tooltip: "Create New FAQ",
           ),
         ],
@@ -108,12 +108,12 @@ class _FAQManagementScreenState extends State<FAQManagementScreen> {
           : _errorMessage != null
               ? Center(
                   child: Padding(
-                    padding: const EdgeInsets.all(24.0),
+                    padding: EdgeInsets.all(context.scale(24.0)),
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Text(_errorMessage!, textAlign: TextAlign.center, style: TextStyle(color: theme.colorScheme.error)),
-                        const SizedBox(height: 16),
+                        Text(_errorMessage!, textAlign: TextAlign.center, style: TextStyle(color: theme.colorScheme.error, fontSize: context.font(14))),
+                        SizedBox(height: context.scale(16)),
                         ElevatedButton(onPressed: _fetchFaqs, child: const Text("Retry")),
                       ],
                     ),
@@ -129,12 +129,12 @@ class _FAQManagementScreenState extends State<FAQManagementScreen> {
                         Card(
                           color: theme.colorScheme.secondaryContainer,
                           child: Padding(
-                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                            child: Text("Total FAQs: ${_faqs.length}", 
-                              style: TextStyle(color: theme.colorScheme.onSecondaryContainer, fontWeight: FontWeight.bold)),
+                            padding: EdgeInsets.symmetric(horizontal: context.scale(16), vertical: context.scale(12)),
+                            child: Text("Total FAQs: ${_faqs.length}",
+                              style: TextStyle(color: theme.colorScheme.onSecondaryContainer, fontWeight: FontWeight.bold, fontSize: context.font(14))),
                           ),
                         ),
-                        const SizedBox(height: 24),
+                        SizedBox(height: context.scale(24)),
                         ..._faqs.map((faq) => _buildFAQCard(faq)),
                       ],
                     ),
@@ -144,7 +144,7 @@ class _FAQManagementScreenState extends State<FAQManagementScreen> {
   }
 
   Widget _buildFAQCard(Map<String, dynamic> faq) {
-    final theme = Theme.of(context);
+    final theme = context.theme;
     String formattedDate = faq['updated_at'] ?? faq['created_at'] ?? 'N/A';
     try {
        DateTime dt = DateTime.parse(formattedDate);
@@ -152,30 +152,30 @@ class _FAQManagementScreenState extends State<FAQManagementScreen> {
     } catch (_) {}
 
     return Card(
-      margin: const EdgeInsets.only(bottom: 16),
+      margin: EdgeInsets.only(bottom: context.scale(16)),
       child: ExpansionTile(
-        title: Text(faq['question'] ?? '', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
-        subtitle: Text("Updated: $formattedDate", style: theme.textTheme.labelSmall?.copyWith(color: theme.hintColor)),
-        childrenPadding: const EdgeInsets.all(16),
+        title: Text(faq['question'] ?? '', style: TextStyle(fontWeight: FontWeight.bold, fontSize: context.font(14))),
+        subtitle: Text("Updated: $formattedDate", style: theme.textTheme.labelSmall?.copyWith(color: theme.hintColor, fontSize: context.font(11))),
+        childrenPadding: EdgeInsets.all(context.scale(16)),
         expandedCrossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const Divider(height: 1),
-          const SizedBox(height: 16),
-          Text(faq['answer'] ?? '', style: theme.textTheme.bodyMedium?.copyWith(height: 1.5)),
-          const SizedBox(height: 24),
+          SizedBox(height: context.scale(16)),
+          Text(faq['answer'] ?? '', style: theme.textTheme.bodyMedium?.copyWith(height: 1.5, fontSize: context.font(14))),
+          SizedBox(height: context.scale(24)),
           Row(
             mainAxisAlignment: MainAxisAlignment.end,
             children: [
               TextButton.icon(
                 onPressed: () => _showFAQModal(faq: faq),
-                icon: const Icon(Icons.edit_outlined, size: 18),
-                label: const Text("EDIT"),
+                icon: Icon(Icons.edit_outlined, size: context.scale(18)),
+                label: Text("EDIT", style: TextStyle(fontSize: context.font(12))),
               ),
-              const SizedBox(width: 8),
+              SizedBox(width: context.scale(8)),
               TextButton.icon(
                 onPressed: () => _deleteFaq(faq['id'].toString()),
-                icon: const Icon(Icons.delete_outline, size: 18),
-                label: const Text("DELETE"),
+                icon: Icon(Icons.delete_outline, size: context.scale(18)),
+                label: Text("DELETE", style: TextStyle(fontSize: context.font(12))),
                 style: TextButton.styleFrom(foregroundColor: theme.colorScheme.error),
               ),
             ],
@@ -250,59 +250,64 @@ class _CreateFAQModalState extends State<CreateFAQModal> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
+    final theme = context.theme;
     return Padding(
       padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
       child: Container(
         decoration: BoxDecoration(
           color: theme.scaffoldBackgroundColor,
-          borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+          borderRadius: BorderRadius.vertical(top: Radius.circular(context.scale(24))),
         ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             Container(
-              padding: const EdgeInsets.all(16),
+              padding: EdgeInsets.all(context.scale(16)),
               decoration: BoxDecoration(
                 color: theme.colorScheme.primary,
-                borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+                borderRadius: BorderRadius.vertical(top: Radius.circular(context.scale(24))),
               ),
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Text(widget.faq != null ? "Update FAQ" : "Create New FAQ", 
-                    style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)),
-                  IconButton(onPressed: () => Navigator.pop(context), icon: const Icon(Icons.close, color: Colors.white)),
+                  Text(widget.faq != null ? "Update FAQ" : "Create New FAQ",
+                    style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: context.font(16))),
+                  IconButton(onPressed: () => Navigator.pop(context), icon: Icon(Icons.close, color: Colors.white, size: context.scale(20))),
                 ],
               ),
             ),
             Padding(
-              padding: const EdgeInsets.all(24),
+              padding: EdgeInsets.all(context.scale(24)),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text("Question *", style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold)),
-                  const SizedBox(height: 8),
+                  Text("Question *", style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold, fontSize: context.font(14))),
+                  SizedBox(height: context.scale(8)),
                   TextField(
                     controller: _questionController,
+                    style: TextStyle(fontSize: context.font(14)),
                     decoration: const InputDecoration(hintText: "Enter question"),
                   ),
-                  const SizedBox(height: 20),
-                  Text("Answer *", style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold)),
-                  const SizedBox(height: 8),
+                  SizedBox(height: context.scale(20)),
+                  Text("Answer *", style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold, fontSize: context.font(14))),
+                  SizedBox(height: context.scale(8)),
                   TextField(
                     controller: _answerController,
                     maxLines: 5,
+                    style: TextStyle(fontSize: context.font(14)),
                     decoration: const InputDecoration(hintText: "Enter detailed answer"),
                   ),
-                  const SizedBox(height: 32),
+                  SizedBox(height: context.scale(32)),
                   SizedBox(
                     width: double.infinity,
                     child: ElevatedButton(
                       onPressed: _isSaving ? null : _save,
+                      style: ElevatedButton.styleFrom(
+                        minimumSize: Size(double.infinity, context.scale(54)),
+                      ),
                       child: _isSaving
-                          ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
-                          : const Text("SAVE FAQ"),
+                          ? SizedBox(height: context.scale(20), width: context.scale(20), child: const CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                          : Text("SAVE FAQ", style: TextStyle(fontSize: context.font(16))),
                     ),
                   ),
                 ],

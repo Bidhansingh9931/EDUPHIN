@@ -1,7 +1,11 @@
 import 'dart:io';
+import 'dart:typed_data';
 import 'package:eduphin/services/responsive_helper.dart';
+import 'package:eduphin/services/theme_service.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:intl/intl.dart';
 import '../../services/api_service.dart';
 
 class AddModeratorScreen extends StatefulWidget {
@@ -47,9 +51,11 @@ class _AddModeratorScreenState extends State<AddModeratorScreen> {
 
   File? _photo;
   File? _aadharPhoto;
-  File? _xMarksheet;
-  File? _xiiMarksheet;
-  File? _resume;
+  
+  Uint8List? _photoBytes;
+  String? _photoName;
+  Uint8List? _aadharBytes;
+  String? _aadharName;
 
   bool _isSaving = false;
 
@@ -91,12 +97,37 @@ class _AddModeratorScreenState extends State<AddModeratorScreen> {
   Future<void> _pickFile(String type) async {
     final pickedFile = await ImagePicker().pickImage(source: ImageSource.gallery);
     if (pickedFile != null) {
+      if (kIsWeb) {
+        final bytes = await pickedFile.readAsBytes();
+        setState(() {
+          if (type == 'photo') {
+            _photoBytes = bytes;
+            _photoName = pickedFile.name;
+          }
+          if (type == 'aadhar') {
+            _aadharBytes = bytes;
+            _aadharName = pickedFile.name;
+          }
+        });
+      } else {
+        setState(() {
+          if (type == 'photo') _photo = File(pickedFile.path);
+          if (type == 'aadhar') _aadharPhoto = File(pickedFile.path);
+        });
+      }
+    }
+  }
+
+  Future<void> _selectDate(TextEditingController controller) async {
+    DateTime? picked = await showDatePicker(
+      context: context,
+      initialDate: DateTime.now(),
+      firstDate: DateTime(1950),
+      lastDate: DateTime(2101),
+    );
+    if (picked != null) {
       setState(() {
-        if (type == 'photo') _photo = File(pickedFile.path);
-        if (type == 'aadhar') _aadharPhoto = File(pickedFile.path);
-        if (type == 'x') _xMarksheet = File(pickedFile.path);
-        if (type == 'xii') _xiiMarksheet = File(pickedFile.path);
-        if (type == 'resume') _resume = File(pickedFile.path);
+        controller.text = DateFormat('yyyy-MM-dd').format(picked);
       });
     }
   }
@@ -139,18 +170,32 @@ class _AddModeratorScreenState extends State<AddModeratorScreen> {
         'role_id': '2', 
       };
 
-      final files = {
-        if (_photo != null) 'photo': _photo!,
-        if (_aadharPhoto != null) 'aadhar_photo': _aadharPhoto!,
-        if (_xMarksheet != null) 'x_marksheet_photo': _xMarksheet!,
-        if (_xiiMarksheet != null) 'xii_marksheet_photo': _xiiMarksheet!,
-        if (_resume != null) 'resume': _resume!,
-      };
+      if (kIsWeb) {
+        final Map<String, Uint8List> files = {
+          if (_photoBytes != null) 'photo': _photoBytes!,
+          if (_aadharBytes != null) 'aadhar_photo': _aadharBytes!,
+        };
+        final Map<String, String> fileNames = {
+          if (_photoName != null) 'photo': _photoName!,
+          if (_aadharName != null) 'aadhar_photo': _aadharName!,
+        };
 
-      if (widget.moderator != null) {
-        await ApiService.updateModerate(widget.moderator!['id'].toString(), fields, files: files);
+        if (widget.moderator != null) {
+          await ApiService.updateModerateFromBytes(widget.moderator!['id'].toString(), fields, files: files, fileNames: fileNames);
+        } else {
+          await ApiService.storeModerateFromBytes(fields, files: files, fileNames: fileNames);
+        }
       } else {
-        await ApiService.storeModerate(fields, files: files);
+        final files = {
+          if (_photo != null) 'photo': _photo!,
+          if (_aadharPhoto != null) 'aadhar_photo': _aadharPhoto!,
+        };
+
+        if (widget.moderator != null) {
+          await ApiService.updateModerate(widget.moderator!['id'].toString(), fields, files: files);
+        } else {
+          await ApiService.storeModerate(fields, files: files);
+        }
       }
 
       if (mounted) {
@@ -168,10 +213,11 @@ class _AddModeratorScreenState extends State<AddModeratorScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
+    final theme = context.theme;
     return Scaffold(
       appBar: AppBar(
-        title: Text(widget.moderator != null ? "Edit Moderator" : "Register Moderator"),
+        title: Text(widget.moderator != null ? "Edit Moderator" : "Register Moderator",
+            style: TextStyle(fontSize: context.font(20), fontWeight: FontWeight.bold)),
       ),
       body: _isSaving
           ? const Center(child: CircularProgressIndicator())
@@ -201,13 +247,19 @@ class _AddModeratorScreenState extends State<AddModeratorScreen> {
                           children: [
                             _buildResponsiveRow(context, [
                               _buildDropdown(context, "Gender *", _gender, ["Male", "Female", "Other"], (v) => setState(() => _gender = v!)),
-                              _buildTextField(context, "Date of Birth *", "YYYY-MM-DD", Icons.calendar_today, _dobController),
+                              _buildTextField(context, "Date of Birth *", "YYYY-MM-DD", Icons.calendar_today, _dobController, readOnly: true, onTap: () => _selectDate(_dobController)),
                             ]),
                             _buildResponsiveRow(context, [
                               _buildTextField(context, "Phone *", "Phone Number", Icons.phone_android, _phoneController),
-                              _buildTextField(context, "Alternate Phone", "Phone Number", Icons.phone, _altPhoneController),
+                              _buildTextField(context, "Alternate Phone *", "Phone Number", Icons.phone, _altPhoneController),
                             ]),
-                            _buildFilePicker(context, "Moderator Photo", _photo, () => _pickFile('photo')),
+                            _buildTextField(context, "Address *", "Full Address", Icons.home_outlined, _addressController, maxLines: 2),
+                            _buildResponsiveRow(context, [
+                              _buildTextField(context, "City *", "City", Icons.location_city, _cityController),
+                              _buildTextField(context, "State *", "State", Icons.map_outlined, _stateController),
+                              _buildTextField(context, "Pincode *", "6-digit Pincode", Icons.pin_drop_outlined, _pincodeController),
+                            ]),
+                            _buildFilePicker(context, "Moderator Photo", _photo, _photoBytes, _photoName, () => _pickFile('photo')),
                           ],
                         ),
                         _buildSection(
@@ -220,7 +272,7 @@ class _AddModeratorScreenState extends State<AddModeratorScreen> {
                               _buildDropdown(context, "Employment Type *", _employmentType, ["full-time", "part-time", "internship", "other"], (v) => setState(() => _employmentType = v!)),
                             ]),
                             _buildResponsiveRow(context, [
-                              _buildTextField(context, "Joining Date *", "YYYY-MM-DD", Icons.calendar_today, _joiningDateController),
+                              _buildTextField(context, "Joining Date *", "YYYY-MM-DD", Icons.calendar_today, _joiningDateController, readOnly: true, onTap: () => _selectDate(_joiningDateController)),
                               _buildTextField(context, "Experience *", "Years", Icons.history_edu, _experienceController),
                             ]),
                             _buildResponsiveRow(context, [
@@ -235,32 +287,38 @@ class _AddModeratorScreenState extends State<AddModeratorScreen> {
                           subtitle: "Official identification and bank details.",
                           children: [
                             _buildTextField(context, "Aadhar Number *", "Number", Icons.fingerprint, _aadharNumberController),
-                            _buildFilePicker(context, "Aadhar Photo *", _aadharPhoto, () => _pickFile('aadhar')),
+                            _buildFilePicker(context, "Aadhar Photo *", _aadharPhoto, _aadharBytes, _aadharName, () => _pickFile('aadhar')),
                             _buildResponsiveRow(context, [
                               _buildTextField(context, "Account Number *", "Number", Icons.account_balance_outlined, _bankAccountController),
                               _buildTextField(context, "IFSC Code", "IFSC", Icons.code, _ifscController),
                             ]),
                           ],
                         ),
-                        const SizedBox(height: 32),
+                        SizedBox(height: context.scale(32)),
                         Row(
                           children: [
                             Expanded(
                               child: OutlinedButton(
                                 onPressed: () => Navigator.pop(context),
-                                child: const Text("CANCEL"),
+                                style: OutlinedButton.styleFrom(
+                                  padding: EdgeInsets.symmetric(vertical: context.scale(12)),
+                                ),
+                                child: Text("CANCEL", style: TextStyle(fontSize: context.font(14))),
                               ),
                             ),
-                            const SizedBox(width: 16),
+                            SizedBox(width: context.scale(16)),
                             Expanded(
                               child: ElevatedButton(
                                 onPressed: _isSaving ? null : _save,
-                                child: const Text("SAVE DETAILS"),
+                                style: ElevatedButton.styleFrom(
+                                  padding: EdgeInsets.symmetric(vertical: context.scale(12)),
+                                ),
+                                child: Text("SAVE DETAILS", style: TextStyle(fontSize: context.font(14))),
                               ),
                             ),
                           ],
                         ),
-                        const SizedBox(height: 40),
+                        SizedBox(height: context.scale(40)),
                       ],
                     ),
                   ),
@@ -271,29 +329,34 @@ class _AddModeratorScreenState extends State<AddModeratorScreen> {
   }
 
   Widget _buildSection(BuildContext context, {required String title, required String subtitle, required List<Widget> children}) {
-    final theme = Theme.of(context);
+    final theme = context.theme;
     return Card(
-      margin: const EdgeInsets.only(bottom: 24),
+      elevation: 0,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(context.scale(16)),
+        side: BorderSide(color: theme.dividerColor.withValues(alpha: 0.1)),
+      ),
+      margin: EdgeInsets.only(bottom: context.scale(24)),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Container(
             width: double.infinity,
-            padding: const EdgeInsets.all(16),
+            padding: EdgeInsets.all(context.scale(16)),
             decoration: BoxDecoration(
               color: theme.colorScheme.primary.withValues(alpha: 0.05),
-              borderRadius: const BorderRadius.only(topLeft: Radius.circular(16), topRight: Radius.circular(16)),
+              borderRadius: BorderRadius.only(topLeft: Radius.circular(context.scale(16)), topRight: Radius.circular(context.scale(16))),
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(title, style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold, color: theme.colorScheme.primary)),
-                Text(subtitle, style: theme.textTheme.labelSmall?.copyWith(color: theme.hintColor)),
+                Text(title, style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold, color: theme.colorScheme.primary, fontSize: context.font(16))),
+                Text(subtitle, style: theme.textTheme.labelSmall?.copyWith(color: theme.hintColor, fontSize: context.font(11))),
               ],
             ),
           ),
           Padding(
-            padding: const EdgeInsets.all(16),
+            padding: EdgeInsets.all(context.scale(16)),
             child: Column(children: children),
           ),
         ],
@@ -302,30 +365,34 @@ class _AddModeratorScreenState extends State<AddModeratorScreen> {
   }
 
   Widget _buildResponsiveRow(BuildContext context, List<Widget> children) {
-    if (!context.isTablet) return Column(children: children);
+    if (context.isMobile) return Column(children: children);
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
-      children: children.map((c) => Expanded(child: Padding(padding: const EdgeInsets.only(right: 12), child: c))).toList(),
+      children: children.map((c) => Expanded(child: Padding(padding: EdgeInsets.only(right: context.scale(12)), child: c))).toList(),
     );
   }
 
-  Widget _buildTextField(BuildContext context, String label, String hint, IconData icon, TextEditingController controller, {int maxLines = 1, bool isPassword = false, bool required = true}) {
-    final theme = Theme.of(context);
+  Widget _buildTextField(BuildContext context, String label, String hint, IconData icon, TextEditingController controller, {int maxLines = 1, bool isPassword = false, bool required = true, bool readOnly = false, VoidCallback? onTap}) {
+    final theme = context.theme;
     return Padding(
-      padding: const EdgeInsets.only(bottom: 16),
+      padding: EdgeInsets.only(bottom: context.scale(16)),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(label, style: theme.textTheme.labelMedium?.copyWith(color: theme.hintColor)),
-          const SizedBox(height: 8),
+          Text(label, style: theme.textTheme.labelMedium?.copyWith(color: theme.hintColor, fontSize: context.font(12))),
+          SizedBox(height: context.scale(8)),
           TextFormField(
             controller: controller,
             maxLines: maxLines,
             obscureText: isPassword,
+            readOnly: readOnly,
+            onTap: onTap,
+            style: TextStyle(fontSize: context.font(14)),
             validator: required ? (v) => v == null || v.isEmpty ? "Required" : null : null,
             decoration: InputDecoration(
               hintText: hint,
-              prefixIcon: Icon(icon, size: 18),
+              prefixIcon: Icon(icon, size: context.scale(18)),
+              contentPadding: EdgeInsets.all(context.scale(12)),
             ),
           ),
         ],
@@ -334,57 +401,68 @@ class _AddModeratorScreenState extends State<AddModeratorScreen> {
   }
 
   Widget _buildDropdown(BuildContext context, String label, String value, List<String> items, ValueChanged<String?> onChanged) {
-    final theme = Theme.of(context);
+    final theme = context.theme;
     return Padding(
-      padding: const EdgeInsets.only(bottom: 16),
+      padding: EdgeInsets.only(bottom: context.scale(16)),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(label, style: theme.textTheme.labelMedium?.copyWith(color: theme.hintColor)),
-          const SizedBox(height: 8),
+          Text(label, style: theme.textTheme.labelMedium?.copyWith(color: theme.hintColor, fontSize: context.font(12))),
+          SizedBox(height: context.scale(8)),
           DropdownButtonFormField<String>(
             isExpanded: true,
             value: value,
-            items: items.map((e) => DropdownMenuItem(value: e, child: Text(e.toUpperCase(), style: const TextStyle(fontSize: 12)))).toList(),
+            style: TextStyle(fontSize: context.font(14), color: theme.textTheme.bodyMedium?.color),
+            items: items.map((e) => DropdownMenuItem(value: e, child: Text(e.toUpperCase(), style: TextStyle(fontSize: context.font(12))))).toList(),
             onChanged: onChanged,
-            decoration: const InputDecoration(prefixIcon: Icon(Icons.list, size: 18)),
+            decoration: InputDecoration(
+              prefixIcon: Icon(Icons.list, size: context.scale(18)),
+              contentPadding: EdgeInsets.all(context.scale(12)),
+            ),
           ),
         ],
       ),
     );
   }
 
-  Widget _buildFilePicker(BuildContext context, String label, File? file, VoidCallback onTap) {
-    final theme = Theme.of(context);
+  Widget _buildFilePicker(BuildContext context, String label, File? file, Uint8List? bytes, String? name, VoidCallback onTap) {
+    final theme = context.theme;
+    String displayText = "No File Chosen";
+    if (kIsWeb) {
+      if (name != null) displayText = name;
+    } else {
+      if (file != null) displayText = file.path.split('/').last;
+    }
+
     return Padding(
-      padding: const EdgeInsets.only(bottom: 16),
+      padding: EdgeInsets.only(bottom: context.scale(16)),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(label, style: theme.textTheme.labelMedium?.copyWith(color: theme.hintColor)),
-          const SizedBox(height: 8),
+          Text(label, style: theme.textTheme.labelMedium?.copyWith(color: theme.hintColor, fontSize: context.font(12))),
+          SizedBox(height: context.scale(8)),
           InkWell(
             onTap: onTap,
-            borderRadius: BorderRadius.circular(12),
+            borderRadius: BorderRadius.circular(context.scale(12)),
             child: Container(
-              height: 56,
+              height: context.scale(56),
               decoration: BoxDecoration(
                 color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: BorderRadius.circular(context.scale(12)),
                 border: Border.all(color: theme.colorScheme.outline.withValues(alpha: 0.2)),
               ),
               child: Row(
                 children: [
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    padding: EdgeInsets.symmetric(horizontal: context.scale(16)),
                     decoration: BoxDecoration(
                       color: theme.colorScheme.primary.withValues(alpha: 0.1),
-                      borderRadius: const BorderRadius.only(topLeft: Radius.circular(12), bottomLeft: Radius.circular(12)),
+                      borderRadius: BorderRadius.only(topLeft: Radius.circular(context.scale(12)), bottomLeft: Radius.circular(context.scale(12))),
                     ),
                     alignment: Alignment.center,
-                    child: Text("Choose File", style: TextStyle(color: theme.colorScheme.primary, fontWeight: FontWeight.bold, fontSize: 13)),
+                    child: Text("Choose File", style: TextStyle(color: theme.colorScheme.primary, fontWeight: FontWeight.bold, fontSize: context.font(13))),
                   ),
-                  Expanded(child: Padding(padding: const EdgeInsets.only(left: 12), child: Text(file == null ? "No File Chosen" : "File Selected", style: TextStyle(color: theme.hintColor, fontSize: 13)))),
+                  Expanded(child: Padding(padding: EdgeInsets.only(left: context.scale(12)), child: Text(displayText, style: TextStyle(color: theme.hintColor, fontSize: context.font(13)), overflow: TextOverflow.ellipsis))),
                 ],
               ),
             ),

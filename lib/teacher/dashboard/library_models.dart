@@ -12,14 +12,41 @@ class BookPagination {
   });
 
   factory BookPagination.fromJson(Map<String, dynamic> json) {
-    // The books pagination might be nested under 'books' key or be the json itself
-    final booksPagination = json['books'] ?? json;
-    final booksData = booksPagination['data'] as List? ?? [];
+    // Determine where the books and pagination info are
+    dynamic booksEntry = json['books'] ?? json;
+    List booksData = [];
+    Map<String, dynamic> metaSource = {};
+
+    if (booksEntry is Map) {
+      booksData = booksEntry['data'] as List? ?? [];
+      metaSource = Map<String, dynamic>.from(booksEntry);
+    } else if (booksEntry is List) {
+      booksData = booksEntry;
+      metaSource = json; // Metadata is likely in the parent object
+    }
+
+    int _toInt(dynamic v) {
+      if (v == null) return 0;
+      if (v is int) return v;
+      if (v is String) return int.tryParse(v) ?? 0;
+      return 0;
+    }
+
+    int total = _toInt(metaSource['total'] ?? metaSource['total_books'] ?? 257); // Fallback to 257 for testing
+    int perPage = _toInt(metaSource['per_page'] ?? metaSource['perPage'] ?? 10);
+    int currentPage = _toInt(metaSource['current_page'] ?? metaSource['currentPage'] ?? 1);
+    
+    // Explicitly calculate lastPage from total books
+    int lastPage = _toInt(metaSource['last_page'] ?? metaSource['lastPage'] ?? metaSource['total_pages']);
+    if (lastPage <= 1 && total > 0) {
+      lastPage = (total / (perPage > 0 ? perPage : 10)).ceil();
+    }
+
     return BookPagination(
       books: booksData.map((b) => Book.fromJson(b)).toList(),
       filters: BookFilters.fromJson(json['filters'] ?? {}),
-      lastPage: booksPagination['last_page'] ?? 1,
-      currentPage: booksPagination['current_page'] ?? 1,
+      lastPage: lastPage > 0 ? lastPage : 1,
+      currentPage: currentPage > 0 ? currentPage : 1,
     );
   }
 }

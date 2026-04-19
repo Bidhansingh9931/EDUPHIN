@@ -92,8 +92,8 @@ class LogDetailsScreen extends StatelessWidget {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
             decoration: BoxDecoration(
-              color: color.withValues(alpha: 0.1), 
-              borderRadius: BorderRadius.circular(12), 
+              color: color.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(12),
               border: Border.all(color: color.withValues(alpha: 0.5))
             ),
             child: Text(value, style: TextStyle(color: color, fontSize: 11, fontWeight: FontWeight.bold)),
@@ -116,7 +116,7 @@ class LogDetailsScreen extends StatelessWidget {
             width: double.infinity,
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.3), 
+              color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
               borderRadius: BorderRadius.circular(12),
               border: Border.all(color: theme.colorScheme.outline.withValues(alpha: 0.1))
             ),

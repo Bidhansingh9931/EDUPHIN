@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:eduphin/services/api_service.dart';
+import 'package:eduphin/services/responsive_helper.dart';
 
 class MyLendingBooksPage extends StatefulWidget {
   const MyLendingBooksPage({super.key});
@@ -13,12 +14,6 @@ class _MyLendingBooksPageState extends State<MyLendingBooksPage> {
   List<dynamic> _issuedBooks = [];
   bool _isLoading = true;
   String? _errorMessage;
-
-  // Theme Colors
-  final Color _bg = const Color(0xff0B1220);
-  final Color _card = const Color(0xff1E2746);
-  final Color _primary = const Color(0xff3366FF);
-  final Color _secondary = const Color(0xff3E4764);
 
   // Controllers
   final TextEditingController _titleController = TextEditingController();
@@ -60,6 +55,8 @@ class _MyLendingBooksPageState extends State<MyLendingBooksPage> {
   }
 
   Future<void> pickDate(TextEditingController controller, String filterKey) async {
+    final theme = context.theme;
+    final colorScheme = theme.colorScheme;
     DateTime? picked = await showDatePicker(
       context: context,
       initialDate: DateTime.now(),
@@ -67,12 +64,9 @@ class _MyLendingBooksPageState extends State<MyLendingBooksPage> {
       lastDate: DateTime(2100),
       builder: (context, child) {
         return Theme(
-          data: Theme.of(context).copyWith(
-            colorScheme: ColorScheme.dark(
-              primary: _primary,
-              onPrimary: Colors.white,
-              surface: _card,
-              onSurface: Colors.white,
+          data: theme.copyWith(
+            colorScheme: colorScheme.copyWith(
+              surface: colorScheme.surfaceContainerLow,
             ),
           ),
           child: child!,
@@ -109,234 +103,279 @@ class _MyLendingBooksPageState extends State<MyLendingBooksPage> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = context.theme;
+    final colorScheme = theme.colorScheme;
+
     return Scaffold(
-      backgroundColor: _bg,
+      backgroundColor: theme.scaffoldBackgroundColor,
       appBar: AppBar(
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.white),
-          onPressed: () => Navigator.pop(context),
-        ),
-        title: const Text(
-          "My Lending Books",
-          style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white),
-        ),
+        title: const Text("My Lending Books"),
       ),
       body: RefreshIndicator(
         onRefresh: _fetchLendingBooks,
-        color: _primary,
+        color: colorScheme.primary,
+        backgroundColor: colorScheme.surfaceContainerLow,
         child: SingleChildScrollView(
           physics: const AlwaysScrollableScrollPhysics(),
-          padding: const EdgeInsets.all(20),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              /// ================= FILTER CARD =================
-              Container(
-                padding: const EdgeInsets.all(20),
-                decoration: BoxDecoration(
-                  color: _card,
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: Colors.white12),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Row(
-                      children: [
-                        Icon(Icons.filter_list, color: Colors.white70, size: 20),
-                        SizedBox(width: 8),
-                        Text(
-                          "Filter Lending History",
-                          style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
-                        ),
-                      ],
+          padding: context.pagePadding,
+          child: Center(
+            child: Container(
+              constraints: const BoxConstraints(maxWidth: 1100),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  /// ================= FILTER CARD =================
+                  Card(
+                    elevation: 0,
+                    color: colorScheme.surfaceContainerLow,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(context.scale(16)),
+                      side: BorderSide(color: colorScheme.outlineVariant.withValues(alpha: 0.5)),
                     ),
-                    const SizedBox(height: 20),
-
-                    buildLabel("Book Title"),
-                    buildTextField(_titleController, "Search by title..."),
-
-                    buildLabel("Due Date From"),
-                    buildDateField(_fromDateController, "due_from"),
-
-                    buildLabel("Due Date To"),
-                    buildDateField(_toDateController, "due_to"),
-
-                    const SizedBox(height: 24),
-
-                    /// Apply & Reset
-                    Row(
-                      children: [
-                        Expanded(
-                          child: SizedBox(
-                            height: 48,
-                            child: ElevatedButton(
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: _primary,
-                                foregroundColor: Colors.white,
-                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                                elevation: 0,
-                              ),
-                              onPressed: _applyFilters,
-                              child: const Text("APPLY FILTERS", style: TextStyle(fontWeight: FontWeight.bold)),
-                            ),
+                    child: Padding(
+                      padding: EdgeInsets.all(context.scale(24)),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Icon(Icons.filter_list, color: colorScheme.primary, size: context.scale(24)),
+                              SizedBox(width: context.scale(12)),
+                              Text("Filter Lending History", style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold, fontSize: context.font(18))),
+                            ],
                           ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: SizedBox(
-                            height: 48,
-                            child: ElevatedButton(
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: _secondary,
-                                foregroundColor: Colors.white,
-                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                                elevation: 0,
-                              ),
-                              onPressed: _resetFilters,
-                              child: const Text("RESET", style: TextStyle(fontWeight: FontWeight.bold)),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-
-              const SizedBox(height: 24),
-
-              /// ================= RESULTS TABLE =================
-              Container(
-                decoration: BoxDecoration(
-                  color: _card,
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: Colors.white12),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Padding(
-                      padding: EdgeInsets.all(20.0),
-                      child: Text(
-                        "Lending Records",
-                        style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
-                      ),
-                    ),
-                    if (_isLoading)
-                      Center(child: Padding(padding: const EdgeInsets.all(40.0), child: CircularProgressIndicator(color: _primary)))
-                    else if (_errorMessage != null)
-                      Center(child: Padding(padding: const EdgeInsets.all(40.0), child: Text(_errorMessage!, style: const TextStyle(color: Colors.redAccent))))
-                    else if (_issuedBooks.isEmpty)
-                      const Center(child: Padding(padding: const EdgeInsets.all(40.0), child: Text("No lending history found", style: TextStyle(color: Colors.white70))))
-                    else
-                      SingleChildScrollView(
-                        scrollDirection: Axis.horizontal,
-                        child: DataTable(
-                          headingRowColor: WidgetStateProperty.all(const Color(0xFF2A3450)),
-                          columnSpacing: 24,
-                          columns: const [
-                            DataColumn(label: Text("#", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold))),
-                            DataColumn(label: Text("BOOK TITLE", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold))),
-                            DataColumn(label: Text("ISSUED AT", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold))),
-                            DataColumn(label: Text("DUE DATE", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold))),
-                            DataColumn(label: Text("STATUS", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold))),
-                            DataColumn(label: Text("RETURNED", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold))),
-                          ],
-                          rows: _issuedBooks.asMap().entries.map((entry) {
-                            int index = entry.key;
-                            var record = entry.value;
-                            
-                            // Calculate overdue
-                            DateTime now = DateTime.now();
-                            DateTime? dueDate = record['due_date'] != null ? DateTime.tryParse(record['due_date']) : null;
-                            String statusText = "N/A";
-                            Color statusColor = Colors.grey;
-
-                            if (dueDate != null) {
-                              int diff = dueDate.difference(now).inDays;
-                              statusText = diff < 0 ? "${diff.abs()} days overdue" : "$diff days left";
-                              statusColor = diff < 0 ? Colors.redAccent : Colors.greenAccent;
-                            }
-
-                            return DataRow(cells: [
-                              DataCell(Text((index + 1).toString(), style: const TextStyle(color: Colors.white70))),
-                              DataCell(Text(record['book']?['title'] ?? 'N/A', style: const TextStyle(color: Colors.white))),
-                              DataCell(Text(record['issued_at'] ?? 'N/A', style: const TextStyle(color: Colors.white70))),
-                              DataCell(Text(record['due_date'] ?? 'N/A', style: const TextStyle(color: Colors.white70))),
-                              DataCell(Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                                decoration: BoxDecoration(
-                                  color: statusColor.withValues(alpha: 0.1),
-                                  borderRadius: BorderRadius.circular(4),
-                                  border: Border.all(color: statusColor.withValues(alpha: 0.5)),
+                          SizedBox(height: context.scale(24)),
+                          LayoutBuilder(builder: (context, constraints) {
+                            final isWide = constraints.maxWidth > 600;
+                            final isExtraWide = constraints.maxWidth > 900;
+                            return Wrap(
+                              spacing: context.scale(20),
+                              runSpacing: context.scale(16),
+                              children: [
+                                SizedBox(
+                                  width: isExtraWide ? (constraints.maxWidth - context.scale(40)) / 3 : (isWide ? (constraints.maxWidth - context.scale(20)) / 2 : double.infinity),
+                                  child: _buildFilterItem(context, "Book Title", buildTextField(context, _titleController, "Search by title...")),
                                 ),
-                                child: Text(statusText, style: TextStyle(color: statusColor, fontSize: 11, fontWeight: FontWeight.bold)),
-                              )),
-                              DataCell(Text(
-                                record['returned_at'] ?? 'Pending', 
-                                style: TextStyle(
-                                  color: record['returned_at'] != null ? Colors.white70 : Colors.orangeAccent,
-                                  fontWeight: record['returned_at'] == null ? FontWeight.bold : FontWeight.normal,
-                                )
-                              )),
-                            ]);
-                          }).toList(),
-                        ),
+                                SizedBox(
+                                  width: isExtraWide ? (constraints.maxWidth - context.scale(40)) / 3 : (isWide ? (constraints.maxWidth - context.scale(20)) / 2 : double.infinity),
+                                  child: _buildFilterItem(context, "Due Date From", buildDateField(context, _fromDateController, "due_from")),
+                                ),
+                                SizedBox(
+                                  width: isExtraWide ? (constraints.maxWidth - context.scale(40)) / 3 : (isWide ? (constraints.maxWidth - context.scale(20)) / 2 : double.infinity),
+                                  child: _buildFilterItem(context, "Due Date To", buildDateField(context, _toDateController, "due_to")),
+                                ),
+                              ],
+                            );
+                          }),
+                          SizedBox(height: context.scale(24)),
+                          Row(
+                            children: [
+                              const Spacer(flex: 2),
+                              Expanded(
+                                child: OutlinedButton(
+                                  onPressed: _resetFilters,
+                                  style: OutlinedButton.styleFrom(
+                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(context.scale(12))),
+                                    padding: EdgeInsets.symmetric(vertical: context.scale(16)),
+                                  ),
+                                  child: Text("RESET", style: TextStyle(fontSize: context.font(14))),
+                                ),
+                              ),
+                              SizedBox(width: context.scale(16)),
+                              Expanded(
+                                child: ElevatedButton(
+                                  onPressed: _applyFilters,
+                                  style: ElevatedButton.styleFrom(
+                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(context.scale(12))),
+                                    padding: EdgeInsets.symmetric(vertical: context.scale(16)),
+                                    elevation: 0,
+                                  ),
+                                  child: Text("APPLY", style: TextStyle(fontWeight: FontWeight.bold, fontSize: context.font(14))),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
                       ),
-                  ],
-                ),
+                    ),
+                  ),
+
+                  SizedBox(height: context.scale(32)),
+
+                  /// ================= RESULTS TABLE =================
+                  Card(
+                    elevation: 0,
+                    color: colorScheme.surfaceContainerLow,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(context.scale(16)),
+                      side: BorderSide(color: colorScheme.outlineVariant.withValues(alpha: 0.5)),
+                    ),
+                    clipBehavior: Clip.antiAlias,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        Padding(
+                          padding: EdgeInsets.all(context.scale(24.0)),
+                          child: Text("Lending Records", style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold, fontSize: context.font(18))),
+                        ),
+                        if (_isLoading)
+                          Center(child: Padding(padding: EdgeInsets.all(context.scale(40.0)), child: CircularProgressIndicator(color: colorScheme.primary)))
+                        else if (_errorMessage != null)
+                          Center(child: Padding(padding: EdgeInsets.all(context.scale(40.0)), child: Text(_errorMessage!, style: TextStyle(color: colorScheme.error, fontSize: context.font(14)))))
+                        else if (_issuedBooks.isEmpty)
+                          _buildEmptyState()
+                        else
+                          SingleChildScrollView(
+                            scrollDirection: Axis.horizontal,
+                            child: Theme(
+                              data: theme.copyWith(dividerColor: colorScheme.outlineVariant.withValues(alpha: 0.5)),
+                              child: DataTable(
+                                headingRowColor: WidgetStateProperty.all(colorScheme.surfaceContainerHighest.withValues(alpha: 0.3)),
+                                columnSpacing: context.responsive(24.0, tablet: 48.0, desktop: 64.0),
+                                columns: [
+                                  DataColumn(label: Text("#", style: TextStyle(fontWeight: FontWeight.bold, fontSize: context.font(14)))),
+                                  DataColumn(label: Text("BOOK TITLE", style: TextStyle(fontWeight: FontWeight.bold, fontSize: context.font(14)))),
+                                  DataColumn(label: Text("ISSUED AT", style: TextStyle(fontWeight: FontWeight.bold, fontSize: context.font(14)))),
+                                  DataColumn(label: Text("DUE DATE", style: TextStyle(fontWeight: FontWeight.bold, fontSize: context.font(14)))),
+                                  DataColumn(label: Text("STATUS", style: TextStyle(fontWeight: FontWeight.bold, fontSize: context.font(14)))),
+                                  DataColumn(label: Text("RETURNED", style: TextStyle(fontWeight: FontWeight.bold, fontSize: context.font(14)))),
+                                ],
+                                rows: _issuedBooks.asMap().entries.map((entry) {
+                                  int index = entry.key;
+                                  var record = entry.value;
+                                  
+                                  // Calculate overdue
+                                  DateTime now = DateTime.now();
+                                  DateTime? dueDate = record['due_date'] != null ? DateTime.tryParse(record['due_date']) : null;
+                                  String statusText = "N/A";
+                                  Color statusColor = Colors.grey;
+
+                                  if (dueDate != null) {
+                                    int diff = dueDate.difference(now).inDays;
+                                    statusText = diff < 0 ? "${diff.abs()} days overdue" : "$diff days left";
+                                    statusColor = diff < 0 ? const Color(0xFFEF4444) : const Color(0xFF10B981); // Red : Emerald
+                                  }
+
+                                  return DataRow(cells: [
+                                    DataCell(Text((index + 1).toString(), style: theme.textTheme.bodySmall?.copyWith(fontSize: context.font(12)))),
+                                    DataCell(Text(record['book']?['title'] ?? 'N/A', style: theme.textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w600, fontSize: context.font(12)))),
+                                    DataCell(Text(record['issued_at'] ?? 'N/A', style: theme.textTheme.bodySmall?.copyWith(fontSize: context.font(12)))),
+                                    DataCell(Text(record['due_date'] ?? 'N/A', style: theme.textTheme.bodySmall?.copyWith(fontSize: context.font(12)))),
+                                    DataCell(Container(
+                                      padding: EdgeInsets.symmetric(horizontal: context.scale(10), vertical: context.scale(4)),
+                                      decoration: BoxDecoration(
+                                        color: statusColor.withValues(alpha: 0.1),
+                                        borderRadius: BorderRadius.circular(context.scale(6)),
+                                        border: Border.all(color: statusColor.withValues(alpha: 0.2)),
+                                      ),
+                                      child: Text(statusText, style: TextStyle(color: statusColor, fontSize: context.font(10), fontWeight: FontWeight.w800)),
+                                    )),
+                                    DataCell(Text(
+                                      record['returned_at'] ?? 'Pending', 
+                                      style: theme.textTheme.bodySmall?.copyWith(
+                                        color: record['returned_at'] != null ? colorScheme.onSurfaceVariant : const Color(0xFFF59E0B), // Amber
+                                        fontWeight: record['returned_at'] == null ? FontWeight.bold : FontWeight.normal,
+                                        fontSize: context.font(12),
+                                      )
+                                    )),
+                                  ]);
+                                }).toList(),
+                              ),
+                            ),
+                          ),
+                        SizedBox(height: context.scale(24)),
+                      ],
+                    ),
+                  ),
+                ],
               ),
-            ],
+            ),
           ),
         ),
       ),
     );
   }
 
+  Widget _buildEmptyState() {
+    final theme = context.theme;
+    final colorScheme = theme.colorScheme;
+    return Center(
+      child: Padding(
+        padding: EdgeInsets.symmetric(vertical: context.scale(80)),
+        child: Column(
+          children: [
+            Icon(Icons.library_books_outlined, size: context.scale(64), color: colorScheme.outlineVariant),
+            SizedBox(height: context.scale(16)),
+            Text("No lending history found", style: theme.textTheme.titleMedium?.copyWith(color: colorScheme.onSurfaceVariant, fontSize: context.font(18))),
+            SizedBox(height: context.scale(8)),
+            Text("Books you borrow will appear here", style: theme.textTheme.bodySmall?.copyWith(color: colorScheme.onSurfaceVariant.withValues(alpha: 0.5), fontSize: context.font(12))),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildFilterItem(BuildContext context, String label, Widget child) {
+    final colorScheme = context.theme.colorScheme;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(label, style: context.theme.textTheme.labelSmall?.copyWith(color: colorScheme.onSurfaceVariant, fontWeight: FontWeight.bold, fontSize: context.font(12))),
+        SizedBox(height: context.scale(8)),
+        child,
+      ],
+    );
+  }
+
   /// ================= COMMON WIDGETS =================
 
-  Widget buildLabel(String text) {
-    return Padding(
-      padding: const EdgeInsets.only(top: 15, bottom: 8),
-      child: Text(
-        text,
-        style: const TextStyle(fontSize: 14, color: Colors.white70),
-      ),
-    );
-  }
-
-  Widget buildTextField(TextEditingController controller, String hint) {
+  Widget buildTextField(BuildContext context, TextEditingController controller, String hint) {
+    final colorScheme = context.theme.colorScheme;
     return TextField(
       controller: controller,
-      style: const TextStyle(color: Colors.white),
+      style: TextStyle(fontSize: context.font(14)),
       decoration: InputDecoration(
         hintText: hint,
-        hintStyle: const TextStyle(color: Colors.white54, fontSize: 14),
+        hintStyle: TextStyle(fontSize: context.font(14), color: colorScheme.onSurfaceVariant),
+        isDense: true,
         filled: true,
-        fillColor: _secondary,
-        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-        border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide.none),
+        fillColor: colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
+        contentPadding: EdgeInsets.symmetric(horizontal: context.scale(16), vertical: context.scale(12)),
+        enabledBorder: OutlineInputBorder(
+          borderSide: BorderSide(color: colorScheme.outlineVariant),
+          borderRadius: BorderRadius.circular(context.scale(12)),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderSide: BorderSide(color: colorScheme.primary),
+          borderRadius: BorderRadius.circular(context.scale(12)),
+        ),
       ),
     );
   }
 
-  Widget buildDateField(TextEditingController controller, String filterKey) {
+  Widget buildDateField(BuildContext context, TextEditingController controller, String filterKey) {
+    final colorScheme = context.theme.colorScheme;
     return TextField(
       controller: controller,
       readOnly: true,
       onTap: () => pickDate(controller, filterKey),
-      style: const TextStyle(color: Colors.white),
+      style: TextStyle(fontSize: context.font(14)),
       decoration: InputDecoration(
         hintText: "DD-MM-YYYY",
-        hintStyle: const TextStyle(color: Colors.white54, fontSize: 14),
+        hintStyle: TextStyle(fontSize: context.font(14), color: colorScheme.onSurfaceVariant),
+        suffixIcon: Icon(Icons.calendar_today, size: context.scale(18), color: colorScheme.primary),
+        isDense: true,
         filled: true,
-        fillColor: _secondary,
-        suffixIcon: const Icon(Icons.calendar_today, color: Colors.white70, size: 18),
-        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-        border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide.none),
+        fillColor: colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
+        contentPadding: EdgeInsets.symmetric(horizontal: context.scale(16), vertical: context.scale(12)),
+        enabledBorder: OutlineInputBorder(
+          borderSide: BorderSide(color: colorScheme.outlineVariant),
+          borderRadius: BorderRadius.circular(context.scale(12)),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderSide: BorderSide(color: colorScheme.primary),
+          borderRadius: BorderRadius.circular(context.scale(12)),
+        ),
       ),
     );
   }

@@ -65,17 +65,17 @@ class _PrivacyPolicyScreenState extends State<PrivacyPolicyScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
+    final theme = context.theme;
     return Scaffold(
       appBar: AppBar(
-        title: const Text("Privacy Policy"),
+        title: Text("Privacy Policy", style: TextStyle(fontSize: context.font(20))),
         actions: [
           if (!_isLoading)
             IconButton(
               onPressed: _isSaving ? null : _updatePolicy,
               icon: _isSaving
-                  ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                  : const Icon(Icons.save),
+                  ? SizedBox(width: context.scale(20), height: context.scale(20), child: const CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                  : Icon(Icons.save, size: context.scale(24)),
             ),
         ],
       ),
@@ -85,42 +85,46 @@ class _PrivacyPolicyScreenState extends State<PrivacyPolicyScreen> {
               padding: context.pagePadding,
               child: Center(
                 child: ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 900),
+                  constraints: BoxConstraints(maxWidth: context.scale(900)),
                   child: Card(
                     child: Padding(
-                      padding: const EdgeInsets.all(24.0),
+                      padding: EdgeInsets.all(context.scale(24.0)),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Row(
                             children: [
-                              Icon(Icons.security, color: theme.colorScheme.primary, size: 24),
-                              const SizedBox(width: 12),
+                              Icon(Icons.security, color: theme.colorScheme.primary, size: context.scale(24)),
+                              SizedBox(width: context.scale(12)),
                               Text(
                                 "Platform Privacy Policy",
-                                style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
+                                style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold, fontSize: context.font(20)),
                               ),
                             ],
                           ),
-                          const SizedBox(height: 8),
+                          SizedBox(height: context.scale(8)),
                           Text("Manage and update the global privacy terms for all users.",
-                            style: theme.textTheme.bodySmall?.copyWith(color: theme.hintColor)),
-                          const Divider(height: 48),
+                            style: theme.textTheme.bodySmall?.copyWith(color: theme.hintColor, fontSize: context.font(12))),
+                          Divider(height: context.scale(48)),
                           TextField(
                             controller: _contentController,
                             maxLines: 25,
+                            style: TextStyle(fontSize: context.font(14)),
                             decoration: const InputDecoration(
                               hintText: "Enter policy content...",
                               contentPadding: EdgeInsets.all(16),
                             ),
                           ),
-                          const SizedBox(height: 24),
+                          SizedBox(height: context.scale(24)),
                           SizedBox(
                             width: double.infinity,
                             child: ElevatedButton.icon(
                               onPressed: _isSaving ? null : _updatePolicy,
-                              icon: const Icon(Icons.check_circle_outline),
-                              label: const Text("SAVE AND PUBLISH"),
+                              style: ElevatedButton.styleFrom(
+                                minimumSize: Size(double.infinity, context.scale(54)),
+                              ),
+                              icon: Icon(Icons.check_circle_outline, size: context.scale(20)),
+                              label: Text("SAVE AND PUBLISH", style: TextStyle(fontSize: context.font(16))),
                             ),
                           ),
                         ],

@@ -141,7 +141,6 @@ class _LibrarianProfilePageState extends State<LibrarianProfilePage> {
 
       if (_passwordController.text.isNotEmpty) {
         fields["password"] = _passwordController.text;
-        fields["password_confirmation"] = _confirmPasswordController.text;
       }
 
       if (kIsWeb && _webImage != null) {
@@ -176,7 +175,11 @@ class _LibrarianProfilePageState extends State<LibrarianProfilePage> {
     }
 
     return Scaffold(
+      backgroundColor: theme.colorScheme.surface,
       appBar: AppBar(
+        centerTitle: true,
+        backgroundColor: theme.colorScheme.surface,
+        surfaceTintColor: Colors.transparent,
         title: Text(
           "Profile Settings",
           style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold, fontSize: context.font(20)),
@@ -190,38 +193,7 @@ class _LibrarianProfilePageState extends State<LibrarianProfilePage> {
             child: Column(
               children: [
                 /// TOP PROFILE CARD
-                Card(
-                  elevation: 0,
-                  color: theme.colorScheme.surfaceContainerLow,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(context.scale(20)),
-                    side: BorderSide(color: theme.colorScheme.outlineVariant.withValues(alpha: 0.5), width: 0.5),
-                  ),
-                  child: Padding(
-                    padding: EdgeInsets.all(context.lg),
-                    child: context.isMobile
-                        ? Column(
-                      children: [
-                        _buildProfileAvatar(context, theme),
-                        SizedBox(height: context.md),
-                        ..._buildProfileInfo(context, theme),
-                      ],
-                    )
-                        : Row(
-                      crossAxisAlignment: CrossAxisAlignment.center,
-                      children: [
-                        _buildProfileAvatar(context, theme),
-                        SizedBox(width: context.lg),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: _buildProfileInfo(context, theme),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
+                _buildHeaderCard(context, theme),
 
                 SizedBox(height: context.lg),
 
@@ -233,6 +205,7 @@ class _LibrarianProfilePageState extends State<LibrarianProfilePage> {
                     AdaptiveFieldRow(children: [
                       ProfileDropdown(
                         label: "Gender",
+                        icon: Icons.wc_rounded,
                         value: _selectedGender,
                         items: const ["Male", "Female", "Other"],
                         onChanged: (val) {
@@ -252,9 +225,11 @@ class _LibrarianProfilePageState extends State<LibrarianProfilePage> {
                         label: "Phone Number",
                         controller: _phoneController,
                         icon: Icons.phone_android_rounded,
+                        keyboardType: TextInputType.phone,
                       ),
                       ProfileDropdown(
                         label: "Relationship Status",
+                        icon: Icons.favorite_border_rounded,
                         value: _selectedStatus,
                         items: const ["Single", "Married", "Divorced", "Widowed"],
                         onChanged: (val) {
@@ -272,14 +247,15 @@ class _LibrarianProfilePageState extends State<LibrarianProfilePage> {
                   children: [
                     ProfileTextField(
                       label: "Full Address",
+                      icon: Icons.home_outlined,
                       controller: _addressController,
                       maxLines: 2,
                     ),
                     AdaptiveFieldRow(children: [
-                      ProfileTextField(label: "City", controller: _cityController),
-                      ProfileTextField(label: "State", controller: _stateController),
+                      ProfileTextField(label: "City", icon: Icons.location_city_rounded, controller: _cityController),
+                      ProfileTextField(label: "State", icon: Icons.map_rounded, controller: _stateController),
                     ]),
-                    ProfileTextField(label: "Postal Code (PINCODE)", controller: _pincodeController),
+                    ProfileTextField(label: "Postal Code (PINCODE)", icon: Icons.pin_drop_rounded, controller: _pincodeController, keyboardType: TextInputType.number),
                   ],
                 ),
 
@@ -289,12 +265,24 @@ class _LibrarianProfilePageState extends State<LibrarianProfilePage> {
                   icon: Icons.account_balance_outlined,
                   children: [
                     AdaptiveFieldRow(children: [
-                      ProfileTextField(label: "Account Number", controller: _bankAccController),
-                      ProfileTextField(label: "IFSC Code", controller: _ifscController),
+                      ProfileTextField(label: "Account Number", icon: Icons.numbers_rounded, controller: _bankAccController, keyboardType: TextInputType.number),
+                      ProfileTextField(label: "IFSC Code", icon: Icons.code_rounded, controller: _ifscController),
                     ]),
                     AdaptiveFieldRow(children: [
-                      ProfileTextField(label: "Bank Name", controller: _bankNameController),
-                      ProfileTextField(label: "Branch Name", controller: _branchNameController),
+                      ProfileTextField(label: "Bank Name", icon: Icons.account_balance_rounded, controller: _bankNameController),
+                      ProfileTextField(label: "Branch Name", icon: Icons.store_rounded, controller: _branchNameController),
+                    ]),
+                  ],
+                ),
+
+                /// EMERGENCY CONTACT
+                ProfileSection(
+                  title: "Emergency Contact",
+                  icon: Icons.emergency_outlined,
+                  children: [
+                    AdaptiveFieldRow(children: [
+                      ProfileTextField(label: "Contact Name", icon: Icons.person_pin_rounded, controller: _emergencyNameController),
+                      ProfileTextField(label: "Contact Number", icon: Icons.phone_rounded, controller: _emergencyPhoneController, keyboardType: TextInputType.phone),
                     ]),
                   ],
                 ),
@@ -305,9 +293,13 @@ class _LibrarianProfilePageState extends State<LibrarianProfilePage> {
                   icon: Icons.lock_outline_rounded,
                   children: [
                     AdaptiveFieldRow(children: [
-                      ProfileTextField(label: "New Password", controller: _passwordController, isPassword: true),
-                      ProfileTextField(label: "Confirm Password", controller: _confirmPasswordController, isPassword: true),
+                      ProfileTextField(label: "New Password", controller: _passwordController, isPassword: true, icon: Icons.lock_open_rounded),
+                      ProfileTextField(label: "Confirm Password", controller: _confirmPasswordController, isPassword: true, icon: Icons.lock_rounded),
                     ]),
+                    Text(
+                      "Leave password fields empty if you don't want to change it.",
+                      style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.outline),
+                    ),
                   ],
                 ),
 
@@ -315,10 +307,13 @@ class _LibrarianProfilePageState extends State<LibrarianProfilePage> {
 
                 FilledButton.icon(
                   onPressed: _isLoading ? null : _saveProfile,
-                  icon: _isLoading ? SizedBox(width: context.scale(20), height: context.scale(20), child: CircularProgressIndicator(strokeWidth: 2, color: theme.colorScheme.onPrimary)) : const Icon(Icons.save_rounded),
-                  label: const Text("SAVE PROFILE CHANGES"),
+                  icon: _isLoading 
+                    ? SizedBox(width: context.scale(20), height: context.scale(20), child: CircularProgressIndicator(strokeWidth: 2, color: theme.colorScheme.onPrimary)) 
+                    : const Icon(Icons.check_circle_outline_rounded),
+                  label: const Text("UPDATE PROFILE"),
                   style: FilledButton.styleFrom(
                     minimumSize: Size(double.infinity, context.scale(56)),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(context.scale(16))),
                   ),
                 ),
                 SizedBox(height: context.md),
@@ -333,7 +328,7 @@ class _LibrarianProfilePageState extends State<LibrarianProfilePage> {
                           TextButton(onPressed: () => Navigator.pop(context, false), child: const Text("CANCEL")),
                           TextButton(
                             onPressed: () => Navigator.pop(context, true),
-                            child: Text("LOGOUT", style: TextStyle(color: theme.colorScheme.error)),
+                            child: Text("LOGOUT", style: TextStyle(color: theme.colorScheme.error, fontWeight: FontWeight.bold)),
                           ),
                         ],
                       ),
@@ -345,11 +340,12 @@ class _LibrarianProfilePageState extends State<LibrarianProfilePage> {
                       }
                     }
                   },
-                  icon: const Icon(Icons.logout_rounded),
-                  label: const Text("LOGOUT FROM ACCOUNT"),
+                  icon: Icon(Icons.logout_rounded, color: theme.colorScheme.error),
+                  label: Text("LOGOUT FROM ACCOUNT", style: TextStyle(color: theme.colorScheme.error, fontWeight: FontWeight.bold)),
                   style: FilledButton.styleFrom(
                     minimumSize: Size(double.infinity, context.scale(56)),
-                    foregroundColor: theme.colorScheme.error,
+                    backgroundColor: theme.colorScheme.error.withValues(alpha: 0.1),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(context.scale(16))),
                   ),
                 ),
                 SizedBox(height: context.xl * 2),
@@ -361,6 +357,72 @@ class _LibrarianProfilePageState extends State<LibrarianProfilePage> {
     );
   }
 
+  Widget _buildHeaderCard(BuildContext context, ThemeData theme) {
+    return Container(
+      width: double.infinity,
+      padding: EdgeInsets.all(context.lg),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [
+            theme.colorScheme.primaryContainer.withValues(alpha: 0.7),
+            theme.colorScheme.surfaceContainerLow,
+          ],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(context.scale(24)),
+        border: Border.all(color: theme.colorScheme.primary.withValues(alpha: 0.1), width: 1),
+      ),
+      child: context.isMobile
+          ? Column(
+              children: [
+                _buildProfileAvatar(context, theme),
+                SizedBox(height: context.md),
+                ..._buildProfileInfo(context, theme),
+              ],
+            )
+          : Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                _buildProfileAvatar(context, theme),
+                SizedBox(width: context.lg),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: _buildProfileInfo(context, theme),
+                  ),
+                ),
+                _buildHeaderBadge(context, theme),
+              ],
+            ),
+    );
+  }
+
+  Widget _buildHeaderBadge(BuildContext context, ThemeData theme) {
+    return Container(
+      padding: EdgeInsets.symmetric(horizontal: context.md, vertical: context.xs),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.primary.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(context.scale(12)),
+        border: Border.all(color: theme.colorScheme.primary.withValues(alpha: 0.2)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(Icons.verified_user_rounded, size: context.scale(16), color: theme.colorScheme.primary),
+          SizedBox(width: context.xs),
+          Text(
+            "ACTIVE",
+            style: theme.textTheme.labelMedium?.copyWith(
+              color: theme.colorScheme.primary,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildProfileAvatar(BuildContext context, ThemeData theme) {
     return ProfileAvatar(
       radius: context.scale(55),
@@ -368,6 +430,7 @@ class _LibrarianProfilePageState extends State<LibrarianProfilePage> {
       webImage: _webImage,
       imageUrl: ApiService.getStorageUrl(_profile?.photo),
       onCameraTap: _pickImage,
+      borderWidth: 3,
     );
   }
 
@@ -376,13 +439,18 @@ class _LibrarianProfilePageState extends State<LibrarianProfilePage> {
       Text(
         _profile?.fullName ?? "N/A",
         textAlign: context.isMobile ? TextAlign.center : TextAlign.start,
-        style: theme.textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold),
+        style: theme.textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold, color: theme.colorScheme.onSurface),
       ),
+      SizedBox(height: context.xs),
       Text(
         "Librarian • Employee ID: ${_profile?.employeeId ?? 'N/A'}",
         textAlign: context.isMobile ? TextAlign.center : TextAlign.start,
-        style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.outline),
+        style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.secondary, fontWeight: FontWeight.w500),
       ),
+      if (context.isMobile) ...[
+        SizedBox(height: context.sm),
+        _buildHeaderBadge(context, theme),
+      ]
     ];
   }
 }

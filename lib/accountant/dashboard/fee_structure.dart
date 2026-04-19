@@ -48,7 +48,7 @@ class _FeeStructurePageState extends State<FeeStructurePage> {
         actions: [
           TextButton(onPressed: () => Navigator.pop(context, false), child: const Text("CANCEL")),
           ElevatedButton(
-            onPressed: () => Navigator.pop(context, true), 
+            onPressed: () => Navigator.pop(context, true),
             style: ElevatedButton.styleFrom(backgroundColor: Theme.of(context).colorScheme.error),
             child: const Text("REMOVE", style: TextStyle(color: Colors.white)),
           ),
@@ -86,23 +86,23 @@ class _FeeStructurePageState extends State<FeeStructurePage> {
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
           : SingleChildScrollView(
-              padding: context.pagePadding,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  _buildSectionHeader(context, "Institute-Wide"),
-                  const SizedBox(height: 16),
-                  _buildResponsiveGrid(_instituteFees, true),
-                  if (_instituteFees.isEmpty) _buildEmptyState(context, "No institute-wide fees found"),
-                  const SizedBox(height: 32),
-                  _buildSectionHeader(context, "Class-Specific"),
-                  const SizedBox(height: 16),
-                  _buildResponsiveGrid(_classFees, false),
-                  if (_classFees.isEmpty) _buildEmptyState(context, "No class-specific fees found"),
-                  const SizedBox(height: 100),
-                ],
-              ),
-            ),
+        padding: context.pagePadding,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _buildSectionHeader(context, "Institute-Wide"),
+            const SizedBox(height: 16),
+            _buildResponsiveGrid(_instituteFees, true),
+            if (_instituteFees.isEmpty) _buildEmptyState(context, "No institute-wide fees found"),
+            const SizedBox(height: 32),
+            _buildSectionHeader(context, "Class-Specific"),
+            const SizedBox(height: 16),
+            _buildResponsiveGrid(_classFees, false),
+            if (_classFees.isEmpty) _buildEmptyState(context, "No class-specific fees found"),
+            const SizedBox(height: 100),
+          ],
+        ),
+      ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: _showAddFeeDialog,
         icon: const Icon(Icons.add),
@@ -112,8 +112,8 @@ class _FeeStructurePageState extends State<FeeStructurePage> {
   }
 
   Widget _buildSectionHeader(BuildContext context, String title) {
-    return Text(title.toUpperCase(), 
-      style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold, letterSpacing: 1.2, color: Theme.of(context).colorScheme.primary));
+    return Text(title.toUpperCase(),
+        style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold, letterSpacing: 1.2, color: Theme.of(context).colorScheme.primary));
   }
 
   Widget _buildResponsiveGrid(List<Fee> fees, bool isInstitute) {
@@ -122,7 +122,7 @@ class _FeeStructurePageState extends State<FeeStructurePage> {
       physics: const NeverScrollableScrollPhysics(),
       gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
         crossAxisCount: context.isTablet ? 2 : 1,
-        mainAxisExtent: 180,
+        mainAxisExtent: 200, // Increased from 180 to prevent overflow
         crossAxisSpacing: 16,
         mainAxisSpacing: 16,
       ),
@@ -135,7 +135,7 @@ class _FeeStructurePageState extends State<FeeStructurePage> {
     final theme = Theme.of(context);
     return Card(
       child: Padding(
-        padding: const EdgeInsets.all(20.0),
+        padding: const EdgeInsets.all(16.0), // Reduced from 20 to save space
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -146,19 +146,45 @@ class _FeeStructurePageState extends State<FeeStructurePage> {
                   backgroundColor: theme.colorScheme.primary.withValues(alpha: 0.1),
                   child: Icon(isInstitute ? Icons.account_balance : Icons.school, color: theme.colorScheme.primary, size: 20),
                 ),
-                Text("₹${fee.amount}", style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold)),
+                Flexible(
+                  child: Text("₹${fee.amount}", 
+                    style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
               ],
             ),
-            const SizedBox(height: 16),
-            Text(fee.feeName, style: const TextStyle(fontWeight: FontWeight.bold), maxLines: 1, overflow: TextOverflow.ellipsis),
-            if (!isInstitute) Text(fee.className ?? 'N/A', style: TextStyle(color: theme.colorScheme.secondary, fontSize: 12, fontWeight: FontWeight.w500)),
+            const SizedBox(height: 12),
+            Text(fee.feeName, 
+              style: const TextStyle(fontWeight: FontWeight.bold), 
+              maxLines: 1, 
+              overflow: TextOverflow.ellipsis
+            ),
+            if (!isInstitute) 
+              Text(fee.className ?? 'N/A', 
+                style: TextStyle(color: theme.colorScheme.secondary, fontSize: 12, fontWeight: FontWeight.w500),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
             const Spacer(),
             Row(
               children: [
-                _buildSmallBadge(context, fee.isOptional ? "OPTIONAL" : "MANDATORY", fee.isOptional ? theme.colorScheme.secondary : Colors.green),
-                const Spacer(),
-                IconButton(onPressed: () => _showEditFeeDialog(fee), icon: const Icon(Icons.edit_outlined, size: 20), color: theme.colorScheme.primary),
-                IconButton(onPressed: () => _deleteFee(fee), icon: const Icon(Icons.delete_outline, size: 20), color: theme.colorScheme.error),
+                Flexible(
+                  child: _buildSmallBadge(context, fee.isOptional ? "OPTIONAL" : "MANDATORY", fee.isOptional ? theme.colorScheme.secondary : Colors.green),
+                ),
+                const SizedBox(width: 4),
+                IconButton(
+                  onPressed: () => _showEditFeeDialog(fee), 
+                  icon: const Icon(Icons.edit_outlined, size: 20), 
+                  color: theme.colorScheme.primary,
+                  visualDensity: VisualDensity.compact,
+                ),
+                IconButton(
+                  onPressed: () => _deleteFee(fee), 
+                  icon: const Icon(Icons.delete_outline, size: 20), 
+                  color: theme.colorScheme.error,
+                  visualDensity: VisualDensity.compact,
+                ),
               ],
             ),
           ],

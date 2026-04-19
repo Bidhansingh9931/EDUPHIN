@@ -57,7 +57,8 @@ class _CreateTicketPageState extends State<CreateTicketPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text("Submit New Ticket"),
+        title: Text("Submit New Ticket", style: TextStyle(fontSize: context.font(20))),
+        centerTitle: true,
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
@@ -128,15 +129,19 @@ class _CreateTicketPageState extends State<CreateTicketPage> {
                             ]),
                           ],
                         ),
-                        const SizedBox(height: 32),
+                        SizedBox(height: context.xl),
                         SizedBox(
                           width: double.infinity,
                           child: ElevatedButton(
                             onPressed: _isLoading ? null : _submitTicket,
-                            child: const Text("SUBMIT TICKET"),
+                            style: ElevatedButton.styleFrom(
+                              padding: EdgeInsets.symmetric(vertical: context.scale(16)),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(context.scale(12))),
+                            ),
+                            child: Text("SUBMIT TICKET", style: TextStyle(fontSize: context.font(14))),
                           ),
                         ),
-                        const SizedBox(height: 40),
+                        SizedBox(height: context.xl),
                       ],
                     ),
                   ),
@@ -147,23 +152,35 @@ class _CreateTicketPageState extends State<CreateTicketPage> {
   }
 
   Widget _buildSection(BuildContext context, {required String title, required List<Widget> children}) {
-    final theme = Theme.of(context);
+    final theme = context.theme;
     return Card(
-      margin: const EdgeInsets.only(bottom: 24),
+      margin: EdgeInsets.only(bottom: context.md),
+      elevation: 0,
+      color: theme.colorScheme.surfaceContainerLow,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+        side: BorderSide(color: theme.colorScheme.outlineVariant, width: 0.5),
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Container(
             width: double.infinity,
-            padding: const EdgeInsets.all(16),
+            padding: EdgeInsets.all(context.md),
             decoration: BoxDecoration(
               color: theme.colorScheme.primary.withValues(alpha: 0.05),
-              borderRadius: const BorderRadius.only(topLeft: Radius.circular(16), topRight: Radius.circular(16)),
+              borderRadius: const BorderRadius.only(
+                topLeft: Radius.circular(16), 
+                topRight: Radius.circular(16)
+              ),
             ),
-            child: Text(title, style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold, color: theme.colorScheme.primary)),
+            child: Text(
+              title, 
+              style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold, color: theme.colorScheme.primary, fontSize: context.font(15))
+            ),
           ),
           Padding(
-            padding: const EdgeInsets.all(16.0),
+            padding: EdgeInsets.all(context.md),
             child: Column(children: children),
           ),
         ],
@@ -172,29 +189,31 @@ class _CreateTicketPageState extends State<CreateTicketPage> {
   }
 
   Widget _buildResponsiveRow(BuildContext context, List<Widget> children) {
-    if (!context.isTablet) return Column(children: children);
+    if (context.isMobile) return Column(children: children);
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
-      children: children.map((c) => Expanded(child: Padding(padding: const EdgeInsets.only(right: 12), child: c))).toList(),
+      children: children.map((c) => Expanded(child: Padding(padding: EdgeInsets.only(right: context.md), child: c))).toList(),
     );
   }
 
   Widget _buildTextField(BuildContext context, {required String label, required String hintText, required TextEditingController controller, int maxLines = 1, IconData? icon, String? Function(String?)? validator}) {
-    final theme = Theme.of(context);
+    final theme = context.theme;
     return Padding(
-      padding: const EdgeInsets.only(bottom: 16),
+      padding: EdgeInsets.only(bottom: context.md),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(label, style: theme.textTheme.labelMedium?.copyWith(color: theme.hintColor)),
-          const SizedBox(height: 8),
+          Text(label, style: theme.textTheme.labelMedium?.copyWith(color: theme.hintColor, fontSize: context.font(12))),
+          SizedBox(height: context.scale(8)),
           TextFormField(
             controller: controller,
             maxLines: maxLines,
             validator: validator,
+            style: TextStyle(fontSize: context.font(14)),
             decoration: InputDecoration(
               hintText: hintText,
-              prefixIcon: icon != null ? Icon(icon, size: 18) : null,
+              prefixIcon: icon != null ? Icon(icon, size: context.scale(18)) : null,
+              contentPadding: EdgeInsets.symmetric(horizontal: context.md, vertical: context.md),
             ),
           ),
         ],
@@ -203,25 +222,28 @@ class _CreateTicketPageState extends State<CreateTicketPage> {
   }
 
   Widget _buildPriorityDropdown(BuildContext context) {
-    final theme = Theme.of(context);
+    final theme = context.theme;
     return Padding(
-      padding: const EdgeInsets.only(bottom: 16),
+      padding: EdgeInsets.only(bottom: context.md),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text("Priority", style: theme.textTheme.labelMedium?.copyWith(color: theme.hintColor)),
-          const SizedBox(height: 8),
+          Text("Priority", style: theme.textTheme.labelMedium?.copyWith(color: theme.hintColor, fontSize: context.font(12))),
+          SizedBox(height: context.scale(8)),
           DropdownButtonFormField<String>(
             isExpanded: true,
             value: _priority,
             items: ['low', 'medium', 'high'].map((String val) {
               return DropdownMenuItem<String>(
                 value: val,
-                child: Text(val.toUpperCase(), style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
+                child: Text(val.toUpperCase(), style: TextStyle(fontSize: context.font(13), fontWeight: FontWeight.bold)),
               );
             }).toList(),
             onChanged: (val) => setState(() => _priority = val!),
-            decoration: const InputDecoration(prefixIcon: Icon(Icons.priority_high, size: 18)),
+            decoration: InputDecoration(
+              prefixIcon: Icon(Icons.priority_high, size: context.scale(18)),
+              contentPadding: EdgeInsets.symmetric(horizontal: context.md, vertical: context.md),
+            ),
           ),
         ],
       ),

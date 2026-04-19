@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:eduphin/services/responsive_helper.dart';
+import 'package:eduphin/services/theme_service.dart';
 import 'package:flutter/material.dart';
 import 'package:eduphin/services/api_service.dart';
 import 'package:eduphin/moderator_dashboard/institute/institute_model.dart';
@@ -61,42 +62,53 @@ class _ManageAccountsScreenState extends State<ManageAccountsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
+    final theme = context.theme;
     return Scaffold(
       appBar: AppBar(
-        title: Text(_institute != null ? "Accounts: ${_institute!.name}" : "Manage Accounts"),
+        title: Text(_institute != null ? "Accounts: ${_institute!.name}" : "Manage Accounts",
+            style: TextStyle(fontSize: context.font(20), fontWeight: FontWeight.bold)),
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
           : _errorMessage != null
               ? Center(child: Padding(
-                  padding: const EdgeInsets.all(24.0),
-                  child: Text(_errorMessage!, textAlign: TextAlign.center, style: TextStyle(color: theme.colorScheme.error)),
+                  padding: EdgeInsets.all(context.scale(24.0)),
+                  child: Text(_errorMessage!, textAlign: TextAlign.center, style: TextStyle(color: theme.colorScheme.error, fontSize: context.font(14))),
                 ))
               : SingleChildScrollView(
                   padding: context.pagePadding,
-                  child: Column(
-                    children: [
-                      Card(
-                        child: Padding(
-                          padding: const EdgeInsets.all(16),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Row(
+                  child: Center(
+                    child: ConstrainedBox(
+                      constraints: const BoxConstraints(maxWidth: 1000),
+                      child: Column(
+                        children: [
+                          Card(
+                            elevation: 0,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(context.scale(12)),
+                              side: BorderSide(color: theme.dividerColor.withValues(alpha: 0.1)),
+                            ),
+                            child: Padding(
+                              padding: EdgeInsets.all(context.spacing),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  Icon(Icons.manage_accounts, color: theme.colorScheme.primary, size: 20),
-                                  const SizedBox(width: 8),
-                                  Text("Account Directory", style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
+                                  Row(
+                                    children: [
+                                      Icon(Icons.manage_accounts, color: theme.colorScheme.primary, size: context.scale(20)),
+                                      SizedBox(width: context.scale(8)),
+                                      Text("Account Directory", style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold, fontSize: context.font(16))),
+                                    ],
+                                  ),
+                                  SizedBox(height: context.spacing),
+                                  _buildTable(context),
                                 ],
                               ),
-                              const SizedBox(height: 16),
-                              _buildTable(context),
-                            ],
+                            ),
                           ),
-                        ),
+                        ],
                       ),
-                    ],
+                    ),
                   ),
                 ),
     );
@@ -104,48 +116,59 @@ class _ManageAccountsScreenState extends State<ManageAccountsScreen> {
 
   Widget _buildTable(BuildContext context) {
     if (_accounts.isEmpty) {
-      return const Center(child: Padding(
-        padding: EdgeInsets.all(20.0),
-        child: Text("No accounts found for this institute."),
+      return Center(child: Padding(
+        padding: EdgeInsets.all(context.scale(20.0)),
+        child: Text("No accounts found for this institute.", style: TextStyle(fontSize: context.font(14))),
       ));
     }
-    return SingleChildScrollView(
-      scrollDirection: Axis.horizontal,
-      child: DataTable(
-        columns: const [
-          DataColumn(label: Text("#", style: TextStyle(fontWeight: FontWeight.bold))),
-          DataColumn(label: Text("Name", style: TextStyle(fontWeight: FontWeight.bold))),
-          DataColumn(label: Text("Email", style: TextStyle(fontWeight: FontWeight.bold))),
-          DataColumn(label: Text("Phone", style: TextStyle(fontWeight: FontWeight.bold))),
-          DataColumn(label: Text("Status", style: TextStyle(fontWeight: FontWeight.bold))),
-        ],
-        rows: _accounts.asMap().entries.map((entry) {
-          final index = entry.key + 1;
-          final account = entry.value;
-          return DataRow(cells: [
-            DataCell(Text(index.toString())),
-            DataCell(Text(account['name'] ?? '')),
-            DataCell(Text(account['email'] ?? '')),
-            DataCell(Text(account['phone'] ?? '')),
-            DataCell(
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                decoration: BoxDecoration(
-                  color: (account['status'] == 'live' ? Colors.green : Colors.red).withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(4),
-                ),
-                child: Text(
-                  account['status'] ?? '',
-                  style: TextStyle(
-                    color: account['status'] == 'live' ? Colors.green : Colors.red,
-                    fontSize: 12,
-                    fontWeight: FontWeight.bold,
+    return Scrollbar(
+      thumbVisibility: true,
+      child: SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        child: ConstrainedBox(
+          constraints: BoxConstraints(minWidth: context.screenWidth - (context.isMobile ? context.scale(64) : context.scale(100))),
+          child: DataTable(
+            columnSpacing: context.scale(24),
+            horizontalMargin: context.scale(12),
+            dataRowMinHeight: context.scale(48),
+            dataRowMaxHeight: context.scale(60),
+            headingRowHeight: context.scale(56),
+            columns: [
+              DataColumn(label: Text("#", style: TextStyle(fontWeight: FontWeight.bold, fontSize: context.font(14)))),
+              DataColumn(label: Text("Name", style: TextStyle(fontWeight: FontWeight.bold, fontSize: context.font(14)))),
+              DataColumn(label: Text("Email", style: TextStyle(fontWeight: FontWeight.bold, fontSize: context.font(14)))),
+              DataColumn(label: Text("Phone", style: TextStyle(fontWeight: FontWeight.bold, fontSize: context.font(14)))),
+              DataColumn(label: Text("Status", style: TextStyle(fontWeight: FontWeight.bold, fontSize: context.font(14)))),
+            ],
+            rows: _accounts.asMap().entries.map((entry) {
+              final index = entry.key + 1;
+              final account = entry.value;
+              return DataRow(cells: [
+                DataCell(Text(index.toString(), style: TextStyle(fontSize: context.font(13)))),
+                DataCell(Text(account['name'] ?? '', style: TextStyle(fontSize: context.font(13)))),
+                DataCell(Text(account['email'] ?? '', style: TextStyle(fontSize: context.font(13)))),
+                DataCell(Text(account['phone'] ?? '', style: TextStyle(fontSize: context.font(13)))),
+                DataCell(
+                  Container(
+                    padding: EdgeInsets.symmetric(horizontal: context.scale(8), vertical: context.scale(2)),
+                    decoration: BoxDecoration(
+                      color: (account['status'] == 'live' ? Colors.green : Colors.red).withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(context.scale(4)),
+                    ),
+                    child: Text(
+                      account['status'] ?? '',
+                      style: TextStyle(
+                        color: account['status'] == 'live' ? Colors.green : Colors.red,
+                        fontSize: context.font(11),
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
                   ),
                 ),
-              ),
-            ),
-          ]);
-        }).toList(),
+              ]);
+            }).toList(),
+          ),
+        ),
       ),
     );
   }

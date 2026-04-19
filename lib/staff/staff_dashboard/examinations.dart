@@ -1,4 +1,6 @@
+import 'package:eduphin/services/responsive_helper.dart';
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 import '../../services/api_service.dart';
 import 'staff_models.dart';
 import 'exam_paper_schedule.dart';
@@ -11,9 +13,6 @@ class StaffExaminationsPage extends StatefulWidget {
 }
 
 class _StaffExaminationsPageState extends State<StaffExaminationsPage> {
-  static const Color bgColor = Color(0xFF0D111F);
-  static const Color cardColor = Color(0xFF2E365A);
-
   late Future<List<Exam>> _examsFuture;
 
   @override
@@ -30,130 +29,214 @@ class _StaffExaminationsPageState extends State<StaffExaminationsPage> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = context.theme;
     return Scaffold(
-      backgroundColor: bgColor,
+      backgroundColor: theme.scaffoldBackgroundColor,
       appBar: AppBar(
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        centerTitle: true,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white, size: 20),
-          onPressed: () => Navigator.pop(context),
-        ),
-        title: const Text("Examinations", 
-          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 18)),
+        title: Text("Examinations", style: TextStyle(fontSize: context.font(20))),
       ),
       body: RefreshIndicator(
         onRefresh: () async => _loadExams(),
-        color: Colors.white,
-        backgroundColor: cardColor,
-        child: FutureBuilder<List<Exam>>(
-          future: _examsFuture,
-          builder: (context, snapshot) {
-            if (snapshot.connectionState == ConnectionState.waiting) {
-              return const Center(child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2));
-            } else if (snapshot.hasError) {
-              return _buildErrorState(snapshot.error.toString());
-            } else if (!snapshot.hasData || snapshot.data!.isEmpty) {
-              return const Center(child: Text("No exams available", style: TextStyle(color: Colors.white38)));
-            }
+        child: SingleChildScrollView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          child: Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 1200),
+              child: FutureBuilder<List<Exam>>(
+                future: _examsFuture,
+                builder: (context, snapshot) {
+                  if (snapshot.connectionState == ConnectionState.waiting) {
+                    return Padding(
+                      padding: EdgeInsets.all(context.scale(64)),
+                      child: const Center(child: CircularProgressIndicator()),
+                    );
+                  } else if (snapshot.hasError) {
+                    return _buildErrorState(context, snapshot.error.toString());
+                  } else if (!snapshot.hasData || snapshot.data!.isEmpty) {
+                    return _buildEmptyState(context);
+                  }
 
-            final exams = snapshot.data!;
-            return ListView.separated(
-              padding: const EdgeInsets.all(20.0),
-              itemCount: exams.length,
-              separatorBuilder: (context, index) => const SizedBox(height: 16),
-              itemBuilder: (context, index) => _buildExamCard(exams[index]),
-            );
-          },
+                  final exams = snapshot.data!;
+                  return GridView.builder(
+                    padding: context.pagePadding,
+                    shrinkWrap: true,
+                    physics: const NeverScrollableScrollPhysics(),
+                    gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                      crossAxisCount: context.responsive(1, tablet: 2, desktop: 3),
+                      crossAxisSpacing: context.spacing,
+                      mainAxisSpacing: context.spacing,
+                      mainAxisExtent: context.scale(240),
+                    ),
+                    itemCount: exams.length,
+                    itemBuilder: (context, index) => _buildExamCard(context, exams[index]),
+                  );
+                },
+              ),
+            ),
+          ),
         ),
       ),
     );
   }
 
-  Widget _buildExamCard(Exam exam) {
-    return Container(
-      padding: const EdgeInsets.all(24),
-      decoration: BoxDecoration(
-        color: cardColor,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.2), blurRadius: 10, offset: const Offset(0, 4))],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              const Icon(Icons.assignment_outlined, color: Colors.white70, size: 22),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Text(exam.name, 
-                  style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 18, letterSpacing: -0.5)),
-              ),
-            ],
-          ),
-          const SizedBox(height: 20),
-          Row(
-            children: [
-              const Text("Status: ", style: TextStyle(color: Colors.white54, fontSize: 14)),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                decoration: BoxDecoration(
-                  color: Colors.green.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(6),
-                ),
-                child: Text(exam.status?.toUpperCase() ?? 'ACTIVE', 
-                  style: const TextStyle(color: Colors.greenAccent, fontSize: 11, fontWeight: FontWeight.bold)),
-              ),
-            ],
-          ),
-          const SizedBox(height: 24),
-          SizedBox(
-            width: double.infinity,
-            height: 50,
-            child: ElevatedButton(
-              onPressed: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => StaffExamPaperSchedulePage(
-                      // Uses encryptedId if backend provides it, otherwise raw ID
-                      examId: exam.encryptedId ?? exam.id.toString(), 
-                      examName: exam.name
+  Widget _buildEmptyState(BuildContext context) {
+    final colorScheme = context.theme.colorScheme;
+    return Padding(
+      padding: context.pagePadding,
+      child: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 600),
+          child: Card(
+            elevation: 0,
+            margin: EdgeInsets.only(top: context.scale(40)),
+            color: colorScheme.surfaceContainerLow,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(context.scale(24)),
+              side: BorderSide(color: colorScheme.outlineVariant),
+            ),
+            child: Padding(
+              padding: EdgeInsets.symmetric(vertical: context.scale(60), horizontal: context.scale(24)),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.assignment_turned_in_outlined, size: context.scale(80), color: colorScheme.onSurfaceVariant.withValues(alpha: 0.2)),
+                  SizedBox(height: context.scale(24)),
+                  Text(
+                    "No exams available",
+                    textAlign: TextAlign.center,
+                    style: GoogleFonts.roboto(
+                      fontSize: context.font(20),
+                      fontWeight: FontWeight.bold,
+                      color: colorScheme.onSurface,
                     ),
                   ),
-                );
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF3E4770),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                elevation: 0,
+                  SizedBox(height: context.scale(12)),
+                  Text(
+                    "Currently, there are no examination schedules published for your department.",
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontSize: context.font(14),
+                      color: colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                ],
               ),
-              child: const Text("VIEW FULL SCHEDULE", 
-                style: TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 12, letterSpacing: 1.1)),
             ),
           ),
-        ],
+        ),
       ),
     );
   }
 
-  Widget _buildErrorState(String error) {
+  Widget _buildExamCard(BuildContext context, Exam exam) {
+    final theme = context.theme;
+    final colorScheme = theme.colorScheme;
+
+    return Card(
+      elevation: 0,
+      margin: EdgeInsets.zero,
+      color: colorScheme.surfaceContainerLow,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(context.scale(20)),
+        side: BorderSide(color: colorScheme.outlineVariant),
+      ),
+      child: Padding(
+        padding: EdgeInsets.all(context.scale(24)),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Container(
+                  width: context.scale(44),
+                  height: context.scale(44),
+                  decoration: BoxDecoration(
+                    color: colorScheme.primary.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(context.scale(12)),
+                  ),
+                  child: Icon(Icons.assignment_outlined, color: colorScheme.primary, size: context.scale(22)),
+                ),
+                const Spacer(),
+                Container(
+                  padding: EdgeInsets.symmetric(horizontal: context.scale(10), vertical: context.scale(4)),
+                  decoration: BoxDecoration(
+                    color: Colors.green.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(context.scale(6)),
+                    border: Border.all(color: Colors.green.withValues(alpha: 0.3)),
+                  ),
+                  child: Text(
+                    exam.status?.toUpperCase() ?? 'ACTIVE', 
+                    style: TextStyle(color: Colors.green, fontSize: context.font(10), fontWeight: FontWeight.bold),
+                  ),
+                ),
+              ],
+            ),
+            SizedBox(height: context.scale(16)),
+            Expanded(
+              child: Text(
+                exam.name, 
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: GoogleFonts.roboto(
+                  fontWeight: FontWeight.bold, 
+                  fontSize: context.font(16),
+                  color: colorScheme.onSurface,
+                ),
+              ),
+            ),
+            SizedBox(height: context.scale(20)),
+            SizedBox(
+              width: double.infinity,
+              height: context.scale(44),
+              child: FilledButton.tonal(
+                onPressed: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => StaffExamPaperSchedulePage(
+                        examId: exam.encryptedId ?? exam.id.toString(), 
+                        examName: exam.name,
+                      ),
+                    ),
+                  );
+                },
+                style: FilledButton.styleFrom(
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(context.scale(12))),
+                ),
+                child: Text("VIEW FULL SCHEDULE", 
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: context.font(13))),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildErrorState(BuildContext context, String error) {
+    final theme = context.theme;
     return Center(
       child: Padding(
-        padding: const EdgeInsets.all(32.0),
+        padding: EdgeInsets.all(context.scale(32)),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const Icon(Icons.error_outline_rounded, color: Colors.white12, size: 60),
-            const SizedBox(height: 16),
-            const Text("Oops! Failed to load exams", 
-              style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
-            const SizedBox(height: 8),
-            Text(error, textAlign: TextAlign.center, style: const TextStyle(color: Colors.white38, fontSize: 13)),
+            Icon(Icons.error_outline_rounded, color: theme.colorScheme.error, size: context.scale(60)),
+            SizedBox(height: context.scale(16)),
+            Text("Oops! Failed to load exams", 
+              style: TextStyle(fontSize: context.font(16), fontWeight: FontWeight.bold)),
+            SizedBox(height: context.scale(8)),
+            Text(error, textAlign: TextAlign.center, style: TextStyle(color: theme.hintColor, fontSize: context.font(13))),
+            SizedBox(height: context.scale(24)),
+            FilledButton.icon(
+              onPressed: _loadExams, 
+              icon: const Icon(Icons.refresh),
+              label: const Text("TRY AGAIN"),
+            ),
           ],
         ),
       ),
     );
   }
 }
+

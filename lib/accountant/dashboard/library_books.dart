@@ -1,8 +1,8 @@
-import 'dart:convert';
 import 'package:eduphin/services/responsive_helper.dart';
 import 'package:flutter/material.dart';
 import 'package:eduphin/services/api_service.dart';
 import 'package:eduphin/teacher/dashboard/library_models.dart';
+import 'package:eduphin/teacher/dashboard/common_widgets.dart';
 
 class LibraryBooksPage extends StatefulWidget {
   const LibraryBooksPage({super.key});
@@ -23,9 +23,6 @@ class _LibraryBooksPageState extends State<LibraryBooksPage> {
   final TextEditingController _isbnController = TextEditingController();
   String _selectedCategory = 'All';
   String _selectedLanguage = 'All';
-  String _selectedFormat = 'All';
-  String _selectedYear = 'All';
-  String _selectedAvailability = 'All';
 
   @override
   void initState() {
@@ -51,10 +48,6 @@ class _LibraryBooksPageState extends State<LibraryBooksPage> {
         'isbn': _isbnController.text,
         if (_selectedCategory != 'All') 'category': _selectedCategory,
         if (_selectedLanguage != 'All') 'language': _selectedLanguage,
-        if (_selectedFormat != 'All') 'format': _selectedFormat,
-        if (_selectedYear != 'All') 'publication_year': _selectedYear,
-        if (_selectedAvailability == 'Available') 'availability': '1',
-        if (_selectedAvailability == 'Out of Stock') 'availability': '0',
       };
       
       final booksPagination = await ApiService.getAccountantLibraryBooks(filters, page);
@@ -77,26 +70,37 @@ class _LibraryBooksPageState extends State<LibraryBooksPage> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
+    final theme = context.theme;
+    
     return Scaffold(
       appBar: AppBar(
-        title: const Text("Library Books"),
+        title: const Text("Library Inventory"),
+        centerTitle: true,
       ),
       body: Stack(
         children: [
           SingleChildScrollView(
-            padding: context.pagePadding,
+            padding: EdgeInsets.symmetric(vertical: context.spacing),
             child: Center(
               child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 1000),
+                constraints: BoxConstraints(maxWidth: context.scale(1000)),
                 child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    _buildFilterCard(context),
-                    const SizedBox(height: 24),
+                    _buildFilterSection(context),
+                    SizedBox(height: context.spacing * 1.5),
+                    Padding(
+                      padding: EdgeInsets.symmetric(horizontal: context.pagePadding.left),
+                      child: Text(
+                        "Books Found (${_books.length})",
+                        style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+                      ),
+                    ),
+                    SizedBox(height: context.spacing),
                     _buildBookList(context),
-                    const SizedBox(height: 24),
+                    SizedBox(height: context.spacing * 2),
                     _buildPagination(context),
-                    const SizedBox(height: 40),
+                    SizedBox(height: context.spacing * 2),
                   ],
                 ),
               ),
@@ -108,124 +112,229 @@ class _LibraryBooksPageState extends State<LibraryBooksPage> {
     );
   }
 
-  Widget _buildFilterCard(BuildContext context) {
-    final theme = Theme.of(context);
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+  Widget _buildFilterSection(BuildContext context) {
+    final theme = context.theme;
+    return buildFilterCard(
+      context,
+      children: [
+        Row(
           children: [
-            Row(
-              children: [
-                Icon(Icons.filter_list, color: theme.colorScheme.primary, size: 20),
-                const SizedBox(width: 8),
-                Text("Search Books", style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
-              ],
+            Icon(Icons.search_rounded, color: theme.colorScheme.primary, size: context.scale(20)),
+            SizedBox(width: context.scale(8)),
+            Text("Search Inventory", style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
+          ],
+        ),
+        SizedBox(height: context.spacing),
+        buildResponsiveRow(context, [
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              buildLabel(context, "Book Title"),
+              buildTextField(context, _titleController, "Search by title...", prefixIcon: Icons.book_outlined),
+            ],
+          ),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              buildLabel(context, "Author"),
+              buildTextField(context, _authorController, "Search by author...", prefixIcon: Icons.person_outline),
+            ],
+          ),
+        ]),
+        SizedBox(height: context.spacing),
+        buildResponsiveRow(context, [
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              buildLabel(context, "Category"),
+              buildDropdown(
+                context, 
+                ['All', ...(_filterOptions?.categories ?? [])], 
+                _selectedCategory, 
+                (v) => setState(() => _selectedCategory = v ?? 'All'),
+                hint: "Select Category",
+              ),
+            ],
+          ),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              buildLabel(context, "Language"),
+              buildDropdown(
+                context, 
+                ['All', ...(_filterOptions?.languages ?? [])], 
+                _selectedLanguage, 
+                (v) => setState(() => _selectedLanguage = v ?? 'All'),
+                hint: "Select Language",
+              ),
+            ],
+          ),
+        ]),
+        SizedBox(height: context.spacing * 1.5),
+        Row(
+          children: [
+            Expanded(
+              flex: 2,
+              child: buildActionButton(context, "SEARCH BOOKS", () => _fetchBooks()),
             ),
-            const SizedBox(height: 20),
-            _buildResponsiveRow(context, [
-              TextField(controller: _titleController, decoration: const InputDecoration(hintText: "Book Title", prefixIcon: Icon(Icons.book, size: 18))),
-              TextField(controller: _authorController, decoration: const InputDecoration(hintText: "Author Name", prefixIcon: Icon(Icons.person, size: 18))),
-            ]),
-            const SizedBox(height: 16),
-            _buildResponsiveRow(context, [
-              _buildDropdown(context, "Category", _selectedCategory, _filterOptions?.categories ?? [], (v) => setState(() => _selectedCategory = v!)),
-              _buildDropdown(context, "Language", _selectedLanguage, _filterOptions?.languages ?? [], (v) => setState(() => _selectedLanguage = v!)),
-            ]),
-            const SizedBox(height: 24),
-            Row(
-              children: [
-                Expanded(child: ElevatedButton(onPressed: () => _fetchBooks(), child: const Text("SEARCH"))),
-                const SizedBox(width: 12),
-                Expanded(child: OutlinedButton(
-                  onPressed: () {
-                    _titleController.clear();
-                    _authorController.clear();
-                    setState(() => _selectedCategory = 'All');
-                    _fetchBooks();
-                  },
-                  child: const Text("RESET"),
-                )),
-              ],
+            SizedBox(width: context.spacing),
+            Expanded(
+              child: buildActionButton(
+                context, 
+                "RESET", 
+                () {
+                  _titleController.clear();
+                  _authorController.clear();
+                  setState(() {
+                    _selectedCategory = 'All';
+                    _selectedLanguage = 'All';
+                  });
+                  _fetchBooks();
+                },
+                isPrimary: false,
+              ),
             ),
           ],
         ),
-      ),
-    );
-  }
-
-  Widget _buildResponsiveRow(BuildContext context, List<Widget> children) {
-    if (!context.isTablet) return Column(children: children.map((c) => Padding(padding: const EdgeInsets.only(bottom: 12), child: c)).toList());
-    return Row(children: children.map((c) => Expanded(child: Padding(padding: const EdgeInsets.only(right: 12), child: c))).toList());
-  }
-
-  Widget _buildDropdown(BuildContext context, String label, String value, List<String> options, ValueChanged<String?> onChanged) {
-    return DropdownButtonFormField<String>(
-      value: options.contains(value) ? value : 'All',
-      items: ['All', ...options].map((e) => DropdownMenuItem(value: e, child: Text(e, style: const TextStyle(fontSize: 13)))).toList(),
-      onChanged: onChanged,
-      decoration: InputDecoration(labelText: label, contentPadding: const EdgeInsets.symmetric(horizontal: 12)),
+      ],
     );
   }
 
   Widget _buildBookList(BuildContext context) {
+    final theme = context.theme;
     if (_books.isEmpty && !_isLoading) {
-      return Center(child: Padding(padding: const EdgeInsets.all(40), child: Text("No books found", style: TextStyle(color: Theme.of(context).hintColor))));
+      return Center(
+        child: Padding(
+          padding: EdgeInsets.all(context.scale(40)),
+          child: Column(
+            children: [
+              Icon(Icons.search_off_rounded, size: context.scale(48), color: theme.hintColor),
+              SizedBox(height: context.scale(16)),
+              Text("No books found matching your criteria", style: TextStyle(color: theme.hintColor)),
+            ],
+          ),
+        ),
+      );
     }
 
-    return GridView.builder(
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: context.isTablet ? 3 : 1,
-        mainAxisExtent: 160,
-        crossAxisSpacing: 16,
-        mainAxisSpacing: 16,
-      ),
-      itemCount: _books.length,
-      itemBuilder: (context, index) {
-        final book = _books[index];
-        final theme = Theme.of(context);
-        return Card(
-          child: Padding(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(book.title, style: const TextStyle(fontWeight: FontWeight.bold), maxLines: 1, overflow: TextOverflow.ellipsis),
-                Text("by ${book.author}", style: theme.textTheme.bodySmall?.copyWith(color: theme.hintColor), maxLines: 1),
-                const Spacer(),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text("ISBN: ${book.isbn ?? 'N/A'}", style: const TextStyle(fontSize: 10)),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: (book.availableCopies > 0 ? Colors.green : Colors.red).withValues(alpha: 0.1),
-                        borderRadius: BorderRadius.circular(6),
-                      ),
-                      child: Text("${book.availableCopies} available", 
-                        style: TextStyle(color: book.availableCopies > 0 ? Colors.green : Colors.red, fontSize: 10, fontWeight: FontWeight.bold)),
-                    ),
-                  ],
-                ),
-              ],
+    return Padding(
+      padding: EdgeInsets.symmetric(horizontal: context.pagePadding.left),
+      child: GridView.builder(
+        shrinkWrap: true,
+        physics: const NeverScrollableScrollPhysics(),
+        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+          crossAxisCount: context.isDesktop ? 3 : (context.isTablet ? 2 : 1),
+          mainAxisExtent: context.scale(180),
+          crossAxisSpacing: context.spacing,
+          mainAxisSpacing: context.spacing,
+        ),
+        itemCount: _books.length,
+        itemBuilder: (context, index) {
+          final book = _books[index];
+          final isAvailable = book.availableCopies > 0;
+          
+          return Card(
+            elevation: 0,
+            color: theme.colorScheme.surfaceContainerLow,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(context.scale(16)),
+              side: BorderSide(color: theme.colorScheme.outlineVariant, width: 0.5),
             ),
-          ),
-        );
-      },
+            child: Padding(
+              padding: EdgeInsets.all(context.spacing),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Container(
+                        padding: EdgeInsets.all(context.scale(10)),
+                        decoration: BoxDecoration(
+                          color: theme.colorScheme.primaryContainer.withValues(alpha: 0.4),
+                          borderRadius: BorderRadius.circular(context.scale(10)),
+                        ),
+                        child: Icon(Icons.menu_book_rounded, color: theme.colorScheme.primary, size: context.scale(20)),
+                      ),
+                      SizedBox(width: context.spacing / 2),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              book.title, 
+                              style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold, fontSize: context.font(15)), 
+                              maxLines: 2, 
+                              overflow: TextOverflow.ellipsis
+                            ),
+                            Text(
+                              "by ${book.author}", 
+                              style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant), 
+                              maxLines: 1, 
+                              overflow: TextOverflow.ellipsis
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                  const Spacer(),
+                  Divider(color: theme.colorScheme.outlineVariant, height: context.spacing),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text("ISBN", style: theme.textTheme.labelSmall?.copyWith(color: theme.hintColor)),
+                          Text(book.isbn ?? 'N/A', style: theme.textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w600)),
+                        ],
+                      ),
+                      Container(
+                        padding: EdgeInsets.symmetric(horizontal: context.scale(10), vertical: context.scale(4)),
+                        decoration: BoxDecoration(
+                          color: (isAvailable ? Colors.green : Colors.red).withValues(alpha: 0.1),
+                          borderRadius: BorderRadius.circular(context.scale(8)),
+                        ),
+                        child: Text(
+                          isAvailable ? "${book.availableCopies} Available" : "Out of Stock", 
+                          style: TextStyle(
+                            color: isAvailable ? Colors.green : Colors.red, 
+                            fontSize: context.font(11), 
+                            fontWeight: FontWeight.bold
+                          )
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          );
+        },
+      ),
     );
   }
 
   Widget _buildPagination(BuildContext context) {
+    final theme = context.theme;
     return Row(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
-        IconButton(onPressed: _currentPage > 1 ? () => _fetchBooks(page: _currentPage - 1) : null, icon: const Icon(Icons.chevron_left)),
-        Text("$_currentPage / $_totalPages", style: const TextStyle(fontWeight: FontWeight.bold)),
-        IconButton(onPressed: _currentPage < _totalPages ? () => _fetchBooks(page: _currentPage + 1) : null, icon: const Icon(Icons.chevron_right)),
+        IconButton.filledTonal(
+          onPressed: _currentPage > 1 ? () => _fetchBooks(page: _currentPage - 1) : null, 
+          icon: const Icon(Icons.chevron_left)
+        ),
+        SizedBox(width: context.spacing),
+        Text(
+          "Page $_currentPage of $_totalPages", 
+          style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.bold)
+        ),
+        SizedBox(width: context.spacing),
+        IconButton.filledTonal(
+          onPressed: _currentPage < _totalPages ? () => _fetchBooks(page: _currentPage + 1) : null, 
+          icon: const Icon(Icons.chevron_right)
+        ),
       ],
     );
   }

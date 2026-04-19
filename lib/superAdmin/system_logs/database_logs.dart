@@ -193,7 +193,7 @@ class _DatabaseLogsScreenState extends State<DatabaseLogsScreen> {
             final log = entry.value;
             final user = log['user'] ?? {};
             final institute = user['institute'] ?? {};
-            
+
             return DataRow(
               cells: [
                 DataCell(Text(index.toString())),

@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:eduphin/services/responsive_helper.dart';
 import '../../librarian/librarian_models.dart';
 import '../../services/api_service.dart';
+import '../../teacher/dashboard/common_widgets.dart';
 
 class MyLendingBooksPage extends StatefulWidget {
   const MyLendingBooksPage({super.key});
@@ -11,14 +13,6 @@ class MyLendingBooksPage extends StatefulWidget {
 }
 
 class _MyLendingBooksPageState extends State<MyLendingBooksPage> {
-  static const Color bgColor = Color(0xFF161C3A);
-  static const Color cardColor = Color(0xFF262F56);
-  static const Color fieldColor = Color(0xFF434E72);
-  static const Color accentBlue = Color(0xFF3B66F5);
-  static const Color greyBtn = Color(0xFF5A6A85);
-  static const Color headerColor = Color(0xFF343E63);
-  static const Color dividerColor = Color(0xFF3D476B);
-
   bool _isLoading = true;
   List<IssuedBook> _lendingBooks = [];
 
@@ -38,8 +32,26 @@ class _MyLendingBooksPageState extends State<MyLendingBooksPage> {
     try {
       final Map<String, String> filters = {};
       if (_bookTitleController.text.isNotEmpty) filters['book_title'] = _bookTitleController.text;
-      if (_dateFromController.text.isNotEmpty) filters['issued_from'] = _dateFromController.text;
-      if (_dateToController.text.isNotEmpty) filters['due_to'] = _dateToController.text;
+      
+      // The API likely expects yyyy-MM-dd. We should ensure conversion if needed, 
+      // but buildDateField in common_widgets uses dd-MM-yyyy.
+      // For consistency with existing logic, let's handle the format.
+      if (_dateFromController.text.isNotEmpty) {
+        try {
+          DateTime dt = DateFormat('dd-MM-yyyy').parse(_dateFromController.text);
+          filters['issued_from'] = DateFormat('yyyy-MM-dd').format(dt);
+        } catch (_) {
+          filters['issued_from'] = _dateFromController.text;
+        }
+      }
+      if (_dateToController.text.isNotEmpty) {
+        try {
+          DateTime dt = DateFormat('dd-MM-yyyy').parse(_dateToController.text);
+          filters['due_to'] = DateFormat('yyyy-MM-dd').format(dt);
+        } catch (_) {
+          filters['due_to'] = _dateToController.text;
+        }
+      }
       if (_searchController.text.isNotEmpty) filters['search'] = _searchController.text;
 
       final books = await ApiService.getStaffIssuedBooks(filters);
@@ -55,272 +67,310 @@ class _MyLendingBooksPageState extends State<MyLendingBooksPage> {
     }
   }
 
-  Future<void> _selectDate(BuildContext context, TextEditingController controller) async {
-    final DateTime? picked = await showDatePicker(
-      context: context,
-      initialDate: DateTime.now(),
-      firstDate: DateTime(2000),
-      lastDate: DateTime(2101),
-      builder: (context, child) {
-        return Theme(
-          data: Theme.of(context).copyWith(
-            colorScheme: const ColorScheme.dark(
-              primary: accentBlue,
-              onPrimary: Colors.white,
-              surface: cardColor,
-              onSurface: Colors.white,
-            ),
-            dialogTheme: const DialogThemeData(
-              backgroundColor: bgColor,
-            ),
-          ),
-          child: child!,
-        );
-      },
-    );
-    if (picked != null) {
-      setState(() {
-        controller.text = DateFormat('yyyy-MM-dd').format(picked);
-      });
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
+    final theme = context.theme;
     return Scaffold(
-      backgroundColor: bgColor,
+      backgroundColor: theme.colorScheme.surface,
       appBar: AppBar(
-        backgroundColor: bgColor,
-        elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.white),
-          onPressed: () => Navigator.pop(context),
-        ),
-        titleSpacing: 0,
-        title: const Row(
-          children: [
-            Icon(Icons.menu_book_outlined, color: Colors.white, size: 24),
-            SizedBox(width: 10),
-            Text("My Lending Books",
-                style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 20)),
-          ],
-        ),
+        title: const Text("My Lending Books"),
+        centerTitle: true,
       ),
       body: _isLoading
-          ? const Center(child: CircularProgressIndicator(color: accentBlue))
+          ? const Center(child: CircularProgressIndicator())
           : RefreshIndicator(
               onRefresh: _fetchLendingBooks,
-              color: accentBlue,
               child: SingleChildScrollView(
                 physics: const AlwaysScrollableScrollPhysics(),
-                padding: const EdgeInsets.all(16.0),
-                child: Column(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.all(16),
-                      decoration: BoxDecoration(
-                        color: cardColor,
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const Row(
-                            children: [
-                              Icon(Icons.filter_alt, color: Colors.white, size: 20),
-                              SizedBox(width: 8),
-                              Text("Filter Books",
-                                  style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 17)),
-                            ],
-                          ),
-                          const SizedBox(height: 16),
-                          buildLabel("Book Title"),
-                          buildInputField("e.g. Math, Physics", _bookTitleController, null),
-                          buildLabel("Due Date From"),
-                          buildInputField("dd-mm-yyyy", _dateFromController, Icons.calendar_month_outlined, isDate: true),
-                          buildLabel("Due Date To"),
-                          buildInputField("dd-mm-yyyy", _dateToController, Icons.calendar_month_outlined, isDate: true),
-                          const SizedBox(height: 24),
-                          SizedBox(
-                            width: double.infinity,
-                            height: 48,
-                            child: ElevatedButton.icon(
-                              onPressed: _fetchLendingBooks,
-                              icon: const Icon(Icons.search, size: 18, color: Colors.white),
-                              label: const Text("APPLY FILTERS", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, letterSpacing: 0.5)),
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: accentBlue,
-                                elevation: 0,
-                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                              ),
-                            ),
-                          ),
-                          const SizedBox(height: 12),
-                          SizedBox(
-                            width: double.infinity,
-                            height: 48,
-                            child: ElevatedButton.icon(
-                              onPressed: () {
-                                setState(() {
-                                  _bookTitleController.clear();
-                                  _dateFromController.clear();
-                                  _dateToController.clear();
-                                });
-                                _fetchLendingBooks();
-                              },
-                              icon: const Icon(Icons.refresh, size: 18, color: Colors.white),
-                              label: const Text("RESET", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, letterSpacing: 0.5)),
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: greyBtn,
-                                elevation: 0,
-                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
+                padding: context.pagePadding,
+                child: Center(
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 1200),
+                    child: Column(
+                      children: [
+                        _buildFilterCard(context),
+                        SizedBox(height: context.spacing),
+                        _buildRecordsCard(context),
+                      ],
                     ),
-                    const SizedBox(height: 20),
-                    Container(
-                      padding: const EdgeInsets.all(16),
-                      decoration: BoxDecoration(
-                        color: cardColor,
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const Text("Current Lending Records",
-                              style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 18)),
-                          const SizedBox(height: 12),
-                          const Text("Show Entries", style: TextStyle(color: Colors.white, fontSize: 15)),
-                          const SizedBox(height: 10),
-                          TextField(
-                            controller: _searchController,
-                            onChanged: (v) => _fetchLendingBooks(),
-                            style: const TextStyle(color: Colors.white, fontSize: 14),
-                            decoration: InputDecoration(
-                              hintText: "search",
-                              hintStyle: const TextStyle(color: Colors.white38, fontSize: 15),
-                              filled: true,
-                              fillColor: fieldColor,
-                              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                              border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide.none),
-                            ),
-                          ),
-                          const SizedBox(height: 20),
-                          if (_lendingBooks.isEmpty)
-                            const Center(child: Padding(
-                              padding: EdgeInsets.symmetric(vertical: 20),
-                              child: Text("No lending records found", style: TextStyle(color: Colors.white38)),
-                            ))
-                          else
-                            Container(
-                              decoration: BoxDecoration(
-                                border: Border.all(color: dividerColor, width: 1),
-                                borderRadius: BorderRadius.circular(2),
-                              ),
-                              child: SingleChildScrollView(
-                                scrollDirection: Axis.horizontal,
-                                child: DataTable(
-                                  headingRowColor: WidgetStateProperty.all(headerColor),
-                                  columnSpacing: 35,
-                                  dividerThickness: 1,
-                                  horizontalMargin: 15,
-                                  dataRowMaxHeight: 80,
-                                  columns: const [
-                                    DataColumn(label: Text("#", style: TextStyle(color: Colors.white, fontWeight: FontWeight.w500, fontSize: 15))),
-                                    DataColumn(label: Text("Issue No.", style: TextStyle(color: Colors.white, fontWeight: FontWeight.w500, fontSize: 15))),
-                                    DataColumn(label: Text("Book ID", style: TextStyle(color: Colors.white, fontWeight: FontWeight.w500, fontSize: 15))),
-                                    DataColumn(label: Text("Book Title", style: TextStyle(color: Colors.white, fontWeight: FontWeight.w500, fontSize: 15))),
-                                    DataColumn(label: Text("Issued At", style: TextStyle(color: Colors.white, fontWeight: FontWeight.w500, fontSize: 15))),
-                                    DataColumn(label: Text("Due Date", style: TextStyle(color: Colors.white, fontWeight: FontWeight.w500, fontSize: 15))),
-                                    DataColumn(label: Text("Days Overdue", style: TextStyle(color: Colors.white, fontWeight: FontWeight.w500, fontSize: 15))),
-                                    DataColumn(label: Text("Return At", style: TextStyle(color: Colors.white, fontWeight: FontWeight.w500, fontSize: 15))),
-                                  ],
-                                  rows: _lendingBooks.asMap().entries.map((entry) {
-                                    int index = entry.key + 1;
-                                    IssuedBook ib = entry.value;
-                                    return buildDataRow(index.toString(), ib);
-                                  }).toList(),
-                                ),
-                              ),
-                            ),
-                        ],
-                      ),
-                    ),
-                  ],
+                  ),
                 ),
               ),
             ),
     );
   }
 
-  Widget buildLabel(String text) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 8, top: 12),
-      child: Text(text, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 15)),
-    );
-  }
-
-  Widget buildInputField(String hint, TextEditingController controller, IconData? icon, {bool isDate = false}) {
-    return InkWell(
-      onTap: isDate ? () => _selectDate(context, controller) : null,
-      child: IgnorePointer(
-        ignoring: isDate,
-        child: TextField(
-          controller: controller,
-          style: const TextStyle(color: Colors.white, fontSize: 14),
-          decoration: InputDecoration(
-            hintText: hint,
-            hintStyle: const TextStyle(color: Colors.white38, fontSize: 15),
-            filled: true,
-            fillColor: fieldColor,
-            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-            suffixIcon: icon != null ? Icon(icon, color: Colors.white54, size: 22) : null,
-            border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide.none),
+  Widget _buildFilterCard(BuildContext context) {
+    final theme = context.theme;
+    return Container(
+      padding: EdgeInsets.all(context.scale(20)),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surfaceContainerLow,
+        borderRadius: BorderRadius.circular(context.scale(20)),
+        border: Border.all(color: theme.colorScheme.outlineVariant, width: 0.5),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.filter_list_rounded, color: theme.colorScheme.primary, size: context.scale(20)),
+              SizedBox(width: context.scale(8)),
+              Text("Filter Books",
+                  style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold, fontSize: context.font(16))),
+            ],
           ),
-        ),
+          SizedBox(height: context.spacing),
+          LayoutBuilder(
+            builder: (context, constraints) {
+              if (constraints.maxWidth > 700) {
+                return Column(
+                  children: [
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Expanded(child: _buildInputGroup("Book Title", _bookTitleController, "e.g. Math, Physics")),
+                        SizedBox(width: context.spacing),
+                        Expanded(child: _buildDateInputGroup("Due Date From", _dateFromController)),
+                        SizedBox(width: context.spacing),
+                        Expanded(child: _buildDateInputGroup("Due Date To", _dateToController)),
+                      ],
+                    ),
+                    SizedBox(height: context.spacing),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.end,
+                      children: [
+                        _buildResetButton(),
+                        SizedBox(width: context.spacing),
+                        _buildApplyButton(),
+                      ],
+                    ),
+                  ],
+                );
+              }
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _buildInputGroup("Book Title", _bookTitleController, "e.g. Math, Physics"),
+                  SizedBox(height: context.spacing),
+                  Row(
+                    children: [
+                      Expanded(child: _buildDateInputGroup("Due Date From", _dateFromController)),
+                      SizedBox(width: context.spacing),
+                      Expanded(child: _buildDateInputGroup("Due Date To", _dateToController)),
+                    ],
+                  ),
+                  SizedBox(height: context.spacing),
+                  Row(
+                    children: [
+                      Expanded(child: _buildResetButton()),
+                      SizedBox(width: context.spacing),
+                      Expanded(child: _buildApplyButton()),
+                    ],
+                  ),
+                ],
+              );
+            },
+          ),
+        ],
       ),
     );
   }
 
-  DataRow buildDataRow(String hash, IssuedBook ib) {
+  Widget _buildInputGroup(String label, TextEditingController controller, String hint) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        buildLabel(context, label),
+        buildTextField(context, controller, hint),
+      ],
+    );
+  }
+
+  Widget _buildDateInputGroup(String label, TextEditingController controller) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        buildLabel(context, label),
+        buildDateField(context, controller, "dd-mm-yyyy"),
+      ],
+    );
+  }
+
+  Widget _buildApplyButton() {
+    return FilledButton.icon(
+      onPressed: _fetchLendingBooks,
+      icon: const Icon(Icons.search_rounded, size: 18),
+      label: const Text("APPLY FILTERS"),
+    );
+  }
+
+  Widget _buildResetButton() {
+    return FilledButton.tonal(
+      onPressed: () {
+        setState(() {
+          _bookTitleController.clear();
+          _dateFromController.clear();
+          _dateToController.clear();
+        });
+        _fetchLendingBooks();
+      },
+      child: const Text("RESET"),
+    );
+  }
+
+  Widget _buildRecordsCard(BuildContext context) {
+    final theme = context.theme;
+    return Container(
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surfaceContainerLow,
+        borderRadius: BorderRadius.circular(context.scale(20)),
+        border: Border.all(color: theme.colorScheme.outlineVariant, width: 0.5),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: EdgeInsets.all(context.scale(20)),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text("Current Lending Records",
+                          style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold, fontSize: context.font(16))),
+                      Text("Detailed view of issued books and status",
+                          style: theme.textTheme.bodySmall?.copyWith(color: theme.hintColor)),
+                    ],
+                  ),
+                ),
+                SizedBox(width: context.spacing),
+                SizedBox(
+                  width: context.responsive(context.scale(200), tablet: context.scale(250)),
+                  child: TextField(
+                    controller: _searchController,
+                    onChanged: (v) => _fetchLendingBooks(),
+                    style: TextStyle(fontSize: context.font(14)),
+                    decoration: InputDecoration(
+                      hintText: "Search records...",
+                      prefixIcon: const Icon(Icons.search, size: 20),
+                      contentPadding: EdgeInsets.symmetric(horizontal: context.scale(16), vertical: context.scale(8)),
+                      isDense: true,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          if (_lendingBooks.isEmpty)
+            Center(
+              child: Padding(
+                padding: EdgeInsets.symmetric(vertical: context.scale(64)),
+                child: Column(
+                  children: [
+                    Icon(Icons.library_books_outlined, size: context.scale(48), color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.5)),
+                    SizedBox(height: context.scale(16)),
+                    Text("No lending records found", style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onSurfaceVariant, fontWeight: FontWeight.bold)),
+                  ],
+                ),
+              ),
+            )
+          else
+            _buildLendingTable(context),
+          SizedBox(height: context.spacing),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildLendingTable(BuildContext context) {
+    final theme = context.theme;
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      child: DataTable(
+        headingRowColor: WidgetStateProperty.all(theme.colorScheme.primaryContainer.withValues(alpha: 0.3)),
+        columnSpacing: context.scale(24),
+        dividerThickness: 0.5,
+        horizontalMargin: context.spacing,
+        columns: [
+          DataColumn(label: _tableHeader(context, "#")),
+          DataColumn(label: _tableHeader(context, "Issue No.")),
+          DataColumn(label: _tableHeader(context, "Book ID")),
+          DataColumn(label: _tableHeader(context, "Book Title")),
+          DataColumn(label: _tableHeader(context, "Issued At")),
+          DataColumn(label: _tableHeader(context, "Due Date")),
+          DataColumn(label: _tableHeader(context, "Days Overdue")),
+          DataColumn(label: _tableHeader(context, "Return At")),
+        ],
+        rows: _lendingBooks.asMap().entries.map((entry) {
+          int index = entry.key + 1;
+          IssuedBook ib = entry.value;
+          return _buildDataRow(context, index.toString(), ib);
+        }).toList(),
+      ),
+    );
+  }
+
+  Widget _tableHeader(BuildContext context, String label) {
+    return Text(
+      label,
+      style: context.theme.textTheme.titleSmall?.copyWith(
+        fontWeight: FontWeight.bold,
+        color: context.theme.colorScheme.primary,
+        fontSize: context.font(13),
+      ),
+    );
+  }
+
+  DataRow _buildDataRow(BuildContext context, String hash, IssuedBook ib) {
+    final theme = context.theme;
     String overdueText = "0 days";
+    Color overdueBg = theme.colorScheme.surfaceContainerHighest;
+    Color overdueTextColor = theme.colorScheme.onSurfaceVariant;
+    
     if (ib.dueDate != null) {
       try {
         DateTime dueDate = DateTime.parse(ib.dueDate!);
-        if (DateTime.now().isAfter(dueDate)) {
+        if (DateTime.now().isAfter(dueDate) && (ib.returnedAt == null || ib.returnedAt!.isEmpty)) {
           int diff = DateTime.now().difference(dueDate).inDays;
           overdueText = "$diff days";
+          // Semantic Red: 0xFFEF4444
+          overdueBg = const Color(0xFFEF4444).withValues(alpha: 0.1);
+          overdueTextColor = const Color(0xFFEF4444);
         }
       } catch (_) {}
     }
 
     return DataRow(cells: [
-      DataCell(Text(hash, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14))),
-      DataCell(Text(ib.id.toString(), style: const TextStyle(color: Colors.white70, fontSize: 14))),
-      DataCell(Text(ib.bookId.toString(), style: const TextStyle(color: Colors.white70, fontSize: 14))),
+      DataCell(Text(hash, style: TextStyle(fontWeight: FontWeight.bold, fontSize: context.font(13)))),
+      DataCell(Text(ib.id.toString(), style: TextStyle(fontSize: context.font(13)))),
+      DataCell(Text(ib.bookId.toString(), style: TextStyle(fontSize: context.font(13)))),
       DataCell(SizedBox(
-        width: 140,
+        width: context.scale(150),
         child: Text(ib.bookTitle ?? "N/A", 
-          style: const TextStyle(color: Colors.white, fontSize: 14),
+          style: TextStyle(fontSize: context.font(13), fontWeight: FontWeight.w500),
           maxLines: 2,
           overflow: TextOverflow.ellipsis,
         ),
       )),
-      DataCell(Text(_formatDate(ib.issuedAt), style: const TextStyle(color: Colors.white, fontSize: 14))),
-      DataCell(Text(_formatDate(ib.dueDate), style: const TextStyle(color: Colors.white, fontSize: 14))),
+      DataCell(Text(_formatDate(ib.issuedAt), style: TextStyle(fontSize: context.font(13)))),
+      DataCell(Text(_formatDate(ib.dueDate), style: TextStyle(fontSize: context.font(13)))),
       DataCell(Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        padding: EdgeInsets.symmetric(horizontal: context.scale(8), vertical: context.scale(4)),
         decoration: BoxDecoration(
-          color: const Color(0xFF3F4A5E),
-          borderRadius: BorderRadius.circular(4),
+          color: overdueBg,
+          borderRadius: BorderRadius.circular(context.scale(4)),
         ),
         child: Text(overdueText, 
-          style: const TextStyle(color: Colors.white, fontSize: 14)),
+          style: TextStyle(
+            fontSize: context.font(12), 
+            color: overdueTextColor,
+            fontWeight: FontWeight.bold,
+          )),
       )),
-      DataCell(Text(_formatDate(ib.returnedAt), style: const TextStyle(color: Colors.white, fontSize: 14))),
+      DataCell(Text(_formatDate(ib.returnedAt), style: TextStyle(fontSize: context.font(13)))),
     ]);
   }
 

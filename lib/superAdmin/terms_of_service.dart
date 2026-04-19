@@ -1,4 +1,5 @@
 import 'package:eduphin/services/responsive_helper.dart';
+import 'package:eduphin/services/theme_service.dart';
 import 'package:flutter/material.dart';
 import '../services/api_service.dart';
 
@@ -28,6 +29,7 @@ class _TermsOfServiceScreenState extends State<TermsOfServiceScreen> {
 
   Future<void> _fetchPolicy() async {
     if (!mounted) return;
+    setState(() => _isLoading = true);
     try {
       final data = await ApiService.getTermsOfService();
       if (data != null && mounted) {
@@ -65,17 +67,17 @@ class _TermsOfServiceScreenState extends State<TermsOfServiceScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
+    final theme = context.theme;
     return Scaffold(
       appBar: AppBar(
-        title: const Text("Terms of Service"),
+        title: Text("Terms of Service", style: TextStyle(fontSize: context.font(20), fontWeight: FontWeight.bold)),
         actions: [
           if (!_isLoading)
             IconButton(
               onPressed: _isSaving ? null : _updatePolicy,
               icon: _isSaving
-                  ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                  : const Icon(Icons.save),
+                  ? SizedBox(width: context.scale(20), height: context.scale(20), child: CircularProgressIndicator(strokeWidth: 2, color: theme.colorScheme.onSurface))
+                  : Icon(Icons.save, size: context.scale(24)),
             ),
         ],
       ),
@@ -87,40 +89,49 @@ class _TermsOfServiceScreenState extends State<TermsOfServiceScreen> {
                 child: ConstrainedBox(
                   constraints: const BoxConstraints(maxWidth: 900),
                   child: Card(
+                    elevation: 0,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(context.scale(16)),
+                      side: BorderSide(color: theme.dividerColor.withValues(alpha: 0.1)),
+                    ),
                     child: Padding(
-                      padding: const EdgeInsets.all(24.0),
+                      padding: EdgeInsets.all(context.spacing * 1.5),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Row(
                             children: [
-                              Icon(Icons.description_outlined, color: theme.colorScheme.primary, size: 24),
-                              const SizedBox(width: 12),
+                              Icon(Icons.description_outlined, color: theme.colorScheme.primary, size: context.scale(24)),
+                              SizedBox(width: context.scale(12)),
                               Text(
                                 "Platform Terms & Conditions",
-                                style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
+                                style: TextStyle(fontWeight: FontWeight.bold, fontSize: context.font(18)),
                               ),
                             ],
                           ),
-                          const SizedBox(height: 8),
+                          SizedBox(height: context.scale(8)),
                           Text("Define the legal agreement between the platform and users.",
-                            style: theme.textTheme.bodySmall?.copyWith(color: theme.hintColor)),
-                          const Divider(height: 48),
+                              style: TextStyle(color: theme.hintColor, fontSize: context.font(12))),
+                          Divider(height: context.scale(48)),
                           TextField(
                             controller: _contentController,
                             maxLines: 25,
-                            decoration: const InputDecoration(
+                            style: TextStyle(fontSize: context.font(14)),
+                            decoration: InputDecoration(
                               hintText: "Enter terms content...",
-                              contentPadding: EdgeInsets.all(16),
+                              contentPadding: EdgeInsets.all(context.scale(16)),
                             ),
                           ),
-                          const SizedBox(height: 24),
+                          SizedBox(height: context.scale(24)),
                           SizedBox(
                             width: double.infinity,
                             child: ElevatedButton.icon(
                               onPressed: _isSaving ? null : _updatePolicy,
-                              icon: const Icon(Icons.published_with_changes),
-                              label: const Text("SAVE AND PUBLISH"),
+                              style: ElevatedButton.styleFrom(
+                                padding: EdgeInsets.symmetric(vertical: context.scale(12)),
+                              ),
+                              icon: Icon(Icons.published_with_changes, size: context.scale(20)),
+                              label: Text("SAVE AND PUBLISH", style: TextStyle(fontSize: context.font(14))),
                             ),
                           ),
                         ],

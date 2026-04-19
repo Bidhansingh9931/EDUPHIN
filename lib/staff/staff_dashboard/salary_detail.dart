@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
+import 'package:eduphin/services/responsive_helper.dart';
 import '../../services/api_service.dart';
 import 'staff_models.dart';
 
@@ -10,10 +12,6 @@ class StaffSalaryDetailPage extends StatefulWidget {
 }
 
 class _StaffSalaryDetailPageState extends State<StaffSalaryDetailPage> {
-  static const Color primaryColor = Color(0xFF6C63FF);
-  static const Color bgColor = Color(0xFF0F1630);
-  static const Color cardColor = Color(0xFF1D2645);
-
   late Future<SalaryPageData> _salaryPageFuture;
 
   @override
@@ -30,16 +28,11 @@ class _StaffSalaryDetailPageState extends State<StaffSalaryDetailPage> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = context.theme;
     return Scaffold(
-      backgroundColor: bgColor,
+      backgroundColor: theme.scaffoldBackgroundColor,
       appBar: AppBar(
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        title: const Text("My Salary Detail", style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white, fontSize: 18)),
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white, size: 20),
-          onPressed: () => Navigator.pop(context),
-        ),
+        title: Text("Salary Details", style: TextStyle(fontSize: context.font(20))),
       ),
       body: RefreshIndicator(
         onRefresh: () async => _loadData(),
@@ -49,29 +42,38 @@ class _StaffSalaryDetailPageState extends State<StaffSalaryDetailPage> {
             if (snapshot.connectionState == ConnectionState.waiting) {
               return const Center(child: CircularProgressIndicator());
             } else if (snapshot.hasError) {
-              return SingleChildScrollView(
-                physics: const AlwaysScrollableScrollPhysics(),
-                child: Container(
-                  height: MediaQuery.of(context).size.height * 0.8,
-                  alignment: Alignment.center,
-                  child: Text('Error: ${snapshot.error}', style: const TextStyle(color: Colors.white)),
-                ),
-              );
+              return _buildErrorState(context, snapshot.error.toString());
             } else if (!snapshot.hasData) {
-              return const Center(child: Text('No data available', style: TextStyle(color: Colors.white)));
+              return _buildEmptyState(context);
             }
 
             final data = snapshot.data!;
             return SingleChildScrollView(
               physics: const AlwaysScrollableScrollPhysics(),
-              padding: const EdgeInsets.all(16.0),
-              child: Column(
-                children: [
-                  _buildBankDetailsCard(data.account),
-                  const SizedBox(height: 24),
-                  _buildPastSalaryRecords(data.salaries),
-                  const SizedBox(height: 40),
-                ],
+              child: Center(
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 1200),
+                  child: Padding(
+                    padding: context.pagePadding,
+                    child: context.responsive(
+                      Column(
+                        children: [
+                          _buildBankDetailsCard(context, data.account),
+                          SizedBox(height: context.spacing),
+                          _buildPastSalaryRecords(context, data.salaries),
+                        ],
+                      ),
+                      tablet: Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Expanded(flex: 2, child: _buildBankDetailsCard(context, data.account)),
+                          SizedBox(width: context.spacing),
+                          Expanded(flex: 3, child: _buildPastSalaryRecords(context, data.salaries)),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
               ),
             );
           },
@@ -80,38 +82,41 @@ class _StaffSalaryDetailPageState extends State<StaffSalaryDetailPage> {
     );
   }
 
-  Widget _buildBankDetailsCard(UserDetail detail) {
-    return Container(
-      width: double.infinity,
-      decoration: BoxDecoration(
-        color: cardColor,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
+  Widget _buildBankDetailsCard(BuildContext context, UserDetail detail) {
+    final theme = context.theme;
+    final colorScheme = theme.colorScheme;
+    return Card(
+      elevation: 0,
+      margin: EdgeInsets.zero,
+      color: colorScheme.surfaceContainerLow,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(context.scale(20)),
+        side: BorderSide(color: colorScheme.outlineVariant),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Padding(
-            padding: EdgeInsets.all(20.0),
+          Padding(
+            padding: EdgeInsets.all(context.scale(20)),
             child: Row(
               children: [
-                Icon(Icons.account_balance_rounded, color: Colors.white, size: 22),
-                SizedBox(width: 12),
-                Text("Bank Details", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white)),
+                Icon(Icons.account_balance_rounded, color: colorScheme.primary, size: context.scale(22)),
+                SizedBox(width: context.scale(12)),
+                Text("Bank Information", style: GoogleFonts.roboto(fontWeight: FontWeight.bold, fontSize: context.font(16))),
               ],
             ),
           ),
-          const Divider(color: Colors.white10, height: 1),
+          Divider(color: colorScheme.outlineVariant, height: 1),
           Padding(
-            padding: const EdgeInsets.all(20.0),
+            padding: EdgeInsets.all(context.scale(20)),
             child: Column(
               children: [
-                _buildBankInfoItem(Icons.person_outline_rounded, "Account Holder:", detail.user?.name ?? 'N/A'),
-                _buildBankInfoItem(Icons.credit_card_rounded, "Account Number:", detail.bankAccountNumber ?? 'N/A'),
-                _buildBankInfoItem(Icons.domain_rounded, "Bank Name:", detail.bankName ?? 'N/A'),
-                _buildBankInfoItem(Icons.code_rounded, "IFSC Code:", detail.ifscCode ?? 'N/A'),
-                _buildBankInfoItem(Icons.location_on_outlined, "Branch:", detail.branchName ?? 'N/A'),
-                _buildBankInfoItem(Icons.payments_outlined, "Relationship Status:", detail.relationshipStatus ?? 'N/A'),
+                _buildBankInfoItem(context, Icons.person_outline_rounded, "Account Holder", detail.user?.name ?? 'N/A'),
+                _buildBankInfoItem(context, Icons.credit_card_rounded, "Account Number", detail.bankAccountNumber ?? 'N/A'),
+                _buildBankInfoItem(context, Icons.domain_rounded, "Bank Name", detail.bankName ?? 'N/A'),
+                _buildBankInfoItem(context, Icons.code_rounded, "IFSC Code", detail.ifscCode ?? 'N/A'),
+                _buildBankInfoItem(context, Icons.location_on_outlined, "Branch", detail.branchName ?? 'N/A'),
+                _buildBankInfoItem(context, Icons.payments_outlined, "Relationship", detail.relationshipStatus ?? 'N/A'),
               ],
             ),
           ),
@@ -120,21 +125,30 @@ class _StaffSalaryDetailPageState extends State<StaffSalaryDetailPage> {
     );
   }
 
-  Widget _buildBankInfoItem(IconData icon, String label, String value) {
+  Widget _buildBankInfoItem(BuildContext context, IconData icon, String label, String value) {
+    final theme = context.theme;
+    final colorScheme = theme.colorScheme;
     return Padding(
-      padding: const EdgeInsets.only(bottom: 16.0),
+      padding: EdgeInsets.only(bottom: context.scale(16)),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(icon, color: Colors.white38, size: 20),
-          const SizedBox(width: 16),
+          Container(
+            padding: EdgeInsets.all(context.scale(8)),
+            decoration: BoxDecoration(
+              color: colorScheme.primary.withValues(alpha: 0.05),
+              borderRadius: BorderRadius.circular(context.scale(8)),
+            ),
+            child: Icon(icon, color: colorScheme.primary, size: context.scale(18)),
+          ),
+          SizedBox(width: context.scale(16)),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(label, style: const TextStyle(color: Colors.white38, fontSize: 12, fontWeight: FontWeight.bold)),
-                const SizedBox(height: 4),
-                Text(value, style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w600)),
+                Text(label, style: TextStyle(color: colorScheme.onSurfaceVariant, fontSize: context.font(11), fontWeight: FontWeight.bold)),
+                SizedBox(height: context.scale(2)),
+                Text(value, style: TextStyle(color: colorScheme.onSurface, fontSize: context.font(14), fontWeight: FontWeight.w600)),
               ],
             ),
           ),
@@ -143,100 +157,92 @@ class _StaffSalaryDetailPageState extends State<StaffSalaryDetailPage> {
     );
   }
 
-  Widget _buildPastSalaryRecords(List<Salary> salaries) {
-    return Container(
-      decoration: BoxDecoration(
-        color: cardColor,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
+  Widget _buildPastSalaryRecords(BuildContext context, List<Salary> salaries) {
+    final theme = context.theme;
+    final colorScheme = theme.colorScheme;
+    return Card(
+      elevation: 0,
+      margin: EdgeInsets.zero,
+      color: colorScheme.surfaceContainerLow,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(context.scale(20)),
+        side: BorderSide(color: colorScheme.outlineVariant),
       ),
+      clipBehavior: Clip.antiAlias,
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Container(
-            padding: const EdgeInsets.all(16),
-            decoration: const BoxDecoration(
-              color: Color(0xFF4C8C4A),
-              borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-            ),
-            child: const Row(
-              children: [
-                Icon(Icons.history_rounded, color: Colors.white, size: 20),
-                SizedBox(width: 12),
-                Text("Past Salary Records", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-              ],
-            ),
-          ),
-          const Padding(
-            padding: EdgeInsets.all(16.0),
+          Padding(
+            padding: EdgeInsets.all(context.scale(20)),
             child: Row(
               children: [
-                Expanded(flex: 2, child: Text("Month", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12))),
-                Expanded(flex: 2, child: Text("Net Salary", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12))),
-                Expanded(flex: 2, child: Text("Status", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12))),
+                Icon(Icons.history_rounded, color: colorScheme.primary, size: context.scale(22)),
+                SizedBox(width: context.scale(12)),
+                Text("Salary History", style: GoogleFonts.roboto(fontWeight: FontWeight.bold, fontSize: context.font(16))),
               ],
             ),
           ),
-          const Divider(color: Colors.white10, height: 1),
+          Divider(color: colorScheme.outlineVariant, height: 1),
           if (salaries.isEmpty)
-            const Padding(
-              padding: EdgeInsets.all(20.0),
-              child: Text("No salary records found", style: TextStyle(color: Colors.white38)),
+            Padding(
+              padding: EdgeInsets.all(context.scale(40)),
+              child: Center(child: Text("No salary records found", style: TextStyle(color: colorScheme.onSurfaceVariant))),
             )
           else
-            ListView.separated(
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              itemCount: salaries.length,
-              separatorBuilder: (context, index) => const Divider(color: Colors.white10, height: 1),
-              itemBuilder: (context, index) {
-                final salary = salaries[index];
-                return _buildSalaryRow(salary);
-              },
-            ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildSalaryRow(Salary salary) {
-    bool isPaid = salary.status.toLowerCase() == 'paid';
-    return InkWell(
-      onTap: () => _showSalaryDetail(salary.id),
-      child: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Row(
-          children: [
-            Expanded(flex: 2, child: Text("${salary.month} ${salary.year}", style: const TextStyle(color: Colors.white70, fontSize: 13))),
-            Expanded(flex: 2, child: Text("₹ ${salary.amount}", style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13))),
-            Expanded(
-              flex: 2,
-              child: Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: (isPaid ? Colors.green : Colors.orange).withValues(alpha: 0.1),
-                      borderRadius: BorderRadius.circular(4)
-                    ),
-                    child: Text(
-                      salary.status.toUpperCase(),
-                      style: TextStyle(
-                        color: isPaid ? Colors.greenAccent : Colors.orangeAccent,
-                        fontSize: 10,
-                        fontWeight: FontWeight.bold
-                      )
-                    ),
-                  ),
-                ],
+            SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: ConstrainedBox(
+                constraints: BoxConstraints(minWidth: context.scale(400)),
+                child: DataTable(
+                  headingRowColor: WidgetStateProperty.all(colorScheme.surfaceContainerHigh.withValues(alpha: 0.5)),
+                  columnSpacing: context.scale(24),
+                  horizontalMargin: context.scale(20),
+                  showCheckboxColumn: false,
+                  columns: [
+                    DataColumn(label: Text("MONTH/YEAR", style: TextStyle(fontWeight: FontWeight.bold, fontSize: context.font(12)))),
+                    DataColumn(label: Text("NET SALARY", style: TextStyle(fontWeight: FontWeight.bold, fontSize: context.font(12)))),
+                    DataColumn(label: Text("STATUS", style: TextStyle(fontWeight: FontWeight.bold, fontSize: context.font(12)))),
+                  ],
+                  rows: salaries.map((salary) {
+                    bool isPaid = salary.status.toLowerCase() == 'paid';
+                    return DataRow(
+                      onSelectChanged: (_) => _showSalaryDetail(salary.id),
+                      cells: [
+                        DataCell(Text("${salary.month} ${salary.year}", style: TextStyle(fontSize: context.font(13)))),
+                        DataCell(Text("₹ ${salary.amount}", style: TextStyle(fontWeight: FontWeight.bold, fontSize: context.font(13), color: colorScheme.primary))),
+                        DataCell(
+                          Container(
+                            padding: EdgeInsets.symmetric(horizontal: context.scale(10), vertical: context.scale(4)),
+                            decoration: BoxDecoration(
+                              color: (isPaid ? Colors.green : Colors.orange).withValues(alpha: 0.1),
+                              borderRadius: BorderRadius.circular(context.scale(6)),
+                              border: Border.all(color: (isPaid ? Colors.green : Colors.orange).withValues(alpha: 0.3)),
+                            ),
+                            child: Text(
+                              salary.status.toUpperCase(),
+                              style: TextStyle(
+                                color: isPaid ? Colors.green : Colors.orange,
+                                fontSize: context.font(10),
+                                fontWeight: FontWeight.bold
+                              )
+                            ),
+                          ),
+                        ),
+                      ],
+                    );
+                  }).toList(),
+                ),
               ),
             ),
-          ],
-        ),
+          SizedBox(height: context.scale(12)),
+        ],
       ),
     );
   }
 
   void _showSalaryDetail(dynamic salaryId) async {
+    final theme = context.theme;
+    final colorScheme = theme.colorScheme;
     try {
       final data = await ApiService.getStaffSalarySlip(salaryId.toString());
       final detail = SalaryDetailData.fromJson(data);
@@ -244,51 +250,121 @@ class _StaffSalaryDetailPageState extends State<StaffSalaryDetailPage> {
       
       showModalBottomSheet(
         context: context,
-        backgroundColor: cardColor,
-        shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
-        builder: (context) => Container(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text("Salary Slip Detail", style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold)),
-              const SizedBox(height: 20),
-              _buildDetailItem("Net Salary", "₹ ${detail.salary.netSalary ?? detail.salary.amount}"),
-              _buildDetailItem("Amount in words", detail.amountInWords),
-              _buildDetailItem("Basic Salary", "₹ ${detail.salary.basicSalary ?? 'N/A'}"),
-              _buildDetailItem("Month/Year", "${detail.salary.month} / ${detail.salary.year}"),
-              const SizedBox(height: 20),
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton(
-                  onPressed: () => Navigator.pop(context),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: primaryColor,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        backgroundColor: colorScheme.surface,
+        isScrollControlled: true,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(context.scale(24)))),
+        builder: (context) => Padding(
+          padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
+          child: Container(
+            padding: EdgeInsets.all(context.scale(24)),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Center(
+                  child: Container(
+                    width: context.scale(40),
+                    height: context.scale(4),
+                    decoration: BoxDecoration(
+                      color: colorScheme.outlineVariant,
+                      borderRadius: BorderRadius.circular(2),
+                    ),
                   ),
-                  child: const Text("CLOSE", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
                 ),
-              ),
-            ],
+                SizedBox(height: context.scale(24)),
+                Text("Salary Slip Details", style: GoogleFonts.roboto(fontSize: context.font(20), fontWeight: FontWeight.bold)),
+                SizedBox(height: context.scale(24)),
+                _buildDetailRow(context, "Net Salary", "₹ ${detail.salary.netSalary ?? detail.salary.amount}", isPrimary: true),
+                _buildDetailRow(context, "Amount in Words", detail.amountInWords),
+                _buildDetailRow(context, "Basic Salary", "₹ ${detail.salary.basicSalary ?? 'N/A'}"),
+                _buildDetailRow(context, "Period", "${detail.salary.month} / ${detail.salary.year}"),
+                SizedBox(height: context.scale(32)),
+                SizedBox(
+                  width: double.infinity,
+                  height: context.scale(50),
+                  child: FilledButton(
+                    onPressed: () => Navigator.pop(context),
+                    style: FilledButton.styleFrom(
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(context.scale(12))),
+                    ),
+                    child: Text("CLOSE", style: TextStyle(fontWeight: FontWeight.bold, fontSize: context.font(14))),
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       );
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text('Error: $e'),
+        backgroundColor: colorScheme.error,
+        behavior: SnackBarBehavior.floating,
+      ));
     }
   }
 
-  Widget _buildDetailItem(String label, String value) {
+  Widget _buildDetailRow(BuildContext context, String label, String value, {bool isPrimary = false}) {
+    final theme = context.theme;
+    final colorScheme = theme.colorScheme;
     return Padding(
-      padding: const EdgeInsets.only(bottom: 12),
+      padding: EdgeInsets.only(bottom: context.scale(20)),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(label, style: const TextStyle(color: Colors.white38, fontSize: 12)),
-          Text(value, style: const TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.bold)),
+          Text(label, style: TextStyle(color: colorScheme.onSurfaceVariant, fontSize: context.font(12), fontWeight: FontWeight.bold)),
+          SizedBox(height: context.scale(4)),
+          Text(value, style: TextStyle(
+            color: isPrimary ? colorScheme.primary : colorScheme.onSurface,
+            fontSize: context.font(16),
+            fontWeight: isPrimary ? FontWeight.bold : FontWeight.w600
+          )),
         ],
       ),
     );
   }
+
+  Widget _buildEmptyState(BuildContext context) {
+    final colorScheme = context.theme.colorScheme;
+    return Center(
+      child: Padding(
+        padding: EdgeInsets.all(context.scale(40)),
+        child: Column(
+          children: [
+            Icon(Icons.payments_outlined, size: context.scale(64), color: colorScheme.onSurfaceVariant.withValues(alpha: 0.2)),
+            SizedBox(height: context.scale(16)),
+            Text("No salary information available", 
+              textAlign: TextAlign.center,
+              style: TextStyle(color: colorScheme.onSurfaceVariant, fontSize: context.font(16), fontWeight: FontWeight.bold)),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildErrorState(BuildContext context, String error) {
+    final colorScheme = context.theme.colorScheme;
+    return Center(
+      child: Padding(
+        padding: EdgeInsets.all(context.scale(32)),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.error_outline_rounded, color: colorScheme.error, size: context.scale(60)),
+            SizedBox(height: context.scale(16)),
+            Text("Failed to load salary data", style: TextStyle(fontSize: context.font(16), fontWeight: FontWeight.bold)),
+            SizedBox(height: context.scale(8)),
+            Text(error, textAlign: TextAlign.center, style: TextStyle(color: colorScheme.onSurfaceVariant, fontSize: context.font(13))),
+            SizedBox(height: context.scale(24)),
+            FilledButton.icon(
+              onPressed: _loadData, 
+              icon: const Icon(Icons.refresh),
+              label: const Text("RETRY"),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 }
+

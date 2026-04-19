@@ -1,5 +1,8 @@
 import 'dart:io';
+import 'dart:typed_data';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:eduphin/services/responsive_helper.dart';
+import 'package:eduphin/services/common_widgets.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:eduphin/services/api_service.dart';
@@ -17,6 +20,8 @@ class _AccountantProfileState extends State<AccountantProfile> {
   bool _isLoading = true;
   UserDetail? _user;
   File? _image;
+  Uint8List? _imageBytes;
+  String? _fileName;
 
   final _formKey = GlobalKey<FormState>();
   final _nameController = TextEditingController();
@@ -35,6 +40,7 @@ class _AccountantProfileState extends State<AccountantProfile> {
   final _emergencyNameController = TextEditingController();
   final _emergencyPhoneController = TextEditingController();
   final _passwordController = TextEditingController();
+  final _passwordConfirmationController = TextEditingController();
   String? _gender;
   String? _relationshipStatus;
 
@@ -82,6 +88,11 @@ class _AccountantProfileState extends State<AccountantProfile> {
   Future<void> _updateProfile() async {
     if (!_formKey.currentState!.validate()) return;
 
+    if (_passwordController.text.isNotEmpty && _passwordController.text != _passwordConfirmationController.text) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Passwords do not match!")));
+      return;
+    }
+
     setState(() => _isLoading = true);
     try {
       final Map<String, String> data = {
@@ -104,11 +115,22 @@ class _AccountantProfileState extends State<AccountantProfile> {
 
       if (_passwordController.text.isNotEmpty) {
         data['password'] = _passwordController.text;
+        data['password_confirmation'] = _passwordConfirmationController.text;
       }
 
-      await ApiService.updateAccountantProfile(data, photo: _image);
+      if (kIsWeb && _imageBytes != null) {
+        await ApiService.updateAccountantProfileFromBytes(data, _imageBytes, _fileName);
+      } else {
+        await ApiService.updateAccountantProfile(data, photo: _image);
+      }
+
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Profile updated successfully")));
+        setState(() {
+          _image = null;
+          _imageBytes = null;
+          _fileName = null;
+        });
         _fetchProfile();
       }
     } catch (e) {
@@ -120,16 +142,67 @@ class _AccountantProfileState extends State<AccountantProfile> {
   }
 
   Future<void> _pickImage() async {
-    final pickedFile = await ImagePicker().pickImage(source: ImageSource.gallery, imageQuality: 70);
-    if (pickedFile != null) setState(() => _image = File(pickedFile.path));
+    final pickedFile = await ImagePicker().pickImage(
+      source: ImageSource.gallery,
+      imageQuality: 50,
+      maxWidth: 1024,
+      maxHeight: 1024,
+    );
+    if (pickedFile != null) {
+      if (kIsWeb) {
+        final bytes = await pickedFile.readAsBytes();
+        setState(() {
+          _imageBytes = bytes;
+          _fileName = pickedFile.name;
+        });
+      } else {
+        setState(() => _image = File(pickedFile.path));
+      }
+    }
   }
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
     return Scaffold(
       appBar: AppBar(
-        title: const Text("Accountant Profile"),
+        title: Text("Accountant Profile", style: TextStyle(fontSize: context.font(20))),
+        actions: [
+          IconButton(
+            tooltip: "Logout",
+            icon: const Icon(Icons.logout),
+            onPressed: () async {
+              final confirmed = await showDialog<bool>(
+                context: context,
+                builder: (context) => AlertDialog(
+                  title: const Text("Logout"),
+                  content: const Text("Are you sure you want to logout?"),
+                  actions: [
+                    TextButton(onPressed: () => Navigator.pop(context, false), child: const Text("Cancel")),
+                    TextButton(
+                      onPressed: () => Navigator.pop(context, true),
+                      child: const Text("Logout", style: TextStyle(color: Colors.red)),
+                    ),
+                  ],
+                ),
+              );
+
+              if (confirmed == true) {
+                if (mounted) setState(() => _isLoading = true);
+                try {
+                  await ApiService.logout();
+                  if (mounted) {
+                    Navigator.pushNamedAndRemoveUntil(context, '/login', (route) => false);
+                  }
+                } catch (e) {
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Logout failed: $e")));
+                    setState(() => _isLoading = false);
+                  }
+                }
+              }
+            },
+          ),
+        ],
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
@@ -137,60 +210,168 @@ class _AccountantProfileState extends State<AccountantProfile> {
               padding: context.pagePadding,
               child: Center(
                 child: ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 800),
+                  constraints: const BoxConstraints(maxWidth: 1000),
                   child: Form(
                     key: _formKey,
                     child: Column(
                       children: [
-                        _buildProfileImage(context),
-                        const SizedBox(height: 32),
-                        _buildResponsiveSection(context, [
-                          _buildSection(context, "Account Info", [
-                            _buildTextField(context, "Full Name", _nameController, enabled: false, icon: Icons.person_outline),
-                            _buildTextField(context, "Email Address", _emailController, enabled: false, icon: Icons.email_outlined),
-                          ]),
-                          _buildSection(context, "Personal Info", [
-                            _buildResponsiveRow(context, [
-                              _buildDropdown(context, "Gender", _gender, ['Male', 'Female', 'Other'], (v) => setState(() => _gender = v)),
-                              _buildDropdown(context, "Relationship", _relationshipStatus, ['Single', 'Married', 'Divorced', 'Widowed'], (v) => setState(() => _relationshipStatus = v)),
+                        _buildHeader(context),
+                        SizedBox(height: context.xl),
+                        AdaptiveFieldRow(children: [
+                          ProfileSection(
+                            title: "Account Info",
+                            icon: Icons.account_circle_outlined,
+                            children: [
+                              ProfileTextField(
+                                label: "Full Name",
+                                controller: _nameController,
+                                enabled: false,
+                                icon: Icons.person_outline,
+                              ),
+                              ProfileTextField(
+                                label: "Email Address",
+                                controller: _emailController,
+                                enabled: false,
+                                icon: Icons.email_outlined,
+                              ),
+                            ],
+                          ),
+                          ProfileSection(
+                            title: "Personal Info",
+                            icon: Icons.person_outline,
+                            children: [
+                              AdaptiveFieldRow(children: [
+                                ProfileDropdown(
+                                  label: "Gender",
+                                  value: _gender,
+                                  items: const ['Male', 'Female', 'Other'],
+                                  onChanged: (v) => setState(() => _gender = v),
+                                  icon: Icons.wc_outlined,
+                                ),
+                                ProfileDropdown(
+                                  label: "Relationship",
+                                  value: _relationshipStatus,
+                                  items: const ['Single', 'Married', 'Divorced', 'Widowed'],
+                                  onChanged: (v) => setState(() => _relationshipStatus = v),
+                                  icon: Icons.favorite_outline,
+                                ),
+                              ]),
+                              ProfileTextField(
+                                label: "Date of Birth",
+                                controller: _dobController,
+                                readOnly: true,
+                                icon: Icons.calendar_today_rounded,
+                                onTap: () async {
+                                  DateTime? picked = await showDatePicker(
+                                    context: context,
+                                    initialDate: DateTime.now().subtract(const Duration(days: 365 * 18)),
+                                    firstDate: DateTime(1950),
+                                    lastDate: DateTime.now(),
+                                  );
+                                  if (picked != null) {
+                                    setState(() => _dobController.text = DateFormat('yyyy-MM-dd').format(picked));
+                                  }
+                                },
+                              ),
+                            ],
+                          ),
+                        ]),
+                        AdaptiveFieldRow(children: [
+                          ProfileSection(
+                            title: "Contact Details",
+                            icon: Icons.contact_phone_outlined,
+                            children: [
+                              ProfileTextField(
+                                label: "Phone Number",
+                                controller: _phoneController,
+                                keyboardType: TextInputType.phone,
+                                icon: Icons.phone_android,
+                              ),
+                              ProfileTextField(
+                                label: "Alternate Phone",
+                                controller: _altPhoneController,
+                                keyboardType: TextInputType.phone,
+                                icon: Icons.phone,
+                              ),
+                            ],
+                          ),
+                          ProfileSection(
+                            title: "Residential Address",
+                            icon: Icons.home_outlined,
+                            children: [
+                              ProfileTextField(
+                                label: "Full Address",
+                                controller: _addressController,
+                                icon: Icons.map_outlined,
+                                maxLines: 2,
+                              ),
+                              AdaptiveFieldRow(children: [
+                                ProfileTextField(label: "City", controller: _cityController),
+                                ProfileTextField(label: "State", controller: _stateController),
+                              ]),
+                              ProfileTextField(
+                                label: "Pincode",
+                                controller: _pincodeController,
+                                keyboardType: TextInputType.number,
+                                icon: Icons.pin_drop_outlined,
+                              ),
+                            ],
+                          ),
+                        ]),
+                        ProfileSection(
+                          title: "Banking & Documents",
+                          icon: Icons.account_balance_outlined,
+                          children: [
+                            ProfileTextField(
+                              label: "Bank Name",
+                              controller: _bankNameController,
+                              icon: Icons.account_balance_outlined,
+                            ),
+                            ProfileTextField(
+                              label: "Account Number",
+                              controller: _bankAccountController,
+                              keyboardType: TextInputType.number,
+                              icon: Icons.numbers,
+                            ),
+                            AdaptiveFieldRow(children: [
+                              ProfileTextField(label: "IFSC Code", controller: _ifscController),
+                              ProfileTextField(label: "Branch", controller: _branchController),
                             ]),
-                            _buildDateField(context, "Date of Birth", _dobController),
-                          ]),
-                        ]),
-                        _buildResponsiveSection(context, [
-                          _buildSection(context, "Contact Details", [
-                            _buildTextField(context, "Phone Number", _phoneController, keyboardType: TextInputType.phone, icon: Icons.phone_android),
-                            _buildTextField(context, "Alternate Phone", _altPhoneController, keyboardType: TextInputType.phone, icon: Icons.phone),
-                          ]),
-                          _buildSection(context, "Residential Address", [
-                            _buildTextField(context, "Full Address", _addressController, icon: Icons.home_outlined, maxLines: 2),
-                            _buildResponsiveRow(context, [
-                              _buildTextField(context, "City", _cityController),
-                              _buildTextField(context, "State", _stateController),
+                          ],
+                        ),
+                        ProfileSection(
+                          title: "Security",
+                          icon: Icons.security_outlined,
+                          children: [
+                            AdaptiveFieldRow(children: [
+                              ProfileTextField(
+                                label: "New Password (Optional)",
+                                controller: _passwordController,
+                                isPassword: true,
+                                icon: Icons.lock_outline,
+                              ),
+                              ProfileTextField(
+                                label: "Confirm New Password",
+                                controller: _passwordConfirmationController,
+                                isPassword: true,
+                                icon: Icons.lock_outline,
+                              ),
                             ]),
-                            _buildTextField(context, "Pincode", _pincodeController, keyboardType: TextInputType.number, icon: Icons.pin_drop_outlined),
-                          ]),
-                        ]),
-                        _buildSection(context, "Banking & Documents", [
-                          _buildTextField(context, "Bank Name", _bankNameController, icon: Icons.account_balance_outlined),
-                          _buildTextField(context, "Account Number", _bankAccountController, keyboardType: TextInputType.number, icon: Icons.numbers),
-                          _buildResponsiveRow(context, [
-                            _buildTextField(context, "IFSC Code", _ifscController),
-                            _buildTextField(context, "Branch", _branchController),
-                          ]),
-                        ]),
-                        _buildSection(context, "Security", [
-                          _buildTextField(context, "New Password (Optional)", _passwordController, obscureText: true, icon: Icons.lock_outline),
-                        ]),
-                        const SizedBox(height: 32),
+                          ],
+                        ),
+                        SizedBox(height: context.xl),
                         SizedBox(
                           width: double.infinity,
                           child: ElevatedButton(
                             onPressed: _updateProfile,
-                            child: const Text("SAVE CHANGES"),
+                            style: ElevatedButton.styleFrom(
+                              padding: EdgeInsets.symmetric(vertical: context.scale(16)),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(context.scale(12))),
+                            ),
+                            child: Text("SAVE CHANGES", style: TextStyle(fontSize: context.font(14))),
                           ),
                         ),
-                        const SizedBox(height: 40),
+                        SizedBox(height: context.xl),
                       ],
                     ),
                   ),
@@ -200,156 +381,59 @@ class _AccountantProfileState extends State<AccountantProfile> {
     );
   }
 
-  Widget _buildProfileImage(BuildContext context) {
-    final theme = Theme.of(context);
-    return Center(
-      child: Stack(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(4),
-            decoration: BoxDecoration(shape: BoxShape.circle, border: Border.all(color: theme.colorScheme.primary, width: 2)),
-            child: CircleAvatar(
-              radius: 60,
-              backgroundColor: theme.colorScheme.surfaceContainerHighest,
-              backgroundImage: _image != null
-                  ? FileImage(_image!)
-                  : (_user?.photo != null ? NetworkImage("${ApiService.baseUrl}/storage/${_user!.photo}") : null) as ImageProvider?,
-              child: _image == null && _user?.photo == null ? Icon(Icons.person, size: 60, color: theme.colorScheme.primary) : null,
-            ),
-          ),
-          Positioned(
-            bottom: 0,
-            right: 4,
-            child: GestureDetector(
-              onTap: _pickImage,
-              child: CircleAvatar(
-                radius: 18,
-                backgroundColor: theme.colorScheme.primary,
-                child: const Icon(Icons.camera_alt_rounded, color: Colors.white, size: 18),
+  Widget _buildHeader(BuildContext context) {
+    return Flex(
+      direction: context.isMobile ? Axis.vertical : Axis.horizontal,
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        ProfileAvatar(
+          radius: context.scale(60),
+          localImage: _image,
+          webImage: _imageBytes,
+          imageUrl: ApiService.getStorageUrl(_user?.photo),
+          onCameraTap: _pickImage,
+        ),
+        if (!context.isMobile) SizedBox(width: context.xl),
+        if (context.isMobile) SizedBox(height: context.md),
+        Column(
+          crossAxisAlignment: context.isMobile ? CrossAxisAlignment.center : CrossAxisAlignment.start,
+          children: [
+            Text(
+              _nameController.text,
+              style: context.theme.textTheme.headlineSmall?.copyWith(
+                fontWeight: FontWeight.bold,
+                fontSize: context.font(24),
               ),
             ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildSection(BuildContext context, String title, List<Widget> children) {
-    final theme = Theme.of(context);
-    return Card(
-      margin: const EdgeInsets.only(bottom: 24),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: theme.colorScheme.primary.withValues(alpha: 0.05),
-              borderRadius: const BorderRadius.only(topLeft: Radius.circular(16), topRight: Radius.circular(16)),
+            Text(
+              _emailController.text,
+              style: context.theme.textTheme.bodyMedium?.copyWith(
+                color: context.theme.colorScheme.onSurfaceVariant,
+                fontSize: context.font(16),
+              ),
             ),
-            child: Text(title, style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold, color: theme.colorScheme.primary)),
-          ),
-          Padding(
-            padding: const EdgeInsets.all(16.0),
-            child: Column(children: children),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildResponsiveSection(BuildContext context, List<Widget> sections) {
-    if (!context.isTablet) return Column(children: sections);
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: sections.map((s) => Expanded(child: Padding(padding: const EdgeInsets.only(right: 16), child: s))).toList(),
-    );
-  }
-
-  Widget _buildResponsiveRow(BuildContext context, List<Widget> children) {
-    if (!context.isTablet) return Column(children: children);
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: children.map((c) => Expanded(child: Padding(padding: const EdgeInsets.only(right: 12), child: c))).toList(),
-    );
-  }
-
-  Widget _buildTextField(BuildContext context, String label, TextEditingController controller, {bool enabled = true, bool obscureText = false, TextInputType? keyboardType, IconData? icon, int maxLines = 1}) {
-    final theme = Theme.of(context);
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(label, style: theme.textTheme.labelMedium?.copyWith(color: theme.hintColor)),
-          const SizedBox(height: 8),
-          TextFormField(
-            controller: controller,
-            enabled: enabled,
-            obscureText: obscureText,
-            keyboardType: keyboardType,
-            maxLines: maxLines,
-            decoration: InputDecoration(
-              prefixIcon: icon != null ? Icon(icon, size: 18) : null,
+            SizedBox(height: context.md),
+            Container(
+              padding: EdgeInsets.symmetric(
+                horizontal: context.scale(12),
+                vertical: context.scale(4),
+              ),
+              decoration: BoxDecoration(
+                color: context.theme.colorScheme.primaryContainer,
+                borderRadius: BorderRadius.circular(context.scale(20)),
+              ),
+              child: Text(
+                "ACCOUNTANT",
+                style: TextStyle(
+                  color: context.theme.colorScheme.onPrimaryContainer,
+                  fontWeight: FontWeight.bold,
+                  fontSize: context.font(12),
+                ),
+              ),
             ),
-            validator: (value) => value!.isEmpty && enabled ? "Required" : null,
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildDateField(BuildContext context, String label, TextEditingController controller) {
-    final theme = Theme.of(context);
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(label, style: theme.textTheme.labelMedium?.copyWith(color: theme.hintColor)),
-          const SizedBox(height: 8),
-          TextFormField(
-            controller: controller,
-            readOnly: true,
-            decoration: const InputDecoration(
-              prefixIcon: Icon(Icons.calendar_today_rounded, size: 18),
-            ),
-            onTap: () async {
-              DateTime? picked = await showDatePicker(
-                context: context,
-                initialDate: DateTime.now().subtract(const Duration(days: 365 * 18)),
-                firstDate: DateTime(1950),
-                lastDate: DateTime.now(),
-              );
-              if (picked != null) {
-                setState(() => controller.text = DateFormat('yyyy-MM-dd').format(picked));
-              }
-            },
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildDropdown(BuildContext context, String label, String? value, List<String> items, ValueChanged<String?> onChanged) {
-    final theme = Theme.of(context);
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(label, style: theme.textTheme.labelMedium?.copyWith(color: theme.hintColor)),
-          const SizedBox(height: 8),
-          DropdownButtonFormField<String>(
-            isExpanded: true,
-            value: value,
-            items: items.map((val) => DropdownMenuItem(value: val, child: Text(val, style: const TextStyle(fontSize: 13)))).toList(),
-            onChanged: onChanged,
-            decoration: const InputDecoration(prefixIcon: Icon(Icons.list, size: 18)),
-          ),
-        ],
-      ),
+          ],
+        ),
+      ],
     );
   }
 }

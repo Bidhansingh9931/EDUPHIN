@@ -208,7 +208,7 @@ class _StaffStudentFeeDetailPageState extends State<StaffStudentFeeDetailPage> {
               children: [
                 Icon(Icons.receipt_long, color: theme.colorScheme.primary, size: context.scale(20)),
                 SizedBox(width: context.scale(12)),
-                Text("Payment Records", 
+                Text("Payment Records",
                   style: theme.textTheme.titleSmall?.copyWith(
                     fontWeight: FontWeight.bold,
                     fontSize: context.font(14),

@@ -1,4 +1,6 @@
 import 'dart:io';
+import 'dart:typed_data';
+import 'package:flutter/foundation.dart';
 import 'package:eduphin/services/responsive_helper.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
@@ -28,16 +30,26 @@ class _AddInstitutesQuickActionState extends State<AddInstitutesQuickAction> {
   final TextEditingController _gstController = TextEditingController();
   final TextEditingController _panController = TextEditingController();
 
-  String _status = "Active";
+  String _status = "active";
   File? _logoFile;
+  Uint8List? _webLogo;
+  String? _fileName;
   bool _isSaving = false;
 
   Future<void> _pickLogo() async {
     final pickedFile = await ImagePicker().pickImage(source: ImageSource.gallery);
     if (pickedFile != null) {
-      setState(() {
-        _logoFile = File(pickedFile.path);
-      });
+      if (kIsWeb) {
+        final bytes = await pickedFile.readAsBytes();
+        setState(() {
+          _webLogo = bytes;
+          _fileName = pickedFile.name;
+        });
+      } else {
+        setState(() {
+          _logoFile = File(pickedFile.path);
+        });
+      }
     }
   }
 
@@ -64,7 +76,12 @@ class _AddInstitutesQuickActionState extends State<AddInstitutesQuickAction> {
         'status': _status,
       };
 
-      await ApiService.storeSuperAdminInstitute(data, logo: _logoFile);
+      await ApiService.storeSuperAdminInstitute(
+        data,
+        logo: _logoFile,
+        logoBytes: _webLogo,
+        fileName: _fileName,
+      );
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Institute created successfully")));
@@ -125,7 +142,25 @@ class _AddInstitutesQuickActionState extends State<AddInstitutesQuickAction> {
                         ]),
                         _buildResponsiveRow(context, [
                           _buildTextField(context, "Contact Phone *", "9876543210", Icons.phone, _phoneController, keyboardType: TextInputType.phone),
-                          _buildTextField(context, "Website", "https://example.com", Icons.language, _websiteController),
+                          _buildTextField(
+                            context,
+                            "Website",
+                            "https://example.com",
+                            Icons.language,
+                            _websiteController,
+                            keyboardType: TextInputType.url,
+                            validator: (v) {
+                              if (v == null || v.isEmpty) return null;
+                              if (!v.startsWith('http://') && !v.startsWith('https://')) {
+                                return 'URL must start with http:// or https://';
+                              }
+                              final uri = Uri.tryParse(v);
+                              if (uri == null || !uri.hasAbsolutePath) {
+                                return 'Enter a valid URL';
+                              }
+                              return null;
+                            },
+                          ),
                         ]),
 
                         const SizedBox(height: 24),
@@ -190,7 +225,7 @@ class _AddInstitutesQuickActionState extends State<AddInstitutesQuickAction> {
     );
   }
 
-  Widget _buildTextField(BuildContext context, String label, String hint, IconData icon, TextEditingController controller, {int maxLines = 1, TextInputType? keyboardType}) {
+  Widget _buildTextField(BuildContext context, String label, String hint, IconData icon, TextEditingController controller, {int maxLines = 1, TextInputType? keyboardType, String? Function(String?)? validator}) {
     final theme = Theme.of(context);
     return Padding(
       padding: const EdgeInsets.only(bottom: 16),
@@ -203,7 +238,7 @@ class _AddInstitutesQuickActionState extends State<AddInstitutesQuickAction> {
             controller: controller,
             maxLines: maxLines,
             keyboardType: keyboardType,
-            validator: (v) => v == null || v.isEmpty ? "Required" : null,
+            validator: validator ?? (v) => v == null || v.isEmpty ? "Required" : null,
             decoration: InputDecoration(
               hintText: hint,
               prefixIcon: Icon(icon, size: 18),
@@ -225,7 +260,7 @@ class _AddInstitutesQuickActionState extends State<AddInstitutesQuickAction> {
           const SizedBox(height: 8),
           DropdownButtonFormField<String>(
             value: _status,
-            items: ["Active", "Inactive"].map((e) => DropdownMenuItem(value: e, child: Text(e))).toList(),
+            items: ["active", "inactive"].map((e) => DropdownMenuItem(value: e, child: Text(e.toUpperCase()))).toList(),
             onChanged: (v) => setState(() => _status = v!),
             decoration: const InputDecoration(prefixIcon: Icon(Icons.check_circle_outline, size: 18)),
           ),
@@ -268,7 +303,13 @@ class _AddInstitutesQuickActionState extends State<AddInstitutesQuickAction> {
                   Expanded(
                     child: Padding(
                       padding: const EdgeInsets.only(left: 12),
-                      child: Text(_logoFile != null ? _logoFile!.path.split('/').last : "No file chosen", style: TextStyle(color: theme.hintColor, fontSize: 13), overflow: TextOverflow.ellipsis),
+                      child: Text(
+                        kIsWeb
+                            ? (_fileName ?? "No file chosen")
+                            : (_logoFile != null ? _logoFile!.path.split('/').last : "No file chosen"),
+                        style: TextStyle(color: theme.hintColor, fontSize: 13),
+                        overflow: TextOverflow.ellipsis,
+                      ),
                     ),
                   ),
                 ],

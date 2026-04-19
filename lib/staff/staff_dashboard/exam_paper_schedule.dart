@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:eduphin/services/responsive_helper.dart';
 import '../../services/api_service.dart';
 import 'staff_models.dart';
 
@@ -12,10 +13,6 @@ class StaffExamPaperSchedulePage extends StatefulWidget {
 }
 
 class _StaffExamPaperSchedulePageState extends State<StaffExamPaperSchedulePage> {
-  static const Color bgColor = Color(0xFF0D111F);
-  static const Color cardColor = Color(0xFF2E365A);
-  static const Color accentColor = Color(0xFF5A6482);
-
   late Future<Map<String, dynamic>> _scheduleFuture;
 
   @override
@@ -32,30 +29,22 @@ class _StaffExamPaperSchedulePageState extends State<StaffExamPaperSchedulePage>
 
   @override
   Widget build(BuildContext context) {
+    final theme = context.theme;
     return Scaffold(
-      backgroundColor: bgColor,
+      backgroundColor: theme.colorScheme.surface,
       appBar: AppBar(
-        backgroundColor: Colors.transparent,
-        elevation: 0,
+        title: const Text("Examination Schedule"),
         centerTitle: true,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white, size: 20),
-          onPressed: () => Navigator.pop(context),
-        ),
-        title: const Text(
-          "Examination Schedule",
-          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 18),
-        ),
       ),
       body: FutureBuilder<Map<String, dynamic>>(
         future: _scheduleFuture,
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2));
+            return const Center(child: CircularProgressIndicator());
           } else if (snapshot.hasError) {
             return _buildErrorState(snapshot.error.toString());
           } else if (!snapshot.hasData) {
-            return const Center(child: Text("No schedule found", style: TextStyle(color: Colors.white38)));
+            return Center(child: Text("No schedule found", style: theme.textTheme.bodyMedium?.copyWith(color: theme.hintColor)));
           }
 
           final data = snapshot.data!;
@@ -63,23 +52,44 @@ class _StaffExamPaperSchedulePageState extends State<StaffExamPaperSchedulePage>
 
           return SingleChildScrollView(
             physics: const AlwaysScrollableScrollPhysics(),
-            padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 24.0),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                _buildHeaderCard(),
-                const SizedBox(height: 32),
-                const Text(
-                  "Examination Papers",
-                  style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w800),
+            padding: context.pagePadding,
+            child: Center(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 1200),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _buildHeaderCard(context),
+                    SizedBox(height: context.spacing * 2),
+                    Text(
+                      "Examination Papers",
+                      style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold, fontSize: context.font(20)),
+                    ),
+                    SizedBox(height: context.spacing),
+                    if (schedules.isEmpty)
+                      _buildEmptyState(context)
+                    else
+                      LayoutBuilder(
+                        builder: (context, constraints) {
+                          final crossAxisCount = constraints.maxWidth > 900 ? 3 : (constraints.maxWidth > 600 ? 2 : 1);
+                          return GridView.builder(
+                            shrinkWrap: true,
+                            physics: const NeverScrollableScrollPhysics(),
+                            itemCount: schedules.length,
+                            gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                              crossAxisCount: crossAxisCount,
+                              crossAxisSpacing: context.spacing,
+                              mainAxisSpacing: context.spacing,
+                              mainAxisExtent: context.scale(160),
+                            ),
+                            itemBuilder: (context, index) => _buildPaperCard(context, schedules[index]),
+                          );
+                        },
+                      ),
+                    SizedBox(height: context.spacing * 2),
+                  ],
                 ),
-                const SizedBox(height: 16),
-                if (schedules.isEmpty)
-                  _buildEmptyState()
-                else
-                  ...schedules.map((paper) => _buildPaperCard(paper)).toList(),
-                const SizedBox(height: 40),
-              ],
+              ),
             ),
           );
         },
@@ -87,81 +97,93 @@ class _StaffExamPaperSchedulePageState extends State<StaffExamPaperSchedulePage>
     );
   }
 
-  Widget _buildHeaderCard() {
+  Widget _buildHeaderCard(BuildContext context) {
+    final theme = context.theme;
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(24),
+      padding: EdgeInsets.all(context.spacing * 1.5),
       decoration: BoxDecoration(
-        color: cardColor,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.2), blurRadius: 10, offset: const Offset(0, 4))],
+        color: theme.colorScheme.primaryContainer.withValues(alpha: 0.3),
+        borderRadius: BorderRadius.circular(context.scale(24)),
+        border: Border.all(color: theme.colorScheme.primary.withValues(alpha: 0.2)),
       ),
       child: Column(
         children: [
-          const Icon(Icons.event_note_rounded, color: Colors.white70, size: 48),
-          const SizedBox(height: 16),
+          Icon(Icons.event_note_rounded, color: theme.colorScheme.primary, size: context.scale(48)),
+          SizedBox(height: context.spacing),
           Text(
             widget.examName,
             textAlign: TextAlign.center,
-            style: const TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.w900, letterSpacing: -0.5),
+            style: theme.textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold, color: theme.colorScheme.onPrimaryContainer, fontSize: context.font(22)),
           ),
-          const SizedBox(height: 8),
-          const Text(
+          SizedBox(height: context.scale(4)),
+          Text(
             "Full Schedule Overview",
-            style: TextStyle(color: Colors.white54, fontSize: 14),
+            style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onPrimaryContainer.withValues(alpha: 0.7)),
           ),
         ],
       ),
     );
   }
 
-  Widget _buildPaperCard(ExamPaperSchedule paper) {
+  Widget _buildPaperCard(BuildContext context, ExamPaperSchedule paper) {
+    final theme = context.theme;
     return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.all(20),
+      padding: EdgeInsets.all(context.scale(20)),
       decoration: BoxDecoration(
-        color: cardColor,
-        borderRadius: BorderRadius.circular(16),
+        color: theme.colorScheme.surfaceContainerLow,
+        borderRadius: BorderRadius.circular(context.scale(20)),
+        border: Border.all(color: theme.colorScheme.outlineVariant, width: 0.5),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
             paper.subject,
-            style: const TextStyle(color: Colors.white, fontSize: 17, fontWeight: FontWeight.bold),
+            style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold, color: theme.colorScheme.primary, fontSize: context.font(16)),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
           ),
-          const SizedBox(height: 16),
-          _buildInfoRow(Icons.calendar_today_outlined, paper.date),
-          const SizedBox(height: 10),
-          _buildInfoRow(Icons.access_time_rounded, "${paper.startTime} - ${paper.endTime}"),
+          SizedBox(height: context.scale(12)),
+          _buildInfoRow(context, Icons.calendar_today_outlined, paper.date),
+          SizedBox(height: context.scale(8)),
+          _buildInfoRow(context, Icons.access_time_rounded, "${paper.startTime} - ${paper.endTime}"),
           if (paper.venue != null && paper.venue!.isNotEmpty) ...[
-            const SizedBox(height: 10),
-            _buildInfoRow(Icons.location_on_outlined, paper.venue!),
+            SizedBox(height: context.scale(8)),
+            _buildInfoRow(context, Icons.location_on_outlined, paper.venue!),
           ],
         ],
       ),
     );
   }
 
-  Widget _buildInfoRow(IconData icon, String text) {
+  Widget _buildInfoRow(BuildContext context, IconData icon, String text) {
+    final theme = context.theme;
     return Row(
       children: [
-        Icon(icon, color: Colors.white38, size: 16),
-        const SizedBox(width: 10),
-        Text(text, style: const TextStyle(color: Colors.white70, fontSize: 14)),
+        Icon(icon, color: theme.colorScheme.onSurfaceVariant, size: context.scale(14)),
+        SizedBox(width: context.scale(10)),
+        Expanded(
+          child: Text(
+            text, 
+            style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant, fontSize: context.font(12)),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+        ),
       ],
     );
   }
 
-  Widget _buildEmptyState() {
-    return const Center(
+  Widget _buildEmptyState(BuildContext context) {
+    return Center(
       child: Padding(
-        padding: EdgeInsets.only(top: 40),
+        padding: EdgeInsets.symmetric(vertical: context.spacing * 2),
         child: Column(
           children: [
-            Icon(Icons.info_outline, color: Colors.white24, size: 50),
-            SizedBox(height: 16),
-            Text("No papers scheduled for this exam yet.", style: TextStyle(color: Colors.white38, fontSize: 14)),
+            Icon(Icons.event_busy_outlined, color: context.theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.5), size: context.scale(64)),
+            SizedBox(height: context.spacing),
+            Text("No papers scheduled for this exam yet.", style: context.theme.textTheme.bodyMedium?.copyWith(color: context.theme.colorScheme.onSurfaceVariant, fontWeight: FontWeight.bold)),
           ],
         ),
       ),
@@ -169,33 +191,29 @@ class _StaffExamPaperSchedulePageState extends State<StaffExamPaperSchedulePage>
   }
 
   Widget _buildErrorState(String error) {
+    final theme = context.theme;
     return Center(
       child: Padding(
-        padding: const EdgeInsets.all(32.0),
+        padding: context.pagePadding,
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const Icon(Icons.error_outline_rounded, color: Colors.redAccent, size: 60),
-            const SizedBox(height: 24),
-            const Text(
-              "Failed to load schedule",
-              style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 12),
+            Icon(Icons.error_outline_rounded, color: theme.colorScheme.error, size: context.scale(60)),
+            SizedBox(height: context.spacing * 1.5),
             Text(
-              "Likely a Backend Decryption error. Ensure your Laravel index() method is encrypting the Exam ID.",
-              textAlign: TextAlign.center,
-              style: TextStyle(color: Colors.white.withOpacity(0.5), fontSize: 14),
+              "Failed to load schedule",
+              style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
             ),
-            const SizedBox(height: 32),
-            ElevatedButton(
+            SizedBox(height: context.scale(12)),
+            Text(
+              error,
+              textAlign: TextAlign.center,
+              style: theme.textTheme.bodyMedium?.copyWith(color: theme.hintColor),
+            ),
+            SizedBox(height: context.spacing * 2),
+            FilledButton.tonal(
               onPressed: _loadSchedule,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF3E4770),
-                padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 14),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-              ),
-              child: const Text("RETRY", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+              child: const Text("RETRY"),
             ),
           ],
         ),

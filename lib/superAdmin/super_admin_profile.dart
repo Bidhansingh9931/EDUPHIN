@@ -1,5 +1,10 @@
+import 'dart:io';
+
+import 'package:eduphin/services/common_widgets.dart';
 import 'package:eduphin/services/responsive_helper.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 import '../services/api_service.dart';
 
 class ManageProfileScreen extends StatefulWidget {
@@ -15,6 +20,33 @@ class _ManageProfileScreenState extends State<ManageProfileScreen> {
   final _passwordController = TextEditingController();
   bool _isLoading = true;
   bool _isSaving = false;
+
+  File? _imageFile;
+  Uint8List? _webImage;
+  String? _fileName;
+  String? _existingPhotoUrl;
+
+  Future<void> _pickImage() async {
+    final pickedFile = await ImagePicker().pickImage(
+      source: ImageSource.gallery,
+      imageQuality: 50,
+      maxWidth: 1024,
+      maxHeight: 1024,
+    );
+    if (pickedFile != null) {
+      if (kIsWeb) {
+        final bytes = await pickedFile.readAsBytes();
+        setState(() {
+          _webImage = bytes;
+          _fileName = pickedFile.name;
+        });
+      } else {
+        setState(() {
+          _imageFile = File(pickedFile.path);
+        });
+      }
+    }
+  }
 
   @override
   void initState() {
@@ -38,6 +70,7 @@ class _ManageProfileScreenState extends State<ManageProfileScreen> {
           setState(() {
             _nameController.text = data['name'] ?? '';
             _emailController.text = data['email'] ?? '';
+            _existingPhotoUrl = data['photo'];
           });
         }
       }
@@ -51,16 +84,28 @@ class _ManageProfileScreenState extends State<ManageProfileScreen> {
   Future<void> _updateProfile() async {
     setState(() => _isSaving = true);
     try {
-      final data = {
+      final Map<String, String> data = {
         'name': _nameController.text,
         'email': _emailController.text,
         if (_passwordController.text.isNotEmpty) 'password': _passwordController.text,
       };
-      await ApiService.updateSuperAdminProfile(data);
+      
+      if (kIsWeb) {
+        await ApiService.updateSuperAdminProfileFromBytes(data, _webImage, _fileName);
+      } else {
+        await ApiService.updateSuperAdminProfile(data, photo: _imageFile);
+      }
+
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text("Profile updated successfully")),
         );
+        setState(() {
+          _imageFile = null;
+          _webImage = null;
+          _fileName = null;
+        });
+        _fetchProfile();
       }
     } catch (e) {
       if (mounted) {
@@ -75,10 +120,10 @@ class _ManageProfileScreenState extends State<ManageProfileScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
+    final theme = context.theme;
     return Scaffold(
       appBar: AppBar(
-        title: const Text("Manage Your Profile"),
+        title: Text("Manage Your Profile", style: TextStyle(fontSize: context.font(20))),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
           onPressed: () => Navigator.pop(context),
@@ -90,59 +135,70 @@ class _ManageProfileScreenState extends State<ManageProfileScreen> {
               padding: context.pagePadding,
               child: Center(
                 child: ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 600),
+                  constraints: BoxConstraints(maxWidth: context.scale(600)),
                   child: Card(
                     child: Padding(
-                      padding: const EdgeInsets.all(24.0),
+                      padding: EdgeInsets.all(context.scale(24.0)),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Row(
                             children: [
-                              CircleAvatar(
-                                radius: 35, 
-                                backgroundColor: theme.colorScheme.primary.withValues(alpha: 0.1), 
-                                child: Icon(Icons.person, color: theme.colorScheme.primary, size: 40)
-                              ),
-                              const SizedBox(width: 16),
+                            ProfileAvatar(
+                              imageUrl: ApiService.getStorageUrl(_existingPhotoUrl),
+                              radius: context.scale(35),
+                              localImage: _imageFile,
+                              webImage: _webImage,
+                              onCameraTap: _pickImage,
+                            ),
+                            SizedBox(width: context.scale(16)),
                               Expanded(
                                 child: Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
-                                    Text("Manage Your Profile", style: theme.textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold)),
-                                    Text("Update your personal details and password.", style: theme.textTheme.bodySmall?.copyWith(color: theme.hintColor)),
+                                    Text("Manage Your Profile", style: theme.textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold, fontSize: context.font(20))),
+                                    Text("Update your personal details and password.", style: theme.textTheme.bodySmall?.copyWith(color: theme.hintColor, fontSize: context.font(12))),
                                   ],
                                 ),
                               ),
                             ],
                           ),
-                          const SizedBox(height: 32),
+                          Padding(
+                            padding: EdgeInsets.symmetric(vertical: context.scale(24)),
+                            child: Divider(height: 1, color: theme.dividerColor.withValues(alpha: 0.1)),
+                          ),
                           _buildLabel(context, Icons.person, "Full Name *"),
                           TextField(
                             controller: _nameController,
+                            style: TextStyle(fontSize: context.font(14)),
                             decoration: const InputDecoration(hintText: "Full Name"),
                           ),
-                          const SizedBox(height: 20),
+                          SizedBox(height: context.scale(20)),
                           _buildLabel(context, Icons.email, "Email Address *"),
                           TextField(
                             controller: _emailController,
+                            style: TextStyle(fontSize: context.font(14)),
                             decoration: const InputDecoration(hintText: "Email Address"),
                           ),
-                          const SizedBox(height: 20),
+                          SizedBox(height: context.scale(20)),
                           _buildLabel(context, Icons.lock, "New Password"),
                           TextField(
                             controller: _passwordController,
                             obscureText: true,
+                            style: TextStyle(fontSize: context.font(14)),
                             decoration: const InputDecoration(hintText: "Enter a new password (optional)"),
                           ),
-                          const SizedBox(height: 8),
-                          Text("Leave blank to keep your current password.", style: theme.textTheme.labelSmall?.copyWith(color: theme.hintColor)),
-                          const SizedBox(height: 40),
+                          SizedBox(height: context.scale(8)),
+                          Text("Leave blank to keep your current password.", style: theme.textTheme.labelSmall?.copyWith(color: theme.hintColor, fontSize: context.font(11))),
+                          SizedBox(height: context.scale(40)),
                           ElevatedButton(
                             onPressed: _isSaving ? null : _updateProfile,
+                            style: ElevatedButton.styleFrom(
+                              minimumSize: Size(double.infinity, context.scale(54)),
+                            ),
                             child: _isSaving
-                                ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
-                                : const Text("SAVE CHANGES"),
+                                ? SizedBox(height: context.scale(20), width: context.scale(20), child: const CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                                : Text("SAVE CHANGES", style: TextStyle(fontSize: context.font(16))),
                           ),
                         ],
                       ),
@@ -155,14 +211,14 @@ class _ManageProfileScreenState extends State<ManageProfileScreen> {
   }
 
   Widget _buildLabel(BuildContext context, IconData icon, String text) {
-    final theme = Theme.of(context);
+    final theme = context.theme;
     return Padding(
-      padding: const EdgeInsets.only(bottom: 8.0),
+      padding: EdgeInsets.only(bottom: context.scale(8.0)),
       child: Row(
         children: [
-          Icon(icon, color: theme.colorScheme.primary, size: 16),
-          const SizedBox(width: 8),
-          Text(text, style: theme.textTheme.labelMedium?.copyWith(fontWeight: FontWeight.bold)),
+          Icon(icon, color: theme.colorScheme.primary, size: context.scale(16)),
+          SizedBox(width: context.scale(8)),
+          Text(text, style: theme.textTheme.labelMedium?.copyWith(fontWeight: FontWeight.bold, fontSize: context.font(12))),
         ],
       ),
     );

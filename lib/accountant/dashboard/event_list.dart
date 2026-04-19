@@ -339,7 +339,7 @@ class _EventListPageState extends State<EventListPage> with SingleTickerProvider
       ),
       clipBehavior: Clip.antiAlias,
       child: InkWell(
-        onTap: () => _register(event),
+        onTap: () => _showEventDetails(event),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -366,6 +366,16 @@ class _EventListPageState extends State<EventListPage> with SingleTickerProvider
                       Text(event.date, style: theme.textTheme.bodySmall?.copyWith(fontSize: context.font(12))),
                     ],
                   ),
+                  if (event.venue != null) ...[
+                    SizedBox(height: context.scale(4)),
+                    Row(
+                      children: [
+                        Icon(Icons.location_on_outlined, color: theme.colorScheme.secondary, size: context.scale(14)),
+                        SizedBox(width: context.scale(8)),
+                        Expanded(child: Text(event.venue!, style: theme.textTheme.bodySmall?.copyWith(fontSize: context.font(12)), maxLines: 1, overflow: TextOverflow.ellipsis)),
+                      ],
+                    ),
+                  ],
                   SizedBox(height: context.scale(12)),
                   Container(
                     padding: EdgeInsets.symmetric(horizontal: context.scale(10), vertical: context.scale(4)),
@@ -403,6 +413,89 @@ class _EventListPageState extends State<EventListPage> with SingleTickerProvider
     );
   }
 
+  void _showEventDetails(Event event) {
+    final theme = context.theme;
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => Container(
+        decoration: BoxDecoration(
+          color: theme.colorScheme.surface,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(context.scale(24))),
+        ),
+        padding: EdgeInsets.all(context.spacing * 1.5),
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Center(
+                child: Container(
+                  width: context.scale(40),
+                  height: context.scale(4),
+                  decoration: BoxDecoration(
+                    color: theme.colorScheme.outlineVariant,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+              ),
+              SizedBox(height: context.spacing),
+              if (event.image != null)
+                Container(
+                  height: context.scale(200),
+                  width: double.infinity,
+                  margin: EdgeInsets.only(bottom: context.spacing),
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(context.scale(16)),
+                    image: DecorationImage(image: NetworkImage("${ApiService.baseUrl}/storage/${event.image}"), fit: BoxFit.cover),
+                  ),
+                ),
+              Text(event.title, style: theme.textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold)),
+              SizedBox(height: context.spacing),
+              _detailInfoRow(Icons.calendar_month, "Date", event.date),
+              if (event.startTime != null) _detailInfoRow(Icons.access_time, "Time", "${event.startTime} - ${event.endTime ?? ''}"),
+              if (event.venue != null) _detailInfoRow(Icons.location_on, "Venue", event.venue!),
+              _detailInfoRow(Icons.confirmation_number, "Price", event.isTicketed ? "₹${event.ticketPrice}" : "Free"),
+              if (event.description != null && event.description!.isNotEmpty) ...[
+                SizedBox(height: context.spacing),
+                Text("About Event", style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
+                SizedBox(height: context.scale(8)),
+                Text(event.description!, style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
+              ],
+              SizedBox(height: context.spacing * 2),
+              SizedBox(
+                width: double.infinity,
+                child: FilledButton(
+                  onPressed: () {
+                    Navigator.pop(context);
+                    _register(event);
+                  },
+                  child: const Text("REGISTER FOR THIS EVENT"),
+                ),
+              ),
+              SizedBox(height: context.spacing),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _detailInfoRow(IconData icon, String label, String value) {
+    return Padding(
+      padding: EdgeInsets.symmetric(vertical: context.scale(6)),
+      child: Row(
+        children: [
+          Icon(icon, size: context.scale(18), color: context.theme.colorScheme.primary),
+          SizedBox(width: context.spacing),
+          Text("$label: ", style: const TextStyle(fontWeight: FontWeight.bold)),
+          Expanded(child: Text(value)),
+        ],
+      ),
+    );
+  }
+
   Widget _buildRegisteredItem(EventRegistration registration) {
     final event = registration.event;
     final bool isCancelled = registration.status.toLowerCase() == 'cancelled';
@@ -435,6 +528,8 @@ class _EventListPageState extends State<EventListPage> with SingleTickerProvider
                 children: [
                   Text(event.title, style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
                   Text(event.date, style: theme.textTheme.bodySmall),
+                  if (registration.reasonForCancel != null && isCancelled)
+                    Text("Reason: ${registration.reasonForCancel}", style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.error, fontStyle: FontStyle.italic)),
                   SizedBox(height: context.scale(8)),
                   Row(
                     children: [

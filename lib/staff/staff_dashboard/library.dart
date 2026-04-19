@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 import '../../services/api_service.dart';
+import '../../services/responsive_helper.dart';
 import '../../teacher/dashboard/library_models.dart';
 
 class StaffLibraryPage extends StatefulWidget {
@@ -10,10 +12,6 @@ class StaffLibraryPage extends StatefulWidget {
 }
 
 class _StaffLibraryPageState extends State<StaffLibraryPage> {
-  static const Color primaryColor = Color(0xFF6C63FF);
-  static const Color bgColor = Color(0xFF0F1630);
-  static const Color cardColor = Color(0xFF1D2645);
-
   final TextEditingController _titleController = TextEditingController();
   final TextEditingController _authorController = TextEditingController();
   
@@ -59,154 +57,245 @@ class _StaffLibraryPageState extends State<StaffLibraryPage> {
     } catch (e) {
       setState(() => _isLoading = false);
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text('Error: $e'),
+          backgroundColor: context.theme.colorScheme.error,
+          behavior: SnackBarBehavior.floating,
+        ));
       }
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    final theme = context.theme;
     return Scaffold(
-      backgroundColor: bgColor,
+      backgroundColor: theme.scaffoldBackgroundColor,
       appBar: AppBar(
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        title: const Text("Library", style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white)),
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white, size: 20),
-          onPressed: () => Navigator.pop(context),
-        ),
+        title: Text("Library", style: TextStyle(fontSize: context.font(20))),
       ),
-      body: Column(
-        children: [
-          Padding(
-            padding: const EdgeInsets.all(16.0),
-            child: _buildSearchCard(),
-          ),
-          Expanded(
-            child: _buildBookList(),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildSearchCard() {
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: cardColor,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text("Filter & Search", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)),
-          const SizedBox(height: 16),
-          _buildTextField("Search Title...", Icons.search, _titleController),
-          const SizedBox(height: 12),
-          _buildTextField("Search Author...", Icons.person_search_outlined, _authorController),
-          const SizedBox(height: 20),
-          SizedBox(
-            width: double.infinity,
-            height: 50,
-            child: ElevatedButton(
-              onPressed: () => _fetchBooks(refresh: true),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: primaryColor,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-              ),
-              child: const Text("SEARCH", style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white)),
+      body: SingleChildScrollView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        child: Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 1200),
+            child: Column(
+              children: [
+                _buildSearchCard(context),
+                Padding(
+                  padding: context.pagePadding,
+                  child: _buildBookList(context),
+                ),
+              ],
             ),
           ),
-        ],
+        ),
       ),
     );
   }
 
-  Widget _buildTextField(String hint, IconData icon, TextEditingController controller) {
+  Widget _buildSearchCard(BuildContext context) {
+    final theme = context.theme;
+    return Padding(
+      padding: context.pagePadding.copyWith(bottom: 0),
+      child: Card(
+        elevation: 0,
+        margin: EdgeInsets.zero,
+        color: theme.colorScheme.surfaceContainerLow,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(context.scale(20)),
+          side: BorderSide(color: theme.colorScheme.outlineVariant),
+        ),
+        child: Padding(
+          padding: EdgeInsets.all(context.scale(20)),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text("Search Books",
+                style: GoogleFonts.roboto(fontWeight: FontWeight.bold, fontSize: context.font(16))),
+              SizedBox(height: context.scale(16)),
+              context.responsive(
+                Column(
+                  children: [
+                    _buildTextField(context, "Search Title...", Icons.search, _titleController),
+                    SizedBox(height: context.scale(12)),
+                    _buildTextField(context, "Search Author...", Icons.person_search_outlined, _authorController),
+                  ],
+                ),
+                tablet: Row(
+                  children: [
+                    Expanded(child: _buildTextField(context, "Search Title...", Icons.search, _titleController)),
+                    SizedBox(width: context.scale(16)),
+                    Expanded(child: _buildTextField(context, "Search Author...", Icons.person_search_outlined, _authorController)),
+                    SizedBox(width: context.scale(16)),
+                    Padding(
+                      padding: EdgeInsets.only(top: 0),
+                      child: FilledButton(
+                        onPressed: () => _fetchBooks(refresh: true),
+                        style: FilledButton.styleFrom(
+                          padding: EdgeInsets.symmetric(horizontal: context.scale(24), vertical: context.scale(16)),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(context.scale(12))),
+                        ),
+                        child: const Text("SEARCH", style: TextStyle(fontWeight: FontWeight.bold)),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              if (context.isMobile) ...[
+                SizedBox(height: context.scale(16)),
+                SizedBox(
+                  width: double.infinity,
+                  child: FilledButton(
+                    onPressed: () => _fetchBooks(refresh: true),
+                    style: FilledButton.styleFrom(
+                      padding: EdgeInsets.symmetric(vertical: context.scale(14)),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(context.scale(12))),
+                    ),
+                    child: const Text("SEARCH", style: TextStyle(fontWeight: FontWeight.bold)),
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildTextField(BuildContext context, String hint, IconData icon, TextEditingController controller) {
+    final theme = context.theme;
     return TextField(
       controller: controller,
-      style: const TextStyle(color: Colors.white, fontSize: 14),
+      style: TextStyle(fontSize: context.font(14)),
       decoration: InputDecoration(
         hintText: hint,
-        hintStyle: const TextStyle(color: Colors.white24, fontSize: 14),
-        prefixIcon: Icon(icon, color: Colors.white38, size: 20),
+        prefixIcon: Icon(icon, size: context.scale(20)),
         filled: true,
-        fillColor: Colors.white.withValues(alpha: 0.05),
-        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+        fillColor: theme.colorScheme.surface,
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(context.scale(12)),
+          borderSide: BorderSide(color: theme.colorScheme.outlineVariant),
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(context.scale(12)),
+          borderSide: BorderSide(color: theme.colorScheme.outlineVariant),
+        ),
       ),
+      onSubmitted: (_) => _fetchBooks(refresh: true),
     );
   }
 
-  Widget _buildBookList() {
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 16),
-      decoration: BoxDecoration(
-        color: cardColor,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
+  Widget _buildBookList(BuildContext context) {
+    final theme = context.theme;
+    return Card(
+      elevation: 0,
+      margin: EdgeInsets.zero,
+      color: theme.colorScheme.surfaceContainerLow,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(context.scale(20)),
+        side: BorderSide(color: theme.colorScheme.outlineVariant),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Padding(
-            padding: EdgeInsets.all(20.0),
-            child: Text("Books Collection", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white)),
+          Padding(
+            padding: EdgeInsets.all(context.scale(20)),
+            child: Text("Library Collection",
+              style: GoogleFonts.roboto(fontSize: context.font(16), fontWeight: FontWeight.bold)),
           ),
-          const Divider(color: Colors.white10, height: 1),
-          Expanded(
-            child: _books.isEmpty && !_isLoading
-                ? const Center(child: Text("No books found", style: TextStyle(color: Colors.white38)))
-                : NotificationListener<ScrollNotification>(
-                    onNotification: (ScrollNotification scrollInfo) {
-                      if (!_isLoading && _hasMore && scrollInfo.metrics.pixels == scrollInfo.metrics.maxScrollExtent) {
-                        _fetchBooks();
-                      }
-                      return true;
-                    },
-                    child: ListView.separated(
-                      padding: const EdgeInsets.only(bottom: 20),
-                      itemCount: _books.length + (_hasMore ? 1 : 0),
-                      separatorBuilder: (context, index) => const Divider(color: Colors.white10, height: 1),
-                      itemBuilder: (context, index) {
-                        if (index == _books.length) {
-                          return const Center(child: Padding(padding: EdgeInsets.all(8.0), child: CircularProgressIndicator()));
-                        }
-                        
-                        final book = _books[index];
-                        final isAvailable = book.availableCopies > 0;
-                        return ListTile(
-                          contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
-                          leading: Container(
-                            padding: const EdgeInsets.all(10),
-                            decoration: BoxDecoration(
-                              color: primaryColor.withValues(alpha: 0.1),
-                              borderRadius: BorderRadius.circular(10),
-                            ),
-                            child: const Icon(Icons.menu_book_rounded, color: primaryColor, size: 20),
-                          ),
-                          title: Text(book.title, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600, fontSize: 14)),
-                          subtitle: Text(book.author, style: const TextStyle(color: Colors.white38, fontSize: 12)),
-                          trailing: Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                            decoration: BoxDecoration(
-                              color: isAvailable ? Colors.green.withValues(alpha: 0.1) : Colors.orange.withValues(alpha: 0.1),
-                              borderRadius: BorderRadius.circular(6),
-                            ),
-                            child: Text(
-                              isAvailable ? "Available" : "Out of Stock",
-                              style: TextStyle(color: isAvailable ? Colors.greenAccent : Colors.orangeAccent, fontSize: 10, fontWeight: FontWeight.bold),
-                            ),
-                          ),
+          Divider(color: theme.colorScheme.outlineVariant, height: 1),
+          _books.isEmpty && !_isLoading
+              ? _buildEmptyState(context)
+              : NotificationListener<ScrollNotification>(
+                  onNotification: (ScrollNotification scrollInfo) {
+                    if (!_isLoading && _hasMore && scrollInfo.metrics.pixels == scrollInfo.metrics.maxScrollExtent) {
+                      _fetchBooks();
+                    }
+                    return true;
+                  },
+                  child: ListView.separated(
+                    shrinkWrap: true,
+                    physics: const NeverScrollableScrollPhysics(),
+                    padding: EdgeInsets.zero,
+                    itemCount: _books.length + (_hasMore ? 1 : 0),
+                    separatorBuilder: (context, index) => Divider(color: theme.colorScheme.outlineVariant, height: 1),
+                    itemBuilder: (context, index) {
+                      if (index == _books.length) {
+                        return Padding(
+                          padding: EdgeInsets.all(context.scale(24)),
+                          child: const Center(child: CircularProgressIndicator()),
                         );
-                      },
-                    ),
+                      }
+
+                      final book = _books[index];
+                      final isAvailable = book.availableCopies > 0;
+                      return ListTile(
+                        contentPadding: EdgeInsets.symmetric(horizontal: context.scale(20), vertical: context.scale(12)),
+                        leading: Container(
+                          width: context.scale(44),
+                          height: context.scale(44),
+                          decoration: BoxDecoration(
+                            color: theme.colorScheme.primary.withValues(alpha: 0.1),
+                            borderRadius: BorderRadius.circular(context.scale(12)),
+                          ),
+                          child: Icon(Icons.menu_book_rounded, color: theme.colorScheme.primary, size: context.scale(22)),
+                        ),
+                        title: Text(book.title,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: theme.textTheme.bodyLarge?.copyWith(fontWeight: FontWeight.bold, fontSize: context.font(14))),
+                        subtitle: Padding(
+                          padding: EdgeInsets.only(top: context.scale(4)),
+                          child: Text(book.author,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: context.font(12))),
+                        ),
+                        trailing: Container(
+                          padding: EdgeInsets.symmetric(horizontal: context.scale(10), vertical: context.scale(4)),
+                          decoration: BoxDecoration(
+                            color: (isAvailable ? Colors.green : Colors.orange).withValues(alpha: 0.1),
+                            borderRadius: BorderRadius.circular(context.scale(6)),
+                            border: Border.all(color: (isAvailable ? Colors.green : Colors.orange).withValues(alpha: 0.3)),
+                          ),
+                          child: Text(
+                            isAvailable ? "Available" : "Out of Stock",
+                            style: TextStyle(
+                              color: isAvailable ? Colors.green : Colors.orange,
+                              fontSize: context.font(10),
+                              fontWeight: FontWeight.bold
+                            ),
+                          ),
+                        ),
+                      );
+                    },
                   ),
-          ),
+                ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildEmptyState(BuildContext context) {
+    final colorScheme = context.theme.colorScheme;
+    return Padding(
+      padding: EdgeInsets.all(context.scale(48)),
+      child: Center(
+        child: Column(
+          children: [
+            Icon(Icons.library_books_rounded, size: context.scale(64), color: colorScheme.onSurfaceVariant.withValues(alpha: 0.2)),
+            SizedBox(height: context.scale(16)),
+            Text("No books found", 
+              style: TextStyle(color: colorScheme.onSurfaceVariant, fontSize: context.font(16), fontWeight: FontWeight.bold)),
+            SizedBox(height: context.scale(8)),
+            Text("Try adjusting your search terms.", 
+              textAlign: TextAlign.center,
+              style: TextStyle(color: colorScheme.onSurfaceVariant, fontSize: context.font(14))),
+          ],
+        ),
       ),
     );
   }
 }
+
