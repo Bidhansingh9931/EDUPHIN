@@ -57,6 +57,30 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
     Navigator.push(context, MaterialPageRoute(builder: (context) => screen)).then((_) => _fetchDashboard());
   }
 
+  Future<void> _handleLogout() async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text("Logout"),
+        content: const Text("Are you sure you want to logout?"),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text("CANCEL")),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text("LOGOUT", style: TextStyle(color: Colors.red)),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm == true) {
+      await ApiService.logout();
+      if (mounted) {
+        Navigator.of(context).pushNamedAndRemoveUntil('/login', (route) => false);
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = context.theme;
@@ -66,8 +90,8 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
     final roles = _dashboardData?['roles'] as List? ?? [];
 
     return Scaffold(
-      drawer: const AppDrawer(),
       appBar: AppBar(
+        automaticallyImplyLeading: false,
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
@@ -78,8 +102,9 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
         ),
         actions: [
           IconButton(
-            onPressed: _fetchDashboard,
-            icon: Icon(Icons.refresh, size: context.scale(20)),
+            onPressed: _handleLogout,
+            icon: const Icon(Icons.logout, color: Colors.red),
+            tooltip: "Logout",
           ),
           SizedBox(width: context.scale(8)),
         ],

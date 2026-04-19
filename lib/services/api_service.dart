@@ -48,7 +48,8 @@ class ApiService {
     if (kIsWeb) {
       return _envUrl;
     } else if (Platform.isAndroid) {
-      return 'https://demo.eduphin.com';
+      // Use 10.0.2.2 for Emulator or your PC IP for physical devices
+      return 'http://10.0.2.2/Eduphin-Portal/public';
     } else {
       return _envUrl;
     }

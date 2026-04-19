@@ -45,6 +45,30 @@ class _FAQManagementScreenState extends State<FAQManagementScreen> {
     }
   }
 
+  Future<void> _handleLogout() async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text("Logout"),
+        content: const Text("Are you sure you want to logout?"),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text("CANCEL")),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text("LOGOUT", style: TextStyle(color: Colors.red)),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm == true) {
+      await ApiService.logout();
+      if (mounted) {
+        Navigator.of(context).pushNamedAndRemoveUntil('/login', (route) => false);
+      }
+    }
+  }
+
   Future<void> _deleteFaq(String id) async {
     final confirm = await showDialog<bool>(
       context: context,
@@ -97,9 +121,9 @@ class _FAQManagementScreenState extends State<FAQManagementScreen> {
         ),
         actions: [
           IconButton(
-            onPressed: () => _showFAQModal(),
-            icon: Icon(Icons.add_circle_outline, size: context.scale(20)),
-            tooltip: "Create New FAQ",
+            onPressed: _handleLogout,
+            icon: const Icon(Icons.logout, color: Colors.red),
+            tooltip: "Logout",
           ),
         ],
       ),
