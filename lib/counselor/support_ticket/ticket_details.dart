@@ -192,7 +192,6 @@ class _TicketDetailsPageState extends State<TicketDetailsPage> {
 
   Widget _buildReplyBubble(TicketReply reply) {
     final colorScheme = context.theme.colorScheme;
-    final isUser = reply.userName != null; // Ideally check against current user ID
 
     return Container(
       margin: EdgeInsets.only(bottom: context.spacing),

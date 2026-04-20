@@ -3,7 +3,6 @@ import 'package:eduphin/services/common_widgets.dart';
 import 'package:flutter/material.dart';
 import 'package:eduphin/services/responsive_helper.dart';
 import 'staff_models.dart';
-import 'dart:convert';
 
 class EmployeeListPage extends StatefulWidget {
   const EmployeeListPage({super.key});
@@ -14,10 +13,9 @@ class EmployeeListPage extends StatefulWidget {
 
 class _EmployeeListPageState extends State<EmployeeListPage> {
   final TextEditingController _searchController = TextEditingController();
-  List<UserDetail> _employees = [];
-  List<UserDetail> _filteredEmployees = [];
-  bool _isLoading = true;
+  Stream<List<UserDetail>>? _employeesStream;
   String _selectedRoleId = '5'; // Default to Teachers (role 5)
+  String _searchQuery = '';
 
   final Map<String, String> _roles = {
     '3': "Managers",
@@ -32,85 +30,22 @@ class _EmployeeListPageState extends State<EmployeeListPage> {
   void initState() {
     super.initState();
     _fetchEmployees();
-    _searchController.addListener(_onSearchChanged);
+    _searchController.addListener(() {
+      setState(() {
+        _searchQuery = _searchController.text;
+      });
+    });
   }
 
   @override
   void dispose() {
-    _searchController.removeListener(_onSearchChanged);
     _searchController.dispose();
     super.dispose();
   }
 
-  void _onSearchChanged() {
-    _filterEmployees(_searchController.text);
-  }
-
-  Future<void> _fetchEmployees() async {
-    if (!mounted) return;
-    setState(() => _isLoading = true);
-    try {
-      // Trying common staff directory patterns
-      final List<String> pathsToTry = [
-        'staff/users/$_selectedRoleId',
-        'staff/accounts/$_selectedRoleId',
-        'staff/employees/$_selectedRoleId',
-        'staff/directory/$_selectedRoleId',
-      ];
-
-      var response;
-      for (String path in pathsToTry) {
-        response = await ApiService.get(path);
-        debugPrint("Trying staff endpoint $path: ${response.statusCode}");
-        if (response.statusCode == 200) break;
-      }
-      
-      if (response != null && response.statusCode == 200) {
-        final data = jsonDecode(response.body);
-        // Handle variations: {data: [...]}, {users: [...]}, {employees: [...]}, or direct list
-        final payload = data['data'] ?? data;
-        final List usersData = payload is List 
-            ? payload 
-            : (payload['users'] ?? payload['employees'] ?? payload['data'] ?? []);
-        
-        if (mounted) {
-          setState(() {
-            _employees = usersData.map((json) => UserDetail.fromJson(json)).toList();
-            _filteredEmployees = _employees;
-            _isLoading = false;
-          });
-        }
-      } else {
-        debugPrint("All staff directory endpoints failed.");
-        if (mounted) {
-          setState(() {
-            _employees = [];
-            _filteredEmployees = [];
-            _isLoading = false;
-          });
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text("Employee directory not found for this role.")),
-          );
-        }
-      }
-    } catch (e) {
-      debugPrint("Error fetching employees: $e");
-      if (mounted) {
-        setState(() => _isLoading = false);
-      }
-    }
-  }
-
-  void _filterEmployees(String query) {
+  void _fetchEmployees() {
     setState(() {
-      _filteredEmployees = _employees.where((emp) {
-        final name = emp.user?.name.toLowerCase() ?? '';
-        final email = emp.user?.email.toLowerCase() ?? '';
-        final pos = emp.position?.toLowerCase() ?? '';
-        final id = emp.id?.toString() ?? '';
-        final q = query.toLowerCase();
-        return name.contains(q) || email.contains(q) || pos.contains(q) || id.contains(q);
-      }).toList();
+      _employeesStream = ApiService.getStaffEmployeesStream(_selectedRoleId);
     });
   }
 
@@ -128,7 +63,7 @@ class _EmployeeListPageState extends State<EmployeeListPage> {
           _buildTopFilters(context),
           Expanded(
             child: RefreshIndicator(
-              onRefresh: _fetchEmployees,
+              onRefresh: () async => _fetchEmployees(),
               child: SingleChildScrollView(
                 padding: context.pagePadding,
                 physics: const AlwaysScrollableScrollPhysics(),
@@ -144,11 +79,28 @@ class _EmployeeListPageState extends State<EmployeeListPage> {
                         SizedBox(height: context.xl),
                         _buildSectionHeader("${_roles[_selectedRoleId]} List", Icons.people_outline_rounded),
                         SizedBox(height: context.md),
-                        _isLoading 
-                            ? const Center(child: Padding(padding: EdgeInsets.all(40), child: CircularProgressIndicator()))
-                            : _filteredEmployees.isEmpty
-                                ? _buildEmptyState()
-                                : _buildEmployeeGrid(context),
+                        StreamBuilder<List<UserDetail>>(
+                          stream: _employeesStream,
+                          builder: (context, snapshot) {
+                            return LoadingWrapper<List<UserDetail>>(
+                              snapshot: snapshot,
+                              skeleton: _buildSkeleton(context),
+                              builder: (employees) {
+                                final filtered = employees.where((emp) {
+                                  final name = emp.user?.name.toLowerCase() ?? '';
+                                  final email = emp.user?.email.toLowerCase() ?? '';
+                                  final pos = emp.position?.toLowerCase() ?? '';
+                                  final id = emp.id?.toString() ?? '';
+                                  final q = _searchQuery.toLowerCase();
+                                  return name.contains(q) || email.contains(q) || pos.contains(q) || id.contains(q);
+                                }).toList();
+
+                                if (filtered.isEmpty) return _buildEmptyState();
+                                return _buildEmployeeGrid(context, filtered);
+                              },
+                            );
+                          },
+                        ),
                       ],
                     ),
                   ),
@@ -256,7 +208,7 @@ class _EmployeeListPageState extends State<EmployeeListPage> {
     );
   }
 
-  Widget _buildEmployeeGrid(BuildContext context) {
+  Widget _buildEmployeeGrid(BuildContext context, List<UserDetail> employees) {
     return GridView.builder(
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
@@ -266,9 +218,9 @@ class _EmployeeListPageState extends State<EmployeeListPage> {
         mainAxisSpacing: context.scale(16),
         mainAxisExtent: context.scale(180),
       ),
-      itemCount: _filteredEmployees.length,
+      itemCount: employees.length,
       itemBuilder: (context, index) {
-        final emp = _filteredEmployees[index];
+        final emp = employees[index];
         return _buildEmployeeCard(context, emp);
       },
     );
@@ -356,5 +308,59 @@ class _EmployeeListPageState extends State<EmployeeListPage> {
       ],
     );
   }
-}
 
+  Widget _buildSkeleton(BuildContext context) {
+    return GridView.builder(
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: context.responsive<int>(1, tablet: 2, desktop: 3),
+        crossAxisSpacing: context.scale(16),
+        mainAxisSpacing: context.scale(16),
+        mainAxisExtent: context.scale(180),
+      ),
+      itemCount: 6,
+      itemBuilder: (context, index) {
+        return Card(
+          elevation: 0,
+          margin: EdgeInsets.zero,
+          color: context.theme.colorScheme.surfaceContainerLow,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(context.scale(16)),
+          ),
+          child: Padding(
+            padding: EdgeInsets.all(context.spacing),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Skeleton(width: context.scale(44), height: context.scale(44), borderRadius: context.scale(22)),
+                    SizedBox(width: context.scale(12)),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Skeleton(width: context.scale(120), height: context.scale(16)),
+                          SizedBox(height: context.scale(8)),
+                          Skeleton(width: context.scale(80), height: context.scale(12)),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+                const Spacer(),
+                const Divider(height: 20, color: Colors.transparent),
+                Skeleton(width: context.scale(100), height: context.scale(12)),
+                SizedBox(height: context.scale(8)),
+                Skeleton(width: context.scale(150), height: context.scale(12)),
+                SizedBox(height: context.scale(8)),
+                Skeleton(width: context.scale(120), height: context.scale(12)),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+}

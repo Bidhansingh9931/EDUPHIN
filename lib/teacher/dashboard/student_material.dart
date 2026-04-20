@@ -153,9 +153,11 @@ class _StudentMaterialPageState extends State<StudentMaterialPage> {
                       } catch (e) {
                         if (mounted) {
                           Navigator.of(context).pop();
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(content: Text('Upload failed: $e'), backgroundColor: colorScheme.error),
-                          );
+                          if (context.mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(content: Text('Upload failed: $e'), backgroundColor: colorScheme.error),
+                            );
+                          }
                         }
                       }
                     } else {

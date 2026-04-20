@@ -337,7 +337,7 @@ class _EditNotePageState extends State<EditNotePage> {
 
   Widget _buildClassDropdown() {
     return DropdownButtonFormField<int>(
-      value: _selectedClassId,
+      initialValue: _selectedClassId,
       items: _classes.map<DropdownMenuItem<int>>((c) => DropdownMenuItem(value: c['id'], child: Text(c['name']))).toList(),
       onChanged: (value) {
         setState(() {
@@ -359,7 +359,7 @@ class _EditNotePageState extends State<EditNotePage> {
 
   Widget _buildSectionDropdown() {
     return DropdownButtonFormField<int>(
-      value: _selectedSectionId,
+      initialValue: _selectedSectionId,
       items: _sections.map<DropdownMenuItem<int>>((s) => DropdownMenuItem(value: s['id'], child: Text(s['section_name']))).toList(),
       onChanged: (value) => setState(() => _selectedSectionId = value),
       decoration: InputDecoration(
@@ -398,6 +398,7 @@ class _EditNotePageState extends State<EditNotePage> {
               style: ElevatedButton.styleFrom(
                 backgroundColor: theme.colorScheme.primary,
                 foregroundColor: theme.colorScheme.onPrimary,
+                minimumSize: const Size(0, 54),
                 padding: EdgeInsets.symmetric(horizontal: context.xl, vertical: context.md),
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(context.sm)),
               ),

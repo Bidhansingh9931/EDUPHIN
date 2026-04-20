@@ -1,5 +1,8 @@
 import 'dart:convert';
 import 'package:eduphin/services/api_service.dart';
+import 'package:eduphin/services/caching_service.dart';
+import 'package:eduphin/services/common_widgets.dart';
+import 'package:eduphin/services/responsive_helper.dart';
 import 'package:intl/intl.dart';
 import 'package:eduphin/manager_dashboard/events/event_attendees.dart';
 import 'package:flutter/material.dart';
@@ -58,23 +61,96 @@ class _EventManagementPageState extends State<EventManagementPage> {
   List<Event> _upcomingEvents = [];
   List<Event> _pastEvents = [];
   bool _isLoading = true;
-  String _errorMessage = '';
+  Object? _error;
 
   @override
   void initState() {
     super.initState();
-    _fetchEvents();
+    _loadCachedData().then((_) => _fetchEvents());
+  }
+
+  Future<void> _loadCachedData() async {
+    final cache = await CachingService.getCache('event_management_data');
+    if (cache != null && mounted) {
+      _processEventData(cache);
+    }
+  }
+
+  void _processEventData(dynamic data) {
+    final List<dynamic>? eventData = data['events'];
+    final List<dynamic>? roleData = data['roles'];
+
+    if (eventData == null || roleData == null) return;
+
+    final List<Event> allEvents = eventData
+        .map((json) {
+          try {
+            return Event.fromJson(json);
+          } catch (e) {
+            return null;
+          }
+        })
+        .where((event) => event != null)
+        .cast<Event>()
+        .toList();
+
+    final List<Event> upcoming = [];
+    final List<Event> past = [];
+    final now = DateTime.now();
+
+    for (var event in allEvents) {
+      final eventDateOnly = DateTime(event.eventDate.year, event.eventDate.month, event.eventDate.day);
+      final nowDateOnly = DateTime(now.year, now.month, now.day);
+      if (eventDateOnly.isAfter(nowDateOnly) || eventDateOnly.isAtSameMomentAs(nowDateOnly)) {
+        upcoming.add(event);
+      } else {
+        past.add(event);
+      }
+    }
+
+    final List<String> roles = ['Audience', 'All'];
+    roles.addAll(roleData
+        .map((role) => role['name']?.toString())
+        .where((roleName) =>
+            roleName != null && roleName != 'Admin' && roleName != 'Super Admin')
+        .cast<String>()
+        .toList());
+
+    setState(() {
+      String? statusParam;
+      if (_selectedStatus == 'Upcoming') {
+        statusParam = 'upcoming';
+      } else if (_selectedStatus == 'Past') {
+        statusParam = 'expired';
+      }
+
+      if (statusParam == 'upcoming') {
+        _upcomingEvents = allEvents;
+        _pastEvents.clear();
+      } else if (statusParam == 'expired') {
+        _pastEvents = allEvents;
+        _upcomingEvents.clear();
+      } else {
+        _upcomingEvents = upcoming;
+        _pastEvents = past;
+      }
+
+      _audienceOptions = roles.toSet().toList();
+      if (!_audienceOptions.contains(_selectedAudience)) {
+        _selectedAudience = 'Audience';
+      }
+      _isLoading = false;
+    });
   }
 
   Future<void> _fetchEvents() async {
     if (!mounted) return;
     setState(() {
-      _isLoading = true;
-      _errorMessage = '';
+      _isLoading = _upcomingEvents.isEmpty && _pastEvents.isEmpty;
+      _error = null;
     });
 
     try {
-      // Mapping UI values to API query params
       String? statusParam;
       if (_selectedStatus == 'Upcoming') {
         statusParam = 'upcoming';
@@ -106,70 +182,11 @@ class _EventManagementPageState extends State<EventManagementPage> {
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
-
-        // Safely access nested data
-        final List<dynamic>? eventData = data['events'];
-        final List<dynamic>? roleData = data['roles'];
-
-        if (eventData == null || roleData == null) {
-          throw Exception("Invalid data structure from API.");
+        if (queryParams.isEmpty) {
+          await CachingService.setCache('event_management_data', data);
         }
-
-        final List<Event> allEvents = eventData
-            .map((json) {
-          try {
-            return Event.fromJson(json);
-          } catch (e) {
-            // Log the error and skip the invalid event
-            debugPrint("Error parsing event: ${e.toString()}");
-            return null;
-          }
-        })
-            .where((event) => event != null)
-            .cast<Event>()
-            .toList();
-
-        final List<Event> upcoming = [];
-        final List<Event> past = [];
-        final now = DateTime.now();
-
-        for (var event in allEvents) {
-          final eventDateOnly = DateTime(event.eventDate.year, event.eventDate.month, event.eventDate.day);
-          final nowDateOnly = DateTime(now.year, now.month, now.day);
-          if (eventDateOnly.isAfter(nowDateOnly) || eventDateOnly.isAtSameMomentAs(nowDateOnly)) {
-            upcoming.add(event);
-          } else {
-            past.add(event);
-          }
-        }
-
-        final List<String> roles = ['Audience', 'All'];
-        roles.addAll(roleData
-            .map((role) => role['name']?.toString())
-            .where((roleName) =>
-        roleName != null && roleName != 'Admin' && roleName != 'Super Admin')
-            .cast<String>()
-            .toList());
-
         if (mounted) {
-          setState(() {
-            if (statusParam == 'upcoming') {
-              _upcomingEvents = allEvents;
-              _pastEvents.clear();
-            } else if (statusParam == 'expired') {
-              _pastEvents = allEvents;
-              _upcomingEvents.clear();
-            } else {
-              _upcomingEvents = upcoming;
-              _pastEvents = past;
-            }
-
-            _audienceOptions = roles.toSet().toList(); // Remove duplicates
-            if (!_audienceOptions.contains(_selectedAudience)) {
-              _selectedAudience = 'Audience';
-            }
-            _isLoading = false;
-          });
+          _processEventData(data);
         }
       } else {
         throw Exception('Failed to load events. Status code: ${response.statusCode}');
@@ -178,11 +195,8 @@ class _EventManagementPageState extends State<EventManagementPage> {
       if (mounted) {
         setState(() {
           _isLoading = false;
-          _errorMessage = 'Error fetching events: ${e.toString().replaceFirst("Exception: ", "")}';
+          _error = e;
         });
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(_errorMessage)),
-        );
       }
     }
   }
@@ -239,24 +253,53 @@ class _EventManagementPageState extends State<EventManagementPage> {
             _buildFilters(theme),
             const SizedBox(height: 16),
             Expanded(
-              child: _isLoading
-                  ? const Center(child: CircularProgressIndicator())
-                  : _errorMessage.isNotEmpty
-                  ? Center(
-                  child: Text(_errorMessage,
-                      textAlign: TextAlign.center,
-                      style:
-                      TextStyle(color: theme.colorScheme.error)))
-                  : LayoutBuilder(builder: (context, constraints) {
-                if (constraints.maxWidth > 600) {
-                  return _buildWideLayout(context);
-                } else {
-                  return _buildNarrowLayout(context);
-                }
-              }),
+              child: LoadingWrapper(
+                isLoading: _isLoading,
+                hasData: _upcomingEvents.isNotEmpty || _pastEvents.isNotEmpty,
+                error: _error,
+                onRetry: _fetchEvents,
+                skeleton: _buildSkeleton(context),
+                child: LayoutBuilder(builder: (context, constraints) {
+                  if (constraints.maxWidth > 600) {
+                    return _buildWideLayout(context);
+                  } else {
+                    return _buildNarrowLayout(context);
+                  }
+                }),
+              ),
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildSkeleton(BuildContext context) {
+    return SingleChildScrollView(
+      child: Column(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(16.0),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const SkeletonBox(width: 200, height: 24),
+                const SizedBox(height: 16),
+                ListView.separated(
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  itemCount: 3,
+                  separatorBuilder: (context, index) => const SizedBox(height: 16),
+                  itemBuilder: (context, index) => const SkeletonBox(height: 80, borderRadius: 12),
+                ),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -319,43 +362,52 @@ class _EventManagementPageState extends State<EventManagementPage> {
   }
 
   Widget _buildNarrowLayout(BuildContext context) {
-    return SingleChildScrollView(
-      child: Column(
-        children: [
-          if (_upcomingEvents.isNotEmpty)
-            _buildEventSection(context, "Upcoming Events", _upcomingEvents),
-          if (_upcomingEvents.isNotEmpty && _pastEvents.isNotEmpty)
-            const SizedBox(height: 16),
-          if (_pastEvents.isNotEmpty)
-            _buildEventSection(context, "Past Events", _pastEvents),
-          if (_upcomingEvents.isEmpty && _pastEvents.isEmpty)
-            const Center(child: Text('No events found.'))
-        ],
+    return RefreshIndicator(
+      onRefresh: _fetchEvents,
+      child: SingleChildScrollView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        child: Column(
+          children: [
+            if (_upcomingEvents.isNotEmpty)
+              _buildEventSection(context, "Upcoming Events", _upcomingEvents),
+            if (_upcomingEvents.isNotEmpty && _pastEvents.isNotEmpty)
+              const SizedBox(height: 16),
+            if (_pastEvents.isNotEmpty)
+              _buildEventSection(context, "Past Events", _pastEvents),
+            if (_upcomingEvents.isEmpty && _pastEvents.isEmpty)
+              SizedBox(
+                height: MediaQuery.of(context).size.height * 0.4,
+                child: const Center(child: Text('No events found.')),
+              )
+          ],
+        ),
       ),
     );
   }
 
   Widget _buildWideLayout(BuildContext context) {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Expanded(
-          child: SingleChildScrollView(
-            child: _upcomingEvents.isNotEmpty
-                ? _buildEventSection(
-                context, "Upcoming Events", _upcomingEvents)
-                : const Center(child: Text("No upcoming events.")),
-          ),
+    return RefreshIndicator(
+      onRefresh: _fetchEvents,
+      child: SingleChildScrollView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(
+              child: _upcomingEvents.isNotEmpty
+                  ? _buildEventSection(
+                  context, "Upcoming Events", _upcomingEvents)
+                  : const Center(child: Text("No upcoming events.")),
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: _pastEvents.isNotEmpty
+                  ? _buildEventSection(context, "Past Events", _pastEvents)
+                  : const Center(child: Text("No past events.")),
+            ),
+          ],
         ),
-        const SizedBox(width: 16),
-        Expanded(
-          child: SingleChildScrollView(
-            child: _pastEvents.isNotEmpty
-                ? _buildEventSection(context, "Past Events", _pastEvents)
-                : const Center(child: Text("No past events.")),
-          ),
-        ),
-      ],
+      ),
     );
   }
 

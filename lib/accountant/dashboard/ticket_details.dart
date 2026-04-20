@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'package:eduphin/services/responsive_helper.dart';
+import 'package:eduphin/services/common_widgets.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:eduphin/services/api_service.dart';
@@ -14,35 +15,25 @@ class TicketDetailsPage extends StatefulWidget {
 }
 
 class _TicketDetailsPageState extends State<TicketDetailsPage> {
-  bool _isLoading = true;
-  TicketDetails? _details;
+  bool _isActionLoading = false;
+  late Stream<TicketDetails> _detailsStream;
   final TextEditingController _replyController = TextEditingController();
   File? _selectedFile;
 
   @override
   void initState() {
     super.initState();
-    _fetchDetails();
+    _updateStream();
+  }
+
+  void _updateStream() {
+    _detailsStream = ApiService.getTicketDetailsAccountantStream(widget.ticketId);
   }
 
   @override
   void dispose() {
     _replyController.dispose();
     super.dispose();
-  }
-
-  Future<void> _fetchDetails() async {
-    if (!mounted) return;
-    setState(() => _isLoading = true);
-    try {
-      final details = await ApiService.getTicketDetailsAccountant(widget.ticketId);
-      if (mounted) setState(() => _details = details);
-    } catch (e) {
-      debugPrint("Ticket Details Error: $e");
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Error: $e")));
-    } finally {
-      if (mounted) setState(() => _isLoading = false);
-    }
   }
 
   Future<void> _pickFile() async {
@@ -66,7 +57,7 @@ class _TicketDetailsPageState extends State<TicketDetailsPage> {
       return;
     }
 
-    setState(() => _isLoading = true);
+    setState(() => _isActionLoading = true);
     try {
       await ApiService.replyAccountantTicket(
         widget.ticketId,
@@ -75,23 +66,23 @@ class _TicketDetailsPageState extends State<TicketDetailsPage> {
       );
       _replyController.clear();
       _selectedFile = null;
-      _fetchDetails();
+      setState(() => _updateStream());
     } catch (e) {
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Error: $e")));
     } finally {
-      if (mounted) setState(() => _isLoading = false);
+      if (mounted) setState(() => _isActionLoading = false);
     }
   }
 
   Future<void> _updateStatus(String status) async {
-    setState(() => _isLoading = true);
+    setState(() => _isActionLoading = true);
     try {
       await ApiService.updateAccountantTicketStatus(widget.ticketId, status);
-      _fetchDetails();
+      setState(() => _updateStream());
     } catch (e) {
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Error: $e")));
     } finally {
-      if (mounted) setState(() => _isLoading = false);
+      if (mounted) setState(() => _isActionLoading = false);
     }
   }
 
@@ -101,42 +92,94 @@ class _TicketDetailsPageState extends State<TicketDetailsPage> {
     
     return Scaffold(
       appBar: AppBar(
-        title: Text(_details != null ? "Ticket #${_details!.ticket.id}" : "Ticket Details"),
+        title: StreamBuilder<TicketDetails>(
+          stream: _detailsStream,
+          builder: (context, snapshot) => Text(snapshot.hasData ? "Ticket #${snapshot.data!.ticket.id}" : "Ticket Details"),
+        ),
         centerTitle: true,
         actions: [
-          if (_details != null && _details!.ticket.status != 'resolved' && _details!.ticket.status != 'closed')
-            _buildStatusMenu(context),
-          IconButton(icon: const Icon(Icons.refresh), onPressed: _fetchDetails),
+          StreamBuilder<TicketDetails>(
+            stream: _detailsStream,
+            builder: (context, snapshot) {
+              if (snapshot.hasData && snapshot.data!.ticket.status != 'resolved' && snapshot.data!.ticket.status != 'closed') {
+                return _buildStatusMenu(context);
+              }
+              return const SizedBox.shrink();
+            },
+          ),
+          IconButton(icon: const Icon(Icons.refresh), onPressed: () => setState(() => _updateStream())),
         ],
       ),
-      body: _isLoading && _details == null
-          ? const Center(child: CircularProgressIndicator())
-          : _details == null
-              ? _buildErrorState(context)
-              : Column(
+      body: StreamBuilder<TicketDetails>(
+        stream: _detailsStream,
+        builder: (context, snapshot) {
+          return LoadingWrapper<TicketDetails>(
+            snapshot: snapshot,
+            skeleton: _buildSkeleton(context),
+            onRetry: () => setState(() => _updateStream()),
+            builder: (details) => Stack(
+              children: [
+                Column(
                   children: [
-                    _buildHeader(context),
+                    _buildHeader(context, details),
                     Expanded(
                       child: Center(
                         child: ConstrainedBox(
                           constraints: BoxConstraints(maxWidth: context.scale(1000)),
                           child: ListView.builder(
                             padding: context.pagePadding,
-                            itemCount: _details!.replies.length,
+                            itemCount: details.replies.length,
                             itemBuilder: (context, index) {
-                              final reply = _details!.replies[index];
-                              // Show replies on the right if they are from the ticket creator
-                              final isRightAligned = reply.userId == _details!.ticket.userId; 
+                              final reply = details.replies[index];
+                              final isRightAligned = reply.userId == details.ticket.userId;
                               return _buildReplyBubble(context, reply, isRightAligned);
                             },
                           ),
                         ),
                       ),
                     ),
-                    if (_details!.ticket.status != 'resolved' && _details!.ticket.status != 'closed') 
+                    if (details.ticket.status != 'resolved' && details.ticket.status != 'closed')
                       _buildInputArea(context),
                   ],
                 ),
+                if (_isActionLoading)
+                  const Center(child: CircularProgressIndicator()),
+              ],
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _buildSkeleton(BuildContext context) {
+    return Column(
+      children: [
+        Padding(
+          padding: EdgeInsets.all(context.spacing),
+          child: Skeleton(height: context.scale(100), width: double.infinity, borderRadius: 16),
+        ),
+        Expanded(
+          child: ListView.builder(
+            padding: context.pagePadding,
+            itemCount: 5,
+            itemBuilder: (context, index) {
+              final isMe = index % 2 == 0;
+              return Align(
+                alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
+                child: Padding(
+                  padding: EdgeInsets.only(bottom: context.spacing),
+                  child: Skeleton(
+                    height: context.scale(80),
+                    width: context.scale(250),
+                    borderRadius: 16,
+                  ),
+                ),
+              );
+            },
+          ),
+        ),
+      ],
     );
   }
 
@@ -167,7 +210,7 @@ class _TicketDetailsPageState extends State<TicketDetailsPage> {
             ),
             SizedBox(height: context.scale(24)),
             ElevatedButton.icon(
-              onPressed: _fetchDetails,
+              onPressed: () => setState(() => _updateStream()),
               icon: const Icon(Icons.refresh),
               label: const Text("RETRY"),
             ),
@@ -194,7 +237,7 @@ class _TicketDetailsPageState extends State<TicketDetailsPage> {
     );
   }
 
-  Widget _buildHeader(BuildContext context) {
+  Widget _buildHeader(BuildContext context, TicketDetails details) {
     final theme = context.theme;
     return Center(
       child: ConstrainedBox(
@@ -213,17 +256,17 @@ class _TicketDetailsPageState extends State<TicketDetailsPage> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  _details!.ticket.title, 
+                  details.ticket.title, 
                   style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold, fontSize: context.font(16))
                 ),
                 SizedBox(height: context.scale(12)),
                 Row(
                   children: [
-                    _buildTag(context, _details!.ticket.status.toUpperCase(), _getStatusColor(_details!.ticket.status)),
+                    _buildTag(context, details.ticket.status.toUpperCase(), _getStatusColor(details.ticket.status)),
                     SizedBox(width: context.scale(8)),
-                    _buildTag(context, _details!.ticket.priority.toUpperCase(), _getPriorityColor(_details!.ticket.priority)),
+                    _buildTag(context, details.ticket.priority.toUpperCase(), _getPriorityColor(details.ticket.priority)),
                     const Spacer(),
-                    if (_details!.ticket.status != 'resolved' && _details!.ticket.status != 'closed')
+                    if (details.ticket.status != 'resolved' && details.ticket.status != 'closed')
                       TextButton.icon(
                         onPressed: () => _updateStatus('resolved'),
                         icon: Icon(Icons.check_circle_outline, size: context.scale(16)),
@@ -349,7 +392,7 @@ class _TicketDetailsPageState extends State<TicketDetailsPage> {
                           minimumSize: Size(context.scale(80), context.scale(48)),
                           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(context.scale(12))),
                         ),
-                        onPressed: _isLoading ? null : _sendReply,
+                        onPressed: _isActionLoading ? null : _sendReply,
                         child: const Text("SEND"),
                       ),
                     ),

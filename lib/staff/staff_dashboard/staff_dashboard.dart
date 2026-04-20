@@ -26,17 +26,18 @@ class StaffDashboard extends StatefulWidget {
 }
 
 class _StaffDashboardState extends State<StaffDashboard> {
-  late Future<StaffDashboardData> _dashboardData;
+  late Stream<StaffDashboardData> _dashboardStream;
 
   @override
   void initState() {
     super.initState();
-    _dashboardData = ApiService.getStaffDashboard();
+    // Convert to broadcast stream to allow multiple StreamBuilders (AppBar and Body) to listen
+    _dashboardStream = ApiService.getStaffDashboardStream().asBroadcastStream();
   }
 
   Future<void> _refreshData() async {
     setState(() {
-      _dashboardData = ApiService.getStaffDashboard();
+      _dashboardStream = ApiService.getStaffDashboardStream().asBroadcastStream();
     });
   }
 
@@ -88,8 +89,8 @@ class _StaffDashboardState extends State<StaffDashboard> {
                   shape: BoxShape.circle,
                   border: Border.all(color: colorScheme.primary.withValues(alpha: 0.3), width: 2),
                 ),
-                child: FutureBuilder<StaffDashboardData>(
-                  future: _dashboardData,
+                child: StreamBuilder<StaffDashboardData>(
+                  stream: _dashboardStream,
                   builder: (context, snapshot) {
                     final photoUrl = snapshot.data?.userDetail?.photo;
                     return ProfileAvatar(
@@ -124,100 +125,120 @@ class _StaffDashboardState extends State<StaffDashboard> {
       ),
       body: RefreshIndicator(
         onRefresh: _refreshData,
-        child: FutureBuilder<StaffDashboardData>(
-          future: _dashboardData,
+        child: StreamBuilder<StaffDashboardData>(
+          stream: _dashboardStream,
           builder: (context, snapshot) {
-            if (snapshot.connectionState == ConnectionState.waiting) {
-              return const Center(child: CircularProgressIndicator());
-            } else if (snapshot.hasError) {
-              return Center(
-                child: Padding(
-                  padding: context.pagePadding,
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(Icons.error_outline, color: colorScheme.error, size: 60),
-                      const SizedBox(height: 16),
-                      Text(
-                        'Failed to load dashboard',
-                        style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        snapshot.error.toString().replaceFirst('Exception: ', ''),
-                        textAlign: TextAlign.center,
-                        style: theme.textTheme.bodyMedium?.copyWith(color: theme.hintColor),
-                      ),
-                      const SizedBox(height: 24),
-                      FilledButton.tonal(
-                        onPressed: _refreshData,
-                        child: const Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(Icons.refresh, size: 18),
-                            SizedBox(width: 8),
-                            Text("Retry"),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              );
-            } else if (!snapshot.hasData) {
-              return const Center(child: Text('No data available'));
-            }
-
-            final data = snapshot.data!;
-            final userDetail = data.userDetail;
-            final user = userDetail?.user;
-
-            return SingleChildScrollView(
-              physics: const AlwaysScrollableScrollPhysics(),
-              padding: context.pagePadding,
-              child: Center(
-                child: ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 1200),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      _buildWelcomeCard(context, user?.name ?? 'Staff Member', userDetail?.photo),
-                      SizedBox(height: context.spacing),
-
-                      _buildSectionHeader(context, "Quick Actions", Icons.bolt_outlined),
-                      SizedBox(height: context.spacing * 0.8),
-                      _buildQuickActions(context),
-                      SizedBox(height: context.spacing * 1.5),
-
-                      LayoutBuilder(
-                        builder: (context, constraints) {
-                          final crossAxisCount = constraints.maxWidth > 900 ? 3 : (constraints.maxWidth > 600 ? 2 : 1);
-                          final spacing = context.spacing;
-                          final itemWidth = (constraints.maxWidth - (spacing * (crossAxisCount - 1))) / crossAxisCount;
-
-                          return Wrap(
-                            spacing: spacing,
-                            runSpacing: spacing,
-                            children: [
-                              SizedBox(width: itemWidth, child: _buildProfileOverview(context, userDetail)),
-                              SizedBox(width: itemWidth, child: _buildSupportTicketCard(context)),
-                              SizedBox(width: itemWidth, child: _buildLibraryCard(context)),
-                              SizedBox(width: itemWidth, child: _buildExaminationsCard(context)),
-                              SizedBox(width: itemWidth, child: _buildFeeManagementCard(context)),
-                              SizedBox(width: itemWidth, child: _buildSalaryDetailCard(context)),
-                              SizedBox(width: itemWidth, child: _buildEventManagementCard(context)),
-                            ],
-                          );
-                        },
-                      ),
-                      SizedBox(height: context.spacing),
-                    ],
-                  ),
-                ),
-              ),
+            return LoadingWrapper<StaffDashboardData>(
+              snapshot: snapshot,
+              skeleton: _buildSkeleton(context),
+              builder: (data) => _buildContent(context, data),
+              onRetry: _refreshData,
             );
           },
         ),
+      ),
+    );
+  }
+
+  Widget _buildContent(BuildContext context, StaffDashboardData data) {
+    final theme = context.theme;
+    final colorScheme = theme.colorScheme;
+
+    final userDetail = data.userDetail;
+    final user = userDetail?.user;
+
+    return SingleChildScrollView(
+      physics: const AlwaysScrollableScrollPhysics(),
+      padding: context.pagePadding,
+      child: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 1200),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _buildWelcomeCard(context, user?.name ?? 'Staff Member', userDetail?.photo),
+              SizedBox(height: context.spacing),
+
+              _buildSectionHeader(context, "Quick Actions", Icons.bolt_outlined),
+              SizedBox(height: context.spacing * 0.8),
+              _buildQuickActions(context),
+              SizedBox(height: context.spacing * 1.5),
+
+              LayoutBuilder(
+                builder: (context, constraints) {
+                  final crossAxisCount = constraints.maxWidth > 900 ? 3 : (constraints.maxWidth > 600 ? 2 : 1);
+                  final spacing = context.spacing;
+                  final itemWidth = (constraints.maxWidth - (spacing * (crossAxisCount - 1))) / crossAxisCount;
+
+                  return Wrap(
+                    spacing: spacing,
+                    runSpacing: spacing,
+                    children: [
+                      SizedBox(width: itemWidth, child: _buildProfileOverview(context, userDetail)),
+                      SizedBox(width: itemWidth, child: _buildSupportTicketCard(context)),
+                      SizedBox(width: itemWidth, child: _buildLibraryCard(context)),
+                      SizedBox(width: itemWidth, child: _buildExaminationsCard(context)),
+                      SizedBox(width: itemWidth, child: _buildFeeManagementCard(context)),
+                      SizedBox(width: itemWidth, child: _buildSalaryDetailCard(context)),
+                      SizedBox(width: itemWidth, child: _buildEventManagementCard(context)),
+                    ],
+                  );
+                },
+              ),
+              SizedBox(height: context.spacing),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSkeleton(BuildContext context) {
+    return SingleChildScrollView(
+      padding: context.pagePadding,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Skeleton(height: 180, width: double.infinity, borderRadius: 24),
+          SizedBox(height: context.spacing),
+          const Skeleton(height: 20, width: 150),
+          SizedBox(height: context.spacing * 0.8),
+          Row(
+            children: [
+              Expanded(child: Skeleton(height: context.scale(80), borderRadius: 20)),
+              SizedBox(width: context.spacing),
+              Expanded(child: Skeleton(height: context.scale(80), borderRadius: 20)),
+              SizedBox(width: context.spacing),
+              Expanded(child: Skeleton(height: context.scale(80), borderRadius: 20)),
+            ],
+          ),
+          SizedBox(height: context.spacing * 1.5),
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final crossAxisCount = constraints.maxWidth > 900 ? 3 : (constraints.maxWidth > 600 ? 2 : 1);
+              final spacing = context.spacing;
+              final itemWidth = (constraints.maxWidth - (spacing * (crossAxisCount - 1))) / crossAxisCount;
+              return Wrap(
+                spacing: spacing,
+                runSpacing: spacing,
+                children: List.generate(
+                  7,
+                  (index) => SizedBox(
+                    width: itemWidth,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Skeleton(height: 15, width: 120),
+                        const SizedBox(height: 10),
+                        Skeleton(height: index == 0 ? 180 : 100, width: double.infinity, borderRadius: 20),
+                      ],
+                    ),
+                  ),
+                ),
+              );
+            },
+          ),
+        ],
       ),
     );
   }
@@ -319,7 +340,7 @@ class _StaffDashboardState extends State<StaffDashboard> {
           child: QuickActionItem(
             label: "My Profile",
             icon: Icons.person_outline_rounded,
-            onTap: () => Navigator.push(context, MaterialPageRoute(builder: (context) => const StaffProfilePage())),
+            onTap: () => Navigator.push(context, MaterialPageRoute(builder: (context) => const StaffProfilePage())).then((_) => _refreshData()),
           ),
         ),
         SizedBox(width: context.spacing),

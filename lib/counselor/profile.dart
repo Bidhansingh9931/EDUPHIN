@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
 import '../services/api_service.dart';
+import '../services/caching_service.dart';
 import 'package:eduphin/counselor/counselor_models.dart' as counselor_model;
 
 class CounselorProfilePage extends StatefulWidget {
@@ -54,7 +55,41 @@ class _CounselorProfilePageState extends State<CounselorProfilePage> {
   @override
   void initState() {
     super.initState();
+    _loadCachedData();
     _fetchProfile();
+  }
+
+  Future<void> _loadCachedData() async {
+    final cachedData = await CachingService.getData('counselor_profile');
+    if (cachedData != null && mounted) {
+      final userDetail = counselor_model.UserDetail.fromJson(cachedData);
+      setState(() {
+        _userDetail = userDetail;
+        _nameController.text = userDetail.fullName;
+        _genderController.text = userDetail.gender ?? '';
+        _dobController.text = userDetail.dateOfBirth ?? '';
+        _addressController.text = userDetail.address ?? '';
+        _cityController.text = userDetail.city ?? '';
+        _stateController.text = userDetail.state ?? '';
+        _pincodeController.text = userDetail.pincode ?? '';
+        _phoneController.text = userDetail.phone ?? '';
+        _altPhoneController.text = userDetail.alternatePhone ?? '';
+        _bankAccController.text = userDetail.bankAccountNumber ?? '';
+        _ifscController.text = userDetail.ifscCode ?? '';
+        _bankNameController.text = userDetail.bankName ?? '';
+        _branchNameController.text = userDetail.branchName ?? '';
+        _relationshipController.text = userDetail.relationshipStatus ?? '';
+        _qualificationController.text = userDetail.qualification ?? '';
+        _emergencyContactNameController.text = userDetail.emergencyContactName ?? '';
+        _emergencyContactNumberController.text = userDetail.emergencyContactNumber ?? '';
+        _aadharController.text = userDetail.aadharNumber ?? '';
+        _xMarksController.text = userDetail.xMarks ?? '';
+        _xiiMarksController.text = userDetail.xiiMarks ?? '';
+        _salaryController.text = userDetail.salary ?? '';
+        _experienceController.text = userDetail.experience ?? '';
+        _isLoading = false;
+      });
+    }
   }
 
   @override
@@ -88,8 +123,12 @@ class _CounselorProfilePageState extends State<CounselorProfilePage> {
 
   Future<void> _fetchProfile() async {
     if (!mounted) return;
+    if (_userDetail == null) {
+      setState(() => _isLoading = true);
+    }
     try {
       final json = await ApiService.getCounselorProfile();
+      await CachingService.saveData('counselor_profile', json);
       final userDetail = counselor_model.UserDetail.fromJson(json);
       if (!mounted) return;
       setState(() {
@@ -228,12 +267,6 @@ class _CounselorProfilePageState extends State<CounselorProfilePage> {
   @override
   Widget build(BuildContext context) {
     final theme = context.theme;
-    if (_isLoading && _userDetail == null) {
-      return Scaffold(
-        backgroundColor: theme.colorScheme.surface,
-        body: const Center(child: CircularProgressIndicator()),
-      );
-    }
 
     return Scaffold(
       backgroundColor: theme.colorScheme.surface,
@@ -250,273 +283,297 @@ class _CounselorProfilePageState extends State<CounselorProfilePage> {
           ),
         ],
       ),
-      body: SingleChildScrollView(
-        physics: const AlwaysScrollableScrollPhysics(),
-        padding: context.pagePadding,
-        child: Center(
-          child: ConstrainedBox(
-            constraints: BoxConstraints(maxWidth: context.scale(800)),
-            child: Form(
-              key: _formKey,
-              child: Column(
-                children: [
-                  _buildProfileHeader(context),
-                  SizedBox(height: context.spacing * 2),
-                  
-                  ProfileSection(
-                    title: "Personal Details", 
-                    icon: Icons.person_outline_rounded,
-                    children: [
-                      ProfileTextField(
-                        label: "Full Name", 
-                        controller: _nameController,
-                        enabled: false,
-                        icon: Icons.person_outline,
-                      ),
-                      AdaptiveFieldRow(children: [
-                        ProfileDropdown(
-                          label: "Gender", 
-                          value: _genderOptions.contains(_genderController.text) ? _genderController.text : null, 
-                          items: _genderOptions, 
-                          onChanged: (v) => setState(() => _genderController.text = v ?? ""),
-                          validator: (v) => v == null || v.isEmpty ? "Required" : null,
-                        ),
-                        ProfileTextField(
-                          label: "Date of Birth", 
-                          controller: _dobController,
-                          readOnly: true,
-                          onTap: () => _selectDate(context),
-                          icon: Icons.calendar_today_rounded,
-                          validator: (v) => v == null || v.isEmpty ? "Required" : null,
-                        ),
-                      ]),
-                      AdaptiveFieldRow(children: [
-                        ProfileTextField(
-                          label: "Phone Number", 
-                          controller: _phoneController,
-                          icon: Icons.phone_android_rounded,
-                          keyboardType: TextInputType.phone,
-                          validator: (v) {
-                            if (v == null || v.isEmpty) return "Required";
-                            if (v.length != 10) return "Must be 10 digits";
-                            return null;
-                          },
-                        ),
-                        ProfileTextField(
-                          label: "Alternate Phone", 
-                          controller: _altPhoneController,
-                          icon: Icons.phone_iphone_rounded,
-                          keyboardType: TextInputType.phone,
-                          validator: (v) {
-                            if (v == null || v.isEmpty) return "Required";
-                            if (v.length != 10) return "Must be 10 digits";
-                            return null;
-                          },
-                        ),
-                      ]),
-                      AdaptiveFieldRow(children: [
-                        ProfileDropdown(
-                          label: "Relationship", 
-                          value: _marriageStatusOptions.contains(_relationshipController.text) ? _relationshipController.text : null,
-                          items: _marriageStatusOptions,
-                          onChanged: (v) => setState(() => _relationshipController.text = v ?? ""),
-                        ),
-                        ProfileTextField(
-                          label: "Aadhar Number", 
-                          controller: _aadharController,
-                          icon: Icons.credit_card_outlined,
-                          enabled: false,
-                        ),
-                      ]),
-                      AdaptiveFieldRow(children: [
-                        ProfileTextField(
-                          label: "Xth Marks (%)", 
-                          controller: _xMarksController,
-                          icon: Icons.grade_outlined,
-                          enabled: false,
-                        ),
-                        ProfileTextField(
-                          label: "XIIth Marks (%)", 
-                          controller: _xiiMarksController,
-                          icon: Icons.grade_outlined,
-                          enabled: false,
-                        ),
-                      ]),
-                      AdaptiveFieldRow(children: [
-                        ProfileTextField(
-                          label: "Qualification", 
-                          controller: _qualificationController,
-                          icon: Icons.school_outlined,
-                          enabled: false,
-                        ),
-                        ProfileTextField(
-                          label: "Experience (Years)", 
-                          controller: _experienceController,
-                          icon: Icons.history_edu_outlined,
-                          enabled: false,
-                        ),
-                      ]),
-                    ]
-                  ),
+      body: LoadingWrapper(
+        isLoading: _isLoading,
+        hasData: _userDetail != null,
+        skeleton: _buildSkeleton(context),
+        onRefresh: _fetchProfile,
+        child: SingleChildScrollView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          padding: context.pagePadding,
+          child: Center(
+            child: ConstrainedBox(
+              constraints: BoxConstraints(maxWidth: context.scale(800)),
+              child: Form(
+                key: _formKey,
+                child: Column(
+                  children: [
+                    _buildProfileHeader(context),
+                    SizedBox(height: context.spacing * 2),
 
-                  ProfileSection(
-                    title: "Employment Info", 
-                    icon: Icons.work_outline_rounded,
-                    children: [
-                      AdaptiveFieldRow(children: [
-                        ProfileTextField(label: "Employee ID", controller: TextEditingController(text: _userDetail?.employeeId ?? ""), enabled: false),
-                        ProfileTextField(label: "Joining Date", controller: TextEditingController(text: _userDetail?.joiningDate ?? ""), enabled: false),
-                      ]),
-                      AdaptiveFieldRow(children: [
-                        ProfileTextField(label: "Position", controller: TextEditingController(text: _userDetail?.position ?? ""), enabled: false),
-                        ProfileTextField(label: "Salary", controller: _salaryController, enabled: false, icon: Icons.currency_rupee),
-                      ]),
-                    ]
-                  ),
-
-                  ProfileSection(
-                    title: "Address Details", 
-                    icon: Icons.location_on_outlined,
-                    children: [
-                      ProfileTextField(
-                        label: "Full Address", 
-                        controller: _addressController, 
-                        icon: Icons.home_outlined,
-                        validator: (v) => v == null || v.isEmpty ? "Required" : null,
-                      ),
-                      AdaptiveFieldRow(children: [
+                    ProfileSection(
+                      title: "Personal Details",
+                      icon: Icons.person_outline_rounded,
+                      children: [
                         ProfileTextField(
-                          label: "City", 
-                          controller: _cityController,
-                          validator: (v) => v == null || v.isEmpty ? "Required" : null,
-                        ),
-                        ProfileTextField(
-                          label: "State", 
-                          controller: _stateController,
-                          validator: (v) => v == null || v.isEmpty ? "Required" : null,
-                        ),
-                      ]),
-                      ProfileTextField(
-                        label: "Pincode", 
-                        controller: _pincodeController,
-                        keyboardType: TextInputType.number,
-                        validator: (v) {
-                          if (v == null || v.isEmpty) return "Required";
-                          if (v.length != 6) return "Must be 6 digits";
-                          return null;
-                        },
-                      ),
-                    ]
-                  ),
-
-                  ProfileSection(
-                    title: "Emergency Contact", 
-                    icon: Icons.contact_phone_outlined,
-                    children: [
-                      AdaptiveFieldRow(children: [
-                        ProfileTextField(
-                          label: "Contact Name", 
-                          controller: _emergencyContactNameController,
+                          label: "Full Name",
+                          controller: _nameController,
+                          enabled: false,
                           icon: Icons.person_outline,
                         ),
-                        ProfileTextField(
-                          label: "Contact Number", 
-                          controller: _emergencyContactNumberController,
-                          icon: Icons.phone_outlined,
-                          keyboardType: TextInputType.phone,
-                          validator: (v) => (v != null && v.isNotEmpty && v.length != 10) ? "Must be 10 digits" : null,
-                        ),
-                      ]),
-                    ]
-                  ),
-
-                  ProfileSection(
-                    title: "Banking Info (View Only)", 
-                    icon: Icons.account_balance_outlined,
-                    children: [
-                      AdaptiveFieldRow(children: [
-                        ProfileTextField(label: "Account Number", controller: _bankAccController, enabled: false),
-                        ProfileTextField(label: "Bank Name", controller: _bankNameController, enabled: false),
-                      ]),
-                      AdaptiveFieldRow(children: [
-                        ProfileTextField(label: "IFSC Code", controller: _ifscController, enabled: false),
-                        ProfileTextField(label: "Branch Name", controller: _branchNameController, enabled: false),
-                      ]),
-                    ]
-                  ),
-
-                  ProfileSection(
-                    title: "Security", 
-                    icon: Icons.lock_reset_rounded,
-                    children: [
-                      AdaptiveFieldRow(children: [
-                        ProfileTextField(label: "New Password", controller: _passwordController, isPassword: true, icon: Icons.password_rounded),
-                        ProfileTextField(label: "Confirm Password", controller: _confirmPasswordController, isPassword: true, icon: Icons.lock_outline_rounded),
-                      ]),
-                    ]
-                  ),
-
-                  SizedBox(height: context.spacing * 2),
-                  SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton(
-                      onPressed: _isLoading ? null : _updateProfile,
-                      style: ElevatedButton.styleFrom(
-                        padding: EdgeInsets.symmetric(vertical: context.spacing),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(context.scale(12))),
-                      ),
-                      child: _isLoading 
-                          ? SizedBox(
-                              width: context.scale(20),
-                              height: context.scale(20),
-                              child: const CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-                            ) 
-                          : Text("UPDATE PROFILE", style: TextStyle(fontSize: context.font(14), fontWeight: FontWeight.bold)),
-                    ),
-                  ),
-                  SizedBox(height: context.spacing),
-                  SizedBox(
-                    width: double.infinity,
-                    child: OutlinedButton.icon(
-                      onPressed: () async {
-                        final confirm = await showDialog<bool>(
-                          context: context,
-                          builder: (context) => AlertDialog(
-                            title: const Text("Logout"),
-                            content: const Text("Are you sure you want to logout?"),
-                            actions: [
-                              TextButton(onPressed: () => Navigator.pop(context, false), child: const Text("CANCEL")),
-                              TextButton(
-                                onPressed: () => Navigator.pop(context, true),
-                                child: const Text("LOGOUT", style: TextStyle(color: Colors.red)),
-                              ),
-                            ],
+                        AdaptiveFieldRow(children: [
+                          ProfileDropdown(
+                            label: "Gender",
+                            value: _genderOptions.contains(_genderController.text) ? _genderController.text : null,
+                            items: _genderOptions,
+                            onChanged: (v) => setState(() => _genderController.text = v ?? ""),
+                            validator: (v) => v == null || v.isEmpty ? "Required" : null,
                           ),
-                        );
+                          ProfileTextField(
+                            label: "Date of Birth",
+                            controller: _dobController,
+                            readOnly: true,
+                            onTap: () => _selectDate(context),
+                            icon: Icons.calendar_today_rounded,
+                            validator: (v) => v == null || v.isEmpty ? "Required" : null,
+                          ),
+                        ]),
+                        AdaptiveFieldRow(children: [
+                          ProfileTextField(
+                            label: "Phone Number",
+                            controller: _phoneController,
+                            icon: Icons.phone_android_rounded,
+                            keyboardType: TextInputType.phone,
+                            validator: (v) {
+                              if (v == null || v.isEmpty) return "Required";
+                              if (v.length != 10) return "Must be 10 digits";
+                              return null;
+                            },
+                          ),
+                          ProfileTextField(
+                            label: "Alternate Phone",
+                            controller: _altPhoneController,
+                            icon: Icons.phone_iphone_rounded,
+                            keyboardType: TextInputType.phone,
+                            validator: (v) {
+                              if (v == null || v.isEmpty) return "Required";
+                              if (v.length != 10) return "Must be 10 digits";
+                              return null;
+                            },
+                          ),
+                        ]),
+                        AdaptiveFieldRow(children: [
+                          ProfileDropdown(
+                            label: "Relationship",
+                            value: _marriageStatusOptions.contains(_relationshipController.text) ? _relationshipController.text : null,
+                            items: _marriageStatusOptions,
+                            onChanged: (v) => setState(() => _relationshipController.text = v ?? ""),
+                          ),
+                          ProfileTextField(
+                            label: "Aadhar Number",
+                            controller: _aadharController,
+                            icon: Icons.credit_card_outlined,
+                            enabled: false,
+                          ),
+                        ]),
+                        AdaptiveFieldRow(children: [
+                          ProfileTextField(
+                            label: "Xth Marks (%)",
+                            controller: _xMarksController,
+                            icon: Icons.grade_outlined,
+                            enabled: false,
+                          ),
+                          ProfileTextField(
+                            label: "XIIth Marks (%)",
+                            controller: _xiiMarksController,
+                            icon: Icons.grade_outlined,
+                            enabled: false,
+                          ),
+                        ]),
+                        AdaptiveFieldRow(children: [
+                          ProfileTextField(
+                            label: "Qualification",
+                            controller: _qualificationController,
+                            icon: Icons.school_outlined,
+                            enabled: false,
+                          ),
+                          ProfileTextField(
+                            label: "Experience (Years)",
+                            controller: _experienceController,
+                            icon: Icons.history_edu_outlined,
+                            enabled: false,
+                          ),
+                        ]),
+                      ]
+                    ),
 
-      if (confirm == true) {
-        await ApiService.logout();
-        if (mounted) {
-          final navigator = Navigator.of(context);
-          navigator.pushNamedAndRemoveUntil('/login', (route) => false);
-        }
-      }
-    },
-                      icon: Icon(Icons.logout, color: theme.colorScheme.error, size: context.scale(20)),
-                      label: Text("LOGOUT", style: TextStyle(color: theme.colorScheme.error, fontWeight: FontWeight.bold, fontSize: context.font(14))),
-                      style: OutlinedButton.styleFrom(
-                        side: BorderSide(color: theme.colorScheme.error),
-                        padding: EdgeInsets.symmetric(vertical: context.spacing),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(context.scale(12))),
+                    ProfileSection(
+                      title: "Employment Info",
+                      icon: Icons.work_outline_rounded,
+                      children: [
+                        AdaptiveFieldRow(children: [
+                          ProfileTextField(label: "Employee ID", controller: TextEditingController(text: _userDetail?.employeeId ?? ""), enabled: false),
+                          ProfileTextField(label: "Joining Date", controller: TextEditingController(text: _userDetail?.joiningDate ?? ""), enabled: false),
+                        ]),
+                        AdaptiveFieldRow(children: [
+                          ProfileTextField(label: "Position", controller: TextEditingController(text: _userDetail?.position ?? ""), enabled: false),
+                          ProfileTextField(label: "Salary", controller: _salaryController, enabled: false, icon: Icons.currency_rupee),
+                        ]),
+                      ]
+                    ),
+
+                    ProfileSection(
+                      title: "Address Details",
+                      icon: Icons.location_on_outlined,
+                      children: [
+                        ProfileTextField(
+                          label: "Full Address",
+                          controller: _addressController,
+                          icon: Icons.home_outlined,
+                          validator: (v) => v == null || v.isEmpty ? "Required" : null,
+                        ),
+                        AdaptiveFieldRow(children: [
+                          ProfileTextField(
+                            label: "City",
+                            controller: _cityController,
+                            validator: (v) => v == null || v.isEmpty ? "Required" : null,
+                          ),
+                          ProfileTextField(
+                            label: "State",
+                            controller: _stateController,
+                            validator: (v) => v == null || v.isEmpty ? "Required" : null,
+                          ),
+                        ]),
+                        ProfileTextField(
+                          label: "Pincode",
+                          controller: _pincodeController,
+                          keyboardType: TextInputType.number,
+                          validator: (v) {
+                            if (v == null || v.isEmpty) return "Required";
+                            if (v.length != 6) return "Must be 6 digits";
+                            return null;
+                          },
+                        ),
+                      ]
+                    ),
+
+                    ProfileSection(
+                      title: "Emergency Contact",
+                      icon: Icons.contact_phone_outlined,
+                      children: [
+                        AdaptiveFieldRow(children: [
+                          ProfileTextField(
+                            label: "Contact Name",
+                            controller: _emergencyContactNameController,
+                            icon: Icons.person_outline,
+                          ),
+                          ProfileTextField(
+                            label: "Contact Number",
+                            controller: _emergencyContactNumberController,
+                            icon: Icons.phone_outlined,
+                            keyboardType: TextInputType.phone,
+                            validator: (v) => (v != null && v.isNotEmpty && v.length != 10) ? "Must be 10 digits" : null,
+                          ),
+                        ]),
+                      ]
+                    ),
+
+                    ProfileSection(
+                      title: "Banking Info (View Only)",
+                      icon: Icons.account_balance_outlined,
+                      children: [
+                        AdaptiveFieldRow(children: [
+                          ProfileTextField(label: "Account Number", controller: _bankAccController, enabled: false),
+                          ProfileTextField(label: "Bank Name", controller: _bankNameController, enabled: false),
+                        ]),
+                        AdaptiveFieldRow(children: [
+                          ProfileTextField(label: "IFSC Code", controller: _ifscController, enabled: false),
+                          ProfileTextField(label: "Branch Name", controller: _branchNameController, enabled: false),
+                        ]),
+                      ]
+                    ),
+
+                    ProfileSection(
+                      title: "Security",
+                      icon: Icons.lock_reset_rounded,
+                      children: [
+                        AdaptiveFieldRow(children: [
+                          ProfileTextField(label: "New Password", controller: _passwordController, isPassword: true, icon: Icons.password_rounded),
+                          ProfileTextField(label: "Confirm Password", controller: _confirmPasswordController, isPassword: true, icon: Icons.lock_outline_rounded),
+                        ]),
+                      ]
+                    ),
+
+                    SizedBox(height: context.spacing * 2),
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton(
+                        onPressed: _isLoading ? null : _updateProfile,
+                        style: ElevatedButton.styleFrom(
+                          padding: EdgeInsets.symmetric(vertical: context.spacing),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(context.scale(12))),
+                        ),
+                        child: _isLoading
+                            ? SizedBox(
+                                width: context.scale(20),
+                                height: context.scale(20),
+                                child: const CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                              )
+                            : Text("UPDATE PROFILE", style: TextStyle(fontSize: context.font(14), fontWeight: FontWeight.bold)),
                       ),
                     ),
-                  ),
-                  SizedBox(height: context.spacing * 3),
-                ],
+                    SizedBox(height: context.spacing),
+                    SizedBox(
+                      width: double.infinity,
+                      child: OutlinedButton.icon(
+                        onPressed: () async {
+                          final confirm = await showDialog<bool>(
+                            context: context,
+                            builder: (context) => AlertDialog(
+                              title: const Text("Logout"),
+                              content: const Text("Are you sure you want to logout?"),
+                              actions: [
+                                TextButton(onPressed: () => Navigator.pop(context, false), child: const Text("CANCEL")),
+                                TextButton(
+                                  onPressed: () => Navigator.pop(context, true),
+                                  child: const Text("LOGOUT", style: TextStyle(color: Colors.red)),
+                                ),
+                              ],
+                            ),
+                          );
+
+        if (confirm == true) {
+          await ApiService.logout();
+          if (mounted) {
+            final navigator = Navigator.of(context);
+            navigator.pushNamedAndRemoveUntil('/login', (route) => false);
+          }
+        }
+      },
+                        icon: Icon(Icons.logout, color: theme.colorScheme.error, size: context.scale(20)),
+                        label: Text("LOGOUT", style: TextStyle(color: theme.colorScheme.error, fontWeight: FontWeight.bold, fontSize: context.font(14))),
+                        style: OutlinedButton.styleFrom(
+                          side: BorderSide(color: theme.colorScheme.error),
+                          padding: EdgeInsets.symmetric(vertical: context.spacing),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(context.scale(12))),
+                        ),
+                      ),
+                    ),
+                    SizedBox(height: context.spacing * 3),
+                  ],
+                ),
               ),
             ),
           ),
         ),
+      ),
+    );
+  }
+
+  Widget _buildSkeleton(BuildContext context) {
+    return SingleChildScrollView(
+      padding: context.pagePadding,
+      child: Column(
+        children: [
+          Skeleton(height: context.scale(150), borderRadius: context.scale(20)),
+          SizedBox(height: context.spacing * 2),
+          ...List.generate(4, (index) => Column(
+            children: [
+              Skeleton(height: context.scale(100), borderRadius: context.scale(12)),
+              SizedBox(height: context.spacing),
+            ],
+          )),
+        ],
       ),
     );
   }
@@ -583,3 +640,4 @@ class _CounselorProfilePageState extends State<CounselorProfilePage> {
     ];
   }
 }
+

@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:csv/csv.dart';
 import 'package:eduphin/services/api_service.dart';
 import 'package:eduphin/services/common_widgets.dart';
+import 'package:eduphin/services/caching_service.dart';
 import 'package:eduphin/services/responsive_helper.dart';
 import 'package:flutter/material.dart';
 import 'package:open_file/open_file.dart';
@@ -39,19 +40,29 @@ class LibrarianListPage extends StatefulWidget {
 class _LibrarianListPageState extends State<LibrarianListPage> {
   List<Librarian> _librarians = [];
   bool _isLoading = true;
-  String _error = '';
+  Object? _error;
 
   @override
   void initState() {
     super.initState();
-    _fetchLibrarians();
+    _loadCachedData().then((_) => _fetchLibrarians());
+  }
+
+  Future<void> _loadCachedData() async {
+    final cache = await CacheService.getCache('librarians');
+    if (cache != null && mounted) {
+      setState(() {
+        _librarians = (cache as List).map((json) => Librarian.fromJson(json)).toList();
+        _isLoading = false;
+      });
+    }
   }
 
   Future<void> _fetchLibrarians() async {
     if (!mounted) return;
     setState(() {
-      _isLoading = true;
-      _error = '';
+      _isLoading = _librarians.isEmpty;
+      _error = null;
     });
 
     try {
@@ -61,6 +72,7 @@ class _LibrarianListPageState extends State<LibrarianListPage> {
         if (response.statusCode == 200) {
           final data = jsonDecode(response.body);
           final List<dynamic> usersData = data['data'] ?? [];
+          await CacheService.setCache('librarians', usersData);
           setState(() {
             _librarians = usersData.map((json) => Librarian.fromJson(json)).toList();
             _isLoading = false;
@@ -72,7 +84,7 @@ class _LibrarianListPageState extends State<LibrarianListPage> {
     } catch (e) {
       if (mounted) {
         setState(() {
-          _error = e.toString();
+          _error = e;
           _isLoading = false;
         });
       }
@@ -126,19 +138,83 @@ class _LibrarianListPageState extends State<LibrarianListPage> {
           IconButton(icon: Icon(Icons.download, size: context.scale(24)), onPressed: _downloadLibrarianList),
         ],
       ),
-      body: SafeArea(
-        child: SingleChildScrollView(
-          padding: context.pagePadding,
-          child: Center(
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 1200),
-              child: _isLoading
-                  ? Center(child: Padding(padding: EdgeInsets.all(context.scale(40)), child: const CircularProgressIndicator()))
-                  : _error.isNotEmpty
-                      ? Center(child: Text(_error, style: theme.textTheme.bodyMedium?.copyWith(fontSize: context.font(14))))
-                      : _librarians.isEmpty
-                          ? Center(child: Text("No librarians found.", style: theme.textTheme.bodyMedium?.copyWith(fontSize: context.font(14))))
-                          : CustomLibrarianListBox(librarians: _librarians),
+      body: LoadingWrapper(
+        isLoading: _isLoading,
+        hasData: _librarians.isNotEmpty,
+        error: _error,
+        onRetry: _fetchLibrarians,
+        skeleton: _buildSkeleton(context),
+        child: SafeArea(
+          child: SingleChildScrollView(
+            padding: context.pagePadding,
+            child: Center(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 1200),
+                child: _librarians.isEmpty
+                    ? Center(child: Text("No librarians found.", style: theme.textTheme.bodyMedium?.copyWith(fontSize: context.font(14))))
+                    : CustomLibrarianListBox(librarians: _librarians),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSkeleton(BuildContext context) {
+    return SingleChildScrollView(
+      padding: context.pagePadding,
+      child: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 1200),
+          child: Card(
+            elevation: 0,
+            color: Colors.white,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(context.scale(12))),
+            child: Padding(
+              padding: EdgeInsets.all(context.spacing),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  SkeletonBox(width: context.scale(120), height: context.scale(20)),
+                  SizedBox(height: context.scale(24)),
+                  GridView.builder(
+                    shrinkWrap: true,
+                    physics: const NeverScrollableScrollPhysics(),
+                    itemCount: 6,
+                    gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                      crossAxisCount: context.responsive(1, tablet: 2, desktop: 3),
+                      crossAxisSpacing: context.scale(16),
+                      mainAxisSpacing: context.scale(16),
+                      mainAxisExtent: context.scale(80),
+                    ),
+                    itemBuilder: (context, index) => Container(
+                      padding: EdgeInsets.all(context.scale(12)),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(context.scale(12)),
+                      ),
+                      child: Row(
+                        children: [
+                          CircleAvatar(radius: context.scale(24), backgroundColor: Colors.white),
+                          SizedBox(width: context.scale(16)),
+                          const Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                SkeletonBox(height: 16),
+                                SizedBox(height: 4),
+                                SkeletonBox(height: 12, width: 80),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
         ),
@@ -170,7 +246,7 @@ class CustomLibrarianListBox extends StatelessWidget {
             LayoutBuilder(
               builder: (context, constraints) {
                 final crossAxisCount = context.responsive(1, tablet: 2, desktop: 3);
-                
+
                 if (crossAxisCount > 1) {
                   return GridView.builder(
                     shrinkWrap: true,
@@ -233,4 +309,5 @@ class CustomLibrarianListBox extends StatelessWidget {
     );
   }
 }
+
 

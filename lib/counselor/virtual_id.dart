@@ -1,10 +1,10 @@
-import 'dart:convert';
 import 'dart:math';
 import 'package:eduphin/services/common_widgets.dart';
 import 'package:eduphin/services/pdf_service.dart';
 import 'package:eduphin/services/responsive_helper.dart';
 import 'package:flutter/material.dart';
-import '../services/api_service.dart';
+import 'package:eduphin/services/api_service.dart';
+import 'package:eduphin/services/caching_service.dart';
 import 'counselor_models.dart';
 
 class VirtualIdCardPage extends StatefulWidget {
@@ -23,13 +23,28 @@ class _VirtualIdCardPageState extends State<VirtualIdCardPage> {
   @override
   void initState() {
     super.initState();
+    _loadCachedData();
     _fetchIdData();
+  }
+
+  Future<void> _loadCachedData() async {
+    final cachedData = await CachingService.getData('counselor_virtual_id');
+    if (cachedData != null && mounted) {
+      setState(() {
+        _idData = CounselorVirtualIdCardData.fromJson(cachedData);
+        _isLoading = false;
+      });
+    }
   }
 
   Future<void> _fetchIdData() async {
     if (!mounted) return;
+    if (_idData == null) {
+      setState(() => _isLoading = true);
+    }
     try {
       final json = await ApiService.getCounselorVirtualIdCard();
+      await CachingService.saveData('counselor_virtual_id', json);
       final data = CounselorVirtualIdCardData.fromJson(json);
       if (mounted) {
         setState(() {
@@ -53,22 +68,6 @@ class _VirtualIdCardPageState extends State<VirtualIdCardPage> {
   Widget build(BuildContext context) {
     final theme = context.theme;
 
-    if (_isLoading) {
-      return Scaffold(
-        backgroundColor: theme.colorScheme.surface,
-        appBar: AppBar(title: const Text("Digital ID Card")),
-        body: const Center(child: CircularProgressIndicator()),
-      );
-    }
-
-    if (_idData == null) {
-      return Scaffold(
-        backgroundColor: theme.colorScheme.surface,
-        appBar: AppBar(title: const Text("Digital ID Card")),
-        body: const Center(child: Text("No data found")),
-      );
-    }
-
     return Scaffold(
       backgroundColor: theme.colorScheme.surface,
       appBar: AppBar(
@@ -77,47 +76,90 @@ class _VirtualIdCardPageState extends State<VirtualIdCardPage> {
           style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold, fontSize: context.font(20)),
         ),
       ),
-      body: SingleChildScrollView(
-        physics: const AlwaysScrollableScrollPhysics(),
-        padding: context.pagePadding,
-        child: Center(
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 800),
-            child: Column(
-              children: [
-                SizedBox(height: context.scale(20)),
-                
-                // 3D Flip Animation
-                FittedBox(
-                  fit: BoxFit.scaleDown,
-                  child: TweenAnimationBuilder<double>(
-                    tween: Tween<double>(begin: 0, end: _rotation),
-                    duration: const Duration(milliseconds: 600),
-                    curve: Curves.easeInOutBack,
-                    builder: (context, value, child) {
-                      final isBack = value > (pi / 2);
-                      return Transform(
-                        transform: Matrix4.identity()
-                          ..setEntry(3, 2, 0.001) // Perspective
-                          ..rotateY(value),
-                        alignment: Alignment.center,
-                        child: isBack
-                            ? Transform(
-                                alignment: Alignment.center,
-                                transform: Matrix4.identity()..rotateY(pi),
-                                child: _buildBackSide(context),
-                              )
-                            : _buildFrontSide(context),
-                      );
-                    },
-                  ),
-                ),
+      body: LayoutBuilder(
+        builder: (context, constraints) {
+          return LoadingWrapper(
+            isLoading: _isLoading,
+            hasData: _idData != null,
+            skeleton: _buildSkeleton(context, constraints),
+            onRefresh: _fetchIdData,
+            child: _idData == null
+                ? const Center(child: Text("No data found"))
+                : SingleChildScrollView(
+                    physics: const AlwaysScrollableScrollPhysics(),
+                    padding: context.pagePadding,
+                    child: Center(
+                      child: ConstrainedBox(
+                        constraints: BoxConstraints(
+                          maxWidth: 800,
+                          minHeight: constraints.maxHeight - (context.spacing * 2),
+                        ),
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            SizedBox(height: context.scale(10)),
+                            
+                            // 3D Flip Animation
+                            FittedBox(
+                              fit: BoxFit.scaleDown,
+                              child: TweenAnimationBuilder<double>(
+                                tween: Tween<double>(begin: 0, end: _rotation),
+                                duration: const Duration(milliseconds: 600),
+                                curve: Curves.easeInOutBack,
+                                builder: (context, value, child) {
+                                  final isBack = value > (pi / 2);
+                                  return Transform(
+                                    transform: Matrix4.identity()
+                                      ..setEntry(3, 2, 0.001) // Perspective
+                                      ..rotateY(value),
+                                    alignment: Alignment.center,
+                                    child: isBack
+                                        ? Transform(
+                                            alignment: Alignment.center,
+                                            transform: Matrix4.identity()..rotateY(pi),
+                                            child: _buildBackSide(context),
+                                          )
+                                        : _buildFrontSide(context),
+                                  );
+                                },
+                              ),
+                            ),
 
-                SizedBox(height: context.scale(40)),
-                _buildActionButtons(context),
-                SizedBox(height: context.scale(40)),
-              ],
-            ),
+                            SizedBox(height: context.scale(30)),
+                            _buildActionButtons(context),
+                            SizedBox(height: context.scale(20)),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _buildSkeleton(BuildContext context, BoxConstraints constraints) {
+    return SingleChildScrollView(
+      padding: context.pagePadding,
+      child: Center(
+        child: ConstrainedBox(
+          constraints: BoxConstraints(
+            minHeight: constraints.maxHeight - (context.spacing * 2),
+          ),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Skeleton(
+                width: context.scale(320),
+                height: context.scale(500),
+                borderRadius: context.scale(24),
+              ),
+              SizedBox(height: context.scale(40)),
+              Skeleton(height: context.scale(50), borderRadius: context.scale(12)),
+              SizedBox(height: context.scale(16)),
+              Skeleton(height: context.scale(50), borderRadius: context.scale(12)),
+            ],
           ),
         ),
       ),
@@ -191,7 +233,7 @@ class _VirtualIdCardPageState extends State<VirtualIdCardPage> {
                 ),
               ),
 
-              SizedBox(height: context.scale(20)),
+              SizedBox(height: context.scale(12)),
 
               ProfileAvatar(
                 imageUrl: data.photoUrl != null && data.photoUrl!.isNotEmpty
@@ -200,7 +242,7 @@ class _VirtualIdCardPageState extends State<VirtualIdCardPage> {
                 radius: context.scale(60),
               ),
 
-              SizedBox(height: context.scale(16)),
+              SizedBox(height: context.scale(8)),
 
               Padding(
                 padding: EdgeInsets.symmetric(horizontal: context.scale(16)),
@@ -221,6 +263,8 @@ class _VirtualIdCardPageState extends State<VirtualIdCardPage> {
                 ),
                 child: Text(
                   (data.position ?? "COUNSELOR").toUpperCase(),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                   style: TextStyle(color: colorScheme.onPrimary, fontWeight: FontWeight.bold, fontSize: context.font(11), letterSpacing: 1.5),
                 ),
               ),
@@ -228,8 +272,8 @@ class _VirtualIdCardPageState extends State<VirtualIdCardPage> {
               const Spacer(),
 
               Container(
-                margin: EdgeInsets.symmetric(horizontal: context.scale(24), vertical: context.scale(12)),
-                padding: EdgeInsets.symmetric(horizontal: context.scale(20), vertical: context.scale(12)),
+                margin: EdgeInsets.symmetric(horizontal: context.scale(24), vertical: context.scale(8)),
+                padding: EdgeInsets.symmetric(horizontal: context.scale(20), vertical: context.scale(8)),
                 decoration: BoxDecoration(
                   color: colorScheme.onPrimary.withValues(alpha: 0.15),
                   borderRadius: BorderRadius.circular(context.scale(16)),
@@ -380,4 +424,5 @@ class _VirtualIdCardPageState extends State<VirtualIdCardPage> {
     );
   }
 }
+
 

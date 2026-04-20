@@ -1,9 +1,12 @@
 import 'dart:convert';
+import 'package:eduphin/services/caching_service.dart';
+import 'package:eduphin/services/common_widgets.dart';
 import 'package:eduphin/services/responsive_helper.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
 import '../../services/api_service.dart';
+import 'ticket_info.dart'; // To use TicketStatus and TicketPriority enums if needed, or keep local
 import 'ticket_details.dart';
 
 // Model for an assigned ticket based on the UI and API speculation
@@ -63,13 +66,16 @@ class AssignedTicketsScreen extends StatefulWidget {
 }
 
 class AssignedTicketsScreenState extends State<AssignedTicketsScreen> {
-  late Future<List<AssignedTicket>> _ticketsFuture;
+  List<AssignedTicket> _tickets = [];
+  bool _isLoading = true;
+  Object? _error;
+  final String _cacheKey = 'manager_assigned_tickets';
   final _searchController = TextEditingController();
 
   @override
   void initState() {
     super.initState();
-    _ticketsFuture = _fetchAssignedTickets();
+    _loadData();
     _searchController.addListener(() {
       setState(() {}); // Rebuild the widget to apply the filter
     });
@@ -81,33 +87,72 @@ class AssignedTicketsScreenState extends State<AssignedTicketsScreen> {
     super.dispose();
   }
 
-  Future<void> _refreshTickets() async {
-    setState(() {
-      // Clear search and re-fetch tickets
-      _searchController.clear();
-      _ticketsFuture = _fetchAssignedTickets();
-    });
+  Future<void> _loadData() async {
+    await _loadCachedData();
+    await _fetchAssignedTickets();
   }
 
-  Future<List<AssignedTicket>> _fetchAssignedTickets() async {
+  Future<void> _loadCachedData() async {
+    final cachedData = await CachingService.getCache(_cacheKey);
+    if (cachedData != null) {
+      if (mounted) {
+        setState(() {
+          final List<dynamic> ticketsJson = cachedData['data'] ?? [];
+          _tickets = ticketsJson.map((json) => AssignedTicket.fromJson(json)).toList();
+          _isLoading = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _refreshTickets() async {
+    _searchController.clear();
+    await _fetchAssignedTickets();
+  }
+
+  Future<void> _fetchAssignedTickets() async {
+    if (_tickets.isEmpty) {
+      setState(() {
+        _isLoading = true;
+        _error = null;
+      });
+    }
+
     try {
       final response = await ApiService.get('manager/assigned-tickets');
-      
+
       if (response.statusCode == 200) {
         final Map<String, dynamic> responseData = json.decode(response.body);
         if (responseData['status'] == true) {
+          await CachingService.setCache(_cacheKey, responseData);
           final List<dynamic> ticketsJson = responseData['data'];
-          // The FutureBuilder will use this returned list
-          return ticketsJson.map((json) => AssignedTicket.fromJson(json)).toList();
+          final tickets = ticketsJson.map((json) => AssignedTicket.fromJson(json)).toList();
+
+          if (mounted) {
+            setState(() {
+              _tickets = tickets;
+              _isLoading = false;
+              _error = null;
+            });
+          }
         } else {
-          throw Exception(responseData['message'] ?? 'Failed to load tickets: API status false');
+          throw Exception(responseData['message'] ?? 'Failed to load tickets');
         }
       } else {
         throw Exception('Failed to load tickets: Server error ${response.statusCode}');
       }
     } catch (e) {
-      // The ApiService handles connection errors, so we just rethrow its message.
-      throw Exception('Failed to fetch tickets: $e');
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+          _error = e;
+        });
+        if (_tickets.isNotEmpty) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Error updating tickets: ${e.toString()}')),
+          );
+        }
+      }
     }
   }
 
@@ -161,72 +206,106 @@ class AssignedTicketsScreenState extends State<AssignedTicketsScreen> {
         backgroundColor: context.theme.scaffoldBackgroundColor,
         foregroundColor: context.theme.colorScheme.onSurface,
       ),
-      body: FutureBuilder<List<AssignedTicket>>(
-        future: _ticketsFuture,
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
-          } else if (snapshot.hasError) {
-            return Center(
-              child: Padding(
+      body: LoadingWrapper(
+        isLoading: _isLoading,
+        hasData: _tickets.isNotEmpty,
+        error: _error,
+        onRetry: _fetchAssignedTickets,
+        skeleton: _buildSkeleton(),
+        child: _buildContent(),
+      ),
+    );
+  }
+
+  Widget _buildSkeleton() {
+    return Column(
+      children: [
+        Padding(
+          padding: context.pagePadding,
+          child: const SkeletonBox(height: 50, borderRadius: 12),
+        ),
+        Expanded(
+          child: ListView.builder(
+            padding: EdgeInsets.symmetric(horizontal: context.spacing),
+            itemCount: 5,
+            itemBuilder: (context, index) => Padding(
+              padding: EdgeInsets.only(bottom: context.md),
+              child: Container(
                 padding: context.pagePadding,
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(context.scale(12)),
+                  border: Border.all(color: Colors.grey.shade200),
+                ),
                 child: Column(
-                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Icon(Icons.error_outline, size: context.scale(48), color: context.theme.colorScheme.error),
-                    SizedBox(height: context.sm),
-                    Text('Error: ${snapshot.error}', textAlign: TextAlign.center, style: context.theme.textTheme.titleMedium),
-                    SizedBox(height: context.md),
-                    ElevatedButton.icon(
-                      onPressed: _refreshTickets,
-                      icon: const Icon(Icons.refresh),
-                      label: const Text("Retry"),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const SkeletonBox(height: 15, width: 40),
+                        const SkeletonBox(height: 25, width: 60),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    const SkeletonBox(height: 20, width: 180),
+                    const SizedBox(height: 8),
+                    const SkeletonBox(height: 15, width: 100),
+                    const SizedBox(height: 16),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const SkeletonBox(height: 35, width: 100),
+                        const SkeletonBox(height: 15, width: 80),
+                      ],
                     ),
                   ],
                 ),
               ),
-            );
-          } else if (!snapshot.hasData || snapshot.data!.isEmpty) {
-            return Center(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(Icons.assignment_turned_in_outlined, size: context.scale(64), color: context.theme.colorScheme.outline),
-                  SizedBox(height: context.sm),
-                  Text('No assigned tickets found.', style: context.theme.textTheme.titleMedium),
-                ],
-              ),
-            );
-          } else {
-            final allTickets = snapshot.data!;
-            final searchQuery = _searchController.text.toLowerCase();
+            ),
+          ),
+        ),
+      ],
+    );
+  }
 
-            final filteredTickets = allTickets.where((ticket) {
-              return ticket.title.toLowerCase().contains(searchQuery) ||
-                  ticket.issueBy.toLowerCase().contains(searchQuery) ||
-                  ticket.id.toString().contains(searchQuery);
-            }).toList();
+  Widget _buildContent() {
+    if (_tickets.isEmpty && !_isLoading) {
+      return Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.assignment_turned_in_outlined, size: context.scale(64), color: context.theme.colorScheme.outline),
+            SizedBox(height: context.sm),
+            Text('No assigned tickets found.', style: context.theme.textTheme.titleMedium),
+          ],
+        ),
+      );
+    }
 
-            return RefreshIndicator(
-              onRefresh: _refreshTickets,
-              child: Center(
-                child: ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 1400),
-                  child: Column(
-                    children: [
-                      _buildHeader(context),
-                      Expanded(
-                        child: context.isMobile
-                            ? _buildMobileList(filteredTickets)
-                            : _buildDesktopTable(filteredTickets),
-                      ),
-                    ],
-                  ),
-                ),
+    final searchQuery = _searchController.text.toLowerCase();
+    final filteredTickets = _tickets.where((ticket) {
+      return ticket.title.toLowerCase().contains(searchQuery) ||
+          ticket.issueBy.toLowerCase().contains(searchQuery) ||
+          ticket.id.toString().contains(searchQuery);
+    }).toList();
+
+    return RefreshIndicator(
+      onRefresh: _refreshTickets,
+      child: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 1400),
+          child: Column(
+            children: [
+              _buildHeader(context),
+              Expanded(
+                child: context.isMobile
+                    ? _buildMobileList(filteredTickets)
+                    : _buildDesktopTable(filteredTickets),
               ),
-            );
-          }
-        },
+            ],
+          ),
+        ),
       ),
     );
   }

@@ -4,7 +4,7 @@ import 'package:eduphin/services/api_service.dart';
 import 'accountant_dashboard_model.dart' as accountant_model;
 import 'package:intl/intl.dart';
 import 'package:eduphin/teacher/dashboard/common_widgets.dart';
-import 'package:eduphin/services/common_widgets.dart' show ProfileAvatar;
+import 'package:eduphin/services/common_widgets.dart';
 
 class SalarySlipsPage extends StatefulWidget {
   final String? employeeId;
@@ -15,9 +15,7 @@ class SalarySlipsPage extends StatefulWidget {
 }
 
 class _SalarySlipsPageState extends State<SalarySlipsPage> {
-  bool _isLoading = true;
-  List<accountant_model.Salary> _salaries = [];
-  accountant_model.UserDetail? _employeeDetail;
+  late Stream<Map<String, dynamic>> _salaryStream;
 
   @override
   void initState() {
@@ -25,79 +23,71 @@ class _SalarySlipsPageState extends State<SalarySlipsPage> {
     _fetchSalaries();
   }
 
-  Future<void> _fetchSalaries() async {
-    if (!mounted) return;
-    setState(() => _isLoading = true);
-    try {
-      final Map<String, dynamic> responseData;
+  void _fetchSalaries() {
+    setState(() {
       if (widget.employeeId != null) {
-        responseData = await ApiService.getAccountantEmployeeSalary(widget.employeeId!);
+        _salaryStream = ApiService.getAccountantEmployeeSalaryStream(widget.employeeId!);
       } else {
-        responseData = await ApiService.getAccountantMySalaries();
+        _salaryStream = ApiService.getAccountantMySalariesStream();
       }
-
-      if (mounted) {
-        setState(() {
-          if (responseData['account'] != null) {
-            _employeeDetail = accountant_model.UserDetail.fromJson(responseData['account']);
-          }
-          if (responseData['salaries'] != null) {
-            _salaries = (responseData['salaries'] as List).map((e) => accountant_model.Salary.fromJson(e)).toList();
-          }
-        });
-      }
-    } catch (e) {
-      if (mounted) {
-        final String errorMsg = e.toString().contains("Exception: ") ? e.toString().replaceAll("Exception: ", "") : "Unable to load salary records.";
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(errorMsg)));
-      }
-    } finally {
-      if (mounted) setState(() => _isLoading = false);
-    }
+    });
   }
 
   @override
   Widget build(BuildContext context) {
     final theme = context.theme;
-    
+
     return Scaffold(
       appBar: AppBar(
         title: Text(widget.employeeId != null ? "Employee Salary Slips" : "My Salary Slips"),
         centerTitle: true,
       ),
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : SingleChildScrollView(
-              padding: context.pagePadding,
-              child: Center(
-                child: ConstrainedBox(
-                  constraints: BoxConstraints(maxWidth: context.scale(800)),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      if (_employeeDetail != null && widget.employeeId != null) _buildEmployeeHeader(context),
-                      if (widget.employeeId == null && _employeeDetail != null) _buildBankDetailsCard(context),
-                      Padding(
-                        padding: EdgeInsets.only(top: context.spacing, bottom: context.spacing),
-                        child: Text(
-                          "Salary History",
-                          style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+      body: StreamBuilder<Map<String, dynamic>>(
+        stream: _salaryStream,
+        builder: (context, snapshot) {
+          return LoadingWrapper<Map<String, dynamic>>(
+            snapshot: snapshot,
+            onRetry: _fetchSalaries,
+            skeleton: _buildSkeleton(),
+            builder: (data) {
+              final employeeDetail = data['account'] != null ? accountant_model.UserDetail.fromJson(data['account']) : null;
+              final salaries = data['salaries'] != null ? (data['salaries'] as List).map((e) => accountant_model.Salary.fromJson(e)).toList() : <accountant_model.Salary>[];
+
+              return SingleChildScrollView(
+                padding: context.pagePadding,
+                child: Center(
+                  child: ConstrainedBox(
+                    constraints: BoxConstraints(maxWidth: context.scale(800)),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        if (employeeDetail != null && widget.employeeId != null) _buildEmployeeHeader(context, employeeDetail),
+                        if (widget.employeeId == null && employeeDetail != null) _buildBankDetailsCard(context, employeeDetail),
+                        Padding(
+                          padding: EdgeInsets.only(top: context.spacing, bottom: context.spacing),
+                          child: Text(
+                            "Salary History",
+                            style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+                          ),
                         ),
-                      ),
-                      if (_salaries.isEmpty)
-                        _buildEmptyState(context)
-                      else
-                        ListView.builder(
-                          shrinkWrap: true,
-                          physics: const NeverScrollableScrollPhysics(),
-                          itemCount: _salaries.length,
-                          itemBuilder: (context, index) => _buildSalaryCard(context, _salaries[index]),
-                        ),
-                    ],
+                        if (salaries.isEmpty)
+                          _buildEmptyState(context)
+                        else
+                          ListView.builder(
+                            shrinkWrap: true,
+                            physics: const NeverScrollableScrollPhysics(),
+                            itemCount: salaries.length,
+                            itemBuilder: (context, index) => _buildSalaryCard(context, salaries[index]),
+                          ),
+                      ],
+                    ),
                   ),
                 ),
-              ),
-            ),
+              );
+            },
+          );
+        },
+      ),
       floatingActionButton: widget.employeeId != null
           ? FloatingActionButton.extended(
               onPressed: () => _showGenerateSalaryDialog(),
@@ -108,7 +98,123 @@ class _SalarySlipsPageState extends State<SalarySlipsPage> {
     );
   }
 
-  Widget _buildEmployeeHeader(BuildContext context) {
+  Widget _buildSkeleton() {
+    return SingleChildScrollView(
+      padding: context.pagePadding,
+      physics: const NeverScrollableScrollPhysics(),
+      child: Center(
+        child: ConstrainedBox(
+          constraints: BoxConstraints(maxWidth: context.scale(800)),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              if (widget.employeeId != null)
+                Card(
+                  margin: EdgeInsets.only(bottom: context.spacing * 1.5),
+                  elevation: 0,
+                  color: context.theme.colorScheme.surfaceContainerLow,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(context.scale(16)),
+                    side: BorderSide(color: context.theme.colorScheme.outlineVariant, width: 0.5),
+                  ),
+                  child: Padding(
+                    padding: EdgeInsets.all(context.spacing),
+                    child: Row(
+                      children: [
+                        Skeleton(width: context.scale(56), height: context.scale(56), borderRadius: context.scale(28)),
+                        SizedBox(width: context.spacing),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Skeleton(height: context.font(18), width: context.scale(150)),
+                              SizedBox(height: context.scale(4)),
+                              Skeleton(height: context.font(14), width: context.scale(100)),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              if (widget.employeeId == null)
+                Card(
+                  margin: EdgeInsets.only(bottom: context.spacing),
+                  elevation: 0,
+                  color: context.theme.colorScheme.surfaceContainerLow,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(context.scale(16)),
+                    side: BorderSide(color: context.theme.colorScheme.outlineVariant, width: 0.5),
+                  ),
+                  child: Padding(
+                    padding: EdgeInsets.all(context.spacing),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Skeleton(height: context.scale(20), width: context.scale(120)),
+                        Divider(height: context.scale(24), color: context.theme.colorScheme.outlineVariant),
+                        ...List.generate(4, (index) => Padding(
+                          padding: EdgeInsets.symmetric(vertical: context.scale(4)),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Skeleton(height: context.font(12), width: context.scale(80)),
+                              Skeleton(height: context.font(12), width: context.scale(100)),
+                            ],
+                          ),
+                        )),
+                      ],
+                    ),
+                  ),
+                ),
+              Padding(
+                padding: EdgeInsets.only(top: context.spacing, bottom: context.spacing),
+                child: Skeleton(height: context.font(16), width: context.scale(120)),
+              ),
+              ...List.generate(5, (index) => Card(
+                margin: EdgeInsets.only(bottom: context.spacing),
+                elevation: 0,
+                color: context.theme.colorScheme.surfaceContainerLow,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(context.scale(16)),
+                  side: BorderSide(color: context.theme.colorScheme.outlineVariant, width: 0.5),
+                ),
+                child: Padding(
+                  padding: EdgeInsets.all(context.spacing),
+                  child: Row(
+                    children: [
+                      Skeleton(width: context.scale(48), height: context.scale(48), borderRadius: context.scale(24)),
+                      SizedBox(width: context.spacing),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Skeleton(height: context.font(16), width: context.scale(120)),
+                            SizedBox(height: context.scale(4)),
+                            Skeleton(height: context.font(12), width: context.scale(100)),
+                          ],
+                        ),
+                      ),
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.end,
+                        children: [
+                          Skeleton(height: context.font(16), width: context.scale(60)),
+                          SizedBox(height: context.scale(4)),
+                          Skeleton(height: context.scale(18), width: context.scale(50), borderRadius: context.scale(4)),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              )),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildEmployeeHeader(BuildContext context, accountant_model.UserDetail employeeDetail) {
     final theme = context.theme;
     return Card(
       margin: EdgeInsets.only(bottom: context.spacing * 1.5),
@@ -123,7 +229,7 @@ class _SalarySlipsPageState extends State<SalarySlipsPage> {
         child: Row(
           children: [
             ProfileAvatar(
-              imageUrl: _employeeDetail!.photo != null ? "${ApiService.baseUrl}/storage/${_employeeDetail!.photo}" : null,
+              imageUrl: employeeDetail.photo != null ? "${ApiService.baseUrl}/storage/${employeeDetail.photo}" : null,
               radius: context.scale(28),
             ),
             SizedBox(width: context.spacing),
@@ -132,7 +238,7 @@ class _SalarySlipsPageState extends State<SalarySlipsPage> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    _employeeDetail!.name,
+                    employeeDetail.name,
                     style: theme.textTheme.titleLarge?.copyWith(
                       fontWeight: FontWeight.bold,
                       color: theme.colorScheme.onSurface,
@@ -140,7 +246,7 @@ class _SalarySlipsPageState extends State<SalarySlipsPage> {
                     ),
                   ),
                   Text(
-                    "Employee ID: ${widget.employeeId ?? _employeeDetail!.encryptedId}",
+                    "Employee ID: ${widget.employeeId ?? employeeDetail.encryptedId}",
                     style: theme.textTheme.bodyMedium?.copyWith(
                       color: theme.hintColor,
                     ),
@@ -245,9 +351,8 @@ class _SalarySlipsPageState extends State<SalarySlipsPage> {
     );
   }
 
-  Widget _buildBankDetailsCard(BuildContext context) {
+  Widget _buildBankDetailsCard(BuildContext context, accountant_model.UserDetail employeeDetail) {
     final theme = context.theme;
-    if (_employeeDetail == null) return const SizedBox.shrink();
 
     return Card(
       margin: EdgeInsets.only(bottom: context.spacing),
@@ -273,10 +378,10 @@ class _SalarySlipsPageState extends State<SalarySlipsPage> {
               ],
             ),
             Divider(height: context.scale(24), color: theme.colorScheme.outlineVariant),
-            _bankDetailRow(context, "Bank Name", _employeeDetail!.bankName ?? "Not Set"),
-            _bankDetailRow(context, "Account No", _employeeDetail!.bankAccountNumber ?? "Not Set"),
-            _bankDetailRow(context, "IFSC Code", _employeeDetail!.ifscCode ?? "Not Set"),
-            _bankDetailRow(context, "Branch", _employeeDetail!.branchName ?? "Not Set"),
+            _bankDetailRow(context, "Bank Name", employeeDetail.bankName ?? "Not Set"),
+            _bankDetailRow(context, "Account No", employeeDetail.bankAccountNumber ?? "Not Set"),
+            _bankDetailRow(context, "IFSC Code", employeeDetail.ifscCode ?? "Not Set"),
+            _bankDetailRow(context, "Branch", employeeDetail.branchName ?? "Not Set"),
           ],
         ),
       ),
@@ -315,191 +420,154 @@ class _SalarySlipsPageState extends State<SalarySlipsPage> {
     );
   }
 
-  void _showSalaryDetail(accountant_model.Salary salary) async {
+  void _showSalaryDetail(accountant_model.Salary salary) {
     final theme = context.theme;
     final scaffoldMessenger = ScaffoldMessenger.of(context);
+    final id = salary.encryptedId ?? salary.id.toString();
 
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (context) {
-        return StatefulBuilder(
-          builder: (context, setModalState) {
-            return FutureBuilder<Map<String, dynamic>>(
-              future: ApiService.getAccountantSalaryDetail(
-                salary.encryptedId ?? salary.id.toString(),
-                employeeId: widget.employeeId,
-              ),
-              builder: (context, snapshot) {
-                final isLoading = snapshot.connectionState == ConnectionState.waiting;
-                final hasError = snapshot.hasError;
-                final dataMap = snapshot.data ?? {};
-                final data = dataMap['salary'] ?? (dataMap.containsKey('id') ? dataMap : {});
-                final amountInWords = dataMap['amount_in_words'] ?? '';
-
-                return Container(
+        return Container(
+          decoration: BoxDecoration(
+            color: theme.colorScheme.surface,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(context.scale(24))),
+          ),
+          padding: EdgeInsets.fromLTRB(context.scale(24), context.scale(12), context.scale(24), context.scale(24)),
+          child: ConstrainedBox(
+            constraints: BoxConstraints(maxWidth: context.scale(600)),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: context.scale(40),
+                  height: context.scale(4),
                   decoration: BoxDecoration(
-                    color: theme.colorScheme.surface,
-                    borderRadius: BorderRadius.vertical(top: Radius.circular(context.scale(24))),
+                    color: theme.colorScheme.outlineVariant,
+                    borderRadius: BorderRadius.circular(context.scale(2)),
                   ),
-                  padding: EdgeInsets.fromLTRB(context.scale(24), context.scale(12), context.scale(24), context.scale(24)),
-                  child: ConstrainedBox(
-                    constraints: BoxConstraints(maxWidth: context.scale(600)),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Container(
-                          width: context.scale(40),
-                          height: context.scale(4),
-                          decoration: BoxDecoration(
-                            color: theme.colorScheme.outlineVariant,
-                            borderRadius: BorderRadius.circular(context.scale(2)),
+                  margin: EdgeInsets.only(bottom: context.scale(24)),
+                ),
+                Text(
+                  "Salary Slip Detail",
+                  style: theme.textTheme.titleLarge?.copyWith(
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                SizedBox(height: context.scale(24)),
+                StreamBuilder<Map<String, dynamic>>(
+                  stream: ApiService.getAccountantSalaryDetailStream(id, employeeId: widget.employeeId),
+                  builder: (context, snapshot) {
+                    return LoadingWrapper<Map<String, dynamic>>(
+                      snapshot: snapshot,
+                      skeleton: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: List.generate(6, (index) => Padding(
+                          padding: EdgeInsets.symmetric(vertical: context.spacing / 1.5),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Skeleton(width: context.scale(80), height: context.scale(14)),
+                              Skeleton(width: context.scale(100), height: context.scale(14)),
+                            ],
                           ),
-                          margin: EdgeInsets.only(bottom: context.scale(24)),
-                        ),
-                        Text(
-                          "Salary Slip Detail",
-                          style: theme.textTheme.titleLarge?.copyWith(
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        SizedBox(height: context.scale(24)),
-                        if (isLoading)
-                          Center(
-                            child: Padding(
-                              padding: EdgeInsets.all(context.scale(40)),
-                              child: const CircularProgressIndicator(),
-                            ),
-                          )
-                        else if (hasError)
-                          Center(
-                            child: Padding(
-                              padding: EdgeInsets.all(context.scale(24)),
-                              child: Column(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Icon(Icons.error_outline, color: theme.colorScheme.error, size: context.scale(48)),
-                                  SizedBox(height: context.scale(16)),
-                                  Text(
-                                    "Failed to load salary detail",
-                                    textAlign: TextAlign.center,
-                                    style: TextStyle(color: theme.colorScheme.error, fontSize: context.font(16), fontWeight: FontWeight.bold),
+                        )),
+                      ),
+                      builder: (dataMap) {
+                        final data = dataMap['salary'] ?? (dataMap.containsKey('id') ? dataMap : {});
+                        final amountInWords = dataMap['amount_in_words'] ?? '';
+
+                        return Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            _detailRow(context, "Month/Year", "${data['month'] ?? salary.month ?? 'N/A'}/${data['year'] ?? salary.year ?? 'N/A'}"),
+                            _detailRow(context, "Basic Pay", "₹${data['basic_salary'] ?? data['amount'] ?? salary.amount ?? '0'}"),
+                            _detailRow(context, "Allowances", "₹${data['allowances'] ?? '0'}"),
+                            _detailRow(context, "Deductions", "₹${data['deductions'] ?? '0'}"),
+                            Divider(height: context.scale(24), color: theme.colorScheme.outlineVariant),
+                            _detailRow(context, "Net Salary", "₹${data['net_salary'] ?? data['amount'] ?? salary.amount ?? '0'}", isBold: true),
+                            if (amountInWords.isNotEmpty)
+                              Padding(
+                                padding: EdgeInsets.symmetric(vertical: context.scale(8.0)),
+                                child: Text(
+                                  amountInWords,
+                                  textAlign: TextAlign.center,
+                                  style: TextStyle(
+                                    color: theme.colorScheme.primary,
+                                    fontStyle: FontStyle.italic,
+                                    fontSize: context.font(13),
                                   ),
-                                  if (snapshot.error != null && 
-                                      !snapshot.error.toString().toLowerCase().contains("failed to load salary detail"))
-                                    Padding(
-                                      padding: EdgeInsets.only(top: context.scale(8)),
-                                      child: Text(
-                                        snapshot.error.toString().replaceAll("Exception: ", ""),
-                                        textAlign: TextAlign.center,
-                                        style: TextStyle(color: theme.hintColor, fontSize: context.font(13)),
-                                      ),
-                                    ),
-                                  SizedBox(height: context.scale(24)),
-                                  SizedBox(
-                                    width: double.infinity,
-                                    child: ElevatedButton(
-                                      onPressed: () => setModalState(() {}),
-                                      style: ElevatedButton.styleFrom(
-                                        backgroundColor: theme.colorScheme.primary,
-                                        foregroundColor: theme.colorScheme.onPrimary,
-                                        padding: EdgeInsets.symmetric(vertical: context.scale(12)),
-                                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(context.scale(12))),
-                                      ),
-                                      child: const Text("RETRY"),
-                                    ),
+                                ),
+                              ),
+                            _detailRow(context, "Payment Date", data['payment_date'] ?? salary.paymentDate ?? "N/A"),
+                            _detailRow(context, "Status", salary.status),
+                          ],
+                        );
+                      },
+                    );
+                  },
+                ),
+                SizedBox(height: context.scale(32)),
+                Row(
+                  children: [
+                    if (widget.employeeId != null)
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          onPressed: () async {
+                            final confirm = await showDialog<bool>(
+                              context: context,
+                              builder: (context) => AlertDialog(
+                                title: const Text("Delete Salary Slip"),
+                                content: const Text("Are you sure you want to delete this salary record?"),
+                                actions: [
+                                  TextButton(onPressed: () => Navigator.pop(context, false), child: const Text("CANCEL")),
+                                  TextButton(
+                                    onPressed: () => Navigator.pop(context, true),
+                                    child: const Text("DELETE", style: TextStyle(color: Colors.red)),
                                   ),
                                 ],
                               ),
-                            ),
-                          )
-                        else ...[
-                          _detailRow(context, "Month/Year", "${data['month'] ?? salary.month ?? 'N/A'}/${data['year'] ?? salary.year ?? 'N/A'}"),
-                          _detailRow(context, "Basic Pay", "₹${data['basic_salary'] ?? data['amount'] ?? salary.amount ?? '0'}"),
-                          _detailRow(context, "Allowances", "₹${data['allowances'] ?? '0'}"),
-                          _detailRow(context, "Deductions", "₹${data['deductions'] ?? '0'}"),
-                          Divider(height: context.scale(24), color: theme.colorScheme.outlineVariant),
-                          _detailRow(context, "Net Salary", "₹${data['net_salary'] ?? data['amount'] ?? salary.amount ?? '0'}", isBold: true),
-                          if (amountInWords.isNotEmpty)
-                            Padding(
-                              padding: EdgeInsets.symmetric(vertical: context.scale(8.0)),
-                              child: Text(
-                                amountInWords,
-                                textAlign: TextAlign.center,
-                                style: TextStyle(
-                                  color: theme.colorScheme.primary,
-                                  fontStyle: FontStyle.italic,
-                                  fontSize: context.font(13),
-                                ),
-                              ),
-                            ),
-                          _detailRow(context, "Payment Date", data['payment_date'] ?? salary.paymentDate ?? "N/A"),
-                          _detailRow(context, "Status", salary.status),
-                          SizedBox(height: context.scale(32)),
-                          Row(
-                            children: [
-                              if (widget.employeeId != null)
-                                Expanded(
-                                  child: OutlinedButton.icon(
-                                    onPressed: () async {
-                                      final confirm = await showDialog<bool>(
-                                        context: context,
-                                        builder: (context) => AlertDialog(
-                                          title: const Text("Delete Salary Slip"),
-                                          content: const Text("Are you sure you want to delete this salary record?"),
-                                          actions: [
-                                            TextButton(onPressed: () => Navigator.pop(context, false), child: const Text("CANCEL")),
-                                            TextButton(
-                                              onPressed: () => Navigator.pop(context, true),
-                                              child: const Text("DELETE", style: TextStyle(color: Colors.red)),
-                                            ),
-                                          ],
-                                        ),
-                                      );
-                                      if (confirm == true) {
-                                        try {
-                                          await ApiService.deleteAccountantSalary(salary.encryptedId ?? salary.id.toString());
-                                          if (mounted) {
-                                            Navigator.pop(context);
-                                            _fetchSalaries();
-                                          }
-                                        } catch (e) {
-                                          scaffoldMessenger.showSnackBar(SnackBar(content: Text("Error: $e")));
-                                        }
-                                      }
-                                    },
-                                    icon: const Icon(Icons.delete_outline, color: Colors.red),
-                                    label: const Text("DELETE", style: TextStyle(color: Colors.red)),
-                                    style: OutlinedButton.styleFrom(
-                                      side: const BorderSide(color: Colors.red),
-                                      padding: EdgeInsets.symmetric(vertical: context.scale(12)),
-                                    ),
-                                  ),
-                                ),
-                              if (widget.employeeId != null) SizedBox(width: context.scale(12)),
-                              Expanded(
-                                child: ElevatedButton(
-                                  onPressed: () => Navigator.pop(context),
-                                  style: ElevatedButton.styleFrom(
-                                    backgroundColor: theme.colorScheme.primary,
-                                    foregroundColor: theme.colorScheme.onPrimary,
-                                    padding: EdgeInsets.symmetric(vertical: context.scale(12)),
-                                  ),
-                                  child: const Text("CLOSE"),
-                                ),
-                              ),
-                            ],
+                            );
+                            if (confirm == true) {
+                              try {
+                                await ApiService.deleteAccountantSalary(id);
+                                if (context.mounted) {
+                                  Navigator.pop(context);
+                                  _fetchSalaries();
+                                }
+                              } catch (e) {
+                                scaffoldMessenger.showSnackBar(SnackBar(content: Text("Error: $e")));
+                              }
+                            }
+                          },
+                          icon: const Icon(Icons.delete_outline, color: Colors.red),
+                          label: const Text("DELETE", style: TextStyle(color: Colors.red)),
+                          style: OutlinedButton.styleFrom(
+                            side: const BorderSide(color: Colors.red),
+                            padding: EdgeInsets.symmetric(vertical: context.scale(12)),
                           ),
-                        ],
-                        SizedBox(height: context.scale(16)),
-                      ],
+                        ),
+                      ),
+                    if (widget.employeeId != null) SizedBox(width: context.scale(12)),
+                    Expanded(
+                      child: ElevatedButton(
+                        onPressed: () => Navigator.pop(context),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: theme.colorScheme.primary,
+                          foregroundColor: theme.colorScheme.onPrimary,
+                          padding: EdgeInsets.symmetric(vertical: context.scale(12)),
+                        ),
+                        child: const Text("CLOSE"),
+                      ),
                     ),
-                  ),
-                );
-              },
-            );
-          },
+                  ],
+                ),
+                SizedBox(height: context.scale(16)),
+              ],
+            ),
+          ),
         );
       },
     );
@@ -588,12 +656,12 @@ class _SalarySlipsPageState extends State<SalarySlipsPage> {
                   'basic_salary': double.parse(basicController.text),
                   'payment_date': paymentDate,
                 });
-                if (mounted) {
+                if (context.mounted) {
                    Navigator.pop(context);
                    _fetchSalaries();
                 }
               } catch (e) {
-                if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Error: $e")));
+                if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Error: $e")));
               }
             },
             child: const Text("GENERATE"),

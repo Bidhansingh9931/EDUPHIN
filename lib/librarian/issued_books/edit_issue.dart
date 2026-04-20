@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import '../../services/api_service.dart';
 import '../librarian_models.dart';
 import 'package:intl/intl.dart';
+import '../librarian_skeleton_widgets.dart';
+import '../../services/common_widgets.dart';
 
 class EditIssuePage extends StatefulWidget {
   final IssuedBook issuedBook;
@@ -18,7 +20,7 @@ class _EditIssuePageState extends State<EditIssuePage> {
   final TextEditingController _notesController = TextEditingController();
   
   bool _isLoading = false;
-  bool _isInitialLoading = true;
+  late Stream<Map<String, dynamic>> _editDataStream;
   
   List<dynamic> _books = [];
   List<dynamic> _users = [];
@@ -32,23 +34,13 @@ class _EditIssuePageState extends State<EditIssuePage> {
     _dueDateController = TextEditingController(text: widget.issuedBook.dueDate ?? "");
     selectedBookId = widget.issuedBook.bookId.toString();
     selectedUserId = widget.issuedBook.issuedToId?.toString();
-    _fetchEditData();
+    _refreshStream();
   }
 
-  Future<void> _fetchEditData() async {
-    try {
-      final data = await ApiService.getEditIssueData(widget.issuedBook.id.toString());
-      setState(() {
-        _books = data['books'] ?? [];
-        _users = data['users'] ?? [];
-        _isInitialLoading = false;
-      });
-    } catch (e) {
-      setState(() => _isInitialLoading = false);
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Error loading data: $e")));
-      }
-    }
+  void _refreshStream() {
+    setState(() {
+      _editDataStream = ApiService.getEditIssueDataStream(widget.issuedBook.id.toString()).asBroadcastStream();
+    });
   }
 
   @override
@@ -109,115 +101,128 @@ class _EditIssuePageState extends State<EditIssuePage> {
       appBar: AppBar(
         title: Text("Edit Issue #${widget.issuedBook.id}"),
       ),
-      body: _isInitialLoading 
-        ? const Center(child: CircularProgressIndicator())
-        : SingleChildScrollView(
-            padding: context.pagePadding,
-            child: Center(
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 800),
-                child: Column(
-                  children: [
-                    Card(
-                      elevation: 0,
-                      color: theme.colorScheme.surfaceContainerLow,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(context.md),
-                        side: BorderSide(color: theme.colorScheme.outlineVariant, width: 0.5),
-                      ),
-                      child: Padding(
-                        padding: EdgeInsets.all(context.lg),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.stretch,
-                          children: [
-                            Center(
-                              child: Column(
-                                children: [
-                                  Container(
-                                    padding: EdgeInsets.all(context.md),
-                                    decoration: BoxDecoration(
-                                      color: theme.colorScheme.primaryContainer,
-                                      shape: BoxShape.circle,
-                                    ),
-                                    child: Icon(Icons.edit_calendar_rounded, size: context.scale(40), color: theme.colorScheme.onPrimaryContainer),
-                                  ),
-                                  SizedBox(height: context.md),
-                                  Text(
-                                    "Update Issue Details",
-                                    style: theme.textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold, fontSize: context.font(24)),
-                                  ),
-                                  SizedBox(height: context.sm),
-                                  Text(
-                                    "Modify dates or reassignment notes below.",
-                                    textAlign: TextAlign.center,
-                                    style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.outline, fontSize: context.font(14)),
-                                  ),
-                                ],
-                              ),
-                            ),
-                            SizedBox(height: context.xl),
-                            
-                            _buildResponsiveRow(context, [
-                              _buildDropdownField(
-                                context,
-                                "Select Book",
-                                selectedBookId, 
-                                _books.map((b) => DropdownMenuItem<String>(
-                                  value: b['id'].toString(),
-                                  child: Text(b['title'] ?? "N/A"),
-                                )).toList(), 
-                                (val) => setState(() => selectedBookId = val)
-                              ),
-                              _buildDropdownField(
-                                context,
-                                "Issue To (User)",
-                                selectedUserId, 
-                                _users.map((u) => DropdownMenuItem<String>(
-                                  value: u['id'].toString(),
-                                  child: Text(u['name'] ?? "N/A"),
-                                )).toList(), 
-                                (val) => setState(() => selectedUserId = val)
-                              ),
-                            ]),
+      body: StreamBuilder<Map<String, dynamic>>(
+        stream: _editDataStream,
+        builder: (context, snapshot) {
+          return LoadingWrapper<Map<String, dynamic>>(
+            snapshot: snapshot,
+            skeleton: const EditIssueSkeleton(),
+            onRetry: _refreshStream,
+            builder: (data) {
+              _books = data['books'] ?? [];
+              _users = data['users'] ?? [];
 
-                            _buildResponsiveRow(context, [
-                              _buildDateField(context, "Issued Date", _issuedDateController),
-                              _buildDateField(context, "Due Date", _dueDateController),
-                            ]),
-                            
-                            _buildInputField(context, "Notes / Remarks", "e.g. extension requested", _notesController, maxLines: 3),
-                            
-                            SizedBox(height: context.md),
-                            FilledButton.icon(
-                              onPressed: _isLoading ? null : _updateIssue,
-                              icon: _isLoading 
-                                ? SizedBox(width: context.md, height: context.md, child: CircularProgressIndicator(color: theme.colorScheme.onPrimary, strokeWidth: 2))
-                                : const Icon(Icons.update_rounded),
-                              label: const Text("UPDATE CHANGES"),
-                              style: FilledButton.styleFrom(
-                                minimumSize: Size(double.infinity, context.scale(56)),
-                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(context.sm)),
-                              ),
+              return SingleChildScrollView(
+                padding: context.pagePadding,
+                child: Center(
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 800),
+                    child: Column(
+                      children: [
+                        Card(
+                          elevation: 0,
+                          color: theme.colorScheme.surfaceContainerLow,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(context.md),
+                            side: BorderSide(color: theme.colorScheme.outlineVariant, width: 0.5),
+                          ),
+                          child: Padding(
+                            padding: EdgeInsets.all(context.lg),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.stretch,
+                              children: [
+                                Center(
+                                  child: Column(
+                                    children: [
+                                      Container(
+                                        padding: EdgeInsets.all(context.md),
+                                        decoration: BoxDecoration(
+                                          color: theme.colorScheme.primaryContainer,
+                                          shape: BoxShape.circle,
+                                        ),
+                                        child: Icon(Icons.edit_calendar_rounded, size: context.scale(40), color: theme.colorScheme.onPrimaryContainer),
+                                      ),
+                                      SizedBox(height: context.md),
+                                      Text(
+                                        "Update Issue Details",
+                                        style: theme.textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold, fontSize: context.font(24)),
+                                      ),
+                                      SizedBox(height: context.sm),
+                                      Text(
+                                        "Modify dates or reassignment notes below.",
+                                        textAlign: TextAlign.center,
+                                        style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.outline, fontSize: context.font(14)),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                SizedBox(height: context.xl),
+                                
+                                _buildResponsiveRow(context, [
+                                  _buildDropdownField(
+                                    context,
+                                    "Select Book",
+                                    selectedBookId, 
+                                    _books.map((b) => DropdownMenuItem<String>(
+                                      value: b['id'].toString(),
+                                      child: Text(b['title'] ?? "N/A"),
+                                    )).toList(), 
+                                    (val) => setState(() => selectedBookId = val)
+                                  ),
+                                  _buildDropdownField(
+                                    context,
+                                    "Issue To (User)",
+                                    selectedUserId, 
+                                    _users.map((u) => DropdownMenuItem<String>(
+                                      value: u['id'].toString(),
+                                      child: Text(u['name'] ?? "N/A"),
+                                    )).toList(), 
+                                    (val) => setState(() => selectedUserId = val)
+                                  ),
+                                ]),
+
+                                _buildResponsiveRow(context, [
+                                  _buildDateField(context, "Issued Date", _issuedDateController),
+                                  _buildDateField(context, "Due Date", _dueDateController),
+                                ]),
+                                
+                                _buildInputField(context, "Notes / Remarks", "e.g. extension requested", _notesController, maxLines: 3),
+                                
+                                SizedBox(height: context.md),
+                                FilledButton.icon(
+                                  onPressed: _isLoading ? null : _updateIssue,
+                                  icon: _isLoading 
+                                    ? SizedBox(width: context.md, height: context.md, child: CircularProgressIndicator(color: theme.colorScheme.onPrimary, strokeWidth: 2))
+                                    : const Icon(Icons.update_rounded),
+                                  label: const Text("UPDATE CHANGES"),
+                                  style: FilledButton.styleFrom(
+                                    minimumSize: Size(double.infinity, context.scale(56)),
+                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(context.sm)),
+                                  ),
+                                ),
+                                SizedBox(height: context.md),
+                                FilledButton.tonal(
+                                  onPressed: () => Navigator.pop(context),
+                                  style: FilledButton.styleFrom(
+                                    minimumSize: Size(double.infinity, context.scale(56)),
+                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(context.sm)),
+                                  ),
+                                  child: const Text("CANCEL"),
+                                ),
+                              ],
                             ),
-                            SizedBox(height: context.md),
-                            FilledButton.tonal(
-                              onPressed: () => Navigator.pop(context),
-                              style: FilledButton.styleFrom(
-                                minimumSize: Size(double.infinity, context.scale(56)),
-                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(context.sm)),
-                              ),
-                              child: const Text("CANCEL"),
-                            ),
-                          ],
+                          ),
                         ),
-                      ),
+                        SizedBox(height: context.xl),
+                      ],
                     ),
-                    SizedBox(height: context.xl),
-                  ],
+                  ),
                 ),
-              ),
-            ),
-          ),
+              );
+            },
+          );
+        },
+      ),
     );
   }
 
@@ -260,7 +265,7 @@ class _EditIssuePageState extends State<EditIssuePage> {
           ),
           SizedBox(height: context.xs),
           DropdownButtonFormField<String>(
-            initialValue: value,
+            value: value,
             isExpanded: true,
             hint: const Text("Select option"),
             style: theme.textTheme.bodyMedium?.copyWith(fontSize: context.font(14)),

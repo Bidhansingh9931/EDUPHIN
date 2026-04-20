@@ -1,5 +1,7 @@
 import 'dart:convert';
 import 'package:eduphin/services/api_service.dart';
+import 'package:eduphin/services/caching_service.dart';
+import 'package:eduphin/services/common_widgets.dart';
 import 'package:eduphin/services/responsive_helper.dart';
 import 'package:flutter/material.dart';
 
@@ -12,29 +14,39 @@ class BookRequestsScreen extends StatefulWidget {
 
 class _BookRequestsScreenState extends State<BookRequestsScreen> {
   bool _isLoading = true;
-  String _error = '';
+  Object? _error;
   List<BookRequest> _requests = [];
 
   @override
   void initState() {
     super.initState();
-    _fetchRequests();
+    _loadCachedData().then((_) => _fetchRequests());
+  }
+
+  Future<void> _loadCachedData() async {
+    final cache = await CacheService.getCache('book_requests');
+    if (cache != null && mounted) {
+      final List<dynamic> data = cache;
+      setState(() {
+        _requests = data.map((json) => BookRequest.fromJson(json)).toList();
+        _isLoading = false;
+      });
+    }
   }
 
   Future<void> _fetchRequests() async {
     setState(() {
-      _isLoading = true;
-      _error = '';
+      _isLoading = _requests.isEmpty;
+      _error = null;
     });
     try {
-      // Note: Assuming endpoint manager/books/requests based on common patterns. 
-      // If this fails in real testing, it might be manager/reservations or similar.
       final response = await ApiService.get('manager/books/requests');
 
       if (response.statusCode == 200) {
         final body = json.decode(response.body);
         if (body['status'] == true) {
           final List<dynamic> data = body['data'] is List ? body['data'] : (body['data']['data'] ?? []);
+          await CacheService.setCache('book_requests', data);
           if (mounted) {
             setState(() {
               _requests = data.map((json) => BookRequest.fromJson(json)).toList();
@@ -42,21 +54,15 @@ class _BookRequestsScreenState extends State<BookRequestsScreen> {
             });
           }
         } else {
-          setState(() {
-            _error = body['message'] ?? 'Failed to load requests';
-            _isLoading = false;
-          });
+          throw Exception(body['message'] ?? 'Failed to load requests');
         }
       } else {
-        setState(() {
-          _error = 'Failed to load requests. Status: ${response.statusCode}';
-          _isLoading = false;
-        });
+        throw Exception('Failed to load requests. Status: ${response.statusCode}');
       }
     } catch (e) {
       if (mounted) {
         setState(() {
-          _error = 'An error occurred: $e';
+          _error = e;
           _isLoading = false;
         });
       }
@@ -104,40 +110,75 @@ class _BookRequestsScreenState extends State<BookRequestsScreen> {
           SizedBox(width: context.xs),
         ],
       ),
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : _error.isNotEmpty
-              ? Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Text(_error, style: TextStyle(color: theme.colorScheme.error)),
-                      SizedBox(height: context.md),
-                      ElevatedButton(onPressed: _fetchRequests, child: const Text("Retry")),
-                    ],
-                  ),
-                )
-              : _requests.isEmpty
-                  ? Center(
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(Icons.bookmark_added_outlined, size: context.scale(64), color: theme.colorScheme.outlineVariant.withValues(alpha: 0.5)),
-                          SizedBox(height: context.scale(16)),
-                          Text("No pending book requests.", style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: context.font(16))),
-                        ],
-                      ),
-                    )
-                  : Center(
-                      child: ConstrainedBox(
-                        constraints: const BoxConstraints(maxWidth: 1200),
-                        child: context.responsive(
-                          _buildListView(),
-                          tablet: _buildGridView(2),
-                          desktop: _buildGridView(3),
-                        ),
-                      ),
+      body: LoadingWrapper(
+        isLoading: _isLoading,
+        hasData: _requests.isNotEmpty,
+        error: _error,
+        onRetry: _fetchRequests,
+        skeleton: _buildSkeleton(context),
+        child: _requests.isEmpty
+            ? Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(Icons.bookmark_added_outlined, size: context.scale(64), color: theme.colorScheme.outlineVariant.withValues(alpha: 0.5)),
+                    SizedBox(height: context.scale(16)),
+                    Text("No pending book requests.", style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: context.font(16))),
+                  ],
+                ),
+              )
+            : RefreshIndicator(
+                onRefresh: _fetchRequests,
+                child: Center(
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 1200),
+                    child: context.responsive(
+                      _buildListView(),
+                      tablet: _buildGridView(2),
+                      desktop: _buildGridView(3),
                     ),
+                  ),
+                ),
+              ),
+      ),
+    );
+  }
+
+  Widget _buildSkeleton(BuildContext context) {
+    return ListView.builder(
+      padding: context.pagePadding,
+      itemCount: 5,
+      itemBuilder: (context, index) => Card(
+        elevation: 0,
+        margin: EdgeInsets.only(bottom: context.md),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(context.scale(16))),
+        color: Colors.white,
+        child: Padding(
+          padding: EdgeInsets.all(context.spacing),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  SkeletonBox(width: 150, height: 20),
+                  SkeletonBox(width: 60, height: 20),
+                ],
+              ),
+              const SizedBox(height: 8),
+              const SkeletonBox(width: 100, height: 14),
+              const SizedBox(height: 16),
+              const Row(
+                children: [
+                  SkeletonBox(width: 100, height: 30),
+                  SizedBox(width: 16),
+                  SkeletonBox(width: 100, height: 30),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 
@@ -340,3 +381,4 @@ class BookRequest {
     );
   }
 }
+

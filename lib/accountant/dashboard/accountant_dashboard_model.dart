@@ -27,6 +27,23 @@ class AccountantDashboardData {
     required this.roles,
   });
 
+  Map<String, dynamic> toJson() {
+    return {
+      'user_detail': userDetail.toJson(),
+      'last_salary': lastSalary?.toJson(),
+      'salary_list': salaryList.map((e) => e.toJson()).toList(),
+      'fines': fines.map((e) => e.toJson()).toList(),
+      'payments': payments.map((e) => e.toJson()).toList(),
+      'events': events.map((e) => e.toJson()).toList(),
+      'exams': exams.map((e) => e.toJson()).toList(),
+      'created_tickets': createdTickets.map((e) => e.toJson()).toList(),
+      'assigned_tickets': assignedTickets.map((e) => e.toJson()).toList(),
+      'institute_fees': instituteFees.map((e) => e.toJson()).toList(),
+      'class_fees': classFees.map((e) => e.toJson()).toList(),
+      'roles': roles,
+    };
+  }
+
   factory AccountantDashboardData.fromJson(Map<String, dynamic> json) {
     return AccountantDashboardData(
       userDetail: UserDetail.fromJson(json['user_detail'] ?? {}),
@@ -119,6 +136,42 @@ class UserDetail {
     this.encryptedId,
   });
 
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'user_id': userId,
+      'name': name,
+      'photo': photo,
+      'gender': gender,
+      'date_of_birth': dateOfBirth,
+      'phone': phone,
+      'alternate_phone': alternatePhone,
+      'relationship_status': relationshipStatus,
+      'address': address,
+      'city': city,
+      'state': state,
+      'pincode': pincode,
+      'bank_account_number': bankAccountNumber,
+      'ifsc_code': ifscCode,
+      'bank_name': bankName,
+      'branch_name': branchName,
+      'emergency_contact_name': emergencyContactName,
+      'emergency_contact_number': emergencyContactNumber,
+      'email': email,
+      'position': position,
+      'employment_type': employmentType,
+      'joining_date': joiningDate,
+      'experience': experience,
+      'status': status,
+      'qualification': qualification,
+      'x_marks': xMarks,
+      'xii_marks': xiiMarks,
+      'aadhaar_number': aadhaarNumber,
+      'encrypted_id': encryptedId,
+    };
+  }
+
+
   factory UserDetail.fromJson(Map<String, dynamic> json) {
     // If the record is nested inside 'user_detail' or 'user'
     final Map<String, dynamic> data = json.containsKey('user_detail') ? json['user_detail'] : json;
@@ -198,6 +251,18 @@ class Salary {
     this.encryptedId,
   });
 
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'amount': amount,
+      'month': month,
+      'year': year,
+      'payment_date': paymentDate,
+      'status': status,
+      'encrypted_id': encryptedId,
+    };
+  }
+
   factory Salary.fromJson(Map<String, dynamic> json) {
     return Salary(
       id: json['id'] ?? 0,
@@ -226,6 +291,16 @@ class Fine {
     this.encryptedId,
   });
 
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'amount': amount,
+      'reason': reason,
+      'created_at': date,
+      'encrypted_id': encryptedId,
+    };
+  }
+
   factory Fine.fromJson(Map<String, dynamic> json) {
     return Fine(
       id: json['id'] ?? 0,
@@ -249,6 +324,15 @@ class Payment {
     required this.date,
     this.encryptedId,
   });
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'amount': amount,
+      'created_at': date,
+      'encrypted_id': encryptedId,
+    };
+  }
 
   factory Payment.fromJson(Map<String, dynamic> json) {
     return Payment(
@@ -286,6 +370,22 @@ class Event {
     this.image,
     this.encryptedId,
   });
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'title': title,
+      'event_date': date,
+      'start_time': startTime,
+      'end_time': endTime,
+      'venue': venue,
+      'description': description,
+      'is_ticketed': isTicketed ? 1 : 0,
+      'ticket_price': ticketPrice,
+      'image': image,
+      'encrypted_id': encryptedId,
+    };
+  }
 
   factory Event.fromJson(Map<String, dynamic> json) {
     return Event(
@@ -347,6 +447,17 @@ class Exam {
     this.encryptedId,
   });
 
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'name': name,
+      'start_date': startDate,
+      'end_date': endDate,
+      'status': status,
+      'encrypted_id': encryptedId,
+    };
+  }
+
   factory Exam.fromJson(Map<String, dynamic> json) {
     return Exam(
       id: json['id'] ?? 0,
@@ -407,6 +518,15 @@ class Ticket {
     this.encryptedId,
   });
 
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'title': title,
+      'status': status,
+      'encrypted_id': encryptedId,
+    };
+  }
+
   factory Ticket.fromJson(Map<String, dynamic> json) {
     return Ticket(
       id: json['id'] ?? 0,
@@ -437,6 +557,19 @@ class Fee {
     this.className,
     this.encryptedId,
   });
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'fee_name': feeName,
+      'amount': amount,
+      'description': description,
+      'is_optional': isOptional ? 1 : 0,
+      'class_id': classId,
+      'class': className != null ? {'name': className} : null,
+      'encrypted_id': encryptedId,
+    };
+  }
 
   factory Fee.fromJson(Map<String, dynamic> json) {
     return Fee(

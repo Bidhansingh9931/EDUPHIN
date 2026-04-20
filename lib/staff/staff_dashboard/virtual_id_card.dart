@@ -14,14 +14,18 @@ class StaffVirtualIdCard extends StatefulWidget {
 }
 
 class _StaffVirtualIdCardState extends State<StaffVirtualIdCard> {
-  late Future<StaffVirtualIdCardData> _idCardFuture;
+  late Stream<StaffVirtualIdCardData> _idCardStream;
   bool _isFront = true;
   double _rotation = 0;
 
   @override
   void initState() {
     super.initState();
-    _idCardFuture = ApiService.getStaffVirtualIdCard();
+    _loadData();
+  }
+
+  void _loadData() {
+    _idCardStream = ApiService.getStaffVirtualIdCardStream();
   }
 
   void _toggleFlip() {
@@ -34,78 +38,89 @@ class _StaffVirtualIdCardState extends State<StaffVirtualIdCard> {
   @override
   Widget build(BuildContext context) {
     final theme = context.theme;
-    final colorScheme = theme.colorScheme;
 
     return Scaffold(
       backgroundColor: theme.colorScheme.surface,
       appBar: AppBar(
         title: const Text("Staff ID Card"),
       ),
-      body: FutureBuilder<StaffVirtualIdCardData>(
-        future: _idCardFuture,
+      body: StreamBuilder<StaffVirtualIdCardData>(
+        stream: _idCardStream,
         builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return Center(child: CircularProgressIndicator(color: colorScheme.primary));
-          } else if (snapshot.hasError) {
-            return Center(
-              child: Padding(
-                padding: context.pagePadding,
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(Icons.error_outline, color: colorScheme.error, size: context.scale(48)),
-                    SizedBox(height: context.scale(16)),
-                    Text('Failed to load ID card details', style: TextStyle(color: colorScheme.onSurfaceVariant, fontSize: context.font(14))),
-                  ],
-                ),
-              ),
-            );
-          } else if (!snapshot.hasData) {
-            return Center(child: Text('No data found', style: TextStyle(color: colorScheme.onSurfaceVariant)));
-          }
-
-          final data = snapshot.data!;
-          return SingleChildScrollView(
-            padding: context.pagePadding,
-            child: Center(
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 800),
-                child: Column(
-                  children: [
-                    SizedBox(height: context.scale(20)),
-                    
-                    // 3D Flip Animation
-                    TweenAnimationBuilder<double>(
-                      tween: Tween<double>(begin: 0, end: _rotation),
-                      duration: const Duration(milliseconds: 600),
-                      curve: Curves.easeInOutBack,
-                      builder: (context, value, child) {
-                        final isBack = value > (pi / 2);
-                        return Transform(
-                          transform: Matrix4.identity()
-                            ..setEntry(3, 2, 0.001) // Perspective
-                            ..rotateY(value),
-                          alignment: Alignment.center,
-                          child: isBack
-                              ? Transform(
-                                  alignment: Alignment.center,
-                                  transform: Matrix4.identity()..rotateY(pi),
-                                  child: _buildBackSide(context, data),
-                                )
-                              : _buildFrontSide(context, data),
-                        );
-                      },
-                    ),
-
-                    SizedBox(height: context.scale(40)),
-                    _buildActionButtons(context, data),
-                    SizedBox(height: context.scale(40)),
-                  ],
-                ),
-              ),
-            ),
+          return LoadingWrapper<StaffVirtualIdCardData>(
+            snapshot: snapshot,
+            onRetry: () => setState(() => _loadData()),
+            skeleton: _buildSkeleton(context),
+            builder: (data) => _buildContent(context, data),
           );
         },
+      ),
+    );
+  }
+
+  Widget _buildSkeleton(BuildContext context) {
+    return SingleChildScrollView(
+      padding: context.pagePadding,
+      child: const Center(
+        child: Column(
+          children: [
+            SizedBox(height: 20),
+            Skeleton(height: 550, width: 320, borderRadius: 24),
+            SizedBox(height: 40),
+            Skeleton(height: 50, width: double.infinity, borderRadius: 12),
+            SizedBox(height: 16),
+            Row(
+              children: [
+                Expanded(child: Skeleton(height: 50, borderRadius: 12)),
+                SizedBox(width: 12),
+                Expanded(child: Skeleton(height: 50, borderRadius: 12)),
+              ],
+            )
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildContent(BuildContext context, StaffVirtualIdCardData data) {
+    return SingleChildScrollView(
+      padding: context.pagePadding,
+      child: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 800),
+          child: Column(
+            children: [
+              SizedBox(height: context.scale(20)),
+              
+              // 3D Flip Animation
+              TweenAnimationBuilder<double>(
+                tween: Tween<double>(begin: 0, end: _rotation),
+                duration: const Duration(milliseconds: 600),
+                curve: Curves.easeInOutBack,
+                builder: (context, value, child) {
+                  final isBack = value > (pi / 2);
+                  return Transform(
+                    transform: Matrix4.identity()
+                      ..setEntry(3, 2, 0.001) // Perspective
+                      ..rotateY(value),
+                    alignment: Alignment.center,
+                    child: isBack
+                        ? Transform(
+                            alignment: Alignment.center,
+                            transform: Matrix4.identity()..rotateY(pi),
+                            child: _buildBackSide(context, data),
+                          )
+                        : _buildFrontSide(context, data),
+                  );
+                },
+              ),
+
+              SizedBox(height: context.scale(40)),
+              _buildActionButtons(context, data),
+              SizedBox(height: context.scale(40)),
+            ],
+          ),
+        ),
       ),
     );
   }

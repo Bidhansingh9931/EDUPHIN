@@ -321,20 +321,23 @@ class _StudentLeaveScreenState extends State<StudentLeaveScreen> {
                     if (!mounted) return;
                     _fetchLeaves();
                     Navigator.pop(context);
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text('Status updated successfully'),
-                        backgroundColor: Color(0xFF10B981), // Emerald
-                      ),
-                    );
+                    if (context.mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('Status updated successfully'),
+                          backgroundColor: Color(0xFF10B981), // Emerald
+                        ),
+                      );
+                    }
                   } catch (e) {
-                    if (mounted)
+                    if (mounted) {
                       ScaffoldMessenger.of(context).showSnackBar(
                         SnackBar(
                           content: Text('Error: $e'),
                           backgroundColor: const Color(0xFFEF4444), // Red
                         ),
                       );
+                    }
                   }
                 },
                 style: ElevatedButton.styleFrom(

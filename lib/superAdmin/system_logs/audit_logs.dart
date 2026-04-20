@@ -149,7 +149,7 @@ class _AuditLogsScreenState extends State<AuditLogsScreen> {
           DropdownButtonFormField<dynamic>(
             isExpanded: true,
             hint: const Text("All Options"),
-            value: label == "Institute" ? _selectedInstituteId : _selectedRoleId,
+            initialValue: label == "Institute" ? _selectedInstituteId : _selectedRoleId,
             items: items.map((item) {
               return DropdownMenuItem<dynamic>(
                 value: item[valueKey].toString(),

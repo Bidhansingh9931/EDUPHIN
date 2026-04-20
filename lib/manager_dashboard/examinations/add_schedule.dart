@@ -34,6 +34,8 @@ class _AddScheduleScreenState extends State<AddScheduleScreen> {
   List<dynamic> _subjects = [];
 
   bool _isLoading = false;
+  bool _isSectionsLoading = false;
+  bool _isSubjectsLoading = false;
 
   @override
   void initState() {
@@ -59,6 +61,7 @@ class _AddScheduleScreenState extends State<AddScheduleScreen> {
   }
 
   Future<void> _fetchSections(int classId) async {
+    setState(() => _isSectionsLoading = true);
     try {
       final response = await ApiService.get('manager/classes/$classId/sections');
       if (response.statusCode == 200) {
@@ -72,10 +75,13 @@ class _AddScheduleScreenState extends State<AddScheduleScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Failed to load sections: $e')),
       );
+    } finally {
+      if (mounted) setState(() => _isSectionsLoading = false);
     }
   }
 
   Future<void> _fetchSubjects(int classId) async {
+    setState(() => _isSubjectsLoading = true);
     try {
       final response = await ApiService.get('manager/classes/$classId/subjects');
       if (response.statusCode == 200) {
@@ -89,6 +95,8 @@ class _AddScheduleScreenState extends State<AddScheduleScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Failed to load subjects: $e')),
       );
+    } finally {
+      if (mounted) setState(() => _isSubjectsLoading = false);
     }
   }
 
@@ -191,14 +199,11 @@ class _AddScheduleScreenState extends State<AddScheduleScreen> {
                     context,
                     children: [
                       buildLabel(context, "Select Class"),
-                      DropdownButtonFormField<int>(
-                        value: _selectedClassId,
-                        decoration: _dropdownDecoration(theme, context),
-                        items: _classes.map((c) => DropdownMenuItem<int>(
-                          value: c['id'],
-                          child: Text(c['name'] ?? 'N/A', style: theme.textTheme.bodyMedium?.copyWith(fontSize: context.font(14))),
-                        )).toList(),
-                        onChanged: (value) {
+                      buildDropdown<int>(
+                        context,
+                        _classes.map((c) => c['id'] as int).toList(),
+                        _selectedClassId,
+                        (value) {
                           setState(() {
                             _selectedClassId = value;
                             _selectedSectionId = null;
@@ -211,30 +216,31 @@ class _AddScheduleScreenState extends State<AddScheduleScreen> {
                             }
                           });
                         },
-                        validator: (value) => value == null ? 'Please select a class' : null,
+                        hint: "Select Class",
+                        itemBuilder: (id) => _classes.firstWhere((c) => c['id'] == id)['name'] ?? 'N/A',
                       ),
 
                       buildLabel(context, "Select Section"),
-                      DropdownButtonFormField<int>(
-                        value: _selectedSectionId,
-                        decoration: _dropdownDecoration(theme, context),
-                        items: _sections.map((s) => DropdownMenuItem<int>(
-                          value: s['id'],
-                          child: Text(s['name'] ?? 'N/A', style: theme.textTheme.bodyMedium?.copyWith(fontSize: context.font(14))),
-                        )).toList(),
-                        onChanged: (value) => setState(() => _selectedSectionId = value),
+                      buildDropdown<int>(
+                        context,
+                        _sections.map((s) => s['id'] as int).toList(),
+                        _selectedSectionId,
+                        (value) => setState(() => _selectedSectionId = value),
+                        hint: "Select Section",
+                        itemBuilder: (id) => _sections.firstWhere((s) => s['id'] == id)['name'] ?? 'N/A',
+                        isLoading: _isSectionsLoading,
                         validator: (value) => value == null ? 'Please select a section' : null,
                       ),
 
                       buildLabel(context, "Select Subject"),
-                      DropdownButtonFormField<int>(
-                        value: _selectedSubjectId,
-                        decoration: _dropdownDecoration(theme, context),
-                        items: _subjects.map((s) => DropdownMenuItem<int>(
-                          value: s['id'],
-                          child: Text(s['name'] ?? 'N/A', style: theme.textTheme.bodyMedium?.copyWith(fontSize: context.font(14))),
-                        )).toList(),
-                        onChanged: (value) => setState(() => _selectedSubjectId = value),
+                      buildDropdown<int>(
+                        context,
+                        _subjects.map((s) => s['id'] as int).toList(),
+                        _selectedSubjectId,
+                        (value) => setState(() => _selectedSubjectId = value),
+                        hint: "Select Subject",
+                        itemBuilder: (id) => _subjects.firstWhere((s) => s['id'] == id)['name'] ?? 'N/A',
+                        isLoading: _isSubjectsLoading,
                         validator: (value) => value == null ? 'Please select a subject' : null,
                       ),
 
@@ -310,21 +316,6 @@ class _AddScheduleScreenState extends State<AddScheduleScreen> {
     );
   }
 
-  InputDecoration _dropdownDecoration(ThemeData theme, BuildContext context) {
-    return InputDecoration(
-      fillColor: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
-      filled: true,
-      contentPadding: EdgeInsets.symmetric(horizontal: context.spacing, vertical: context.spacing / 1.5),
-      border: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(context.scale(12)),
-        borderSide: BorderSide(color: theme.colorScheme.outlineVariant.withValues(alpha: 0.5), width: 0.5),
-      ),
-      enabledBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(context.scale(12)),
-        borderSide: BorderSide(color: theme.colorScheme.outlineVariant.withValues(alpha: 0.5), width: 0.5),
-      ),
-    );
-  }
 
   InputDecoration _inputDecoration(ThemeData theme, BuildContext context, IconData icon) {
     return InputDecoration(

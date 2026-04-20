@@ -1,4 +1,5 @@
 import 'package:eduphin/services/responsive_helper.dart';
+import 'package:eduphin/services/common_widgets.dart';
 import 'package:flutter/material.dart';
 import 'package:eduphin/services/api_service.dart';
 import 'package:eduphin/teacher/dashboard/ticket_models.dart';
@@ -15,50 +16,32 @@ class SupportTicketsPage extends StatefulWidget {
 }
 
 class _SupportTicketsPageState extends State<SupportTicketsPage> {
-  bool _isLoading = true;
-  List<SupportTicket> _tickets = [];
   final TextEditingController _searchController = TextEditingController();
   String _selectedPriority = 'all';
   String _selectedStatus = 'all';
+  late Stream<List<SupportTicket>> _ticketsStream;
 
   @override
   void initState() {
     super.initState();
-    _fetchTickets();
+    _updateStream();
+  }
+
+  void _updateStream() {
+    final filters = {
+      'search': _searchController.text,
+      'priority': _selectedPriority,
+      'status': _selectedStatus,
+    };
+    _ticketsStream = widget.isAssigned 
+        ? ApiService.getAccountantAssignedTicketsStream(filters)
+        : ApiService.getAccountantTicketsStream(filters);
   }
 
   @override
   void dispose() {
     _searchController.dispose();
     super.dispose();
-  }
-
-  Future<void> _fetchTickets() async {
-    if (!mounted) return;
-    setState(() => _isLoading = true);
-    try {
-      final filters = {
-        'search': _searchController.text,
-        'priority': _selectedPriority,
-        'status': _selectedStatus,
-      };
-      final tickets = widget.isAssigned 
-          ? await ApiService.getAccountantAssignedTickets(filters)
-          : await ApiService.getAccountantTickets(filters);
-      if (mounted) setState(() => _tickets = tickets);
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text("Error: $e"),
-            backgroundColor: context.theme.colorScheme.error,
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
-      }
-    } finally {
-      if (mounted) setState(() => _isLoading = false);
-    }
   }
 
   @override
@@ -74,10 +57,15 @@ class _SupportTicketsPageState extends State<SupportTicketsPage> {
         ),
         centerTitle: false,
       ),
-      body: _isLoading && _tickets.isEmpty
-          ? const Center(child: CircularProgressIndicator())
-          : RefreshIndicator(
-              onRefresh: _fetchTickets,
+      body: StreamBuilder<List<SupportTicket>>(
+        stream: _ticketsStream,
+        builder: (context, snapshot) {
+          return LoadingWrapper<List<SupportTicket>>(
+            snapshot: snapshot,
+            skeleton: _buildSkeleton(context),
+            onRetry: () => setState(() => _updateStream()),
+            builder: (tickets) => RefreshIndicator(
+              onRefresh: () async => setState(() => _updateStream()),
               child: SingleChildScrollView(
                 physics: const AlwaysScrollableScrollPhysics(),
                 padding: EdgeInsets.symmetric(vertical: context.spacing),
@@ -92,15 +80,15 @@ class _SupportTicketsPageState extends State<SupportTicketsPage> {
                         Padding(
                           padding: EdgeInsets.symmetric(horizontal: context.pagePadding.left),
                           child: Text(
-                            "Tickets (${_tickets.length})",
+                            "Tickets (${tickets.length})",
                             style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
                           ),
                         ),
                         SizedBox(height: context.spacing),
-                        if (_tickets.isEmpty)
+                        if (tickets.isEmpty)
                           _buildEmptyState(context)
                         else
-                          _buildTicketList(context),
+                          _buildTicketList(context, tickets, snapshot.connectionState == ConnectionState.waiting),
                         SizedBox(height: context.spacing * 2),
                       ],
                     ),
@@ -108,16 +96,49 @@ class _SupportTicketsPageState extends State<SupportTicketsPage> {
                 ),
               ),
             ),
+          );
+        },
+      ),
       floatingActionButton: !widget.isAssigned
           ? FloatingActionButton.extended(
               onPressed: () {
                 Navigator.push(context, MaterialPageRoute(builder: (context) => const CreateTicketPage()))
-                    .then((_) => _fetchTickets());
+                    .then((_) => setState(() => _updateStream()));
               },
               icon: const Icon(Icons.add),
               label: const Text("New Ticket"),
             )
           : null,
+    );
+  }
+
+  Widget _buildSkeleton(BuildContext context) {
+    return SingleChildScrollView(
+      padding: EdgeInsets.symmetric(vertical: context.spacing),
+      child: Center(
+        child: ConstrainedBox(
+          constraints: BoxConstraints(maxWidth: context.scale(1000)),
+          child: Column(
+            children: [
+              Skeleton(height: context.scale(280), width: double.infinity, borderRadius: 16),
+              SizedBox(height: context.spacing * 2),
+              GridView.builder(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                padding: EdgeInsets.symmetric(horizontal: context.pagePadding.left),
+                gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: context.isDesktop ? 3 : (context.isTablet ? 2 : 1),
+                  mainAxisExtent: context.scale(180),
+                  crossAxisSpacing: context.spacing,
+                  mainAxisSpacing: context.spacing,
+                ),
+                itemCount: 6,
+                itemBuilder: (_, __) => Skeleton(borderRadius: 16),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 
@@ -182,8 +203,10 @@ class _SupportTicketsPageState extends State<SupportTicketsPage> {
                 ['all', 'low', 'medium', 'high'].map((e) => e.toUpperCase()).toList(), 
                 _selectedPriority.toUpperCase(), 
                 (val) {
-                  setState(() => _selectedPriority = val!.toLowerCase());
-                  _fetchTickets();
+                  setState(() {
+                    _selectedPriority = val!.toLowerCase();
+                    _updateStream();
+                  });
                 },
               ),
             ],
@@ -197,8 +220,10 @@ class _SupportTicketsPageState extends State<SupportTicketsPage> {
                 ['all', 'open', 'in_progress', 'resolved', 'closed'].map((e) => e.toUpperCase()).toList(), 
                 _selectedStatus.toUpperCase(), 
                 (val) {
-                  setState(() => _selectedStatus = val!.toLowerCase());
-                  _fetchTickets();
+                  setState(() {
+                    _selectedStatus = val!.toLowerCase();
+                    _updateStream();
+                  });
                 },
               ),
             ],
@@ -209,7 +234,7 @@ class _SupportTicketsPageState extends State<SupportTicketsPage> {
           children: [
             Expanded(
               flex: 2,
-              child: buildActionButton(context, "APPLY FILTERS", () => _fetchTickets()),
+              child: buildActionButton(context, "APPLY FILTERS", () => setState(() => _updateStream())),
             ),
             SizedBox(width: context.spacing),
             Expanded(
@@ -221,8 +246,8 @@ class _SupportTicketsPageState extends State<SupportTicketsPage> {
                   setState(() {
                     _selectedPriority = 'all';
                     _selectedStatus = 'all';
+                    _updateStream();
                   });
-                  _fetchTickets();
                 },
                 isPrimary: false,
               ),
@@ -233,99 +258,102 @@ class _SupportTicketsPageState extends State<SupportTicketsPage> {
     );
   }
 
-  Widget _buildTicketList(BuildContext context) {
+  Widget _buildTicketList(BuildContext context, List<SupportTicket> tickets, bool isRefreshing) {
     final theme = context.theme;
-    return Padding(
-      padding: EdgeInsets.symmetric(horizontal: context.pagePadding.left),
-      child: GridView.builder(
-        shrinkWrap: true,
-        physics: const NeverScrollableScrollPhysics(),
-        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-          crossAxisCount: context.isDesktop ? 3 : (context.isTablet ? 2 : 1),
-          mainAxisExtent: context.scale(180),
-          crossAxisSpacing: context.spacing,
-          mainAxisSpacing: context.spacing,
-        ),
-        itemCount: _tickets.length,
-        itemBuilder: (context, index) {
-          final ticket = _tickets[index];
-          final priorityColor = _getPriorityColor(ticket.priority);
-          final statusColor = _getStatusColor(ticket.status);
+    return Opacity(
+      opacity: isRefreshing ? 0.6 : 1.0,
+      child: Padding(
+        padding: EdgeInsets.symmetric(horizontal: context.pagePadding.left),
+        child: GridView.builder(
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: context.isDesktop ? 3 : (context.isTablet ? 2 : 1),
+            mainAxisExtent: context.scale(180),
+            crossAxisSpacing: context.spacing,
+            mainAxisSpacing: context.spacing,
+          ),
+          itemCount: tickets.length,
+          itemBuilder: (context, index) {
+            final ticket = tickets[index];
+            final priorityColor = _getPriorityColor(ticket.priority);
+            final statusColor = _getStatusColor(ticket.status);
 
-          return Card(
-            elevation: 0,
-            color: theme.colorScheme.surfaceContainerLow,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(context.scale(16)),
-              side: BorderSide(color: theme.colorScheme.outlineVariant, width: 0.5),
-            ),
-            child: InkWell(
-              onTap: () => Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                      builder: (context) => TicketDetailsPage(ticketId: ticket.encryptedId ?? ticket.id.toString()))),
-              borderRadius: BorderRadius.circular(context.scale(16)),
-              child: Padding(
-                padding: EdgeInsets.all(context.spacing),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Container(
-                          padding: EdgeInsets.symmetric(horizontal: context.scale(10), vertical: context.scale(5)),
-                          decoration: BoxDecoration(
-                            color: theme.colorScheme.primaryContainer,
-                            borderRadius: BorderRadius.circular(context.scale(8)),
+            return Card(
+              elevation: 0,
+              color: theme.colorScheme.surfaceContainerLow,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(context.scale(16)),
+                side: BorderSide(color: theme.colorScheme.outlineVariant, width: 0.5),
+              ),
+              child: InkWell(
+                onTap: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                        builder: (context) => TicketDetailsPage(ticketId: ticket.encryptedId ?? ticket.id.toString()))).then((_) => setState(() => _updateStream())),
+                borderRadius: BorderRadius.circular(context.scale(16)),
+                child: Padding(
+                  padding: EdgeInsets.all(context.spacing),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Container(
+                            padding: EdgeInsets.symmetric(horizontal: context.scale(10), vertical: context.scale(5)),
+                            decoration: BoxDecoration(
+                              color: theme.colorScheme.primaryContainer,
+                              borderRadius: BorderRadius.circular(context.scale(8)),
+                            ),
+                            child: Text(
+                              "#${ticket.id}",
+                              style: theme.textTheme.labelSmall?.copyWith(
+                                color: theme.colorScheme.onPrimaryContainer,
+                                fontWeight: FontWeight.bold,
+                                fontSize: context.font(11),
+                              ),
+                            ),
                           ),
-                          child: Text(
-                            "#${ticket.id}",
+                          const Spacer(),
+                          Icon(Icons.chevron_right, size: context.scale(20), color: theme.colorScheme.onSurfaceVariant),
+                        ],
+                      ),
+                      SizedBox(height: context.spacing),
+                      Text(
+                        ticket.title,
+                        style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold, fontSize: context.font(15)),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      const Spacer(),
+                      Row(
+                        children: [
+                          _buildBadge(context, ticket.priority.toUpperCase(), priorityColor),
+                          SizedBox(width: context.scale(8)),
+                          _buildBadge(context, ticket.status.toUpperCase(), statusColor),
+                        ],
+                      ),
+                      SizedBox(height: context.spacing / 2),
+                      Row(
+                        children: [
+                          Icon(Icons.access_time, size: context.scale(12), color: theme.colorScheme.onSurfaceVariant),
+                          SizedBox(width: context.scale(4)),
+                          Text(
+                            ticket.createdAt,
                             style: theme.textTheme.labelSmall?.copyWith(
-                              color: theme.colorScheme.onPrimaryContainer,
-                              fontWeight: FontWeight.bold,
+                              color: theme.colorScheme.onSurfaceVariant,
                               fontSize: context.font(11),
                             ),
                           ),
-                        ),
-                        const Spacer(),
-                        Icon(Icons.chevron_right, size: context.scale(20), color: theme.colorScheme.onSurfaceVariant),
-                      ],
-                    ),
-                    SizedBox(height: context.spacing),
-                    Text(
-                      ticket.title,
-                      style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold, fontSize: context.font(15)),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    const Spacer(),
-                    Row(
-                      children: [
-                        _buildBadge(context, ticket.priority.toUpperCase(), priorityColor),
-                        SizedBox(width: context.scale(8)),
-                        _buildBadge(context, ticket.status.toUpperCase(), statusColor),
-                      ],
-                    ),
-                    SizedBox(height: context.spacing / 2),
-                    Row(
-                      children: [
-                        Icon(Icons.access_time, size: context.scale(12), color: theme.colorScheme.onSurfaceVariant),
-                        SizedBox(width: context.scale(4)),
-                        Text(
-                          ticket.createdAt,
-                          style: theme.textTheme.labelSmall?.copyWith(
-                            color: theme.colorScheme.onSurfaceVariant,
-                            fontSize: context.font(11),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
+                        ],
+                      ),
+                    ],
+                  ),
                 ),
               ),
-            ),
-          );
-        },
+            );
+          },
+        ),
       ),
     );
   }

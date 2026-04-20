@@ -191,7 +191,7 @@ class _RemarksPageState extends State<RemarksPage> {
                                               Text("Remark Category", style: TextStyle(fontSize: context.font(12), fontWeight: FontWeight.bold, color: theme.colorScheme.onSurfaceVariant)),
                                               SizedBox(height: context.scale(8)),
                                               DropdownButtonFormField<String>(
-                                                value: selectedRemarkType,
+                                                initialValue: selectedRemarkType,
                                                 style: TextStyle(fontSize: context.font(14), color: theme.colorScheme.onSurface),
                                                 items: ["All", "Academic", "Discipline", "Attendance", "Behavior"]
                                                     .map((e) => DropdownMenuItem(

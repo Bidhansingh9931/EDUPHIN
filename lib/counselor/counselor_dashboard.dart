@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:eduphin/services/responsive_helper.dart';
 import 'package:flutter/material.dart';
 import '../services/api_service.dart';
+import '../services/caching_service.dart';
 import 'counselor_models.dart';
 import 'profile.dart';
 import 'virtual_id.dart';
@@ -46,17 +47,31 @@ class _CounselorDashboardPageState extends State<CounselorDashboardPage> {
   @override
   void initState() {
     super.initState();
+    _loadCachedData();
     _fetchDashboardData();
+  }
+
+  Future<void> _loadCachedData() async {
+    final cachedData = await CachingService.getData('counselor_dashboard');
+    if (cachedData != null && mounted) {
+      setState(() {
+        _dashboardData = CounselorDashboardData.fromJson(cachedData);
+        _isLoading = false;
+      });
+    }
   }
 
   Future<void> _fetchDashboardData() async {
     if (!mounted) return;
-    setState(() => _isLoading = true);
+    if (_dashboardData == null) {
+      setState(() => _isLoading = true);
+    }
     try {
       final response = await ApiService.get('counselor/dashboard');
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
         if (data['status'] == true || data['status'] == 'success') {
+          await CachingService.saveData('counselor_dashboard', data);
           if (mounted) {
             setState(() {
               _dashboardData = CounselorDashboardData.fromJson(data);
@@ -93,14 +108,7 @@ class _CounselorDashboardPageState extends State<CounselorDashboardPage> {
   Widget build(BuildContext context) {
     final theme = context.theme;
 
-    if (_isLoading) {
-      return Scaffold(
-        backgroundColor: theme.colorScheme.surface,
-        body: const Center(child: CircularProgressIndicator()),
-      );
-    }
-
-    if (_errorMessage != null) {
+    if (_errorMessage != null && _dashboardData == null) {
       return Scaffold(
         backgroundColor: theme.colorScheme.surface,
         body: Center(
@@ -159,7 +167,10 @@ class _CounselorDashboardPageState extends State<CounselorDashboardPage> {
           SizedBox(width: context.scale(8)),
         ],
       ),
-      body: RefreshIndicator(
+      body: LoadingWrapper(
+        isLoading: _isLoading,
+        hasData: _dashboardData != null,
+        skeleton: _buildSkeleton(context),
         onRefresh: _fetchDashboardData,
         child: SingleChildScrollView(
           physics: const AlwaysScrollableScrollPhysics(),
@@ -214,6 +225,56 @@ class _CounselorDashboardPageState extends State<CounselorDashboardPage> {
             ),
           ),
         ),
+      ),
+    );
+  }
+
+  Widget _buildSkeleton(BuildContext context) {
+    return SingleChildScrollView(
+      padding: context.pagePadding,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(child: Skeleton(height: context.scale(100))),
+              SizedBox(width: context.spacing),
+              Expanded(child: Skeleton(height: context.scale(100))),
+            ],
+          ),
+          SizedBox(height: context.spacing * 2),
+          Skeleton(height: context.scale(250), borderRadius: context.scale(20)),
+          SizedBox(height: context.spacing * 2),
+          Skeleton(width: context.scale(200), height: context.scale(24)),
+          SizedBox(height: context.spacing),
+          GridView.builder(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: context.responsive(2, tablet: 4, desktop: 6),
+              crossAxisSpacing: context.scale(12),
+              mainAxisSpacing: context.scale(12),
+              childAspectRatio: 1.1,
+            ),
+            itemCount: 4,
+            itemBuilder: (_, __) => Skeleton(height: context.scale(80)),
+          ),
+          SizedBox(height: context.spacing * 2),
+          Skeleton(width: context.scale(200), height: context.scale(24)),
+          SizedBox(height: context.spacing),
+          GridView.builder(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: context.responsive(2, tablet: 4, desktop: 6),
+              crossAxisSpacing: context.scale(12),
+              mainAxisSpacing: context.scale(12),
+              childAspectRatio: 1.1,
+            ),
+            itemCount: 6,
+            itemBuilder: (_, __) => Skeleton(height: context.scale(80)),
+          ),
+        ],
       ),
     );
   }
@@ -493,3 +554,4 @@ class _ActionItem {
   final Color color;
   _ActionItem(this.title, this.icon, this.page, this.color);
 }
+

@@ -317,7 +317,7 @@ class _LibraryBooksPageState extends State<LibraryBooksPage> {
     final colorScheme = context.theme.colorScheme;
     return DropdownButtonFormField<String>(
       isExpanded: true,
-      value: _filters[filterKey],
+      initialValue: _filters[filterKey],
       dropdownColor: colorScheme.surfaceContainerLow,
       items: items.map((String value) {
         return DropdownMenuItem<String>(

@@ -468,7 +468,7 @@ class _EmployeeDetailsPageState extends State<EmployeeDetailsPage> {
           Text(label, style: TextStyle(color: context.theme.colorScheme.onSurfaceVariant, fontSize: context.font(12), fontWeight: FontWeight.w500)),
           SizedBox(height: context.xs),
           DropdownButtonFormField<String>(
-            value: items.contains(controller.text) ? controller.text : null,
+            initialValue: items.contains(controller.text) ? controller.text : null,
             items: items.map((String item) {
               return DropdownMenuItem<String>(
                 value: item,

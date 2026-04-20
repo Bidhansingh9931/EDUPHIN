@@ -1,8 +1,9 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:eduphin/services/common_widgets.dart';
+import 'package:eduphin/services/responsive_helper.dart';
 import 'package:image_picker/image_picker.dart';
 import '../../services/api_service.dart';
-import '../../services/responsive_helper.dart';
 import '../../teacher/dashboard/ticket_details_models.dart';
 
 class TicketDetailsPage extends StatefulWidget {
@@ -14,7 +15,7 @@ class TicketDetailsPage extends StatefulWidget {
 }
 
 class _TicketDetailsPageState extends State<TicketDetailsPage> {
-  late Future<TicketDetails> _detailsFuture;
+  late Stream<TicketDetails> _detailsStream;
   final TextEditingController _replyController = TextEditingController();
   bool _isSending = false;
   File? _attachment;
@@ -27,7 +28,7 @@ class _TicketDetailsPageState extends State<TicketDetailsPage> {
 
   void _loadDetails() {
     setState(() {
-      _detailsFuture = ApiService.getStaffTicketDetails(widget.ticketId);
+      _detailsStream = ApiService.getStaffTicketDetailsStream(widget.ticketId);
     });
   }
 
@@ -126,100 +127,84 @@ class _TicketDetailsPageState extends State<TicketDetailsPage> {
         title: Text("Ticket #${widget.ticketId}"),
         centerTitle: true,
       ),
-      body: FutureBuilder<TicketDetails>(
-        future: _detailsFuture,
+      body: StreamBuilder<TicketDetails>(
+        stream: _detailsStream,
         builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
-          } else if (snapshot.hasError) {
-            return Center(
-              child: Padding(
-                padding: context.pagePadding,
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(Icons.error_outline, size: context.scale(48), color: theme.colorScheme.error),
-                    SizedBox(height: context.scale(16)),
-                    Text("Error: ${snapshot.error}", textAlign: TextAlign.center, style: TextStyle(color: theme.colorScheme.error)),
-                    SizedBox(height: context.scale(16)),
-                    FilledButton.tonal(onPressed: _loadDetails, child: const Text("Retry")),
-                  ],
-                ),
-              ),
-            );
-          } else if (!snapshot.hasData) {
-            return const Center(child: Text("No data found"));
-          }
+          return LoadingWrapper<TicketDetails>(
+            snapshot: snapshot,
+            skeleton: _buildSkeleton(context),
+            onRetry: _loadDetails,
+            builder: (details) {
+              final ticket = details.ticket;
+              final replies = details.replies;
 
-          final details = snapshot.data!;
-          final ticket = details.ticket;
-          final replies = details.replies;
-
-          return Center(
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 1200),
-              child: Column(
-                children: [
-                  Padding(
-                    padding: context.pagePadding,
-                    child: Row(
-                      children: [
-                        _buildTag(
-                          ticket.status.toUpperCase().replaceAll('_', ' '),
-                          _getStatusColor(ticket.status),
-                          onTap: () => _showStatusDialog(ticket.status.toLowerCase()),
-                        ),
-                        SizedBox(width: context.scale(12)),
-                        _buildTag(
-                          ticket.priority.toUpperCase(),
-                          _getPriorityColor(ticket.priority),
-                        ),
-                      ],
-                    ),
-                  ),
-                  Expanded(
-                    child: Container(
-                      margin: EdgeInsets.symmetric(horizontal: context.spacing),
-                      decoration: BoxDecoration(
-                        color: theme.colorScheme.surfaceContainerLow,
-                        borderRadius: BorderRadius.circular(context.scale(20)),
-                        border: Border.all(color: theme.colorScheme.outlineVariant, width: 0.5),
-                      ),
-                      clipBehavior: Clip.antiAlias,
-                      child: replies.isEmpty
-                          ? Center(
-                              child: Column(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  Icon(Icons.forum_outlined, 
-                                    size: context.scale(64), 
-                                    color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.5)),
-                                  SizedBox(height: context.scale(16)),
-                                  Text("No replies yet.", 
-                                    style: TextStyle(
-                                      color: theme.colorScheme.onSurfaceVariant, 
-                                      fontWeight: FontWeight.bold, 
-                                      fontSize: context.font(16)
-                                    )),
-                                ],
-                              ),
-                            )
-                          : ListView.builder(
-                              padding: EdgeInsets.all(context.spacing),
-                              itemCount: replies.length,
-                              itemBuilder: (context, index) {
-                                final reply = replies[index];
-                                // Check if the reply's author is the user themselves (You) or matches the ticket's creator ID
-                                final isMe = reply.userName == "You" || (reply.userId != 0 && reply.userId == ticket.userId);
-                                return _buildReplyBubble(reply, isMe);
-                              },
+              return Center(
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 1200),
+                  child: Column(
+                    children: [
+                      Padding(
+                        padding: context.pagePadding,
+                        child: Row(
+                          children: [
+                            _buildTag(
+                              ticket.status.toUpperCase().replaceAll('_', ' '),
+                              _getStatusColor(ticket.status),
+                              onTap: () => _showStatusDialog(ticket.status.toLowerCase()),
                             ),
-                    ),
+                            SizedBox(width: context.scale(12)),
+                            _buildTag(
+                              ticket.priority.toUpperCase(),
+                              _getPriorityColor(ticket.priority),
+                            ),
+                          ],
+                        ),
+                      ),
+                      Expanded(
+                        child: Container(
+                          margin: EdgeInsets.symmetric(horizontal: context.spacing),
+                          decoration: BoxDecoration(
+                            color: theme.colorScheme.surfaceContainerLow,
+                            borderRadius: BorderRadius.circular(context.scale(20)),
+                            border: Border.all(color: theme.colorScheme.outlineVariant, width: 0.5),
+                          ),
+                          clipBehavior: Clip.antiAlias,
+                          child: replies.isEmpty
+                              ? Center(
+                                  child: Column(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      Icon(Icons.forum_outlined, 
+                                        size: context.scale(64), 
+                                        color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.5)),
+                                      SizedBox(height: context.scale(16)),
+                                      Text("No replies yet.", 
+                                        style: TextStyle(
+                                          color: theme.colorScheme.onSurfaceVariant, 
+                                          fontWeight: FontWeight.bold, 
+                                          fontSize: context.font(16)
+                                        )),
+                                    ],
+                                  ),
+                                )
+                              : ListView.builder(
+                                  padding: EdgeInsets.all(context.spacing),
+                                  itemCount: replies.length,
+                                  itemBuilder: (context, index) {
+                                    final reply = replies[index];
+                                    // Check if the reply's author is the user themselves (You) or matches the ticket's creator ID
+                                    final isMe = reply.userName == "You" || (reply.userId != 0 && reply.userId == ticket.userId);
+                                    return _buildReplyBubble(reply, isMe);
+                                  },
+                                ),
+                        ),
+                      ),
+                      _buildInputArea(),
+                    ],
                   ),
-                  _buildInputArea(),
-                ],
-              ),
-            ),
+                ),
+              );
+            },
           );
         },
       ),
@@ -461,6 +446,73 @@ class _TicketDetailsPageState extends State<TicketDetailsPage> {
           ),
         ],
       ),
+    );
+  }
+
+  Widget _buildSkeleton(BuildContext context) {
+    return Column(
+      children: [
+        Padding(
+          padding: context.pagePadding,
+          child: Row(
+            children: [
+              Expanded(child: Skeleton(height: context.scale(40), borderRadius: context.scale(12))),
+              SizedBox(width: context.scale(12)),
+              Expanded(child: Skeleton(height: context.scale(40), borderRadius: context.scale(12))),
+            ],
+          ),
+        ),
+        Expanded(
+          child: Container(
+            margin: EdgeInsets.symmetric(horizontal: context.spacing),
+            decoration: BoxDecoration(
+              color: context.theme.colorScheme.surfaceContainerLow,
+              borderRadius: BorderRadius.circular(context.scale(20)),
+            ),
+            child: ListView.builder(
+              padding: EdgeInsets.all(context.spacing),
+              itemCount: 4,
+              itemBuilder: (context, index) {
+                final isMe = index % 2 == 0;
+                return Align(
+                  alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
+                  child: Container(
+                    margin: EdgeInsets.only(bottom: context.scale(16)),
+                    padding: EdgeInsets.all(context.scale(16)),
+                    width: context.screenWidth * 0.7,
+                    decoration: BoxDecoration(
+                      color: isMe ? context.theme.colorScheme.primaryContainer.withValues(alpha: 0.5) : context.theme.colorScheme.surfaceContainerHighest,
+                      borderRadius: BorderRadius.circular(context.scale(20)),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Skeleton(width: context.scale(80), height: context.scale(12)),
+                        SizedBox(height: context.scale(8)),
+                        Skeleton(width: double.infinity, height: context.scale(14)),
+                        SizedBox(height: context.scale(4)),
+                        Skeleton(width: context.screenWidth * 0.4, height: context.scale(14)),
+                      ],
+                    ),
+                  ),
+                );
+              },
+            ),
+          ),
+        ),
+        Container(
+          padding: EdgeInsets.all(context.spacing),
+          child: Row(
+            children: [
+              Skeleton(width: context.scale(48), height: context.scale(48), borderRadius: context.scale(24)),
+              SizedBox(width: context.scale(8)),
+              Expanded(child: Skeleton(height: context.scale(48), borderRadius: context.scale(24))),
+              SizedBox(width: context.scale(8)),
+              Skeleton(width: context.scale(48), height: context.scale(48), borderRadius: context.scale(24)),
+            ],
+          ),
+        ),
+      ],
     );
   }
 

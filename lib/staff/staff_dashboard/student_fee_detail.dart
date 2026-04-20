@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../services/api_service.dart';
+import '../../services/common_widgets.dart';
 import '../../services/responsive_helper.dart';
 import 'staff_models.dart';
 
@@ -12,32 +13,15 @@ class StaffStudentFeeDetailPage extends StatefulWidget {
 
 class _StaffStudentFeeDetailPageState extends State<StaffStudentFeeDetailPage> {
   final TextEditingController _searchController = TextEditingController();
-  StudentFeeDetail? _feeDetail;
-  bool _isLoading = false;
-  String? _error;
+  Stream<StudentFeeDetail>? _feeStream;
 
-  Future<void> _fetchDetail() async {
+  void _fetchDetail() {
     final query = _searchController.text.trim();
     if (query.isEmpty) return;
 
     setState(() {
-      _isLoading = true;
-      _error = null;
-      _feeDetail = null;
+      _feeStream = ApiService.getStaffStudentFeeDetailStream(query);
     });
-
-    try {
-      final detail = await ApiService.getStaffStudentFeeDetail(query);
-      setState(() {
-        _feeDetail = detail;
-        _isLoading = false;
-      });
-    } catch (e) {
-      setState(() {
-        _error = e.toString().replaceFirst('Exception: ', '');
-        _isLoading = false;
-      });
-    }
   }
 
   @override
@@ -57,24 +41,93 @@ class _StaffStudentFeeDetailPageState extends State<StaffStudentFeeDetailPage> {
               children: [
                 _buildSearchBox(context),
                 SizedBox(height: context.scale(24)),
-                if (_isLoading)
-                  Padding(
-                    padding: EdgeInsets.all(context.scale(32)),
-                    child: const CircularProgressIndicator(),
+                if (_feeStream != null)
+                  StreamBuilder<StudentFeeDetail>(
+                    stream: _feeStream,
+                    builder: (context, snapshot) {
+                      return LoadingWrapper<StudentFeeDetail>(
+                        snapshot: snapshot,
+                        skeleton: _buildSkeleton(context),
+                        builder: (detail) => Column(
+                          children: [
+                            _buildStudentInfo(context, detail),
+                            SizedBox(height: context.scale(24)),
+                            _buildFeeSummary(context, detail),
+                          ],
+                        ),
+                      );
+                    },
                   )
-                else if (_error != null)
-                  _buildErrorState(context)
-                else if (_feeDetail != null) ...[
-                  _buildStudentInfo(context, _feeDetail!),
-                  SizedBox(height: context.scale(24)),
-                  _buildFeeSummary(context, _feeDetail!),
-                ] else
+                else
                   _buildEmptyState(context),
               ],
             ),
           ),
         ),
       ),
+    );
+  }
+
+  Widget _buildSkeleton(BuildContext context) {
+    return Column(
+      children: [
+        Card(
+          elevation: 0,
+          color: context.theme.colorScheme.surfaceContainerLow,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(context.scale(20)),
+          ),
+          child: Padding(
+            padding: EdgeInsets.all(context.scale(20)),
+            child: Row(
+              children: [
+                Skeleton(width: context.scale(56), height: context.scale(56), borderRadius: context.scale(28)),
+                SizedBox(width: context.scale(16)),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Skeleton(width: context.scale(150), height: context.scale(20)),
+                      SizedBox(height: context.scale(8)),
+                      Skeleton(width: context.scale(200), height: context.scale(14)),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+        SizedBox(height: context.scale(24)),
+        Card(
+          elevation: 0,
+          color: context.theme.colorScheme.surfaceContainerLow,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(context.scale(20)),
+          ),
+          child: Column(
+            children: List.generate(
+              3,
+              (index) => Padding(
+                padding: EdgeInsets.all(context.scale(20)),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Skeleton(width: context.scale(120), height: context.scale(16)),
+                        SizedBox(height: context.scale(8)),
+                        Skeleton(width: context.scale(60), height: context.scale(14)),
+                      ],
+                    ),
+                    Skeleton(width: context.scale(80), height: context.scale(28), borderRadius: context.scale(12)),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+      ],
     );
   }
 
@@ -118,19 +171,6 @@ class _StaffStudentFeeDetailPageState extends State<StaffStudentFeeDetailPage> {
           ],
         ),
       ),
-    );
-  }
-
-  Widget _buildErrorState(BuildContext context) {
-    return Column(
-      children: [
-        Icon(Icons.error_outline, color: context.theme.colorScheme.error, size: context.scale(48)),
-        SizedBox(height: context.scale(16)),
-        Text(_error!, 
-          style: TextStyle(color: context.theme.colorScheme.error, fontSize: context.font(14)),
-          textAlign: TextAlign.center,
-        ),
-      ],
     );
   }
 

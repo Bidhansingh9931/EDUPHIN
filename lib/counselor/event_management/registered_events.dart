@@ -2,6 +2,8 @@ import 'dart:convert';
 import 'package:eduphin/services/responsive_helper.dart';
 import 'package:flutter/material.dart';
 import '../../services/api_service.dart';
+import '../../services/caching_service.dart';
+import '../../services/common_widgets.dart';
 import '../counselor_models.dart';
 
 class MyRegisteredEventsPage extends StatefulWidget {
@@ -17,38 +19,60 @@ class _MyRegisteredEventsPageState extends State<MyRegisteredEventsPage> {
   bool _isLoading = true;
   List<EventRegistration> _registrations = [];
   String? _errorMessage;
+  final String _cacheKey = 'counselor_registered_events_data';
 
   @override
   void initState() {
     super.initState();
+    _loadCachedData();
     _fetchRegisteredEvents();
   }
 
-  Future<void> _fetchRegisteredEvents() async {
+  Future<void> _loadCachedData() async {
+    final cachedData = await CachingService.getData(_cacheKey);
+    if (cachedData != null && mounted) {
+      _processData(cachedData);
+    }
+  }
+
+  void _processData(dynamic data) {
+    final jsonResponse = data is String ? jsonDecode(data) : data;
+    final List registrationsData = jsonResponse['data'] ?? jsonResponse['registered_events'] ?? [];
     setState(() {
-      _isLoading = true;
+      _registrations = registrationsData.map((e) => EventRegistration.fromJson(e)).toList();
+      _isLoading = false;
       _errorMessage = null;
     });
+  }
+
+  Future<void> _fetchRegisteredEvents() async {
+    if (_registrations.isEmpty) {
+      setState(() {
+        _isLoading = true;
+        _errorMessage = null;
+      });
+    }
     try {
       final response = await ApiService.get('counselor/events/registered');
       if (!mounted) return;
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
-        setState(() {
-          final List registrationsData = data['data'] ?? data['registered_events'] ?? [];
-          _registrations = registrationsData.map((e) => EventRegistration.fromJson(e)).toList();
-          _isLoading = false;
-        });
+        await CachingService.saveData(_cacheKey, data);
+        if (mounted) {
+          _processData(data);
+        }
       } else {
-        setState(() {
-          _errorMessage = ApiService.errorMessage(response, "Failed to load registered events");
-          _isLoading = false;
-        });
+        if (mounted && _registrations.isEmpty) {
+          setState(() {
+            _errorMessage = ApiService.errorMessage(response, "Failed to load registered events");
+            _isLoading = false;
+          });
+        }
       }
     } catch (e) {
-      if (mounted) {
+      if (mounted && _registrations.isEmpty) {
         setState(() {
-          _errorMessage = "Error: $e";
+          _errorMessage = e.toString().replaceFirst("Exception: ", "");
           _isLoading = false;
         });
       }
@@ -105,6 +129,61 @@ class _MyRegisteredEventsPageState extends State<MyRegisteredEventsPage> {
     }
   }
 
+  Widget _buildSkeleton() {
+    return ListView.builder(
+      padding: context.pagePadding,
+      itemCount: 4,
+      itemBuilder: (context, index) {
+        return Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 800),
+            child: Card(
+              margin: EdgeInsets.only(bottom: context.spacing),
+              elevation: 0,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(context.scale(12)),
+              ),
+              child: Padding(
+                padding: EdgeInsets.all(context.spacing),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        const Skeleton(width: 60, height: 60, borderRadius: 12),
+                        SizedBox(width: context.spacing / 2),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Skeleton(width: 150, height: 20),
+                              SizedBox(height: 8),
+                              const Skeleton(width: double.infinity, height: 16),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                    SizedBox(height: 16),
+                    const Divider(),
+                    SizedBox(height: 16),
+                    const Skeleton(width: 200, height: 16),
+                    SizedBox(height: 8),
+                    const Skeleton(width: 150, height: 16),
+                    SizedBox(height: 8),
+                    const Skeleton(width: 100, height: 16),
+                    SizedBox(height: 16),
+                    const Skeleton(width: double.infinity, height: 44, borderRadius: BorderRadius.all(Radius.circular(8))),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     _colorScheme = context.theme.colorScheme;
@@ -112,32 +191,44 @@ class _MyRegisteredEventsPageState extends State<MyRegisteredEventsPage> {
       appBar: AppBar(
         title: const Text("My Registered Events"),
       ),
-      body: RefreshIndicator(
+      body: LoadingWrapper(
+        isLoading: _isLoading,
+        hasData: _registrations.isNotEmpty,
+        skeleton: _buildSkeleton(),
         onRefresh: _fetchRegisteredEvents,
-        child: _isLoading
-            ? const Center(child: CircularProgressIndicator())
-            : _errorMessage != null
+        child: _errorMessage != null && _registrations.isEmpty
+            ? Center(
+                child: Padding(
+                  padding: EdgeInsets.all(context.scale(24.0)),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.error_outline, color: _colorScheme.error, size: context.scale(48)),
+                      SizedBox(height: context.spacing),
+                      Text(_errorMessage!, textAlign: TextAlign.center, style: TextStyle(color: _colorScheme.error, fontSize: context.font(14))),
+                      SizedBox(height: context.spacing),
+                      FilledButton.icon(onPressed: _fetchRegisteredEvents, icon: const Icon(Icons.refresh), label: const Text("RETRY")),
+                    ],
+                  ),
+                ),
+              )
+            : _registrations.isEmpty
                 ? Center(
-                    child: Text(_errorMessage!,
-                        style: TextStyle(
-                            color: _colorScheme.error, fontSize: context.font(14))))
-                : _registrations.isEmpty
-                    ? Center(
-                        child: Text("No registered events found",
-                            style: TextStyle(fontSize: context.font(14))))
-                    : ListView.builder(
-                        padding: context.pagePadding,
-                        itemCount: _registrations.length,
-                        itemBuilder: (context, index) {
-                          final reg = _registrations[index];
-                          return Center(
-                            child: ConstrainedBox(
-                              constraints: const BoxConstraints(maxWidth: 800),
-                              child: _buildEventCard(reg),
-                            ),
-                          );
-                        },
-                      ),
+                    child: Text("No registered events found",
+                        style: TextStyle(fontSize: context.font(14))))
+                : ListView.builder(
+                    padding: context.pagePadding,
+                    itemCount: _registrations.length,
+                    itemBuilder: (context, index) {
+                      final reg = _registrations[index];
+                      return Center(
+                        child: ConstrainedBox(
+                          constraints: const BoxConstraints(maxWidth: 800),
+                          child: _buildEventCard(reg),
+                        ),
+                      );
+                    },
+                  ),
       ),
     );
   }
@@ -264,3 +355,5 @@ class _MyRegisteredEventsPageState extends State<MyRegisteredEventsPage> {
     );
   }
 }
+
+

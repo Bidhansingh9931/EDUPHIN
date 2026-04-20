@@ -1,8 +1,8 @@
+import 'package:eduphin/services/common_widgets.dart';
 import 'package:eduphin/services/responsive_helper.dart';
 import 'package:flutter/material.dart';
 import 'package:eduphin/services/api_service.dart';
 import 'package:eduphin/accountant/dashboard/accountant_dashboard_model.dart';
-import 'package:eduphin/teacher/dashboard/common_widgets.dart';
 import 'exam_paper_schedule.dart';
 
 class ExamListPage extends StatefulWidget {
@@ -13,38 +13,18 @@ class ExamListPage extends StatefulWidget {
 }
 
 class _ExamListPageState extends State<ExamListPage> {
-  bool _isLoading = true;
-  List<Exam> _exams = [];
+  late Stream<List<Exam>> _examsStream;
 
   @override
   void initState() {
     super.initState();
-    _fetchExams();
+    _examsStream = ApiService.getAccountantExamsStream();
   }
 
-  Future<void> _fetchExams() async {
-    if (!mounted) return;
-    setState(() => _isLoading = true);
-    try {
-      final examsData = await ApiService.getAccountantExams();
-      if (mounted) {
-        setState(() {
-          _exams = examsData;
-        });
-      }
-    } catch (e) {
-      debugPrint("Exams Fetch Error: $e");
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text("Error fetching exams: $e"),
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
-      }
-    } finally {
-      if (mounted) setState(() => _isLoading = false);
-    }
+  void _refreshExams() {
+    setState(() {
+      _examsStream = ApiService.getAccountantExamsStream();
+    });
   }
 
   @override
@@ -55,40 +35,114 @@ class _ExamListPageState extends State<ExamListPage> {
       appBar: AppBar(
         title: Text("Examinations", style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold, fontSize: context.font(20))),
         centerTitle: false,
+        actions: [
+          IconButton(icon: const Icon(Icons.refresh_rounded), onPressed: _refreshExams),
+        ],
       ),
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : RefreshIndicator(
-              onRefresh: _fetchExams,
-              child: Center(
-                child: ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 1200),
-                  child: ListView(
-                    padding: context.pagePadding,
-                    children: [
-                      _buildSectionHeader("Active Examinations", Icons.assignment_outlined),
-                      SizedBox(height: context.md),
-                      _exams.isEmpty
-                          ? _buildEmptyState(context)
-                          : GridView.builder(
-                              shrinkWrap: true,
-                              physics: const NeverScrollableScrollPhysics(),
-                              gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                                crossAxisCount: context.responsive(1, tablet: 2, desktop: 3),
-                                mainAxisExtent: context.scale(230),
-                                crossAxisSpacing: context.spacing,
-                                mainAxisSpacing: context.spacing,
+      body: StreamBuilder<List<Exam>>(
+        stream: _examsStream,
+        builder: (context, snapshot) {
+          return LoadingWrapper<List<Exam>>(
+            snapshot: snapshot,
+            skeleton: _buildSkeleton(context),
+            onRetry: _refreshExams,
+            builder: (exams) {
+              return RefreshIndicator(
+                onRefresh: () async => _refreshExams(),
+                child: Center(
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 1200),
+                    child: ListView(
+                      padding: context.pagePadding,
+                      children: [
+                        _buildSectionHeader("Active Examinations", Icons.assignment_outlined),
+                        SizedBox(height: context.md),
+                        exams.isEmpty
+                            ? _buildEmptyState(context)
+                            : GridView.builder(
+                                shrinkWrap: true,
+                                physics: const NeverScrollableScrollPhysics(),
+                                gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                                  crossAxisCount: context.responsive(1, tablet: 2, desktop: 3),
+                                  mainAxisExtent: context.scale(230),
+                                  crossAxisSpacing: context.spacing,
+                                  mainAxisSpacing: context.spacing,
+                                ),
+                                itemCount: exams.length,
+                                itemBuilder: (context, index) {
+                                  return _buildExamCard(context, exams[index]);
+                                },
                               ),
-                              itemCount: _exams.length,
-                              itemBuilder: (context, index) {
-                                return _buildExamCard(context, _exams[index]);
-                              },
-                            ),
-                    ],
+                      ],
+                    ),
                   ),
                 ),
+              );
+            },
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _buildSkeleton(BuildContext context) {
+    return SingleChildScrollView(
+      padding: context.pagePadding,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(children: [
+            const Skeleton(width: 20, height: 20, borderRadius: 4),
+            SizedBox(width: context.scale(8)),
+            const Skeleton(width: 150, height: 20, borderRadius: 4),
+          ]),
+          SizedBox(height: context.md),
+          GridView.builder(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: context.responsive(1, tablet: 2, desktop: 3),
+              mainAxisExtent: context.scale(230),
+              crossAxisSpacing: context.spacing,
+              mainAxisSpacing: context.spacing,
+            ),
+            itemCount: 6,
+            itemBuilder: (context, index) => Card(
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(context.scale(16))),
+              child: Padding(
+                padding: EdgeInsets.all(context.md),
+                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Row(children: [
+                    Skeleton(width: 40, height: 40, borderRadius: context.scale(12)),
+                    SizedBox(width: context.md),
+                    Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                      Skeleton(width: 120, height: 16, borderRadius: 4),
+                      const SizedBox(height: 4),
+                      Skeleton(width: 80, height: 12, borderRadius: 4),
+                    ]),
+                  ]),
+                  const Spacer(),
+                  Row(children: [
+                    Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                      Skeleton(width: 60, height: 10, borderRadius: 2),
+                      const SizedBox(height: 4),
+                      Skeleton(width: 80, height: 14, borderRadius: 4),
+                    ]),
+                    const Spacer(),
+                    Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
+                      Skeleton(width: 60, height: 10, borderRadius: 2),
+                      const SizedBox(height: 4),
+                      Skeleton(width: 80, height: 14, borderRadius: 4),
+                    ]),
+                  ]),
+                  const Spacer(),
+                  Skeleton(width: double.infinity, height: context.scale(44), borderRadius: context.scale(12)),
+                ]),
               ),
             ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -128,7 +182,7 @@ class _ExamListPageState extends State<ExamListPage> {
           ),
           SizedBox(height: context.md),
           TextButton.icon(
-            onPressed: _fetchExams,
+            onPressed: _refreshExams,
             icon: const Icon(Icons.refresh),
             label: const Text("Retry"),
           ),

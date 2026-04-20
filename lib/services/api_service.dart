@@ -36,12 +36,10 @@ import 'package:eduphin/student/student_profile_model.dart' as student_profile;
 import 'package:eduphin/student/student_virtual_id_model.dart' as student_id;
 import 'package:eduphin/student/student_fee_model.dart' as student_fee;
 
-import 'package:eduphin/superAdmin/superadmin_models.dart' as super_admin;
-
 class ApiService {
   static const String _envUrl = String.fromEnvironment(
-    'API_BASE_URL',
-    defaultValue: 'https://demo.eduphin.com'
+      'API_BASE_URL',
+      defaultValue: 'https://demo.eduphin.com'
   );
 
   static String get baseUrl {
@@ -259,7 +257,7 @@ class ApiService {
       headers.remove('Content-Type');
       final request = http.MultipartRequest('POST', _uri(endpoint));
       request.headers.addAll(headers);
-      
+
       fields.forEach((key, value) {
         if (value != null) {
           request.fields[key] = value.toString();
@@ -269,7 +267,7 @@ class ApiService {
       if (files != null) {
         for (final entry in files.entries) {
           if (kIsWeb) {
-            // On Web, we can't use fromPath. Use fromBytes instead if available, 
+            // On Web, we can't use fromPath. Use fromBytes instead if available,
             // otherwise throw a more helpful error.
             throw Exception('Web uploads must use postMultipartFromBytes instead of postMultipart');
           } else {
@@ -289,7 +287,7 @@ class ApiService {
       headers.remove('Content-Type');
       final request = http.MultipartRequest('POST', _uri(endpoint));
       request.headers.addAll(headers);
-      
+
       fields.forEach((key, value) {
         if (value != null) {
           request.fields[key] = value.toString();
@@ -320,6 +318,97 @@ class ApiService {
       throw Exception('Upload failed: $e');
     }
   }
+
+  static Future<List<librarian_model.IssuedBook>> getLibrarianOverdueBooks(Map<String, String> filters) async {
+    final response = await get('librarian/overdue-books', filters);
+    if (response.statusCode == 200) {
+      final data = jsonDecode(response.body);
+      if (data['success'] == true || data['status'] == true) {
+        final rawList = (data['data'] is List) ? data['data'] : (data['data']?['data'] as List? ?? []);
+        return (rawList as List).map<librarian_model.IssuedBook>((e) => librarian_model.IssuedBook.fromJson(e)).toList();
+      }
+    }
+    throw Exception('Failed to load overdue books');
+  }
+
+  static Stream<List<librarian_model.IssuedBook>> getLibrarianOverdueBooksStream(Map<String, String> filters) => Stream.fromFuture(getLibrarianOverdueBooks(filters));
+
+  static Future<List<staff_model.UserDetail>> getStaffEmployees(dynamic roleId) async {
+    final encodedId = Uri.encodeComponent(roleId.toString());
+    final response = await get('staff/accounts/$encodedId');
+    if (response.statusCode == 200) {
+      final data = jsonDecode(response.body);
+      if (data['success'] == true || data['status'] == true) {
+        final payload = data['data'] ?? data;
+        final usersData = payload['users'] ?? payload['employees'] ?? (payload is List ? payload : []);
+        List usersList = [];
+        if (usersData is List) {
+          usersList = usersData;
+        } else if (usersData is Map) {
+          usersList = usersData.values.toList();
+        }
+        return usersList.map((e) => staff_model.UserDetail.fromJson(e)).toList();
+      }
+    }
+    throw Exception('Failed to load employees');
+  }
+
+  static Stream<List<staff_model.UserDetail>> getStaffEmployeesStream(dynamic roleId) => Stream.fromFuture(getStaffEmployees(roleId));
+
+  // Staff Stream Wrappers
+  static Stream<staff_model.StaffDashboardData> getStaffDashboardStream() => Stream.fromFuture(getStaffDashboard());
+  static Stream<staff_model.UserDetail> getStaffProfileStream() => Stream.fromFuture(getStaffProfile());
+  static Stream<List<staff_model.Exam>> getStaffExamsStream() => Stream.fromFuture(getStaffExams());
+  static Stream<Map<String, dynamic>> getStaffExamScheduleStream(String examId) => Stream.fromFuture(getStaffExamSchedule(examId));
+  static Stream<staff_model.SalaryPageData> getStaffSalariesStream() => Stream.fromFuture(getStaffSalaries());
+  static Stream<staff_model.SalaryDetailData> getStaffSalarySlipStream(String salaryId) => Stream.fromFuture(getStaffSalaryDetails(salaryId));
+  static Stream<List<teacher_ticket.SupportTicket>> getStaffTicketsStream(Map<String, String> filters) => Stream.fromFuture(getStaffTickets(filters));
+  static Stream<List<teacher_ticket.SupportTicket>> getStaffAssignedTicketsStream(Map<String, String> filters) => Stream.fromFuture(getStaffAssignedTickets(filters));
+  static Stream<teacher_ticket_details.TicketDetails> getStaffTicketDetailsStream(String ticketId) => Stream.fromFuture(getStaffTicketDetails(ticketId));
+  static Stream<List<librarian_model.IssuedBook>> getStaffIssuedBooksStream(Map<String, String> filters) => Stream.fromFuture(getStaffIssuedBooks(filters));
+  static Stream<teacher_library.BookPagination> getStaffLibraryBooksStream(Map<String, String> filters, int page) => Stream.fromFuture(getStaffLibraryBooks(filters, page));
+  static Stream<List<staff_model.Event>> getStaffEventsStream({String? status, String? type}) => Stream.fromFuture(getStaffEvents(status: status, type: type));
+  static Stream<List<staff_model.EventRegistration>> getStaffRegisteredEventsStream() => Stream.fromFuture(getStaffRegisteredEvents());
+  static Stream<List<staff_model.Fee>> getStaffFeesStream() => Stream.fromFuture(getStaffFees());
+  static Stream<staff_model.StudentFeeDetail> getStaffStudentFeeDetailStream(String studentId) => Stream.fromFuture(getStaffStudentFeeDetail(studentId));
+
+  // Librarian Stream Wrappers
+  static Stream<librarian_model.LibrarianDashboardData> getLibrarianDashboardStream() => Stream.fromFuture(getLibrarianDashboard());
+  static Stream<List<librarian_model.ExamType>> getLibrarianExamsStream() => Stream.fromFuture(getLibrarianExams());
+  static Stream<Map<String, dynamic>> getLibrarianExamScheduleStream(String examId) => Stream.fromFuture(getLibrarianExamSchedule(examId));
+  static Stream<List<librarian_model.IssuedBook>> getLibrarianMyIssuedBooksStream([Map<String, String>? filters]) => Stream.fromFuture(getLibrarianMyIssuedBooks(filters));
+  static Stream<List<librarian_model.IssuedBook>> getLibrarianIssuedBooksStream(Map<String, String> filters) => Stream.fromFuture(getLibrarianIssuedBooks(filters));
+  static Stream<List<dynamic>> getIssueAuditLogsStream(String issueId) => Stream.fromFuture(getIssueAuditLogs(issueId));
+  static Stream<Map<String, dynamic>> getIssueBookCreateDataStream() => Stream.fromFuture(getIssueBookCreateData());
+  static Stream<Map<String, dynamic>> getEditIssueDataStream(String issueId) => Stream.fromFuture(getEditIssueData(issueId));
+  static Stream<librarian_model.UserDetail> getLibrarianProfileStream() => Stream.fromFuture(getLibrarianProfile());
+  static Stream<Map<String, dynamic>> getLibrarianSalariesStream() => Stream.fromFuture(getLibrarianSalaries());
+  static Stream<teacher_library.BookPagination> getLibrarianBooksStream(Map<String, String> filters, int page) => Stream.fromFuture(getLibrarianBooks(filters, page));
+  static Stream<List<librarian_model.Event>> getLibrarianEventsStream({String? status, String? type}) => Stream.fromFuture(getLibrarianEvents(status: status, type: type));
+  static Stream<List<librarian_model.EventRegistration>> getLibrarianRegisteredEventsStream() => Stream.fromFuture(getLibrarianRegisteredEvents());
+  static Stream<List<librarian_model.SupportTicket>> getLibrarianTicketsStream(Map<String, String> filters) => Stream.fromFuture(getLibrarianTickets(filters));
+  static Stream<List<librarian_model.SupportTicket>> getLibrarianAssignedTicketsStream(Map<String, String> filters) => Stream.fromFuture(getLibrarianAssignedTickets(filters));
+  static Stream<teacher_ticket_details.TicketDetails> getLibrarianTicketDetailsStream(String ticketId) => Stream.fromFuture(getLibrarianTicketDetails(ticketId));
+
+  // Accountant Stream Wrappers
+  static Stream<accountant_model.AccountantDashboardData> getAccountantDashboardStream() => Stream.fromFuture(getAccountantDashboard());
+  static Stream<List<accountant_model.Event>> getAccountantEventsStream({String? status, String? type}) => Stream.fromFuture(getAccountantEvents(status: status, type: type));
+  static Stream<List<accountant_model.EventRegistration>> getAccountantRegisteredEventsStream({String? status, String? type}) => Stream.fromFuture(getAccountantRegisteredEvents(status: status, type: type));
+  static Stream<List<accountant_model.Exam>> getAccountantExamsStream() => Stream.fromFuture(getAccountantExams());
+  static Stream<accountant_model.UserDetail> getAccountantProfileStream() => Stream.fromFuture(getAccountantProfile());
+  static Stream<Map<String, dynamic>> getAccountantExamScheduleStream(String id) => Stream.fromFuture(getAccountantExamSchedule(id));
+  static Stream<teacher_library.BookPagination> getAccountantLibraryBooksStream(Map<String, String> filters, int page) => Stream.fromFuture(getAccountantLibraryBooks(filters, page));
+  static Stream<teacher_library.LendingPagination> getAccountantLendingBooksStream(Map<String, String> filters, int page) => Stream.fromFuture(getAccountantLendingBooks(filters, page));
+  static Stream<List<dynamic>> getAccountantStudentsStream(Map<String, String> filters) => Stream.fromFuture(getAccountantStudents(filters));
+  static Stream<Map<String, dynamic>> getAccountantStudentFeeDetailsStream(String studentId) => Stream.fromFuture(getAccountantStudentFeeDetails(studentId));
+  static Stream<Map<String, dynamic>> getAccountantMySalariesStream() => Stream.fromFuture(getAccountantMySalaries());
+  static Stream<Map<String, dynamic>> getAccountantEmployeeSalaryStream(String id) => Stream.fromFuture(getAccountantEmployeeSalary(id));
+  static Stream<Map<String, dynamic>> getAccountantSalaryDetailStream(String id, {String? employeeId}) => Stream.fromFuture(getAccountantSalaryDetail(id, employeeId: employeeId));
+  static Stream<Map<String, dynamic>> getAccountantFeesStream() => Stream.fromFuture(getAccountantFees());
+  static Stream<List<accountant_model.UserDetail>> getEmployeesByRoleStream(dynamic roleId) => Stream.fromFuture(getEmployeesByRole(roleId));
+  static Stream<teacher_ticket_details.TicketDetails> getTicketDetailsAccountantStream(String id) => Stream.fromFuture(getTicketDetailsAccountant(id));
+  static Stream<List<teacher_ticket.SupportTicket>> getAccountantTicketsStream(Map<String, String> filters) => Stream.fromFuture(getAccountantTickets(filters));
+  static Stream<List<teacher_ticket.SupportTicket>> getAccountantAssignedTicketsStream(Map<String, String> filters) => Stream.fromFuture(getAccountantAssignedTickets(filters));
 
   static Future<List<moderator_institute.Institute>> getInstitutes() async {
     final response = await get('moderator/institutes');
@@ -630,7 +719,7 @@ class ApiService {
 
   static Future<Map<String, dynamic>> getLibrarianSalarySlip(String salaryId) async {
     final encodedId = Uri.encodeComponent(salaryId);
-    
+
     // 1. Try librarian specific endpoint
     try {
       final response = await get('librarian/salary/$encodedId');
@@ -651,7 +740,7 @@ class ApiService {
         final list = data['salaries'] ?? data['data']?['salaries'] ?? data['data'];
         if (list is List) {
           final record = list.firstWhere(
-            (s) => s['id'].toString() == salaryId || s['encrypted_id']?.toString() == salaryId,
+                (s) => s['id'].toString() == salaryId || s['encrypted_id']?.toString() == salaryId,
             orElse: () => null,
           );
           if (record != null) {
@@ -670,15 +759,15 @@ class ApiService {
 
   static Future<teacher_library.BookPagination> getLibrarianBooks(Map<String, String> filters, int page) async {
     final query = Map<String, String>.from(filters);
-    
+
     // Clean filters: remove "All", empty strings, and map 'year' to 'publication_year'
     query.removeWhere((k, v) => v.isEmpty || v.toLowerCase() == 'all');
     if (query.containsKey('year')) {
       query['publication_year'] = query.remove('year')!;
     }
-    
+
     query['page'] = page.toString();
-    
+
     final response = await get('librarian/books', query);
     if (response.statusCode == 200) {
       final decoded = jsonDecode(response.body);
@@ -809,10 +898,12 @@ class ApiService {
     throw Exception('Failed to load virtual ID card');
   }
 
+  static Stream<staff_model.StaffVirtualIdCardData> getLibrarianVirtualIdCardStream() => Stream.fromFuture(getLibrarianVirtualIdCard());
+
   static Future<teacher_ticket_details.TicketDetails> getTicketDetailsAccountant(String id) async {
     // Attempt 1: General accountant see-reply endpoint (Matches PHP seeReply method)
     var response = await get('accountants/tickets/see-reply/$id');
-    
+
     // Attempt 2: Specific accountant view endpoint
     if (response.statusCode != 200) {
       final altResponse = await get('accountants/tickets/view/$id');
@@ -835,7 +926,7 @@ class ApiService {
       final data = jsonDecode(response.body);
       if (data['success'] == true || data['status'] == true) {
         final payload = data['data'] ?? data;
-        
+
         if (payload is Map<String, dynamic>) {
           if (payload.containsKey('ticket')) {
             return teacher_ticket_details.TicketDetails.fromJson(payload);
@@ -850,7 +941,7 @@ class ApiService {
       }
       if (data['message'] != null) throw Exception(data['message']);
     }
-    
+
     throw Exception('Failed to load ticket details (Status: ${response.statusCode})');
   }
 
@@ -889,7 +980,7 @@ class ApiService {
     final encodedId = Uri.encodeComponent(studentId);
     // Attempt 1: The ID-specific endpoint (studentId could be encrypted or numeric)
     var response = await get('accountants/students/$encodedId');
-    
+
     // Attempt 2: Laravel standard 'view' pattern
     if (response.statusCode != 200) {
       final altResponse = await get('accountants/students/view/$encodedId');
@@ -909,7 +1000,7 @@ class ApiService {
       }
       if (data['message'] != null) throw Exception(data['message']);
     }
-    
+
     // If we reach here, check if it's a 500 error specifically on a numeric ID
     if (response.statusCode == 500 && RegExp(r'^\d+$').hasMatch(studentId)) {
       throw Exception('Server error (500). The backend may require an ENCRYPTED student ID instead of "$studentId".');
@@ -961,7 +1052,7 @@ class ApiService {
 
   static Future<Map<String, dynamic>> getAccountantSalaryDetail(String id, {String? employeeId}) async {
     final encodedId = Uri.encodeComponent(id);
-    
+
     // 1. Try accountant specific endpoint
     try {
       final response = await get('accountants/salary/view/$encodedId');
@@ -980,7 +1071,7 @@ class ApiService {
         final list = data['salaries'] ?? data['data']?['salaries'] ?? data['data'];
         if (list is List) {
           final record = list.firstWhere(
-            (s) => s['id'].toString() == id || s['encrypted_id']?.toString() == id,
+                (s) => s['id'].toString() == id || s['encrypted_id']?.toString() == id,
             orElse: () => null,
           );
           if (record != null) {
@@ -1177,24 +1268,24 @@ class ApiService {
   static Future<List<accountant_model.UserDetail>> getEmployeesByRole(dynamic roleId) async {
     final encodedId = Uri.encodeComponent(roleId.toString());
     final response = await get('accountants/accounts/$encodedId');
-    
+
     if (response.statusCode == 200) {
       final data = jsonDecode(response.body);
       if (data['success'] == true || data['status'] == true) {
         final payload = data['data'] ?? data;
         final usersData = payload['users'] ?? payload['employees'] ?? (payload is List ? payload : []);
-        
+
         List usersList = [];
         if (usersData is List) {
           usersList = usersData;
         } else if (usersData is Map) {
           usersList = usersData.values.toList();
         }
-        
+
         return usersList.map((e) => accountant_model.UserDetail.fromJson(e)).toList();
       }
     }
-    
+
     // Handle specific encryption error from Laravel
     if (response.statusCode == 500 && response.body.contains("The payload is invalid")) {
       throw Exception('Backend decryption failed. The role ID "$roleId" might need to be encrypted.');
@@ -1211,7 +1302,7 @@ class ApiService {
       final data = jsonDecode(response.body);
       if (data['success'] == true || data['status'] == true) {
         final payload = data['data'] ?? data;
-        
+
         // Try to extract dynamic roles from the dashboard data if available
         final rolesData = payload['roles'];
         if (rolesData is Map) {
@@ -1229,7 +1320,7 @@ class ApiService {
           }
           if (dynamicRoles.isNotEmpty) return dynamicRoles;
         }
-        
+
         // Fallback to static map if the API doesn't provide dynamic roles
         return {
           '3': "Managers",
@@ -1252,7 +1343,7 @@ class ApiService {
       if (response.statusCode == 405 || response.statusCode == 404) {
         final postResponse = await post('accountants/fees/delete/$encodedId', {});
         if (postResponse.statusCode == 200) return;
-        
+
         final postData = jsonDecode(postResponse.body);
         throw Exception(postData['message'] ?? 'Failed to delete fee (Status: ${postResponse.statusCode})');
       }
@@ -1327,6 +1418,8 @@ class ApiService {
     throw Exception('Failed to load virtual ID card');
   }
 
+  static Stream<staff_model.StaffVirtualIdCardData> getStaffVirtualIdCardStream() => Stream.fromFuture(getStaffVirtualIdCard());
+
   static Future<List<staff_model.Exam>> getStaffExams() async {
     final response = await get('staff/exams');
     if (response.statusCode == 200) {
@@ -1356,11 +1449,11 @@ class ApiService {
     throw Exception('Failed to load salaries');
   }
 
-  static Future<staff_model.StaffDashboardData> getStaffSalaryDetails(String salaryId) async {
+  static Future<staff_model.SalaryDetailData> getStaffSalaryDetails(String salaryId) async {
     final response = await get('staff/salary/$salaryId');
     if (response.statusCode == 200) {
       final data = jsonDecode(response.body);
-      if (data['success'] == true || data['status'] == true) return staff_model.StaffDashboardData.fromJson(data['data']);
+      if (data['success'] == true || data['status'] == true) return staff_model.SalaryDetailData.fromJson(data['data']);
     }
     throw Exception('Failed to load salary details');
   }
@@ -1473,7 +1566,7 @@ class ApiService {
 
   static Future<List<staff_model.Fee>> getStaffFees() async {
     final response = await get('staff/fees');
-    
+
     if (response.statusCode == 200) {
       final data = jsonDecode(response.body);
       if (data['success'] == true || data['status'] == true) {
@@ -1482,13 +1575,13 @@ class ApiService {
         if (listData is Map && listData.containsKey('data')) {
           listData = listData['data'];
         }
-        
+
         if (listData is List) {
           return listData.map((f) => staff_model.Fee.fromJson(f)).toList();
         }
       }
     }
-    
+
     throw Exception('Failed to load fees (Status: ${response.statusCode})');
   }
 
@@ -1563,7 +1656,7 @@ class ApiService {
 
   static Future<Map<String, dynamic>> getStaffSalarySlip(String salaryId) async {
     final encodedId = Uri.encodeComponent(salaryId);
-    
+
     // 1. Try staff specific endpoint
     try {
       final response = await get('staff/salary/$encodedId');
@@ -1587,8 +1680,8 @@ class ApiService {
 
         if (list is List) {
           final record = list.firstWhere(
-            (s) => s['id'].toString() == salaryId || s['encrypted_id']?.toString() == salaryId,
-            orElse: () => null
+                  (s) => s['id'].toString() == salaryId || s['encrypted_id']?.toString() == salaryId,
+              orElse: () => null
           );
 
           if (record != null) {
@@ -1682,10 +1775,12 @@ class ApiService {
     throw Exception('Failed to load virtual ID card');
   }
 
+  static Stream<accountant_model.AccountantVirtualIdCardData> getAccountantVirtualIdCardStream() => Stream.fromFuture(getAccountantVirtualIdCard());
+
   static Future<Map<String, dynamic>> getAccountantExamSchedule(String id) async {
     final encodedId = Uri.encodeComponent(id);
     final response = await get('accountants/exams/schedule/$encodedId');
-    
+
     if (response.statusCode == 200) {
       final data = jsonDecode(response.body);
       if (data['success'] == true || data['status'] == true) return data['data'] ?? data;

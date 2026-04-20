@@ -1,8 +1,10 @@
+import 'package:eduphin/librarian/librarian_skeleton_widgets.dart';
+import 'package:eduphin/services/common_widgets.dart';
 import '../../services/responsive_helper.dart';
 import 'package:flutter/material.dart';
 import '../../services/api_service.dart';
 import '../../teacher/dashboard/app_drawer.dart';
-import 'package:eduphin/teacher/dashboard/library_models.dart';
+import 'package:eduphin/teacher/dashboard/library_models.dart' as teacher_library;
 import 'add_new_books.dart';
 
 class AllBooksPage extends StatefulWidget {
@@ -13,10 +15,10 @@ class AllBooksPage extends StatefulWidget {
 }
 
 class _AllBooksPageState extends State<AllBooksPage> {
-  bool _isLoading = true;
-  List<Book> _books = [];
+  List<teacher_library.Book> _books = [];
   int _currentPage = 1;
   int _totalPages = 1;
+  late Stream<teacher_library.BookPagination> _booksStream;
 
   final Map<String, String> _filters = {
     'title': '',
@@ -32,26 +34,16 @@ class _AllBooksPageState extends State<AllBooksPage> {
   @override
   void initState() {
     super.initState();
-    _fetchBooks();
+    _refreshData();
+  }
+
+  void _refreshData() {
+    _booksStream = ApiService.getLibrarianBooksStream(_filters, _currentPage).asBroadcastStream();
+    setState(() {});
   }
 
   Future<void> _fetchBooks() async {
-    if (!mounted) return;
-    setState(() => _isLoading = true);
-    try {
-      final pagination = await ApiService.getLibrarianBooks(_filters, _currentPage);
-      if (!mounted) return;
-      setState(() {
-        _books = pagination.books;
-        _totalPages = pagination.lastPage;
-        _isLoading = false;
-      });
-    } catch (e) {
-      if (mounted) {
-        setState(() => _isLoading = false);
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Error: $e")));
-      }
-    }
+    _refreshData();
   }
 
   Future<void> _deleteBook(int bookId) async {
@@ -104,62 +96,76 @@ class _AllBooksPageState extends State<AllBooksPage> {
         ],
       ),
       drawer: const AppDrawer(),
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : RefreshIndicator(
-              onRefresh: _fetchBooks,
-              child: SingleChildScrollView(
-                padding: context.pagePadding,
-                child: Center(
-                  child: ConstrainedBox(
-                    constraints: const BoxConstraints(maxWidth: 1200),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        _buildFilterCard(context),
-                        SizedBox(height: context.lg),
-                        if (_books.isEmpty)
-                          Center(
-                            child: Padding(
-                              padding: EdgeInsets.all(context.xl),
-                              child: Column(
-                                children: [
-                                  Icon(Icons.search_off_rounded, size: context.scale(64), color: context.theme.colorScheme.outlineVariant),
-                                  SizedBox(height: context.md),
-                                  Text(
-                                    "No books found matching your criteria.",
-                                    style: context.theme.textTheme.bodyLarge?.copyWith(color: context.theme.colorScheme.outline),
-                                  ),
-                                  SizedBox(height: context.sm),
-                                  FilledButton.tonal(onPressed: _fetchBooks, child: const Text("Reset Filters"))
-                                ],
+      body: StreamBuilder<teacher_library.BookPagination>(
+        stream: _booksStream,
+        builder: (context, snapshot) {
+          return LoadingWrapper<teacher_library.BookPagination>(
+            snapshot: snapshot,
+            skeleton: const GridSkeleton(),
+            onRetry: _refreshData,
+            builder: (pagination) {
+              final books = pagination.books;
+              _totalPages = pagination.lastPage;
+
+              return RefreshIndicator(
+                onRefresh: () async => _refreshData(),
+                child: SingleChildScrollView(
+                  padding: context.pagePadding,
+                  child: Center(
+                    child: ConstrainedBox(
+                      constraints: const BoxConstraints(maxWidth: 1200),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          _buildFilterCard(context),
+                          SizedBox(height: context.lg),
+                          if (books.isEmpty)
+                            Center(
+                              child: Padding(
+                                padding: EdgeInsets.all(context.xl),
+                                child: Column(
+                                  children: [
+                                    Icon(Icons.search_off_rounded, size: context.scale(64), color: context.theme.colorScheme.outlineVariant),
+                                    SizedBox(height: context.md),
+                                    Text(
+                                      "No books found matching your criteria.",
+                                      style: context.theme.textTheme.bodyLarge?.copyWith(color: context.theme.colorScheme.outline),
+                                    ),
+                                    SizedBox(height: context.sm),
+                                    FilledButton.tonal(onPressed: _fetchBooks, child: const Text("Reset Filters"))
+                                  ],
+                                ),
                               ),
+                            )
+                          else
+                            GridView.builder(
+                              shrinkWrap: true,
+                              physics: const NeverScrollableScrollPhysics(),
+                              gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                                crossAxisCount: context.responsive<int>(1, tablet: 2, desktop: 3),
+                                mainAxisExtent: context.scale(260),
+                                crossAxisSpacing: context.md,
+                                mainAxisSpacing: context.md,
+                              ),
+                              itemCount: books.length,
+                              itemBuilder: (context, index) => _buildBookCard(context, books[index]),
                             ),
-                          )
-                        else
-                          GridView.builder(
-                            shrinkWrap: true,
-                            physics: const NeverScrollableScrollPhysics(),
-                            gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                              crossAxisCount: context.responsive<int>(1, tablet: 2, desktop: 3),
-                              mainAxisExtent: context.scale(260),
-                              crossAxisSpacing: context.md,
-                              mainAxisSpacing: context.md,
-                            ),
-                            itemCount: _books.length,
-                            itemBuilder: (context, index) => _buildBookCard(context, _books[index]),
-                          ),
-                        SizedBox(height: context.lg),
-                        _buildPagination(context),
-                        SizedBox(height: context.xl),
-                      ],
+                          SizedBox(height: context.lg),
+                          _buildPagination(context, books.isNotEmpty),
+                          SizedBox(height: context.xl),
+                        ],
+                      ),
                     ),
                   ),
                 ),
-              ),
-            ),
+              );
+            },
+          );
+        },
+      ),
     );
   }
+
 
   Widget _buildFilterCard(BuildContext context) {
     final theme = context.theme;
@@ -247,7 +253,7 @@ class _AllBooksPageState extends State<AllBooksPage> {
     );
   }
 
-  Widget _buildBookCard(BuildContext context, Book book) {
+  Widget _buildBookCard(BuildContext context, teacher_library.Book book) {
     final theme = context.theme;
     return Card(
       elevation: 0,
@@ -376,8 +382,8 @@ class _AllBooksPageState extends State<AllBooksPage> {
     );
   }
 
-  Widget _buildPagination(BuildContext context) {
-    if (_books.isEmpty) return const SizedBox.shrink();
+  Widget _buildPagination(BuildContext context, bool hasData) {
+    if (!hasData) return const SizedBox.shrink();
     final theme = context.theme;
 
     return Center(

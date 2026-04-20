@@ -6,6 +6,7 @@ import 'package:eduphin/models/class.dart';
 import 'package:eduphin/models/new_student.dart';
 import 'package:eduphin/models/section.dart';
 import 'package:eduphin/services/api_service.dart';
+import 'package:eduphin/services/caching_service.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:http/http.dart' as http;
 import 'package:flutter/material.dart';
@@ -20,7 +21,11 @@ class AddNewStudentPage extends StatefulWidget {
 
 class _AddNewStudentPageState extends State<AddNewStudentPage> {
   final _formKey = GlobalKey<FormState>();
-  late Future<AcademicData> _academicDataFuture;
+  
+  AcademicData? _academicData;
+  bool _isLoading = true;
+  Object? _error;
+  final String _cacheKey = 'manager_academic_data';
 
   final _newStudent = NewStudent();
   bool _isSubmitting = false;
@@ -31,18 +36,50 @@ class _AddNewStudentPageState extends State<AddNewStudentPage> {
   @override
   void initState() {
     super.initState();
-    _academicDataFuture = _fetchAcademicData();
+    _loadData();
   }
 
-  Future<AcademicData> _fetchAcademicData() async {
+  Future<void> _loadData() async {
+    await _loadCachedData();
+    await _fetchAcademicData();
+  }
+
+  Future<void> _loadCachedData() async {
+    final cachedData = await CacheService.getCache(_cacheKey);
+    if (cachedData != null) {
+      if (mounted) {
+        setState(() {
+          final List<dynamic> classData = cachedData['data'];
+          _classes = classData.map((data) => Class.fromJson(data)).toList();
+          _academicData = AcademicData(classes: _classes);
+          _isLoading = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _fetchAcademicData() async {
+    if (_academicData == null) {
+      setState(() {
+        _isLoading = true;
+        _error = null;
+      });
+    }
     try {
       final response = await ApiService.get('manager/classes');
       if (response.statusCode == 200) {
         final responseBody = jsonDecode(response.body);
         if (responseBody['status'] == true) {
+          await CacheService.setCache(_cacheKey, responseBody);
           List<dynamic> classData = responseBody['data'];
-          List<Class> classes = classData.map((data) => Class.fromJson(data)).toList();
-          return AcademicData(classes: classes);
+          if (mounted) {
+            setState(() {
+              _classes = classData.map((data) => Class.fromJson(data)).toList();
+              _academicData = AcademicData(classes: _classes);
+              _isLoading = false;
+              _error = null;
+            });
+          }
         } else {
           throw Exception('Failed to load academic data: ${responseBody['message']}');
         }
@@ -51,7 +88,12 @@ class _AddNewStudentPageState extends State<AddNewStudentPage> {
         throw Exception('Failed to load academic data: ${responseBody['message'] ?? 'Server error with status code ${response.statusCode}'}');
       }
     } catch (e) {
-      throw Exception('An error occurred while fetching academic data: ${e.toString().replaceFirst("Exception: ", "")}');
+      if (mounted) {
+        setState(() {
+          _error = e;
+          _isLoading = false;
+        });
+      }
     }
   }
 
@@ -115,25 +157,16 @@ class _AddNewStudentPageState extends State<AddNewStudentPage> {
       appBar: AppBar(title: const Text("Add New Student"), centerTitle: true),
       floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
       floatingActionButton: _buildActionButtons(theme),
-      body: FutureBuilder<AcademicData>(
-        future: _academicDataFuture,
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
-          } else if (snapshot.hasError) {
-            return Center(
-                child: Text(
-                    "Error: ${snapshot.error.toString().replaceFirst("Exception: ", "")}"));
-          } else if (snapshot.hasData) {
-            _classes = snapshot.data!.classes;
-            return _buildForm(theme, snapshot.data!);
-          } else {
-            return const Center(child: Text("No academic data available."));
-          }
-        },
-      ),
+      body: _isLoading
+          ? const Center(child: CircularProgressIndicator())
+          : _error != null
+              ? Center(child: Text("Error: ${_error.toString().replaceFirst("Exception: ", "")}"))
+              : _academicData != null
+                  ? _buildForm(theme, _academicData!)
+                  : const Center(child: Text("No academic data available.")),
     );
   }
+
 
   Widget _buildForm(ThemeData theme, AcademicData academicData) {
     return SingleChildScrollView(
@@ -388,7 +421,7 @@ class _AddNewStudentPageState extends State<AddNewStudentPage> {
           Text(label, style: theme.textTheme.labelLarge),
           const SizedBox(height: 8),
           DropdownButtonFormField<T>(
-              value: value,
+              initialValue: value,
               items: items,
               onChanged: onChanged,
               decoration: InputDecoration(
@@ -595,3 +628,4 @@ class _AddNewStudentPageState extends State<AddNewStudentPage> {
     });
   }
 }
+

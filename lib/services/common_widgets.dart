@@ -1,11 +1,188 @@
 import 'dart:io';
 import 'dart:typed_data';
+import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:eduphin/services/api_service.dart';
 import 'package:eduphin/services/responsive_helper.dart';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
+import 'package:shimmer/shimmer.dart';
+
+class SkeletonBox extends StatelessWidget {
+  final double? width;
+  final double? height;
+  final double? borderRadius;
+
+  const SkeletonBox({super.key, this.width, this.height, this.borderRadius});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = context.theme;
+    return Shimmer.fromColors(
+      baseColor: theme.colorScheme.surfaceContainerHighest,
+      highlightColor: theme.colorScheme.surface,
+      child: Container(
+        width: width ?? double.infinity,
+        height: height ?? context.scale(20),
+        decoration: BoxDecoration(
+          color: theme.colorScheme.surfaceContainerHighest,
+          borderRadius: BorderRadius.circular(borderRadius ?? context.scale(8)),
+        ),
+      ),
+    );
+  }
+}
+
+class Skeleton extends StatelessWidget {
+  final double? width;
+  final double? height;
+  final dynamic borderRadius;
+
+  const Skeleton({super.key, this.width, this.height, this.borderRadius});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = context.theme;
+    return Shimmer.fromColors(
+      baseColor: theme.colorScheme.surfaceContainerHighest,
+      highlightColor: theme.colorScheme.surface,
+      child: Container(
+        width: width,
+        height: height,
+        decoration: BoxDecoration(
+          color: theme.colorScheme.surfaceContainerHighest,
+          borderRadius: borderRadius is BorderRadius 
+              ? borderRadius 
+              : BorderRadius.circular(borderRadius?.toDouble() ?? context.scale(8)),
+        ),
+      ),
+    );
+  }
+}
+
+class LoadingWrapper<T> extends StatelessWidget {
+  final AsyncSnapshot<T>? snapshot;
+  final bool? isLoading;
+  final bool? hasData;
+  final Object? error;
+  final Widget skeleton;
+  final Widget? child;
+  final Widget Function(T data)? builder;
+  final VoidCallback? onRetry;
+  final VoidCallback? onRefresh;
+
+  const LoadingWrapper({
+    super.key,
+    this.snapshot,
+    this.isLoading,
+    this.hasData,
+    this.error,
+    required this.skeleton,
+    this.child,
+    this.builder,
+    this.onRetry,
+    this.onRefresh,
+  }) : assert(snapshot != null || isLoading != null, 'Either snapshot or isLoading must be provided'),
+       assert(child != null || builder != null, 'Either child or builder must be provided');
+
+  @override
+  Widget build(BuildContext context) {
+    bool loading;
+    if (isLoading != null) {
+      if (hasData != null) {
+        loading = isLoading! && !hasData!;
+      } else {
+        loading = isLoading!;
+      }
+    } else {
+      loading = snapshot!.connectionState == ConnectionState.waiting && !snapshot!.hasData;
+    }
+    
+    if (loading) {
+      return skeleton;
+    }
+
+    final hasError = error != null || (snapshot != null && snapshot!.hasError && !snapshot!.hasData);
+    if (hasError) {
+      final theme = context.theme;
+      final errorMessage = error?.toString() ?? snapshot!.error.toString();
+      return Center(
+        child: Padding(
+          padding: context.pagePadding,
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(Icons.error_outline, color: theme.colorScheme.error, size: context.scale(48)),
+              SizedBox(height: context.scale(16)),
+              Text(
+                errorMessage.replaceFirst('Exception: ', ''),
+                textAlign: TextAlign.center,
+                style: TextStyle(color: theme.hintColor),
+              ),
+              if (onRetry != null) ...[
+                SizedBox(height: context.scale(24)),
+                FilledButton.tonal(onPressed: onRetry, child: const Text("Retry")),
+              ],
+            ],
+          ),
+        ),
+      );
+    }
+
+    Widget content;
+    if (child != null) {
+      content = child!;
+    } else if (builder != null) {
+      if (snapshot != null && !snapshot!.hasData) {
+        content = const SizedBox.shrink();
+      } else {
+        content = builder!(snapshot!.data as T);
+      }
+    } else {
+      content = const SizedBox.shrink();
+    }
+
+    if (onRefresh != null) {
+      return RefreshIndicator(
+        onRefresh: () async => onRefresh!(),
+        child: content,
+      );
+    }
+
+    return content;
+  }
+}
+
+class SkeletonLoader extends StatelessWidget {
+  final double? width;
+  final double height;
+  final BorderRadius? borderRadius;
+
+  const SkeletonLoader({
+    super.key,
+    this.width,
+    required this.height,
+    this.borderRadius,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = context.theme;
+    return Shimmer.fromColors(
+      baseColor: theme.colorScheme.surfaceContainerHighest,
+      highlightColor: theme.colorScheme.surface,
+      child: Container(
+        width: width ?? double.infinity,
+        height: height,
+        decoration: BoxDecoration(
+          color: theme.colorScheme.surfaceContainerHighest,
+          borderRadius: borderRadius ?? BorderRadius.circular(context.scale(8)),
+        ),
+      ),
+    );
+  }
+}
 
 class ProfileSection extends StatelessWidget {
   final String title;
@@ -202,7 +379,7 @@ class ProfileDropdown extends StatelessWidget {
     return Padding(
       padding: EdgeInsets.only(bottom: context.scale(16)),
       child: DropdownButtonFormField<String>(
-        value: value,
+        initialValue: value,
         items: items
             .map((i) => DropdownMenuItem(value: i, child: Text(i)))
             .toList(),
@@ -297,8 +474,15 @@ class _ProfileAvatarState extends State<ProfileAvatar> {
   void initState() {
     super.initState();
     _loadToken();
-    if (kIsWeb) {
-      _fetchNetworkImageBytes();
+  }
+
+  Future<void> _loadToken() async {
+    _token = await ApiService.getToken();
+    if (mounted) {
+      setState(() {});
+      if (kIsWeb) {
+        _fetchNetworkImageBytes();
+      }
     }
   }
 
@@ -324,11 +508,13 @@ class _ProfileAvatarState extends State<ProfileAvatar> {
       return;
     }
 
-    setState(() {
-      _isLoadingNetworkImage = true;
-      _networkImageBytes = null;
-      _errorLoadingImage = false;
-    });
+    if (mounted) {
+      setState(() {
+        _isLoadingNetworkImage = true;
+        _networkImageBytes = null;
+        _errorLoadingImage = false;
+      });
+    }
 
     try {
       final response = await http.get(
@@ -344,7 +530,14 @@ class _ProfileAvatarState extends State<ProfileAvatar> {
           });
         }
       } else {
-        throw Exception('Failed to load image: ${response.statusCode}');
+        // Log the error but don't throw to avoid crashing the state
+        debugPrint('ProfileAvatar: Failed to load image. Status: ${response.statusCode}');
+        if (mounted) {
+          setState(() {
+            _errorLoadingImage = true;
+            _isLoadingNetworkImage = false;
+          });
+        }
       }
     } catch (e) {
       debugPrint('ProfileAvatar: Error fetching image bytes: $e');
@@ -355,11 +548,6 @@ class _ProfileAvatarState extends State<ProfileAvatar> {
         });
       }
     }
-  }
-
-  Future<void> _loadToken() async {
-    _token = await ApiService.getToken();
-    if (mounted) setState(() {});
   }
 
   @override
@@ -550,7 +738,7 @@ class QuickActionItem extends StatelessWidget {
 
     return InkWell(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(context.scale(16)),
+      borderRadius: BorderRadius.circular(context.scale(20)),
       child: Container(
         width: width,
         padding: EdgeInsets.symmetric(
@@ -559,7 +747,7 @@ class QuickActionItem extends StatelessWidget {
         ),
         decoration: BoxDecoration(
           color: colorScheme.surfaceContainerLow,
-          borderRadius: BorderRadius.circular(context.scale(16)),
+          borderRadius: BorderRadius.circular(context.scale(20)),
           border: Border.all(
             color: colorScheme.outlineVariant.withValues(alpha: 0.5),
             width: 0.5,

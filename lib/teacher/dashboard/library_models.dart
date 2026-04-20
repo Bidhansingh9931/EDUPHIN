@@ -62,6 +62,9 @@ class Book {
   final String? language;
   final String? format;
   final String? publicationYear;
+  final String? edition;
+  final String? volume;
+  final String? publisher;
 
   Book({
     required this.id,
@@ -74,6 +77,9 @@ class Book {
     this.language,
     this.format,
     this.publicationYear,
+    this.edition,
+    this.volume,
+    this.publisher,
   });
 
   factory Book.fromJson(Map<String, dynamic> json) {
@@ -88,6 +94,9 @@ class Book {
       language: json['language'],
       format: json['format'],
       publicationYear: json['publication_year']?.toString(),
+      edition: json['edition']?.toString(),
+      volume: json['volume']?.toString(),
+      publisher: json['publisher']?.toString(),
     );
   }
 }

@@ -1,3 +1,5 @@
+import 'package:eduphin/services/common_widgets.dart';
+import 'package:eduphin/librarian/librarian_skeleton_widgets.dart';
 import 'package:eduphin/services/responsive_helper.dart';
 import 'package:flutter/material.dart';
 import '../services/api_service.dart';
@@ -12,8 +14,7 @@ class OverdueBooksPage extends StatefulWidget {
 }
 
 class _OverdueBooksPageState extends State<OverdueBooksPage> {
-  bool _isLoading = true;
-  List<IssuedBook> _overdueBooks = [];
+  Stream<List<IssuedBook>>? _overdueBooksStream;
 
   final TextEditingController _bookTitleController = TextEditingController();
   final TextEditingController _userNameController = TextEditingController();
@@ -24,33 +25,20 @@ class _OverdueBooksPageState extends State<OverdueBooksPage> {
   @override
   void initState() {
     super.initState();
-    _fetchOverdueBooks();
+    _refreshStream();
   }
 
-  Future<void> _fetchOverdueBooks() async {
-    if (!mounted) return;
-    setState(() => _isLoading = true);
-    try {
-      final Map<String, String> filters = {'overdue': '1'}; 
-      if (_bookTitleController.text.isNotEmpty) filters['book_title'] = _bookTitleController.text;
-      if (_userNameController.text.isNotEmpty) filters['user_name'] = _userNameController.text;
-      if (_dateFromController.text.isNotEmpty) filters['due_from'] = _dateFromController.text;
-      if (_dateToController.text.isNotEmpty) filters['due_to'] = _dateToController.text;
-      if (_searchController.text.isNotEmpty) filters['search'] = _searchController.text;
+  void _refreshStream() {
+    final Map<String, String> filters = {};
+    if (_bookTitleController.text.isNotEmpty) filters['book_title'] = _bookTitleController.text;
+    if (_userNameController.text.isNotEmpty) filters['user_name'] = _userNameController.text;
+    if (_dateFromController.text.isNotEmpty) filters['due_from'] = _dateFromController.text;
+    if (_dateToController.text.isNotEmpty) filters['due_to'] = _dateToController.text;
+    if (_searchController.text.isNotEmpty) filters['search'] = _searchController.text;
 
-      final books = await ApiService.getLibrarianIssuedBooks(filters);
-      if (mounted) {
-        setState(() {
-          _overdueBooks = books;
-          _isLoading = false;
-        });
-      }
-    } catch (e) {
-      if (mounted) {
-        setState(() => _isLoading = false);
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Error: $e")));
-      }
-    }
+    setState(() {
+      _overdueBooksStream = ApiService.getLibrarianOverdueBooksStream(filters).asBroadcastStream();
+    });
   }
 
   Future<void> _selectDate(BuildContext context, TextEditingController controller) async {
@@ -77,184 +65,195 @@ class _OverdueBooksPageState extends State<OverdueBooksPage> {
         title: const Text("Overdue Books"),
         centerTitle: false,
       ),
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : RefreshIndicator(
-              onRefresh: _fetchOverdueBooks,
-              child: Center(
-                child: ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 1200),
-                  child: SingleChildScrollView(
-                    physics: const AlwaysScrollableScrollPhysics(),
-                    padding: context.pagePadding,
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        /// FILTER SECTION
-                        Card(
-                          elevation: 0,
-                          color: colorScheme.surfaceContainerLow,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(context.scale(20)),
-                            side: BorderSide(color: colorScheme.outlineVariant.withValues(alpha: 0.5), width: 0.5),
+      body: StreamBuilder<List<IssuedBook>>(
+        stream: _overdueBooksStream,
+        builder: (context, snapshot) {
+          return RefreshIndicator(
+            onRefresh: () async => _refreshStream(),
+            child: Center(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 1200),
+                child: LoadingWrapper<List<IssuedBook>>(
+                  snapshot: snapshot,
+                  skeleton: const TableSkeleton(),
+                  onRetry: _refreshStream,
+                  builder: (overdueBooks) {
+                    return SingleChildScrollView(
+                      physics: const AlwaysScrollableScrollPhysics(),
+                      padding: context.pagePadding,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          /// FILTER SECTION
+                          Card(
+                            elevation: 0,
+                            color: colorScheme.surfaceContainerLow,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(context.scale(20)),
+                              side: BorderSide(color: colorScheme.outlineVariant.withValues(alpha: 0.5), width: 0.5),
+                            ),
+                            child: Padding(
+                              padding: EdgeInsets.all(context.scale(16)),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    "Filter Overdue Books",
+                                    style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+                                  ),
+                                  SizedBox(height: context.scale(16)),
+                                  _buildResponsiveRow(context, [
+                                    _buildInputField(context, "Book Title", "e.g Math, Physics", _bookTitleController),
+                                    _buildInputField(context, "User Name", "e.g John, Ayesha", _userNameController),
+                                  ]),
+                                  _buildResponsiveRow(context, [
+                                    _buildDateField(context, "Due Date From", _dateFromController),
+                                    _buildDateField(context, "Due Date To", _dateToController),
+                                  ]),
+                                  SizedBox(height: context.scale(12)),
+                                  Row(
+                                    children: [
+                                      Expanded(
+                                        child: FilledButton(
+                                          onPressed: _refreshStream,
+                                          style: FilledButton.styleFrom(
+                                            padding: EdgeInsets.symmetric(vertical: context.scale(14)),
+                                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(context.scale(12))),
+                                          ),
+                                          child: const Text("APPLY FILTERS"),
+                                        ),
+                                      ),
+                                      SizedBox(width: context.scale(12)),
+                                      Expanded(
+                                        child: OutlinedButton(
+                                          onPressed: () {
+                                            setState(() {
+                                              _bookTitleController.clear();
+                                              _userNameController.clear();
+                                              _dateFromController.clear();
+                                              _dateToController.clear();
+                                            });
+                                            _refreshStream();
+                                          },
+                                          style: OutlinedButton.styleFrom(
+                                            padding: EdgeInsets.symmetric(vertical: context.scale(14)),
+                                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(context.scale(12))),
+                                          ),
+                                          child: const Text("RESET"),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ],
+                              ),
+                            ),
                           ),
-                          child: Padding(
-                            padding: EdgeInsets.all(context.scale(16)),
+
+                          SizedBox(height: context.scale(24)),
+
+                          /// OVERDUE RECORDS SECTION
+                          Card(
+                            elevation: 0,
+                            color: colorScheme.surfaceContainerLow,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(context.scale(20)),
+                              side: BorderSide(color: colorScheme.outlineVariant.withValues(alpha: 0.5), width: 0.5),
+                            ),
+                            clipBehavior: Clip.antiAlias,
                             child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
+                              crossAxisAlignment: CrossAxisAlignment.stretch,
                               children: [
-                                Text(
-                                  "Filter Overdue Books",
-                                  style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+                                Padding(
+                                  padding: EdgeInsets.all(context.scale(16)),
+                                  child: Row(
+                                    children: [
+                                      Text(
+                                        "Overdue Records",
+                                        style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+                                      ),
+                                      const Spacer(),
+                                      _exportIcon(context, Icons.picture_as_pdf, Colors.red),
+                                      _exportIcon(context, Icons.table_chart, Colors.green),
+                                    ],
+                                  ),
+                                ),
+                                Padding(
+                                  padding: EdgeInsets.symmetric(horizontal: context.scale(16)),
+                                  child: TextField(
+                                    controller: _searchController,
+                                    onChanged: (v) => _refreshStream(),
+                                    style: TextStyle(fontSize: context.font(14)),
+                                    decoration: InputDecoration(
+                                      hintText: "Search books...",
+                                      prefixIcon: const Icon(Icons.search),
+                                      filled: true,
+                                      fillColor: colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
+                                      border: OutlineInputBorder(
+                                        borderRadius: BorderRadius.circular(context.scale(12)),
+                                        borderSide: BorderSide(color: colorScheme.outlineVariant.withValues(alpha: 0.5)),
+                                      ),
+                                      enabledBorder: OutlineInputBorder(
+                                        borderRadius: BorderRadius.circular(context.scale(12)),
+                                        borderSide: BorderSide(color: colorScheme.outlineVariant.withValues(alpha: 0.5)),
+                                      ),
+                                      focusedBorder: OutlineInputBorder(
+                                        borderRadius: BorderRadius.circular(context.scale(12)),
+                                        borderSide: BorderSide(color: colorScheme.primary, width: 1),
+                                      ),
+                                      contentPadding: EdgeInsets.symmetric(horizontal: context.scale(16)),
+                                    ),
+                                  ),
                                 ),
                                 SizedBox(height: context.scale(16)),
-                                _buildResponsiveRow(context, [
-                                  _buildInputField(context, "Book Title", "e.g Math, Physics", _bookTitleController),
-                                  _buildInputField(context, "User Name", "e.g John, Ayesha", _userNameController),
-                                ]),
-                                _buildResponsiveRow(context, [
-                                  _buildDateField(context, "Due Date From", _dateFromController),
-                                  _buildDateField(context, "Due Date To", _dateToController),
-                                ]),
-                                SizedBox(height: context.scale(12)),
-                                Row(
-                                  children: [
-                                    Expanded(
-                                      child: FilledButton(
-                                        onPressed: _fetchOverdueBooks,
-                                        style: FilledButton.styleFrom(
-                                          padding: EdgeInsets.symmetric(vertical: context.scale(14)),
-                                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(context.scale(12))),
-                                        ),
-                                        child: const Text("APPLY FILTERS"),
+                                if (overdueBooks.isEmpty)
+                                  Center(
+                                    child: Padding(
+                                      padding: EdgeInsets.symmetric(vertical: context.scale(40)),
+                                      child: const Text("No overdue records found"),
+                                    ),
+                                  )
+                                else
+                                  SingleChildScrollView(
+                                    scrollDirection: Axis.horizontal,
+                                    child: ConstrainedBox(
+                                      constraints: const BoxConstraints(minWidth: 800),
+                                      child: DataTable(
+                                        headingRowColor: WidgetStateProperty.all(colorScheme.surfaceContainer),
+                                        dataRowMinHeight: context.scale(60),
+                                        dataRowMaxHeight: context.scale(70),
+                                        columnSpacing: context.scale(24),
+                                        columns: [
+                                          DataColumn(label: Text("#", style: TextStyle(fontWeight: FontWeight.bold, fontSize: context.font(14)))),
+                                          DataColumn(label: Text("ISSUE ID", style: TextStyle(fontWeight: FontWeight.bold, fontSize: context.font(14)))),
+                                          DataColumn(label: Text("BOOK TITLE", style: TextStyle(fontWeight: FontWeight.bold, fontSize: context.font(14)))),
+                                          DataColumn(label: Text("LENDER", style: TextStyle(fontWeight: FontWeight.bold, fontSize: context.font(14)))),
+                                          DataColumn(label: Text("DUE DATE", style: TextStyle(fontWeight: FontWeight.bold, fontSize: context.font(14)))),
+                                          DataColumn(label: Text("ACTION", style: TextStyle(fontWeight: FontWeight.bold, fontSize: context.font(14)))),
+                                        ],
+                                        rows: overdueBooks.asMap().entries.map((entry) {
+                                          int index = entry.key + 1;
+                                          IssuedBook ib = entry.value;
+                                          return _buildDataRow(context, index.toString(), ib);
+                                        }).toList(),
                                       ),
                                     ),
-                                    SizedBox(width: context.scale(12)),
-                                    Expanded(
-                                      child: OutlinedButton(
-                                        onPressed: () {
-                                          setState(() {
-                                            _bookTitleController.clear();
-                                            _userNameController.clear();
-                                            _dateFromController.clear();
-                                            _dateToController.clear();
-                                          });
-                                          _fetchOverdueBooks();
-                                        },
-                                        style: OutlinedButton.styleFrom(
-                                          padding: EdgeInsets.symmetric(vertical: context.scale(14)),
-                                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(context.scale(12))),
-                                        ),
-                                        child: const Text("RESET"),
-                                      ),
-                                    ),
-                                  ],
-                                ),
+                                  ),
                               ],
                             ),
                           ),
-                        ),
-
-                        SizedBox(height: context.scale(24)),
-
-                        /// OVERDUE RECORDS SECTION
-                        Card(
-                          elevation: 0,
-                          color: colorScheme.surfaceContainerLow,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(context.scale(20)),
-                            side: BorderSide(color: colorScheme.outlineVariant.withValues(alpha: 0.5), width: 0.5),
-                          ),
-                          clipBehavior: Clip.antiAlias,
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.stretch,
-                            children: [
-                              Padding(
-                                padding: EdgeInsets.all(context.scale(16)),
-                                child: Row(
-                                  children: [
-                                    Text(
-                                      "Overdue Records",
-                                      style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
-                                    ),
-                                    const Spacer(),
-                                    _exportIcon(context, Icons.picture_as_pdf, Colors.red),
-                                    _exportIcon(context, Icons.table_chart, Colors.green),
-                                  ],
-                                ),
-                              ),
-                              Padding(
-                                padding: EdgeInsets.symmetric(horizontal: context.scale(16)),
-                                child: TextField(
-                                  controller: _searchController,
-                                  onChanged: (v) => _fetchOverdueBooks(),
-                                  style: TextStyle(fontSize: context.font(14)),
-                                  decoration: InputDecoration(
-                                    hintText: "Search books...",
-                                    prefixIcon: const Icon(Icons.search),
-                                    filled: true,
-                                    fillColor: colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
-                                    border: OutlineInputBorder(
-                                      borderRadius: BorderRadius.circular(context.scale(12)),
-                                      borderSide: BorderSide(color: colorScheme.outlineVariant.withValues(alpha: 0.5)),
-                                    ),
-                                    enabledBorder: OutlineInputBorder(
-                                      borderRadius: BorderRadius.circular(context.scale(12)),
-                                      borderSide: BorderSide(color: colorScheme.outlineVariant.withValues(alpha: 0.5)),
-                                    ),
-                                    focusedBorder: OutlineInputBorder(
-                                      borderRadius: BorderRadius.circular(context.scale(12)),
-                                      borderSide: BorderSide(color: colorScheme.primary, width: 1),
-                                    ),
-                                    contentPadding: EdgeInsets.symmetric(horizontal: context.scale(16)),
-                                  ),
-                                ),
-                              ),
-                              SizedBox(height: context.scale(16)),
-                              if (_overdueBooks.isEmpty)
-                                Center(
-                                  child: Padding(
-                                    padding: EdgeInsets.symmetric(vertical: context.scale(40)),
-                                    child: const Text("No overdue records found"),
-                                  ),
-                                )
-                              else
-                                SingleChildScrollView(
-                                  scrollDirection: Axis.horizontal,
-                                  child: ConstrainedBox(
-                                    constraints: const BoxConstraints(minWidth: 800),
-                                    child: DataTable(
-                                      headingRowColor: WidgetStateProperty.all(colorScheme.surfaceContainer),
-                                      dataRowMinHeight: context.scale(60),
-                                      dataRowMaxHeight: context.scale(70),
-                                      columnSpacing: context.scale(24),
-                                      columns: [
-                                        DataColumn(label: Text("#", style: TextStyle(fontWeight: FontWeight.bold, fontSize: context.font(14)))),
-                                        DataColumn(label: Text("ISSUE ID", style: TextStyle(fontWeight: FontWeight.bold, fontSize: context.font(14)))),
-                                        DataColumn(label: Text("BOOK TITLE", style: TextStyle(fontWeight: FontWeight.bold, fontSize: context.font(14)))),
-                                        DataColumn(label: Text("LENDER", style: TextStyle(fontWeight: FontWeight.bold, fontSize: context.font(14)))),
-                                        DataColumn(label: Text("DUE DATE", style: TextStyle(fontWeight: FontWeight.bold, fontSize: context.font(14)))),
-                                        DataColumn(label: Text("ACTION", style: TextStyle(fontWeight: FontWeight.bold, fontSize: context.font(14)))),
-                                      ],
-                                      rows: _overdueBooks.asMap().entries.map((entry) {
-                                        int index = entry.key + 1;
-                                        IssuedBook ib = entry.value;
-                                        return _buildDataRow(context, index.toString(), ib);
-                                      }).toList(),
-                                    ),
-                                  ),
-                                ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
+                        ],
+                      ),
+                    );
+                  },
                 ),
               ),
             ),
+          );
+        },
+      ),
     );
   }
+
 
   Widget _buildResponsiveRow(BuildContext context, List<Widget> children) {
     if (!context.isTablet) {
@@ -390,10 +389,10 @@ class _OverdueBooksPageState extends State<OverdueBooksPage> {
         onPressed: () async {
           try {
             await ApiService.returnIssuedBook(ib.id.toString());
-            _fetchOverdueBooks();
-            if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Book returned successfully")));
+            _refreshStream();
+            if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Book returned successfully")));
           } catch (e) {
-            if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Error: $e")));
+            if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Error: $e")));
           }
         },
       )),

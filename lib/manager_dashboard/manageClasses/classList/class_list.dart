@@ -1,4 +1,6 @@
 import 'dart:convert';
+import 'package:eduphin/services/caching_service.dart';
+import 'package:eduphin/services/common_widgets.dart';
 import 'package:eduphin/manager_dashboard/manageClasses/classList/section/create_new_section.dart';
 import 'package:eduphin/manager_dashboard/manageClasses/classList/section/section.dart';
 import 'package:eduphin/services/api_service.dart';
@@ -68,10 +70,22 @@ class ClassListPage extends StatefulWidget {
 class _ClassListPageState extends State<ClassListPage> {
   bool _isLoading = true;
   List<Class> _classes = [];
+  Object? _error;
 
   @override
   void initState() {
     super.initState();
+    _loadCacheAndFetch();
+  }
+
+  Future<void> _loadCacheAndFetch() async {
+    final cachedData = await CachingService.getCache('manager_classes');
+    if (cachedData != null && mounted) {
+      final List classesData = cachedData;
+      setState(() {
+        _classes = classesData.map((c) => Class.fromJson(c)).toList();
+      });
+    }
     _fetchClasses();
   }
 
@@ -79,6 +93,7 @@ class _ClassListPageState extends State<ClassListPage> {
     if (!mounted) return;
     setState(() {
       _isLoading = true;
+      _error = null;
     });
 
     try {
@@ -89,6 +104,7 @@ class _ClassListPageState extends State<ClassListPage> {
 
       if (response.statusCode == 200 && responseData['status'] == true) {
         final List classesData = responseData['data'];
+        await CachingService.setCache('manager_classes', classesData);
         if (mounted) {
           setState(() {
             _classes = classesData.map((c) => Class.fromJson(c)).toList();
@@ -101,14 +117,9 @@ class _ClassListPageState extends State<ClassListPage> {
     } catch (e) {
       if (mounted) {
         setState(() {
+          _error = e;
           _isLoading = false;
         });
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(e.toString().replaceFirst('Exception: ', '')),
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
       }
     }
   }
@@ -144,32 +155,51 @@ class _ClassListPageState extends State<ClassListPage> {
           SizedBox(width: context.spacing),
         ],
       ),
-      body: _isLoading
-          ? Center(child: CircularProgressIndicator(color: theme.colorScheme.primary))
-          : _classes.isEmpty
-              ? _buildEmptyState(theme)
-              : RefreshIndicator(
-                  onRefresh: _fetchClasses,
-                  color: theme.colorScheme.primary,
-                  child: Center(
-                    child: ConstrainedBox(
-                      constraints: const BoxConstraints(maxWidth: 1200),
-                      child: GridView.builder(
-                        padding: context.pagePadding,
-                        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                          crossAxisCount: context.responsive(1, tablet: 2, desktop: 3),
-                          crossAxisSpacing: context.spacing,
-                          mainAxisSpacing: context.spacing,
-                          mainAxisExtent: context.scale(300), // Fixed height for cards
-                        ),
-                        itemCount: _classes.length,
-                        itemBuilder: (context, index) {
-                          return _buildClassCard(context, _classes[index]);
-                        },
+      body: LoadingWrapper(
+        isLoading: _isLoading,
+        hasData: _classes.isNotEmpty,
+        error: _error,
+        onRetry: _fetchClasses,
+        skeleton: _buildSkeleton(),
+        child: _classes.isEmpty
+            ? _buildEmptyState(theme)
+            : RefreshIndicator(
+                onRefresh: _fetchClasses,
+                color: theme.colorScheme.primary,
+                child: Center(
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 1200),
+                    child: GridView.builder(
+                      padding: context.pagePadding,
+                      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                        crossAxisCount: context.responsive(1, tablet: 2, desktop: 3),
+                        crossAxisSpacing: context.spacing,
+                        mainAxisSpacing: context.spacing,
+                        mainAxisExtent: context.scale(300), // Fixed height for cards
                       ),
+                      itemCount: _classes.length,
+                      itemBuilder: (context, index) {
+                        return _buildClassCard(context, _classes[index]);
+                      },
                     ),
                   ),
                 ),
+              ),
+      ),
+    );
+  }
+
+  Widget _buildSkeleton() {
+    return GridView.builder(
+      padding: context.pagePadding,
+      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: context.responsive(1, tablet: 2, desktop: 3),
+        crossAxisSpacing: context.spacing,
+        mainAxisSpacing: context.spacing,
+        mainAxisExtent: context.scale(300),
+      ),
+      itemCount: 6,
+      itemBuilder: (context, index) => SkeletonBox(height: context.scale(300), borderRadius: context.scale(16)),
     );
   }
 
@@ -341,3 +371,4 @@ class _ClassListPageState extends State<ClassListPage> {
     );
   }
 }
+

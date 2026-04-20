@@ -1,4 +1,5 @@
 import 'package:eduphin/services/responsive_helper.dart';
+import 'package:eduphin/services/common_widgets.dart';
 import 'package:flutter/material.dart';
 import 'package:eduphin/services/api_service.dart';
 import 'package:eduphin/teacher/dashboard/library_models.dart';
@@ -12,10 +13,8 @@ class LendingBooksPage extends StatefulWidget {
 }
 
 class _LendingBooksPageState extends State<LendingBooksPage> {
-  bool _isLoading = false;
-  List<IssuedBook> _issuedBooks = [];
   int _currentPage = 1;
-  int _totalPages = 1;
+  late Stream<LendingPagination> _lendingStream;
 
   final TextEditingController _titleController = TextEditingController();
   final TextEditingController _issuedFromController = TextEditingController();
@@ -26,7 +25,18 @@ class _LendingBooksPageState extends State<LendingBooksPage> {
   @override
   void initState() {
     super.initState();
-    _fetchLending();
+    _updateStream();
+  }
+
+  void _updateStream() {
+    final filters = {
+      'book_title': _titleController.text,
+      'issued_from': _issuedFromController.text,
+      'due_from': _dueFromController.text,
+      'due_to': _dueToController.text,
+      if (_selectedStatus != 'all') 'returned_status': _selectedStatus,
+    };
+    _lendingStream = ApiService.getAccountantLendingBooksStream(filters, _currentPage);
   }
 
   @override
@@ -38,32 +48,6 @@ class _LendingBooksPageState extends State<LendingBooksPage> {
     super.dispose();
   }
 
-  Future<void> _fetchLending({int page = 1}) async {
-    if (!mounted) return;
-    setState(() => _isLoading = true);
-    try {
-      final filters = {
-        'book_title': _titleController.text,
-        'issued_from': _issuedFromController.text,
-        'due_from': _dueFromController.text,
-        'due_to': _dueToController.text,
-        if (_selectedStatus != 'all') 'returned_status': _selectedStatus,
-      };
-      final result = await ApiService.getAccountantLendingBooks(filters, page);
-      if (mounted) {
-        setState(() {
-          _issuedBooks = result.issuedBooks;
-          _currentPage = result.currentPage;
-          _totalPages = result.lastPage;
-        });
-      }
-    } catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Error: $e")));
-    } finally {
-      if (mounted) setState(() => _isLoading = false);
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -71,28 +55,68 @@ class _LendingBooksPageState extends State<LendingBooksPage> {
         title: const Text("Lending Records"),
         centerTitle: true,
       ),
-      body: Stack(
-        children: [
-          SingleChildScrollView(
-            padding: context.pagePadding,
-            child: Center(
-              child: ConstrainedBox(
-                constraints: BoxConstraints(maxWidth: context.scale(1000)),
-                child: Column(
-                  children: [
-                    _buildFilterCard(context),
-                    SizedBox(height: context.spacing),
-                    _buildLendingList(context),
-                    SizedBox(height: context.spacing),
-                    _buildPagination(context),
-                    SizedBox(height: context.spacing * 2),
-                  ],
+      body: StreamBuilder<LendingPagination>(
+        stream: _lendingStream,
+        builder: (context, snapshot) {
+          return LoadingWrapper<LendingPagination>(
+            snapshot: snapshot,
+            onRetry: _updateStream,
+            skeleton: _buildSkeleton(context),
+            builder: (data) {
+              final issuedBooks = data.issuedBooks;
+              final totalPages = data.lastPage;
+              final isRefreshing = snapshot.connectionState == ConnectionState.waiting;
+
+              return SingleChildScrollView(
+                padding: context.pagePadding,
+                child: Center(
+                  child: ConstrainedBox(
+                    constraints: BoxConstraints(maxWidth: context.scale(1000)),
+                    child: Column(
+                      children: [
+                        _buildFilterCard(context),
+                        SizedBox(height: context.spacing),
+                        _buildLendingList(context, issuedBooks, isRefreshing),
+                        SizedBox(height: context.spacing),
+                        _buildPagination(context, totalPages),
+                        SizedBox(height: context.spacing * 2),
+                      ],
+                    ),
+                  ),
                 ),
+              );
+            },
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _buildSkeleton(BuildContext context) {
+    return SingleChildScrollView(
+      padding: context.pagePadding,
+      child: Center(
+        child: ConstrainedBox(
+          constraints: BoxConstraints(maxWidth: context.scale(1000)),
+          child: Column(
+            children: [
+              Skeleton(height: context.scale(250), width: double.infinity, borderRadius: context.scale(16)),
+              SizedBox(height: context.spacing),
+              GridView.builder(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: context.isDesktop ? 3 : (context.isTablet ? 2 : 1),
+                  mainAxisExtent: context.scale(180),
+                  crossAxisSpacing: context.spacing,
+                  mainAxisSpacing: context.spacing,
+                ),
+                itemCount: 6,
+                itemBuilder: (_, __) => Skeleton(borderRadius: context.scale(16)),
               ),
-            ),
+            ],
           ),
-          if (_isLoading) const Center(child: CircularProgressIndicator()),
-        ],
+        ),
       ),
     );
   }
@@ -146,7 +170,7 @@ class _LendingBooksPageState extends State<LendingBooksPage> {
               children: [
                 Expanded(
                   child: ElevatedButton(
-                    onPressed: () => _fetchLending(),
+                    onPressed: () => setState(() => _updateStream()),
                     style: ElevatedButton.styleFrom(
                       padding: EdgeInsets.symmetric(vertical: context.scale(14)),
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(context.scale(12))),
@@ -162,8 +186,10 @@ class _LendingBooksPageState extends State<LendingBooksPage> {
                       _issuedFromController.clear();
                       _dueFromController.clear();
                       _dueToController.clear();
-                      setState(() => _selectedStatus = 'all');
-                      _fetchLending();
+                      setState(() {
+                        _selectedStatus = 'all';
+                        _updateStream();
+                      });
                     },
                     style: OutlinedButton.styleFrom(
                       padding: EdgeInsets.symmetric(vertical: context.scale(14)),
@@ -198,7 +224,7 @@ class _LendingBooksPageState extends State<LendingBooksPage> {
 
   Widget _buildStatusDropdown(BuildContext context) {
     return DropdownButtonFormField<String>(
-      value: _selectedStatus,
+      initialValue: _selectedStatus,
       isExpanded: true,
       items: const [
         DropdownMenuItem(value: 'all', child: Text("All Status")),
@@ -213,71 +239,74 @@ class _LendingBooksPageState extends State<LendingBooksPage> {
     );
   }
 
-  Widget _buildLendingList(BuildContext context) {
+  Widget _buildLendingList(BuildContext context, List<IssuedBook> issuedBooks, bool isRefreshing) {
     final theme = context.theme;
-    if (_issuedBooks.isEmpty && !_isLoading) {
+    if (issuedBooks.isEmpty && !isRefreshing) {
       return Padding(
         padding: EdgeInsets.all(context.scale(40)), 
         child: Center(child: Text("No records found", style: TextStyle(color: theme.hintColor)))
       );
     }
 
-    return GridView.builder(
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: context.isDesktop ? 3 : (context.isTablet ? 2 : 1),
-        mainAxisExtent: context.scale(180),
-        crossAxisSpacing: context.spacing,
-        mainAxisSpacing: context.spacing,
-      ),
-      itemCount: _issuedBooks.length,
-      itemBuilder: (context, index) {
-        final record = _issuedBooks[index];
-        final isReturned = record.returnedAt != null;
+    return Opacity(
+      opacity: isRefreshing ? 0.6 : 1.0,
+      child: GridView.builder(
+        shrinkWrap: true,
+        physics: const NeverScrollableScrollPhysics(),
+        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+          crossAxisCount: context.isDesktop ? 3 : (context.isTablet ? 2 : 1),
+          mainAxisExtent: context.scale(180),
+          crossAxisSpacing: context.spacing,
+          mainAxisSpacing: context.spacing,
+        ),
+        itemCount: issuedBooks.length,
+        itemBuilder: (context, index) {
+          final record = issuedBooks[index];
+          final isReturned = record.returnedAt != null;
 
-        return Card(
-          elevation: 0,
-          color: theme.colorScheme.surfaceContainerLow,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(context.scale(16)),
-            side: BorderSide(color: theme.colorScheme.outlineVariant, width: 0.5),
-          ),
-          child: Padding(
-            padding: EdgeInsets.all(context.spacing),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Expanded(
-                      child: Text(
-                        record.book.title, 
-                        style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold, fontSize: context.font(15)), 
-                        maxLines: 1, 
-                        overflow: TextOverflow.ellipsis
-                      )
-                    ),
-                    _statusBadge(context, isReturned),
-                  ],
-                ),
-                Text("ISBN: ${record.book.isbn ?? 'N/A'}", style: theme.textTheme.bodySmall?.copyWith(color: theme.hintColor)),
-                const Spacer(),
-                Divider(color: theme.colorScheme.outlineVariant, height: context.spacing),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Expanded(child: _infoCol(context, "Issued", record.issuedAt)),
-                    SizedBox(width: context.scale(8)),
-                    Expanded(child: _infoCol(context, "Due", record.dueDate, isRed: (record.daysOverdue ?? 0) > 0)),
-                  ],
-                ),
-              ],
+          return Card(
+            elevation: 0,
+            color: theme.colorScheme.surfaceContainerLow,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(context.scale(16)),
+              side: BorderSide(color: theme.colorScheme.outlineVariant, width: 0.5),
             ),
-          ),
-        );
-      },
+            child: Padding(
+              padding: EdgeInsets.all(context.spacing),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Expanded(
+                        child: Text(
+                          record.book.title, 
+                          style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold, fontSize: context.font(15)), 
+                          maxLines: 1, 
+                          overflow: TextOverflow.ellipsis
+                        )
+                      ),
+                      _statusBadge(context, isReturned),
+                    ],
+                  ),
+                  Text("ISBN: ${record.book.isbn ?? 'N/A'}", style: theme.textTheme.bodySmall?.copyWith(color: theme.hintColor)),
+                  const Spacer(),
+                  Divider(color: theme.colorScheme.outlineVariant, height: context.spacing),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Expanded(child: _infoCol(context, "Issued", record.issuedAt)),
+                      SizedBox(width: context.scale(8)),
+                      Expanded(child: _infoCol(context, "Due", record.dueDate, isRed: (record.daysOverdue ?? 0) > 0)),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          );
+        },
+      ),
     );
   }
 
@@ -308,19 +337,29 @@ class _LendingBooksPageState extends State<LendingBooksPage> {
     );
   }
 
-  Widget _buildPagination(BuildContext context) {
+  Widget _buildPagination(BuildContext context, int totalPages) {
     return Row(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
         IconButton.filledTonal(
-          onPressed: _currentPage > 1 ? () => _fetchLending(page: _currentPage - 1) : null,
+          onPressed: _currentPage > 1 ? () {
+            setState(() {
+              _currentPage--;
+              _updateStream();
+            });
+          } : null,
           icon: const Icon(Icons.chevron_left),
         ),
         SizedBox(width: context.spacing),
-        Text("Page $_currentPage of $_totalPages", style: context.theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.bold)),
+        Text("Page $_currentPage of $totalPages", style: context.theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.bold)),
         SizedBox(width: context.spacing),
         IconButton.filledTonal(
-          onPressed: _currentPage < _totalPages ? () => _fetchLending(page: _currentPage + 1) : null,
+          onPressed: _currentPage < totalPages ? () {
+            setState(() {
+              _currentPage++;
+              _updateStream();
+            });
+          } : null,
           icon: const Icon(Icons.chevron_right),
         ),
       ],

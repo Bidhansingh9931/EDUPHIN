@@ -1,4 +1,6 @@
-import 'package:eduphin/services/responsive_helper.dart';
+import 'librarian_skeleton_widgets.dart';
+import '../services/common_widgets.dart';
+import '../services/responsive_helper.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../services/api_service.dart';
@@ -12,36 +14,23 @@ class SalaryBankDetailsPage extends StatefulWidget {
 }
 
 class _SalaryBankDetailsPageState extends State<SalaryBankDetailsPage> {
-  bool _isLoading = true;
-  Map<String, dynamic>? _salaryData;
+  final GlobalKey<RefreshIndicatorState> _refreshKey = GlobalKey<RefreshIndicatorState>();
+  late Stream<Map<String, dynamic>> _salaryStream;
 
   @override
   void initState() {
     super.initState();
-    _fetchSalaries();
+    _refreshStream();
   }
 
-  Future<void> _fetchSalaries() async {
-    if (!mounted) return;
-    setState(() => _isLoading = true);
-    try {
-      final data = await ApiService.getLibrarianSalaries();
-      if (mounted) {
-        setState(() {
-          _salaryData = {
-            'userDetail': data['account'] ?? {},
-            'salaries': data['salaries'] ?? [],
-            'lastSalary': (data['salaries'] is List && (data['salaries'] as List).isNotEmpty) ? data['salaries'][0] : null,
-          };
-          _isLoading = false;
-        });
-      }
-    } catch (e) {
-      if (mounted) {
-        setState(() => _isLoading = false);
-        _showError(e.toString());
-      }
-    }
+  void _refreshStream() {
+    _salaryStream = ApiService.getLibrarianSalariesStream().asBroadcastStream();
+  }
+
+  Future<void> _handleRefresh() async {
+    setState(() {
+      _refreshStream();
+    });
   }
 
   void _showError(String message) {
@@ -67,7 +56,43 @@ class _SalaryBankDetailsPageState extends State<SalaryBankDetailsPage> {
     showDialog(
       context: context,
       barrierDismissible: false,
-      builder: (context) => const Center(child: CircularProgressIndicator()),
+      builder: (context) => Dialog(
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        child: Container(
+          padding: EdgeInsets.all(context.lg),
+          decoration: BoxDecoration(
+            color: context.theme.colorScheme.surface,
+            borderRadius: BorderRadius.circular(context.scale(28)),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Row(
+                children: [
+                  LibrarianSkeleton(width: context.scale(30), height: context.scale(30), borderRadius: 15),
+                  SizedBox(width: context.md),
+                  const LibrarianSkeleton(width: 150, height: 24),
+                ],
+              ),
+              const Divider(height: 32),
+              for (int i = 0; i < 3; i++) ...[
+                const Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    LibrarianSkeleton(width: 100, height: 16),
+                    LibrarianSkeleton(width: 80, height: 16),
+                  ],
+                ),
+                SizedBox(height: context.md),
+              ],
+              const LibrarianSkeleton(height: 80, borderRadius: 16),
+              SizedBox(height: context.lg),
+              const LibrarianSkeleton(height: 50, borderRadius: 12),
+            ],
+          ),
+        ),
+      ),
     );
 
     try {
@@ -227,48 +252,59 @@ class _SalaryBankDetailsPageState extends State<SalaryBankDetailsPage> {
         backgroundColor: colorScheme.surface,
         elevation: 0,
       ),
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : RefreshIndicator(
-              onRefresh: _fetchSalaries,
-              child: SingleChildScrollView(
-                padding: context.pagePadding,
-                physics: const AlwaysScrollableScrollPhysics(),
-                child: Center(
-                  child: ConstrainedBox(
-                    constraints: BoxConstraints(maxWidth: context.responsive(800.0, tablet: 1000.0, desktop: 1200.0)),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        _buildBankCard(context, colorScheme),
-                        SizedBox(height: context.xl),
-                        Padding(
-                          padding: EdgeInsets.symmetric(horizontal: context.xs),
-                          child: Row(
-                            children: [
-                              Icon(Icons.history_rounded, color: colorScheme.primary, size: context.scale(22)),
-                              SizedBox(width: context.sm),
-                              Text(
-                                "Past Salary Records",
-                                style: TextStyle(fontSize: context.font(18), fontWeight: FontWeight.w800),
-                              ),
-                            ],
+      body: StreamBuilder<Map<String, dynamic>>(
+        stream: _salaryStream,
+        builder: (context, snapshot) {
+          return LoadingWrapper<Map<String, dynamic>>(
+            snapshot: snapshot,
+            skeleton: const SalarySkeleton(),
+            onRetry: _handleRefresh,
+            builder: (salaryData) {
+              return RefreshIndicator(
+                key: _refreshKey,
+                onRefresh: _handleRefresh,
+                child: SingleChildScrollView(
+                  padding: context.pagePadding,
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  child: Center(
+                    child: ConstrainedBox(
+                      constraints: BoxConstraints(maxWidth: context.responsive(800.0, tablet: 1000.0, desktop: 1200.0)),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          _buildBankCard(context, colorScheme, salaryData),
+                          SizedBox(height: context.xl),
+                          Padding(
+                            padding: EdgeInsets.symmetric(horizontal: context.xs),
+                            child: Row(
+                              children: [
+                                Icon(Icons.history_rounded, color: colorScheme.primary, size: context.scale(22)),
+                                SizedBox(width: context.sm),
+                                Text(
+                                  "Past Salary Records",
+                                  style: TextStyle(fontSize: context.font(18), fontWeight: FontWeight.w800),
+                                ),
+                              ],
+                            ),
                           ),
-                        ),
-                        SizedBox(height: context.md),
-                        _buildSalaryList(context, colorScheme),
-                      ],
+                          SizedBox(height: context.md),
+                          _buildSalaryList(context, colorScheme, salaryData),
+                        ],
+                      ),
                     ),
                   ),
                 ),
-              ),
-            ),
+              );
+            },
+          );
+        },
+      ),
     );
   }
 
-  Widget _buildBankCard(BuildContext context, ColorScheme colorScheme) {
-    final user = _salaryData?['userDetail'] ?? {};
-    final fullName = user['first_name'] != null 
+  Widget _buildBankCard(BuildContext context, ColorScheme colorScheme, Map<String, dynamic>? salaryData) {
+    final user = salaryData?['userDetail'] ?? {};
+    final fullName = user['first_name'] != null
         ? "${user['first_name']} ${user['last_name'] ?? ''}".trim()
         : (user['name'] ?? "N/A");
 
@@ -303,7 +339,7 @@ class _SalaryBankDetailsPageState extends State<SalaryBankDetailsPage> {
             _buildDetailRow(
               context,
               "Current Salary",
-              "₹${_salaryData?['lastSalary']?['net_salary'] ?? user['salary'] ?? '0.00'}",
+              "₹${salaryData?['lastSalary']?['net_salary'] ?? user['salary'] ?? '0.00'}",
               isLast: true,
               isPrimary: true,
             ),
@@ -313,9 +349,9 @@ class _SalaryBankDetailsPageState extends State<SalaryBankDetailsPage> {
     );
   }
 
-  Widget _buildSalaryList(BuildContext context, ColorScheme colorScheme) {
-    final salaries = _salaryData?['salaries'] as List? ?? [];
-    
+  Widget _buildSalaryList(BuildContext context, ColorScheme colorScheme, Map<String, dynamic>? salaryData) {
+    final salaries = salaryData?['salaries'] as List? ?? [];
+
     if (salaries.isEmpty) {
       return Center(
         child: Padding(

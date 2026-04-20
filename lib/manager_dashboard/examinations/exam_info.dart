@@ -1,4 +1,6 @@
 import 'dart:convert';
+import 'package:eduphin/services/common_widgets.dart';
+import 'package:eduphin/services/caching_service.dart';
 import 'package:eduphin/services/api_service.dart';
 import 'package:eduphin/services/responsive_helper.dart';
 import 'package:intl/intl.dart';
@@ -52,36 +54,61 @@ class ExamInfoPage extends StatefulWidget {
 }
 
 class _ExamInfoPageState extends State<ExamInfoPage> {
-  late Future<List<Exam>> _examsFuture;
+  bool _isLoading = true;
+  List<Exam> _exams = [];
+  Object? _error;
 
   @override
   void initState() {
     super.initState();
-    _examsFuture = _fetchExams();
+    _loadCacheAndFetch();
   }
 
-  Future<List<Exam>> _fetchExams() async {
+  Future<void> _loadCacheAndFetch() async {
+    final cachedData = await CacheService.getCache('manager_exams');
+    if (cachedData != null && mounted) {
+      final List<dynamic> examJson = cachedData;
+      setState(() {
+        _exams = examJson.map((json) => Exam.fromJson(json)).toList();
+      });
+    }
+    _fetchExams();
+  }
+
+  Future<void> _fetchExams() async {
+    if (!mounted) return;
+    setState(() {
+      _isLoading = true;
+      _error = null;
+    });
+
     try {
       final response = await ApiService.get('manager/exams');
       final body = json.decode(response.body);
       if (body['status'] == true) {
         final List<dynamic> examJson = body['data'];
-        return examJson.map((json) => Exam.fromJson(json)).toList();
+        await CacheService.setCache('manager_exams', examJson);
+        if (mounted) {
+          setState(() {
+            _exams = examJson.map((json) => Exam.fromJson(json)).toList();
+            _isLoading = false;
+          });
+        }
       } else {
         throw Exception('Failed to load exams: ${body['message']}');
       }
     } catch (e) {
-      // Providing a more user-friendly error message
-      throw Exception('Could not fetch exams. Please check your network connection and try again.');
+      if (mounted) {
+        setState(() {
+          _error = e;
+          _isLoading = false;
+        });
+      }
     }
   }
 
   void _refreshExams() {
-    if (mounted) {
-      setState(() {
-        _examsFuture = _fetchExams();
-      });
-    }
+    _fetchExams();
   }
 
   @override
@@ -102,46 +129,30 @@ class _ExamInfoPageState extends State<ExamInfoPage> {
       body: Center(
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 1200),
-          child: RefreshIndicator(
-            onRefresh: () async => _refreshExams(),
-            child: FutureBuilder<List<Exam>>(
-              future: _examsFuture,
-              builder: (context, snapshot) {
-                if (snapshot.connectionState == ConnectionState.waiting) {
-                  return const Center(child: CircularProgressIndicator());
-                } else if (snapshot.hasError) {
-                  return Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(Icons.error_outline, size: context.scale(48), color: theme.colorScheme.error),
-                        SizedBox(height: context.scale(16)),
-                        Text('Error: ${snapshot.error.toString().replaceFirst("Exception: ", "")}', 
-                          textAlign: TextAlign.center,
-                          style: theme.textTheme.bodyMedium?.copyWith(fontSize: context.font(14))),
-                      ],
+          child: LoadingWrapper(
+            isLoading: _isLoading,
+            hasData: _exams.isNotEmpty,
+            error: _error,
+            onRetry: _refreshExams,
+            skeleton: _buildSkeleton(),
+            child: RefreshIndicator(
+              onRefresh: () async => _refreshExams(),
+              child: _exams.isEmpty
+                  ? Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(Icons.assignment_outlined, size: context.scale(64), color: theme.colorScheme.outlineVariant.withValues(alpha: 0.5)),
+                          SizedBox(height: context.scale(16)),
+                          Text('No exams found.', style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: context.font(16))),
+                        ],
+                      ),
+                    )
+                  : context.responsive(
+                      _buildListView(_exams),
+                      tablet: _buildGridView(_exams, crossAxisCount: 2),
+                      desktop: _buildGridView(_exams, crossAxisCount: 3),
                     ),
-                  );
-                } else if (!snapshot.hasData || snapshot.data!.isEmpty) {
-                  return Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(Icons.assignment_outlined, size: context.scale(64), color: theme.colorScheme.outlineVariant.withValues(alpha: 0.5)),
-                        SizedBox(height: context.scale(16)),
-                        Text('No exams found.', style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: context.font(16))),
-                      ],
-                    ),
-                  );
-                } else {
-                  final exams = snapshot.data!;
-                  return context.responsive(
-                    _buildListView(exams),
-                    tablet: _buildGridView(exams, crossAxisCount: 2),
-                    desktop: _buildGridView(exams, crossAxisCount: 3),
-                  );
-                }
-              },
             ),
           ),
         ),
@@ -163,6 +174,28 @@ class _ExamInfoPageState extends State<ExamInfoPage> {
         icon: Icon(Icons.add, size: context.scale(20)),
       ),
       floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
+    );
+  }
+
+  Widget _buildSkeleton() {
+    return context.responsive(
+      ListView.separated(
+        padding: context.pagePadding,
+        itemCount: 4,
+        separatorBuilder: (context, index) => SizedBox(height: context.scale(16)),
+        itemBuilder: (context, index) => SkeletonBox(height: context.scale(220), borderRadius: context.scale(16)),
+      ),
+      tablet: GridView.builder(
+        padding: context.pagePadding,
+        itemCount: 4,
+        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+          crossAxisCount: 2,
+          mainAxisSpacing: context.scale(16),
+          crossAxisSpacing: context.scale(16),
+          childAspectRatio: 1.4,
+        ),
+        itemBuilder: (context, index) => SkeletonBox(height: context.scale(220), borderRadius: context.scale(16)),
+      ),
     );
   }
 
@@ -394,3 +427,4 @@ class CustomExamListContainerBox extends StatelessWidget {
     );
   }
 }
+

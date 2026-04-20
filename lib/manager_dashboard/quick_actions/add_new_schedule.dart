@@ -1,6 +1,8 @@
 import 'dart:async';
 import 'dart:convert';
 import 'package:eduphin/services/api_service.dart';
+import 'package:eduphin/services/caching_service.dart';
+import 'package:eduphin/services/common_widgets.dart';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 
@@ -115,7 +117,11 @@ class AddNewSchedulePage extends StatefulWidget {
 class _AddNewSchedulePageState extends State<AddNewSchedulePage> {
   final _formKey = GlobalKey<FormState>();
   final _apiService = ScheduleApiService();
-  late Future<ScheduleFormData> _formDataFuture;
+  
+  ScheduleFormData? _formData;
+  bool _isLoading = true;
+  Object? _error;
+  final String _cacheKey = 'schedule_form_data';
 
   final _newSchedule = NewSchedule();
   bool _isSubmitting = false;
@@ -123,12 +129,71 @@ class _AddNewSchedulePageState extends State<AddNewSchedulePage> {
   @override
   void initState() {
     super.initState();
-    _formDataFuture = _apiService.fetchScheduleFormData();
+    _loadData();
+  }
+
+  Future<void> _loadData() async {
+    await _loadCachedData();
+    await _fetchFormData();
+  }
+
+  Future<void> _loadCachedData() async {
+    final cachedData = await CacheService.getCache(_cacheKey);
+    if (cachedData != null) {
+      if (mounted) {
+        setState(() {
+          _formData = ScheduleFormData(
+            classes: (cachedData['classes'] as List).map((c) => ApiClass.fromJson(c)).toList(),
+            sections: (cachedData['sections'] as List).map((s) => ApiSection.fromJson(s)).toList(),
+            subjects: (cachedData['subjects'] as List).map((s) => ApiSubject.fromJson(s)).toList(),
+            teachers: (cachedData['teachers'] as List).map((t) => ApiTeacher.fromJson(t)).toList(),
+          );
+          _isLoading = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _fetchFormData() async {
+    if (_formData == null) {
+      setState(() {
+        _isLoading = true;
+        _error = null;
+      });
+    }
+    try {
+      final response = await ApiService.get('manager/class-schedules/meta');
+      final body = jsonDecode(response.body);
+      if (body['status'] == true) {
+        await CacheService.setCache(_cacheKey, body);
+        if (mounted) {
+          setState(() {
+            _formData = ScheduleFormData(
+              classes: (body['classes'] as List).map((c) => ApiClass.fromJson(c)).toList(),
+              sections: (body['sections'] as List).map((s) => ApiSection.fromJson(s)).toList(),
+              subjects: (body['subjects'] as List).map((s) => ApiSubject.fromJson(s)).toList(),
+              teachers: (body['teachers'] as List).map((t) => ApiTeacher.fromJson(t)).toList(),
+            );
+            _isLoading = false;
+            _error = null;
+          });
+        }
+      } else {
+        throw Exception('Failed to load form data: ${body['message']}');
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _error = e;
+          _isLoading = false;
+        });
+      }
+    }
   }
 
   Future<void> _selectTime(BuildContext context, {required bool isStartTime}) async {
     final TimeOfDay? picked = await showTimePicker(context: context, initialTime: TimeOfDay.now());
-    if (picked != null) {
+    if (picked != null && context.mounted) {
       setState(() {
         if (isStartTime) {
           _newSchedule.startTime = picked;
@@ -185,29 +250,53 @@ class _AddNewSchedulePageState extends State<AddNewSchedulePage> {
       appBar: AppBar(title: const Text('Add New Schedule'), centerTitle: true),
       backgroundColor: theme.scaffoldBackgroundColor,
       floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
-      floatingActionButton: FutureBuilder<ScheduleFormData>(
-        future: _formDataFuture,
-        builder: (context, snapshot) {
-          if (snapshot.hasData) return _buildActionButtons(theme);
-          return const SizedBox.shrink();
-        },
-      ),
-      body: FutureBuilder<ScheduleFormData>(
-        future: _formDataFuture,
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
-          } else if (snapshot.hasError) {
-            return Center(child: Text("Error loading data: ${snapshot.error.toString().replaceFirst("Exception: ", "")}"));
-          } else if (snapshot.hasData) {
-            return _buildForm(theme, snapshot.data!);
-          } else {
-            return const Center(child: Text('No schedule data available'));
-          }
-        },
+      floatingActionButton: _isLoading && _formData == null ? null : _buildActionButtons(theme),
+      body: LoadingWrapper(
+        isLoading: _isLoading,
+        hasData: _formData != null,
+        error: _error,
+        onRetry: _fetchFormData,
+        skeleton: _buildSkeleton(),
+        child: _formData == null ? const SizedBox.shrink() : _buildForm(theme, _formData!),
       ),
     );
   }
+
+  Widget _buildSkeleton() {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 120),
+      child: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 800),
+          child: Container(
+            decoration: BoxDecoration(borderRadius: BorderRadius.circular(10), color: Colors.white),
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const SkeletonBox(height: 20, width: 100),
+                const SizedBox(height: 10),
+                const SkeletonBox(height: 50),
+                const SizedBox(height: 20),
+                const SkeletonBox(height: 20, width: 100),
+                const SizedBox(height: 10),
+                const SkeletonBox(height: 50),
+                const SizedBox(height: 20),
+                const SkeletonBox(height: 20, width: 100),
+                const SizedBox(height: 10),
+                const SkeletonBox(height: 50),
+                const SizedBox(height: 20),
+                const SkeletonBox(height: 20, width: 100),
+                const SizedBox(height: 10),
+                const SkeletonBox(height: 50),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
 
   Widget _buildForm(ThemeData theme, ScheduleFormData formData) {
     return SingleChildScrollView(
@@ -292,7 +381,7 @@ class _AddNewSchedulePageState extends State<AddNewSchedulePage> {
       Text(label, style: theme.textTheme.titleMedium?.copyWith(color: theme.colorScheme.onPrimary)),
       const SizedBox(height: 8),
       DropdownButtonFormField<T>(
-        initialValue: value,
+        value: value,
         items: items,
         onChanged: onChanged,
         decoration: InputDecoration(
@@ -375,3 +464,4 @@ class _AddNewSchedulePageState extends State<AddNewSchedulePage> {
     );
   }
 }
+

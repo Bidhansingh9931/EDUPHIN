@@ -94,6 +94,8 @@ Widget buildDropdown<T>(
   ValueChanged<T?> onChanged, {
   String hint = "Select",
   String Function(T)? itemBuilder,
+  String? Function(T?)? validator,
+  bool isLoading = false,
 }) {
   final theme = context.theme;
   final uniqueItems = items.toSet().toList();
@@ -109,7 +111,15 @@ Widget buildDropdown<T>(
   return DropdownButtonFormField<T?>(
     value: effectiveValue,
     decoration: InputDecoration(
-      hintText: hint,
+      hintText: isLoading ? "Loading..." : hint,
+      prefixIcon: isLoading 
+        ? Container(
+            padding: const EdgeInsets.all(12),
+            width: context.scale(20),
+            height: context.scale(20),
+            child: const CircularProgressIndicator(strokeWidth: 2),
+          )
+        : null,
       fillColor: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
       filled: true,
       contentPadding: EdgeInsets.symmetric(horizontal: context.spacing, vertical: context.spacing / 1.5),
@@ -127,16 +137,20 @@ Widget buildDropdown<T>(
       ),
     ),
     isExpanded: true,
-    icon: Icon(Icons.keyboard_arrow_down_rounded, size: context.scale(24), color: theme.colorScheme.primary),
+    icon: IgnorePointer(
+      child: Icon(Icons.keyboard_arrow_down_rounded, size: context.scale(24), color: theme.colorScheme.primary),
+    ),
+    disabledHint: Text(isLoading ? "Loading..." : (items.isEmpty ? "No items available" : hint)),
     dropdownColor: theme.colorScheme.surfaceContainerHigh,
-    items: uniqueItems.map((item) {
+    items: isLoading ? null : uniqueItems.map((item) {
       String displayValue = itemBuilder != null ? itemBuilder(item) : item.toString();
       return DropdownMenuItem<T>(
         value: item,
         child: Text(displayValue, style: theme.textTheme.bodyMedium?.copyWith(fontSize: context.font(14))),
       );
     }).toList(),
-    onChanged: onChanged,
+    onChanged: isLoading ? null : onChanged,
+    validator: validator,
   );
 }
 

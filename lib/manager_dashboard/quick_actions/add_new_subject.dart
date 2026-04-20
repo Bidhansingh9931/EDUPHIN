@@ -1,6 +1,8 @@
 import 'dart:async';
 import 'dart:convert';
 import 'package:eduphin/services/api_service.dart';
+import 'package:eduphin/services/common_widgets.dart';
+import 'package:eduphin/services/caching_service.dart';
 import 'package:flutter/material.dart';
 
 // ───────────────────────────────────────────────────────────
@@ -81,7 +83,11 @@ class AddNewSubjectPage extends StatefulWidget {
 class _AddNewSubjectPageState extends State<AddNewSubjectPage> {
   final _formKey = GlobalKey<FormState>();
   final _apiService = SubjectApiService();
-  late Future<SubjectFormData> _formDataFuture;
+  
+  SubjectFormData? _formData;
+  bool _isLoading = true;
+  Object? _error;
+  final String _cacheKey = 'subject_form_data';
 
   final _newSubject = NewSubject();
   bool _isSubmitting = false;
@@ -89,7 +95,57 @@ class _AddNewSubjectPageState extends State<AddNewSubjectPage> {
   @override
   void initState() {
     super.initState();
-    _formDataFuture = _apiService.fetchSubjectFormData();
+    _loadData();
+  }
+
+  Future<void> _loadData() async {
+    await _loadCachedData();
+    await _fetchFormData();
+  }
+
+  Future<void> _loadCachedData() async {
+    final cachedData = await CachingService.getCache(_cacheKey);
+    if (cachedData != null) {
+      if (mounted) {
+        setState(() {
+          _formData = SubjectFormData(
+            types: List<String>.from(cachedData['types']),
+            statuses: List<String>.from(cachedData['statuses']),
+          );
+          _isLoading = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _fetchFormData() async {
+    if (_formData == null) {
+      setState(() {
+        _isLoading = true;
+        _error = null;
+      });
+    }
+    try {
+      final formData = await _apiService.fetchSubjectFormData();
+      await CachingService.setCache(_cacheKey, {
+        'types': formData.types,
+        'statuses': formData.statuses,
+      });
+      if (mounted) {
+        setState(() {
+          _formData = formData;
+          _isLoading = false;
+          _error = null;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _error = e;
+          _isLoading = false;
+        });
+      }
+    }
   }
 
   Future<void> _submitForm() async {
@@ -146,38 +202,61 @@ class _AddNewSubjectPageState extends State<AddNewSubjectPage> {
         centerTitle: true,
       ),
       floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
-      floatingActionButton: FutureBuilder<SubjectFormData>(
-        future: _formDataFuture,
-        builder: (context, snapshot) {
-          if (snapshot.hasData) {
-            return _buildActionButtons(theme);
-          }
-          return const SizedBox.shrink();
-        },
-      ),
-      body: FutureBuilder<SubjectFormData>(
-        future: _formDataFuture,
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
-          } else if (snapshot.hasError) {
-            return Center(child: Text("Error loading data: ${snapshot.error}"));
-          } else if (snapshot.hasData) {
-            final formData = snapshot.data!;
-            // Set default values if not already set
-            _newSubject.type ??= formData.types.first;
-            _newSubject.status ??= formData.statuses.first;
-
-            return LayoutBuilder(builder: (context, constraints) {
-              return _buildForm(theme, formData, constraints.maxWidth > 700);
-            });
-          } else {
-            return const Center(child: Text('No form data available.'));
-          }
-        },
+      floatingActionButton: _isLoading && _formData == null ? null : _buildActionButtons(theme),
+      body: LoadingWrapper(
+        isLoading: _isLoading,
+        hasData: _formData != null,
+        error: _error,
+        onRetry: _fetchFormData,
+        skeleton: _buildSkeleton(),
+        child: _formData == null ? const SizedBox.shrink() : LayoutBuilder(builder: (context, constraints) {
+          // Set default values if not already set
+          _newSubject.type ??= _formData!.types.first;
+          _newSubject.status ??= _formData!.statuses.first;
+          return _buildForm(theme, _formData!, constraints.maxWidth > 700);
+        }),
       ),
     );
   }
+
+  Widget _buildSkeleton() {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 120),
+      child: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 800),
+          child: Container(
+            padding: const EdgeInsets.all(16.0),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const SkeletonBox(height: 20, width: 100),
+                const SizedBox(height: 10),
+                const SkeletonBox(height: 50),
+                const SizedBox(height: 20),
+                const SkeletonBox(height: 20, width: 100),
+                const SizedBox(height: 10),
+                const SkeletonBox(height: 50),
+                const SizedBox(height: 20),
+                const SkeletonBox(height: 20, width: 100),
+                const SizedBox(height: 10),
+                const SkeletonBox(height: 100),
+                const SizedBox(height: 20),
+                const SkeletonBox(height: 20, width: 100),
+                const SizedBox(height: 10),
+                const SkeletonBox(height: 50),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
 
   Widget _buildForm(ThemeData theme, SubjectFormData formData, bool isWide) {
     return SingleChildScrollView(
@@ -315,7 +394,7 @@ class _AddNewSubjectPageState extends State<AddNewSubjectPage> {
                   ?.copyWith(color: theme.colorScheme.onPrimary)),
           const SizedBox(height: 8),
           DropdownButtonFormField<String>(
-            initialValue: value,
+            value: value,
             items: items.map((String item) {
               return DropdownMenuItem<String>(value: item, child: Text(item));
             }).toList(),
@@ -388,3 +467,4 @@ class _AddNewSubjectPageState extends State<AddNewSubjectPage> {
     );
   }
 }
+

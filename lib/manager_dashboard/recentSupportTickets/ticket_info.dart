@@ -1,7 +1,8 @@
 import 'dart:convert';
 import 'package:eduphin/services/api_service.dart';
+import 'package:eduphin/services/caching_service.dart';
+import 'package:eduphin/services/common_widgets.dart';
 import 'package:eduphin/services/responsive_helper.dart';
-import 'package:eduphin/teacher/dashboard/common_widgets.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'ticket_details.dart';
@@ -138,26 +139,50 @@ class _TicketInfoPageState extends State<TicketInfoPage> {
   bool _isLoading = true;
   List<Ticket> _tickets = [];
   List<AssignableUser> _assignableUsers = [];
+  Object? _error;
+  final String _cacheKey = 'manager_tickets';
 
   @override
   void initState() {
     super.initState();
-    _fetchTickets();
+    _loadData();
+  }
+
+  Future<void> _loadData() async {
+    await _loadCachedData();
+    await _fetchTickets();
+  }
+
+  Future<void> _loadCachedData() async {
+    final cachedData = await CacheService.getCache(_cacheKey);
+    if (cachedData != null) {
+      if (mounted) {
+        setState(() {
+          final List<dynamic> ticketsList = cachedData['tickets'] as List? ?? [];
+          _tickets = ticketsList.whereType<Map<String, dynamic>>().map(Ticket.fromJson).toList();
+
+          final List<dynamic> usersList = cachedData['assignable_users'] as List? ?? [];
+          _assignableUsers = usersList.whereType<Map<String, dynamic>>().map(AssignableUser.fromJson).toList();
+          _isLoading = false;
+        });
+      }
+    }
   }
 
   Future<void> _fetchTickets() async {
-    if (!mounted) return;
-    setState(() {
-      _isLoading = true;
-    });
+    if (_tickets.isEmpty) {
+      setState(() {
+        _isLoading = true;
+        _error = null;
+      });
+    }
 
     try {
       final response = await ApiService.get('manager/tickets');
 
-      if (!mounted) return;
-
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
+        await CacheService.setCache(_cacheKey, data);
 
         final List<dynamic> ticketsList = data['tickets'] as List? ?? [];
         final ticketsData =
@@ -167,22 +192,29 @@ class _TicketInfoPageState extends State<TicketInfoPage> {
         final usersData =
             usersList.whereType<Map<String, dynamic>>().map(AssignableUser.fromJson).toList();
 
-        setState(() {
-          _tickets = ticketsData;
-          _assignableUsers = usersData;
-          _isLoading = false;
-        });
+        if (mounted) {
+          setState(() {
+            _tickets = ticketsData;
+            _assignableUsers = usersData;
+            _isLoading = false;
+            _error = null;
+          });
+        }
       } else {
         throw Exception('Failed to load tickets');
       }
     } catch (e) {
-      if (!mounted) return;
-      setState(() {
-        _isLoading = false;
-      });
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(e.toString())),
-      );
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+          _error = e;
+        });
+        if (_tickets.isNotEmpty) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Error updating tickets: ${e.toString()}')),
+          );
+        }
+      }
     }
   }
 
@@ -210,23 +242,87 @@ class _TicketInfoPageState extends State<TicketInfoPage> {
           SizedBox(width: context.sm),
         ],
       ),
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : RefreshIndicator(
-              onRefresh: _fetchTickets,
-              child: Center(
-                child: ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 1200),
-                  child: context.responsive(
-                    _buildListView(),
-                    tablet: _buildGridView(crossAxisCount: 2),
-                    desktop: _buildGridView(crossAxisCount: 3),
+      body: LoadingWrapper(
+        isLoading: _isLoading,
+        hasData: _tickets.isNotEmpty,
+        error: _error,
+        onRetry: _fetchTickets,
+        skeleton: _buildSkeleton(),
+        child: RefreshIndicator(
+          onRefresh: _fetchTickets,
+          child: _tickets.isEmpty && !_isLoading
+              ? const Center(child: Text("No tickets found"))
+              : Center(
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 1200),
+                    child: context.responsive(
+                      _buildListView(),
+                      tablet: _buildGridView(crossAxisCount: 2),
+                      desktop: _buildGridView(crossAxisCount: 3),
+                    ),
                   ),
                 ),
-              ),
-            ),
+        ),
+      ),
     );
   }
+
+  Widget _buildSkeleton() {
+    return ListView.builder(
+      padding: context.pagePadding,
+      itemCount: 5,
+      itemBuilder: (context, index) {
+        return Padding(
+          padding: EdgeInsets.only(bottom: context.md),
+          child: Container(
+            padding: EdgeInsets.all(context.spacing),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(context.scale(16)),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const SkeletonBox(height: 15, width: 60),
+                    const SkeletonBox(height: 20, width: 80),
+                  ],
+                ),
+                SizedBox(height: context.md),
+                const SkeletonBox(height: 20, width: 200),
+                SizedBox(height: context.md),
+                Row(
+                  children: [
+                    Expanded(child: SkeletonBox(height: 15, width: 80)),
+                    Expanded(child: SkeletonBox(height: 15, width: 80)),
+                  ],
+                ),
+                SizedBox(height: context.md),
+                const SkeletonBox(height: 32, width: 32, borderRadius: 16),
+                SizedBox(height: context.md),
+                const SkeletonBox(height: 15, width: 100),
+                SizedBox(height: context.md),
+                const Divider(),
+                SizedBox(height: context.sm),
+                Row(
+                  children: [
+                    const SkeletonBox(height: 40, width: 60),
+                    SizedBox(width: context.sm),
+                    const SkeletonBox(height: 40, width: 60),
+                    SizedBox(width: context.sm),
+                    const Expanded(child: SkeletonBox(height: 45)),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
 
   Widget _buildListView() {
     return ListView.builder(
@@ -589,7 +685,7 @@ class _TicketCardState extends State<TicketCard> {
               SizedBox(height: context.spacing),
               contentBuilder(setModalState),
               SizedBox(height: context.spacing),
-              buildActionButton(context, buttonText.toUpperCase(), () async {
+              _buildModalActionButton(context, buttonText.toUpperCase(), () async {
                 await onConfirm();
                 if (context.mounted) {
                   Navigator.pop(context);
@@ -599,6 +695,20 @@ class _TicketCardState extends State<TicketCard> {
           );
         },
       ),
+    );
+  }
+
+  Widget _buildModalActionButton(BuildContext context, String label, VoidCallback onPressed) {
+    final theme = context.theme;
+    return ElevatedButton(
+      onPressed: onPressed,
+      style: ElevatedButton.styleFrom(
+        backgroundColor: theme.colorScheme.primary,
+        foregroundColor: theme.colorScheme.onPrimary,
+        minimumSize: Size(double.infinity, context.scale(48)),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(context.scale(12))),
+      ),
+      child: Text(label, style: TextStyle(fontSize: context.font(14), fontWeight: FontWeight.bold)),
     );
   }
 
@@ -622,48 +732,6 @@ class _TicketCardState extends State<TicketCard> {
         onChanged: onChanged,
         activeColor: theme.colorScheme.primary,
         contentPadding: EdgeInsets.symmetric(horizontal: context.sm),
-      ),
-    );
-  }
-
-  Widget _rowText(ThemeData theme, String l1, String v1, String l2, String v2) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [_columnText(theme, l1, v1), _columnText(theme, l2, v2)],
-    );
-  }
-
-  Widget _columnText(ThemeData theme, String label, String value) {
-    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      Text(label, style: TextStyle(color: theme.hintColor)),
-      const SizedBox(height: 4),
-      Text(value, style: theme.textTheme.bodyLarge),
-    ]);
-  }
-
-  Widget _actionButton(ThemeData theme,
-      {required String text, required VoidCallback onTap, required bool isPrimary}) {
-    final Color textColor =
-        isPrimary ? theme.colorScheme.onPrimary : theme.colorScheme.onSecondaryContainer;
-    return Expanded(
-      child: ElevatedButton(
-        onPressed: onTap,
-        style: ElevatedButton.styleFrom(
-          backgroundColor: isPrimary
-              ? theme.colorScheme.primary
-              : theme.colorScheme.secondaryContainer,
-          foregroundColor: isPrimary
-              ? theme.colorScheme.onPrimary
-              : theme.colorScheme.onSecondaryContainer,
-          padding: const EdgeInsets.symmetric(vertical: 16),
-          shape:
-              RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        ),
-        child: Text(
-          text,
-          textAlign: TextAlign.center,
-          style: TextStyle(color: textColor),
-        ),
       ),
     );
   }

@@ -1,3 +1,5 @@
+import 'package:eduphin/services/common_widgets.dart';
+import 'package:eduphin/librarian/librarian_skeleton_widgets.dart';
 import 'package:eduphin/services/responsive_helper.dart';
 import 'package:flutter/material.dart';
 import '../services/api_service.dart';
@@ -12,8 +14,7 @@ class MyLendingBooksPage extends StatefulWidget {
 }
 
 class _MyLendingBooksPageState extends State<MyLendingBooksPage> {
-  bool _isLoading = true;
-  List<IssuedBook> _myIssuedBooks = [];
+  Stream<List<IssuedBook>>? _lendingBooksStream;
 
   final TextEditingController _bookTitleController = TextEditingController();
   final TextEditingController _dateFromController = TextEditingController();
@@ -23,29 +24,18 @@ class _MyLendingBooksPageState extends State<MyLendingBooksPage> {
   @override
   void initState() {
     super.initState();
-    _fetchMyIssuedBooks();
+    _refreshStream();
   }
 
-  Future<void> _fetchMyIssuedBooks() async {
-    if (!mounted) return;
-    setState(() => _isLoading = true);
-    try {
-      final filters = {
-        'book_title': _bookTitleController.text,
-        'date_from': _dateFromController.text,
-        'date_to': _dateToController.text,
-      };
-      final books = await ApiService.getLibrarianMyIssuedBooks(filters);
-      if (!mounted) return;
-      setState(() {
-        _myIssuedBooks = books;
-        _isLoading = false;
-      });
-    } catch (e) {
-      if (!mounted) return;
-      setState(() => _isLoading = false);
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Error: $e")));
-    }
+  void _refreshStream() {
+    final filters = {
+      'book_title': _bookTitleController.text,
+      'date_from': _dateFromController.text,
+      'date_to': _dateToController.text,
+    };
+    setState(() {
+      _lendingBooksStream = ApiService.getLibrarianMyIssuedBooksStream(filters).asBroadcastStream();
+    });
   }
 
   Future<void> _selectDate(BuildContext context, TextEditingController controller) async {
@@ -72,189 +62,199 @@ class _MyLendingBooksPageState extends State<MyLendingBooksPage> {
         title: const Text("My Lending Books"),
         centerTitle: false,
       ),
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : RefreshIndicator(
-              onRefresh: _fetchMyIssuedBooks,
-              child: Center(
-                child: ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 1200),
-                  child: SingleChildScrollView(
-                    physics: const AlwaysScrollableScrollPhysics(),
-                    padding: context.pagePadding,
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        /// FILTER SECTION
-                        Card(
-                          elevation: 0,
-                          color: colorScheme.surfaceContainerLow,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(context.scale(20)),
-                            side: BorderSide(color: colorScheme.outlineVariant.withValues(alpha: 0.5), width: 0.5),
+      body: StreamBuilder<List<IssuedBook>>(
+        stream: _lendingBooksStream,
+        builder: (context, snapshot) {
+          return RefreshIndicator(
+            onRefresh: () async => _refreshStream(),
+            child: Center(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 1200),
+                child: LoadingWrapper<List<IssuedBook>>(
+                  snapshot: snapshot,
+                  skeleton: const TableSkeleton(),
+                  onRetry: _refreshStream,
+                  builder: (records) {
+                    final filteredRecords = records
+                        .where((ib) => (ib.bookTitle ?? "").toLowerCase().contains(_searchController.text.toLowerCase()))
+                        .toList();
+
+                    return SingleChildScrollView(
+                      physics: const AlwaysScrollableScrollPhysics(),
+                      padding: context.pagePadding,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          /// FILTER SECTION
+                          Card(
+                            elevation: 0,
+                            color: colorScheme.surfaceContainerLow,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(context.scale(20)),
+                              side: BorderSide(color: colorScheme.outlineVariant.withValues(alpha: 0.5), width: 0.5),
+                            ),
+                            child: Padding(
+                              padding: EdgeInsets.all(context.scale(16)),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    "Filter My Lending Books",
+                                    style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+                                  ),
+                                  SizedBox(height: context.scale(16)),
+                                  _buildResponsiveRow(context, [
+                                    _buildInputField(context, "Book Title", "e.g Math, Physics", _bookTitleController),
+                                    _buildDateField(context, "Due Date From", _dateFromController),
+                                  ]),
+                                  SizedBox(height: context.isTablet ? 0 : context.scale(12)),
+                                  _buildResponsiveRow(context, [
+                                    _buildDateField(context, "Due Date To", _dateToController),
+                                    const SizedBox.shrink(), // Spacer for alignment in tablet mode if needed
+                                  ]),
+                                  SizedBox(height: context.scale(12)),
+                                  Row(
+                                    children: [
+                                      Expanded(
+                                        child: FilledButton(
+                                          onPressed: _refreshStream,
+                                          style: FilledButton.styleFrom(
+                                            padding: EdgeInsets.symmetric(vertical: context.scale(14)),
+                                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(context.scale(12))),
+                                          ),
+                                          child: const Text("APPLY FILTERS"),
+                                        ),
+                                      ),
+                                      SizedBox(width: context.scale(12)),
+                                      Expanded(
+                                        child: OutlinedButton(
+                                          onPressed: () {
+                                            setState(() {
+                                              _bookTitleController.clear();
+                                              _dateFromController.clear();
+                                              _dateToController.clear();
+                                            });
+                                            _refreshStream();
+                                          },
+                                          style: OutlinedButton.styleFrom(
+                                            padding: EdgeInsets.symmetric(vertical: context.scale(14)),
+                                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(context.scale(12))),
+                                          ),
+                                          child: const Text("RESET"),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ],
+                              ),
+                            ),
                           ),
-                          child: Padding(
-                            padding: EdgeInsets.all(context.scale(16)),
+
+                          SizedBox(height: context.scale(24)),
+
+                          /// RECORDS SECTION
+                          Card(
+                            elevation: 0,
+                            color: colorScheme.surfaceContainerLow,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(context.scale(20)),
+                              side: BorderSide(color: colorScheme.outlineVariant.withValues(alpha: 0.5), width: 0.5),
+                            ),
+                            clipBehavior: Clip.antiAlias,
                             child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
+                              crossAxisAlignment: CrossAxisAlignment.stretch,
                               children: [
-                                Text(
-                                  "Filter My Lending Books",
-                                  style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+                                Padding(
+                                  padding: EdgeInsets.all(context.scale(16)),
+                                  child: Row(
+                                    children: [
+                                      Text(
+                                        "Lending Records",
+                                        style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+                                      ),
+                                      const Spacer(),
+                                      _exportIcon(context, Icons.description, Colors.teal),
+                                      _exportIcon(context, Icons.table_chart, Colors.green),
+                                    ],
+                                  ),
+                                ),
+                                Padding(
+                                  padding: EdgeInsets.symmetric(horizontal: context.scale(16)),
+                                  child: TextField(
+                                    controller: _searchController,
+                                    onChanged: (v) => setState(() {}),
+                                    style: TextStyle(fontSize: context.font(14)),
+                                    decoration: InputDecoration(
+                                      hintText: "Quick search...",
+                                      prefixIcon: const Icon(Icons.search),
+                                      filled: true,
+                                      fillColor: colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
+                                      border: OutlineInputBorder(
+                                        borderRadius: BorderRadius.circular(context.scale(12)),
+                                        borderSide: BorderSide(color: colorScheme.outlineVariant.withValues(alpha: 0.5)),
+                                      ),
+                                      enabledBorder: OutlineInputBorder(
+                                        borderRadius: BorderRadius.circular(context.scale(12)),
+                                        borderSide: BorderSide(color: colorScheme.outlineVariant.withValues(alpha: 0.5)),
+                                      ),
+                                      focusedBorder: OutlineInputBorder(
+                                        borderRadius: BorderRadius.circular(context.scale(12)),
+                                        borderSide: BorderSide(color: colorScheme.primary, width: 1),
+                                      ),
+                                      contentPadding: EdgeInsets.symmetric(horizontal: context.scale(16)),
+                                    ),
+                                  ),
                                 ),
                                 SizedBox(height: context.scale(16)),
-                                _buildResponsiveRow(context, [
-                                  _buildInputField(context, "Book Title", "e.g Math, Physics", _bookTitleController),
-                                  _buildDateField(context, "Due Date From", _dateFromController),
-                                ]),
-                                SizedBox(height: context.isTablet ? 0 : context.scale(12)),
-                                _buildResponsiveRow(context, [
-                                  _buildDateField(context, "Due Date To", _dateToController),
-                                  const SizedBox.shrink(), // Spacer for alignment in tablet mode if needed
-                                ]),
-                                SizedBox(height: context.scale(12)),
-                                Row(
-                                  children: [
-                                    Expanded(
-                                      child: FilledButton(
-                                        onPressed: _fetchMyIssuedBooks,
-                                        style: FilledButton.styleFrom(
-                                          padding: EdgeInsets.symmetric(vertical: context.scale(14)),
-                                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(context.scale(12))),
-                                        ),
-                                        child: const Text("APPLY FILTERS"),
+                                if (filteredRecords.isEmpty)
+                                  Center(
+                                    child: Padding(
+                                      padding: EdgeInsets.symmetric(vertical: context.scale(40)),
+                                      child: const Text("No lending records found"),
+                                    ),
+                                  )
+                                else
+                                  SingleChildScrollView(
+                                    scrollDirection: Axis.horizontal,
+                                    child: ConstrainedBox(
+                                      constraints: const BoxConstraints(minWidth: 900),
+                                      child: DataTable(
+                                        headingRowColor: WidgetStateProperty.all(colorScheme.surfaceContainer),
+                                        dataRowMinHeight: context.scale(60),
+                                        dataRowMaxHeight: context.scale(70),
+                                        columnSpacing: context.scale(24),
+                                        columns: [
+                                          DataColumn(label: Text("#", style: TextStyle(fontWeight: FontWeight.bold, fontSize: context.font(14)))),
+                                          DataColumn(label: Text("ISSUE ID", style: TextStyle(fontWeight: FontWeight.bold, fontSize: context.font(14)))),
+                                          DataColumn(label: Text("BOOK TITLE", style: TextStyle(fontWeight: FontWeight.bold, fontSize: context.font(14)))),
+                                          DataColumn(label: Text("ISSUED AT", style: TextStyle(fontWeight: FontWeight.bold, fontSize: context.font(14)))),
+                                          DataColumn(label: Text("DUE DATE", style: TextStyle(fontWeight: FontWeight.bold, fontSize: context.font(14)))),
+                                          DataColumn(label: Text("STATUS", style: TextStyle(fontWeight: FontWeight.bold, fontSize: context.font(14)))),
+                                        ],
+                                        rows: filteredRecords.asMap().entries.map((entry) {
+                                          int index = entry.key + 1;
+                                          IssuedBook ib = entry.value;
+                                          return _buildDataRow(context, index.toString(), ib);
+                                        }).toList(),
                                       ),
                                     ),
-                                    SizedBox(width: context.scale(12)),
-                                    Expanded(
-                                      child: OutlinedButton(
-                                        onPressed: () {
-                                          setState(() {
-                                            _bookTitleController.clear();
-                                            _dateFromController.clear();
-                                            _dateToController.clear();
-                                          });
-                                          _fetchMyIssuedBooks();
-                                        },
-                                        style: OutlinedButton.styleFrom(
-                                          padding: EdgeInsets.symmetric(vertical: context.scale(14)),
-                                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(context.scale(12))),
-                                        ),
-                                        child: const Text("RESET"),
-                                      ),
-                                    ),
-                                  ],
-                                ),
+                                  ),
                               ],
                             ),
                           ),
-                        ),
-
-                        SizedBox(height: context.scale(24)),
-
-                        /// RECORDS SECTION
-                        Card(
-                          elevation: 0,
-                          color: colorScheme.surfaceContainerLow,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(context.scale(20)),
-                            side: BorderSide(color: colorScheme.outlineVariant.withValues(alpha: 0.5), width: 0.5),
-                          ),
-                          clipBehavior: Clip.antiAlias,
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.stretch,
-                            children: [
-                              Padding(
-                                padding: EdgeInsets.all(context.scale(16)),
-                                child: Row(
-                                  children: [
-                                    Text(
-                                      "Lending Records",
-                                      style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
-                                    ),
-                                    const Spacer(),
-                                    _exportIcon(context, Icons.description, Colors.teal),
-                                    _exportIcon(context, Icons.table_chart, Colors.green),
-                                  ],
-                                ),
-                              ),
-                              Padding(
-                                padding: EdgeInsets.symmetric(horizontal: context.scale(16)),
-                                child: TextField(
-                                  controller: _searchController,
-                                  onChanged: (v) => setState(() {}),
-                                  style: TextStyle(fontSize: context.font(14)),
-                                  decoration: InputDecoration(
-                                    hintText: "Quick search...",
-                                    prefixIcon: const Icon(Icons.search),
-                                    filled: true,
-                                    fillColor: colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
-                                    border: OutlineInputBorder(
-                                      borderRadius: BorderRadius.circular(context.scale(12)),
-                                      borderSide: BorderSide(color: colorScheme.outlineVariant.withValues(alpha: 0.5)),
-                                    ),
-                                    enabledBorder: OutlineInputBorder(
-                                      borderRadius: BorderRadius.circular(context.scale(12)),
-                                      borderSide: BorderSide(color: colorScheme.outlineVariant.withValues(alpha: 0.5)),
-                                    ),
-                                    focusedBorder: OutlineInputBorder(
-                                      borderRadius: BorderRadius.circular(context.scale(12)),
-                                      borderSide: BorderSide(color: colorScheme.primary, width: 1),
-                                    ),
-                                    contentPadding: EdgeInsets.symmetric(horizontal: context.scale(16)),
-                                  ),
-                                ),
-                              ),
-                              SizedBox(height: context.scale(16)),
-                              if (_myIssuedBooks.isEmpty)
-                                Center(
-                                  child: Padding(
-                                    padding: EdgeInsets.symmetric(vertical: context.scale(40)),
-                                    child: const Text("No lending records found"),
-                                  ),
-                                )
-                              else
-                                SingleChildScrollView(
-                                  scrollDirection: Axis.horizontal,
-                                  child: ConstrainedBox(
-                                    constraints: const BoxConstraints(minWidth: 900),
-                                    child: DataTable(
-                                      headingRowColor: WidgetStateProperty.all(colorScheme.surfaceContainer),
-                                      dataRowMinHeight: context.scale(60),
-                                      dataRowMaxHeight: context.scale(70),
-                                      columnSpacing: context.scale(24),
-                                      columns: [
-                                        DataColumn(label: Text("#", style: TextStyle(fontWeight: FontWeight.bold, fontSize: context.font(14)))),
-                                        DataColumn(label: Text("ISSUE ID", style: TextStyle(fontWeight: FontWeight.bold, fontSize: context.font(14)))),
-                                        DataColumn(label: Text("BOOK TITLE", style: TextStyle(fontWeight: FontWeight.bold, fontSize: context.font(14)))),
-                                        DataColumn(label: Text("ISSUED AT", style: TextStyle(fontWeight: FontWeight.bold, fontSize: context.font(14)))),
-                                        DataColumn(label: Text("DUE DATE", style: TextStyle(fontWeight: FontWeight.bold, fontSize: context.font(14)))),
-                                        DataColumn(label: Text("STATUS", style: TextStyle(fontWeight: FontWeight.bold, fontSize: context.font(14)))),
-                                      ],
-                                      rows: _myIssuedBooks
-                                          .where((ib) => (ib.bookTitle ?? "").toLowerCase().contains(_searchController.text.toLowerCase()))
-                                          .toList()
-                                          .asMap()
-                                          .entries
-                                          .map((entry) {
-                                        int index = entry.key + 1;
-                                        IssuedBook ib = entry.value;
-                                        return _buildDataRow(context, index.toString(), ib);
-                                      }).toList(),
-                                    ),
-                                  ),
-                                ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
+                        ],
+                      ),
+                    );
+                  },
                 ),
               ),
             ),
+          );
+        },
+      ),
     );
   }
+
 
   Widget _buildResponsiveRow(BuildContext context, List<Widget> children) {
     if (!context.isTablet) {

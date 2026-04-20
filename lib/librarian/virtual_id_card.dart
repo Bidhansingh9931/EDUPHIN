@@ -1,3 +1,4 @@
+import 'package:eduphin/librarian/librarian_skeleton_widgets.dart';
 import 'package:eduphin/services/pdf_service.dart';
 import 'package:eduphin/services/common_widgets.dart';
 import 'package:eduphin/services/responsive_helper.dart';
@@ -14,14 +15,20 @@ class LibrarianVirtualIdCardPage extends StatefulWidget {
 }
 
 class _LibrarianVirtualIdCardPageState extends State<LibrarianVirtualIdCardPage> {
-  late Future<StaffVirtualIdCardData> _idCardFuture;
+  late Stream<StaffVirtualIdCardData> _idCardStream;
   bool _isFront = true;
   double _rotation = 0;
 
   @override
   void initState() {
     super.initState();
-    _idCardFuture = ApiService.getLibrarianVirtualIdCard();
+    _idCardStream = ApiService.getLibrarianVirtualIdCardStream().asBroadcastStream();
+  }
+
+  void _refreshData() {
+    setState(() {
+      _idCardStream = ApiService.getLibrarianVirtualIdCardStream().asBroadcastStream();
+    });
   }
 
   void _toggleFlip() {
@@ -34,84 +41,88 @@ class _LibrarianVirtualIdCardPageState extends State<LibrarianVirtualIdCardPage>
   @override
   Widget build(BuildContext context) {
     final theme = context.theme;
-    final colorScheme = theme.colorScheme;
 
     return Scaffold(
       backgroundColor: theme.colorScheme.surface,
       appBar: AppBar(
         title: const Text("Librarian ID Card"),
       ),
-      body: FutureBuilder<StaffVirtualIdCardData>(
-        future: _idCardFuture,
+      body: StreamBuilder<StaffVirtualIdCardData>(
+        stream: _idCardStream,
         builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return Center(child: CircularProgressIndicator(color: colorScheme.primary));
-          } else if (snapshot.hasError) {
-            return Center(
-              child: Padding(
+          return LoadingWrapper<StaffVirtualIdCardData>(
+            snapshot: snapshot,
+            skeleton: _buildSkeleton(context),
+            onRetry: _refreshData,
+            builder: (data) => SingleChildScrollView(
                 padding: context.pagePadding,
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(Icons.error_outline, color: colorScheme.error, size: context.scale(48)),
-                    SizedBox(height: context.scale(16)),
-                    Text('Failed to load ID card details', style: TextStyle(color: colorScheme.onSurfaceVariant, fontSize: context.font(14))),
-                  ],
-                ),
-              ),
-            );
-          } else if (!snapshot.hasData) {
-            return Center(child: Text('No data found', style: TextStyle(color: colorScheme.onSurfaceVariant)));
-          }
+                child: Center(
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 800),
+                    child: Column(
+                      children: [
+                        SizedBox(height: context.scale(20)),
+                        
+                        // 3D Flip Animation
+                        FittedBox(
+                          fit: BoxFit.scaleDown,
+                          child: TweenAnimationBuilder<double>(
+                            tween: Tween<double>(begin: 0, end: _rotation),
+                            duration: const Duration(milliseconds: 600),
+                            curve: Curves.easeInOutBack,
+                            builder: (context, value, child) {
+                              final isBack = value > (pi / 2);
+                              return Transform(
+                                transform: Matrix4.identity()
+                                  ..setEntry(3, 2, 0.001) // Perspective
+                                  ..rotateY(value),
+                                alignment: Alignment.center,
+                                child: isBack
+                                    ? Transform(
+                                        alignment: Alignment.center,
+                                        transform: Matrix4.identity()..rotateY(pi),
+                                        child: _buildBackSide(context, data),
+                                      )
+                                    : _buildFrontSide(context, data),
+                              );
+                            },
+                          ),
+                        ),
 
-          final data = snapshot.data!;
-          return SingleChildScrollView(
-            padding: context.pagePadding,
-            child: Center(
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 800),
-                child: Column(
-                  children: [
-                    SizedBox(height: context.scale(20)),
-                    
-                    // 3D Flip Animation
-                    FittedBox(
-                      fit: BoxFit.scaleDown,
-                      child: TweenAnimationBuilder<double>(
-                        tween: Tween<double>(begin: 0, end: _rotation),
-                        duration: const Duration(milliseconds: 600),
-                        curve: Curves.easeInOutBack,
-                        builder: (context, value, child) {
-                          final isBack = value > (pi / 2);
-                          return Transform(
-                            transform: Matrix4.identity()
-                              ..setEntry(3, 2, 0.001) // Perspective
-                              ..rotateY(value),
-                            alignment: Alignment.center,
-                            child: isBack
-                                ? Transform(
-                                    alignment: Alignment.center,
-                                    transform: Matrix4.identity()..rotateY(pi),
-                                    child: _buildBackSide(context, data),
-                                  )
-                                : _buildFrontSide(context, data),
-                          );
-                        },
-                      ),
+                        SizedBox(height: context.scale(40)),
+                        _buildActionButtons(context, data),
+                        SizedBox(height: context.scale(40)),
+                      ],
                     ),
-
-                    SizedBox(height: context.scale(40)),
-                    _buildActionButtons(context),
-                    SizedBox(height: context.scale(40)),
-                  ],
+                  ),
                 ),
               ),
-            ),
           );
         },
       ),
     );
   }
+
+  Widget _buildSkeleton(BuildContext context) {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          LibrarianSkeleton(width: context.scale(320), height: context.scale(500), borderRadius: 24),
+          SizedBox(height: context.scale(40)),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              LibrarianSkeleton(width: context.scale(120), height: context.scale(50), borderRadius: 25),
+              SizedBox(width: context.scale(20)),
+              LibrarianSkeleton(width: context.scale(120), height: context.scale(50), borderRadius: 25),
+            ],
+          )
+        ],
+      ),
+    );
+  }
+
 
   Widget _buildFrontSide(BuildContext context, StaffVirtualIdCardData data) {
     final colorScheme = context.theme.colorScheme;
@@ -330,7 +341,7 @@ class _LibrarianVirtualIdCardPageState extends State<LibrarianVirtualIdCardPage>
     );
   }
 
-  Widget _buildActionButtons(BuildContext context) {
+  Widget _buildActionButtons(BuildContext context, StaffVirtualIdCardData data) {
     final colorScheme = context.theme.colorScheme;
     return Column(
       children: [
@@ -349,24 +360,19 @@ class _LibrarianVirtualIdCardPageState extends State<LibrarianVirtualIdCardPage>
           ),
         ),
         SizedBox(height: context.scale(16)),
-        FutureBuilder<StaffVirtualIdCardData>(
-          future: _idCardFuture,
-          builder: (context, snapshot) {
-            return SizedBox(
-              width: double.infinity,
-              child: ElevatedButton.icon(
-                onPressed: snapshot.hasData ? () => PdfService.generateAndPrintIdCard(snapshot.data!) : null,
-                icon: Icon(Icons.download, size: context.scale(20)),
-                label: Text("DOWNLOAD ID", style: TextStyle(fontSize: context.font(14))),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: colorScheme.primary,
-                  foregroundColor: colorScheme.onPrimary,
-                  padding: EdgeInsets.symmetric(vertical: context.scale(16)),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(context.scale(12))),
-                ),
-              ),
-            );
-          },
+        SizedBox(
+          width: double.infinity,
+          child: ElevatedButton.icon(
+            onPressed: () => PdfService.generateAndPrintIdCard(data),
+            icon: Icon(Icons.download, size: context.scale(20)),
+            label: Text("DOWNLOAD ID", style: TextStyle(fontSize: context.font(14))),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: colorScheme.primary,
+              foregroundColor: colorScheme.onPrimary,
+              padding: EdgeInsets.symmetric(vertical: context.scale(16)),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(context.scale(12))),
+            ),
+          ),
         ),
       ],
     );

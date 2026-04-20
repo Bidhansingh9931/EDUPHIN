@@ -214,7 +214,7 @@ class _InstitutesPageState extends State<InstitutesPage> {
           ),
           SizedBox(height: context.scale(24)),
           ElevatedButton.icon(
-            onPressed: _fetchData, 
+            onPressed: _fetchData,
             icon: const Icon(Icons.refresh_rounded),
             label: Text("Retry", style: TextStyle(fontSize: context.font(16))),
             style: ElevatedButton.styleFrom(

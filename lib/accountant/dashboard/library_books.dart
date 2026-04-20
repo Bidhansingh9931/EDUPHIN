@@ -1,3 +1,4 @@
+import 'package:eduphin/services/common_widgets.dart';
 import 'package:eduphin/services/responsive_helper.dart';
 import 'package:flutter/material.dart';
 import 'package:eduphin/services/api_service.dart';
@@ -12,11 +13,9 @@ class LibraryBooksPage extends StatefulWidget {
 }
 
 class _LibraryBooksPageState extends State<LibraryBooksPage> {
-  bool _isLoading = false;
-  List<Book> _books = [];
+  late Stream<BookPagination> _booksStream;
   BookFilters? _filterOptions;
   int _currentPage = 1;
-  int _totalPages = 1;
 
   final TextEditingController _titleController = TextEditingController();
   final TextEditingController _authorController = TextEditingController();
@@ -38,48 +37,37 @@ class _LibraryBooksPageState extends State<LibraryBooksPage> {
     super.dispose();
   }
 
-  Future<void> _fetchBooks({int page = 1}) async {
-    if (!mounted) return;
-    setState(() => _isLoading = true);
-    try {
-      final filters = {
-        'title': _titleController.text,
-        'author': _authorController.text,
-        'isbn': _isbnController.text,
-        if (_selectedCategory != 'All') 'category': _selectedCategory,
-        if (_selectedLanguage != 'All') 'language': _selectedLanguage,
-      };
-      
-      final booksPagination = await ApiService.getAccountantLibraryBooks(filters, page);
-      
-      if (mounted) {
-        setState(() {
-          _books = booksPagination.books;
-          _filterOptions = booksPagination.filters;
-          _currentPage = booksPagination.currentPage;
-          _totalPages = booksPagination.lastPage;
-        });
-      }
-    } catch (e) {
-      debugPrint("Library Fetch Error: $e");
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Error: $e")));
-    } finally {
-      if (mounted) setState(() => _isLoading = false);
-    }
+  void _fetchBooks({int page = 1}) {
+    final filters = {
+      'title': _titleController.text,
+      'author': _authorController.text,
+      'isbn': _isbnController.text,
+      if (_selectedCategory != 'All') 'category': _selectedCategory,
+      if (_selectedLanguage != 'All') 'language': _selectedLanguage,
+    };
+    setState(() {
+      _currentPage = page;
+      _booksStream = ApiService.getAccountantLibraryBooksStream(filters, page);
+    });
   }
 
   @override
   Widget build(BuildContext context) {
     final theme = context.theme;
-    
+
     return Scaffold(
       appBar: AppBar(
         title: const Text("Library Inventory"),
         centerTitle: true,
       ),
-      body: Stack(
-        children: [
-          SingleChildScrollView(
+      body: StreamBuilder<BookPagination>(
+        stream: _booksStream,
+        builder: (context, snapshot) {
+          if (snapshot.hasData) {
+            _filterOptions = snapshot.data!.filters;
+          }
+
+          return SingleChildScrollView(
             padding: EdgeInsets.symmetric(vertical: context.spacing),
             child: Center(
               child: ConstrainedBox(
@@ -89,25 +77,37 @@ class _LibraryBooksPageState extends State<LibraryBooksPage> {
                   children: [
                     _buildFilterSection(context),
                     SizedBox(height: context.spacing * 1.5),
-                    Padding(
-                      padding: EdgeInsets.symmetric(horizontal: context.pagePadding.left),
-                      child: Text(
-                        "Books Found (${_books.length})",
-                        style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
-                      ),
+                    LoadingWrapper<BookPagination>(
+                      snapshot: snapshot,
+                      onRetry: () => _fetchBooks(page: _currentPage),
+                      skeleton: _buildSkeleton(),
+                      builder: (pagination) {
+                        final books = pagination.books;
+                        return Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Padding(
+                              padding: EdgeInsets.symmetric(horizontal: context.pagePadding.left),
+                              child: Text(
+                                "Books Found (${books.length})",
+                                style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+                              ),
+                            ),
+                            SizedBox(height: context.spacing),
+                            _buildBookList(context, books),
+                            SizedBox(height: context.spacing * 2),
+                            _buildPagination(context, pagination.currentPage, pagination.lastPage),
+                            SizedBox(height: context.spacing * 2),
+                          ],
+                        );
+                      },
                     ),
-                    SizedBox(height: context.spacing),
-                    _buildBookList(context),
-                    SizedBox(height: context.spacing * 2),
-                    _buildPagination(context),
-                    SizedBox(height: context.spacing * 2),
                   ],
                 ),
               ),
             ),
-          ),
-          if (_isLoading) const Center(child: CircularProgressIndicator()),
-        ],
+          );
+        },
       ),
     );
   }
@@ -148,9 +148,9 @@ class _LibraryBooksPageState extends State<LibraryBooksPage> {
             children: [
               buildLabel(context, "Category"),
               buildDropdown(
-                context, 
-                ['All', ...(_filterOptions?.categories ?? [])], 
-                _selectedCategory, 
+                context,
+                ['All', ...(_filterOptions?.categories ?? [])],
+                _selectedCategory,
                 (v) => setState(() => _selectedCategory = v ?? 'All'),
                 hint: "Select Category",
               ),
@@ -161,9 +161,9 @@ class _LibraryBooksPageState extends State<LibraryBooksPage> {
             children: [
               buildLabel(context, "Language"),
               buildDropdown(
-                context, 
-                ['All', ...(_filterOptions?.languages ?? [])], 
-                _selectedLanguage, 
+                context,
+                ['All', ...(_filterOptions?.languages ?? [])],
+                _selectedLanguage,
                 (v) => setState(() => _selectedLanguage = v ?? 'All'),
                 hint: "Select Language",
               ),
@@ -180,8 +180,8 @@ class _LibraryBooksPageState extends State<LibraryBooksPage> {
             SizedBox(width: context.spacing),
             Expanded(
               child: buildActionButton(
-                context, 
-                "RESET", 
+                context,
+                "RESET",
                 () {
                   _titleController.clear();
                   _authorController.clear();
@@ -200,9 +200,9 @@ class _LibraryBooksPageState extends State<LibraryBooksPage> {
     );
   }
 
-  Widget _buildBookList(BuildContext context) {
+  Widget _buildBookList(BuildContext context, List<Book> books) {
     final theme = context.theme;
-    if (_books.isEmpty && !_isLoading) {
+    if (books.isEmpty) {
       return Center(
         child: Padding(
           padding: EdgeInsets.all(context.scale(40)),
@@ -228,11 +228,11 @@ class _LibraryBooksPageState extends State<LibraryBooksPage> {
           crossAxisSpacing: context.spacing,
           mainAxisSpacing: context.spacing,
         ),
-        itemCount: _books.length,
+        itemCount: books.length,
         itemBuilder: (context, index) {
-          final book = _books[index];
+          final book = books[index];
           final isAvailable = book.availableCopies > 0;
-          
+
           return Card(
             elevation: 0,
             color: theme.colorScheme.surfaceContainerLow,
@@ -262,15 +262,15 @@ class _LibraryBooksPageState extends State<LibraryBooksPage> {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              book.title, 
-                              style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold, fontSize: context.font(15)), 
-                              maxLines: 2, 
+                              book.title,
+                              style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold, fontSize: context.font(15)),
+                              maxLines: 2,
                               overflow: TextOverflow.ellipsis
                             ),
                             Text(
-                              "by ${book.author}", 
-                              style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant), 
-                              maxLines: 1, 
+                              "by ${book.author}",
+                              style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+                              maxLines: 1,
                               overflow: TextOverflow.ellipsis
                             ),
                           ],
@@ -297,10 +297,10 @@ class _LibraryBooksPageState extends State<LibraryBooksPage> {
                           borderRadius: BorderRadius.circular(context.scale(8)),
                         ),
                         child: Text(
-                          isAvailable ? "${book.availableCopies} Available" : "Out of Stock", 
+                          isAvailable ? "${book.availableCopies} Available" : "Out of Stock",
                           style: TextStyle(
-                            color: isAvailable ? Colors.green : Colors.red, 
-                            fontSize: context.font(11), 
+                            color: isAvailable ? Colors.green : Colors.red,
+                            fontSize: context.font(11),
                             fontWeight: FontWeight.bold
                           )
                         ),
@@ -316,24 +316,100 @@ class _LibraryBooksPageState extends State<LibraryBooksPage> {
     );
   }
 
-  Widget _buildPagination(BuildContext context) {
+  Widget _buildPagination(BuildContext context, int currentPage, int totalPages) {
     final theme = context.theme;
     return Row(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
         IconButton.filledTonal(
-          onPressed: _currentPage > 1 ? () => _fetchBooks(page: _currentPage - 1) : null, 
+          onPressed: currentPage > 1 ? () => _fetchBooks(page: currentPage - 1) : null,
           icon: const Icon(Icons.chevron_left)
         ),
         SizedBox(width: context.spacing),
         Text(
-          "Page $_currentPage of $_totalPages", 
+          "Page $currentPage of $totalPages",
           style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.bold)
         ),
         SizedBox(width: context.spacing),
         IconButton.filledTonal(
-          onPressed: _currentPage < _totalPages ? () => _fetchBooks(page: _currentPage + 1) : null, 
+          onPressed: currentPage < totalPages ? () => _fetchBooks(page: currentPage + 1) : null,
           icon: const Icon(Icons.chevron_right)
+        ),
+      ],
+    );
+  }
+
+  Widget _buildSkeleton() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: EdgeInsets.symmetric(horizontal: context.pagePadding.left),
+          child: Skeleton(height: context.font(16), width: context.scale(150)),
+        ),
+        SizedBox(height: context.spacing),
+        Padding(
+          padding: EdgeInsets.symmetric(horizontal: context.pagePadding.left),
+          child: GridView.builder(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: context.isDesktop ? 3 : (context.isTablet ? 2 : 1),
+              mainAxisExtent: context.scale(180),
+              crossAxisSpacing: context.spacing,
+              mainAxisSpacing: context.spacing,
+            ),
+            itemCount: 6,
+            itemBuilder: (context, index) => Card(
+              elevation: 0,
+              color: context.theme.colorScheme.surfaceContainerLow,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(context.scale(16)),
+                side: BorderSide(color: context.theme.colorScheme.outlineVariant, width: 0.5),
+              ),
+              child: Padding(
+                padding: EdgeInsets.all(context.spacing),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Skeleton(width: context.scale(40), height: context.scale(40), borderRadius: context.scale(10)),
+                        SizedBox(width: context.spacing / 2),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Skeleton(height: context.font(15), width: context.scale(150)),
+                              SizedBox(height: context.scale(4)),
+                              Skeleton(height: context.font(12), width: context.scale(100)),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                    const Spacer(),
+                    Divider(color: context.theme.colorScheme.outlineVariant, height: context.spacing),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Skeleton(height: context.font(10), width: context.scale(30)),
+                            SizedBox(height: context.scale(2)),
+                            Skeleton(height: context.font(12), width: context.scale(80)),
+                          ],
+                        ),
+                        Skeleton(height: context.scale(20), width: context.scale(80), borderRadius: context.scale(8)),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
         ),
       ],
     );

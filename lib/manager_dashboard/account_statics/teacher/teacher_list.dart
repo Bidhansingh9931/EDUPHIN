@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:csv/csv.dart';
 import 'package:eduphin/manager_dashboard/account_statics/teacher/add_teacher.dart';
 import 'package:eduphin/services/api_service.dart';
+import 'package:eduphin/services/caching_service.dart';
 import 'package:eduphin/services/common_widgets.dart';
 import 'package:eduphin/services/responsive_helper.dart';
 import 'package:flutter/material.dart';
@@ -51,6 +52,7 @@ class TeacherListPage extends StatefulWidget {
 
 class _TeacherListPageState extends State<TeacherListPage> {
   bool _isLoading = true;
+  Object? _error;
   int? _selectedRoleId;
   List<Role> _roles = [];
   List<Teacher> _teachers = [];
@@ -58,19 +60,49 @@ class _TeacherListPageState extends State<TeacherListPage> {
   @override
   void initState() {
     super.initState();
-    _fetchInitialData();
+    _loadCachedData().then((_) => _fetchInitialData());
+  }
+
+  Future<void> _loadCachedData() async {
+    final rolesCache = await CacheService.getCache('teacher_roles');
+    if (rolesCache != null && mounted) {
+      final List<dynamic> rolesData = rolesCache;
+      final List<Role> allRoles = rolesData
+          .map((role) => Role(id: role['role_id'], name: role['name']))
+          .toList();
+      final teacherRoles = allRoles.where((role) => role.name.toLowerCase().contains('teacher')).toList();
+
+      setState(() {
+        _roles = teacherRoles;
+        if (_roles.isNotEmpty) _selectedRoleId = _roles.first.id;
+      });
+
+      if (_selectedRoleId != null) {
+        final teacherCache = await CacheService.getCache('teachers_$_selectedRoleId');
+        if (teacherCache != null && mounted) {
+          setState(() {
+            _teachers = (teacherCache as List).map((json) => Teacher.fromJson(json)).toList();
+            _isLoading = false;
+          });
+        }
+      }
+    }
   }
 
   Future<void> _fetchInitialData() async {
     if (!mounted) return;
-    setState(() => _isLoading = true);
+    setState(() {
+      _isLoading = _roles.isEmpty;
+      _error = null;
+    });
 
     try {
       final response = await ApiService.get('manager/salary/accounts');
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
         final List<dynamic> rolesData = data['roles'];
-        
+        await CacheService.setCache('teacher_roles', rolesData);
+
         final List<Role> allRoles = rolesData
             .map((role) => Role(id: role['role_id'], name: role['name']))
             .toList();
@@ -95,21 +127,28 @@ class _TeacherListPageState extends State<TeacherListPage> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString())));
-        setState(() => _isLoading = false);
+        setState(() {
+          _error = e;
+          _isLoading = false;
+        });
       }
     }
   }
 
   Future<void> _fetchTeachersForRole(int roleId) async {
     if (!mounted) return;
-    setState(() => _isLoading = true);
+    setState(() {
+      _isLoading = _teachers.isEmpty;
+      _error = null;
+    });
 
     try {
       final response = await ApiService.get('manager/users/$roleId');
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
         final List<dynamic> teachersData = data['data'];
+        await CacheService.setCache('teachers_$roleId', teachersData);
+
         if(mounted){
           setState(() {
             _teachers = teachersData.map((json) => Teacher.fromJson(json)).toList();
@@ -121,8 +160,10 @@ class _TeacherListPageState extends State<TeacherListPage> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString())));
-        setState(() => _isLoading = false);
+        setState(() {
+          _error = e;
+          _isLoading = false;
+        });
       }
     }
   }
@@ -178,9 +219,13 @@ class _TeacherListPageState extends State<TeacherListPage> {
         icon: Icon(Icons.person_add_rounded, size: context.scale(20)),
         label: Text("Add Teacher", style: theme.textTheme.labelLarge?.copyWith(fontSize: context.font(14))),
       ),
-      body: _isLoading 
-        ? const Center(child: CircularProgressIndicator())
-        : RefreshIndicator(
+      body: LoadingWrapper(
+        isLoading: _isLoading,
+        hasData: _teachers.isNotEmpty || _roles.isNotEmpty,
+        error: _error,
+        onRetry: _fetchInitialData,
+        skeleton: _buildSkeleton(context),
+        child: RefreshIndicator(
             onRefresh: () => _fetchTeachersForRole(_selectedRoleId!),
             child: SingleChildScrollView(
               padding: context.pagePadding,
@@ -219,6 +264,48 @@ class _TeacherListPageState extends State<TeacherListPage> {
               ),
             ),
           ),
+      ),
+    );
+  }
+
+  Widget _buildSkeleton(BuildContext context) {
+    return SingleChildScrollView(
+      padding: context.pagePadding,
+      child: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 1200),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              SkeletonBox(height: context.scale(56), borderRadius: context.scale(12)),
+              SizedBox(height: context.scale(24)),
+              SkeletonBox(width: context.scale(100), height: context.scale(16)),
+              SizedBox(height: context.scale(12)),
+              GridView.builder(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                itemCount: 6,
+                gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: context.responsive(1, tablet: 2, desktop: 3),
+                  crossAxisSpacing: context.scale(16),
+                  mainAxisSpacing: context.scale(16),
+                  mainAxisExtent: context.scale(80),
+                ),
+                itemBuilder: (context, index) => Card(
+                  elevation: 0,
+                  color: Colors.white,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(context.scale(16))),
+                  child: ListTile(
+                    leading: CircleAvatar(radius: context.scale(20), backgroundColor: Colors.white),
+                    title: const SkeletonBox(height: 14),
+                    subtitle: const SkeletonBox(height: 12),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 
@@ -306,4 +393,5 @@ class _TeacherListPageState extends State<TeacherListPage> {
     );
   }
 }
+
 

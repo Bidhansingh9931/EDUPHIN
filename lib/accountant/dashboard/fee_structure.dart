@@ -1,3 +1,4 @@
+import 'package:eduphin/services/common_widgets.dart';
 import 'package:eduphin/services/responsive_helper.dart';
 import 'package:flutter/material.dart';
 import 'package:eduphin/services/api_service.dart';
@@ -11,32 +12,18 @@ class FeeStructurePage extends StatefulWidget {
 }
 
 class _FeeStructurePageState extends State<FeeStructurePage> {
-  bool _isLoading = true;
-  List<Fee> _instituteFees = [];
-  List<Fee> _classFees = [];
+  late Stream<Map<String, dynamic>> _feesStream;
 
   @override
   void initState() {
     super.initState();
-    _fetchFees();
+    _feesStream = ApiService.getAccountantFeesStream();
   }
 
-  Future<void> _fetchFees() async {
-    if (!mounted) return;
-    setState(() => _isLoading = true);
-    try {
-      final data = await ApiService.getAccountantFees();
-      if (mounted) {
-        setState(() {
-          _instituteFees = (data['institute_fees'] as List).map((e) => Fee.fromJson(e)).toList();
-          _classFees = (data['class_fees'] as List).map((e) => Fee.fromJson(e)).toList();
-        });
-      }
-    } catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Error fetching fees: $e")));
-    } finally {
-      if (mounted) setState(() => _isLoading = false);
-    }
+  void _refreshFees() {
+    setState(() {
+      _feesStream = ApiService.getAccountantFeesStream();
+    });
   }
 
   Future<void> _deleteFee(Fee fee) async {
@@ -57,56 +44,139 @@ class _FeeStructurePageState extends State<FeeStructurePage> {
     );
 
     if (confirmed == true) {
-      setState(() => _isLoading = true);
       try {
         final targetId = fee.encryptedId ?? fee.id.toString();
         await ApiService.deleteAccountantFee(targetId);
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Fee removed successfully")));
-          _fetchFees();
+          _refreshFees();
         }
       } catch (e) {
         if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Error: $e")));
-        setState(() => _isLoading = false);
       }
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
     return Scaffold(
       appBar: AppBar(
         title: const Text("Fee Structures"),
         actions: [
-          IconButton(icon: const Icon(Icons.refresh_rounded), onPressed: _fetchFees),
+          IconButton(icon: const Icon(Icons.refresh_rounded), onPressed: _refreshFees),
         ],
       ),
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : SingleChildScrollView(
-        padding: context.pagePadding,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            _buildSectionHeader(context, "Institute-Wide"),
-            const SizedBox(height: 16),
-            _buildResponsiveGrid(_instituteFees, true),
-            if (_instituteFees.isEmpty) _buildEmptyState(context, "No institute-wide fees found"),
-            const SizedBox(height: 32),
-            _buildSectionHeader(context, "Class-Specific"),
-            const SizedBox(height: 16),
-            _buildResponsiveGrid(_classFees, false),
-            if (_classFees.isEmpty) _buildEmptyState(context, "No class-specific fees found"),
-            const SizedBox(height: 100),
-          ],
-        ),
+      body: StreamBuilder<Map<String, dynamic>>(
+        stream: _feesStream,
+        builder: (context, snapshot) {
+          return LoadingWrapper<Map<String, dynamic>>(
+            snapshot: snapshot,
+            onRetry: _refreshFees,
+            skeleton: _buildSkeleton(context),
+            builder: (data) {
+              final instituteFees = (data['institute_fees'] as List? ?? []).map((e) => Fee.fromJson(e)).toList();
+              final classFees = (data['class_fees'] as List? ?? []).map((e) => Fee.fromJson(e)).toList();
+
+              return SingleChildScrollView(
+                padding: context.pagePadding,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _buildSectionHeader(context, "Institute-Wide"),
+                    SizedBox(height: context.spacing),
+                    _buildResponsiveGrid(instituteFees, true),
+                    if (instituteFees.isEmpty) _buildEmptyState(context, "No institute-wide fees found"),
+                    SizedBox(height: context.spacing * 2),
+                    _buildSectionHeader(context, "Class-Specific"),
+                    SizedBox(height: context.spacing),
+                    _buildResponsiveGrid(classFees, false),
+                    if (classFees.isEmpty) _buildEmptyState(context, "No class-specific fees found"),
+                    SizedBox(height: context.scale(100)),
+                  ],
+                ),
+              );
+            },
+          );
+        },
       ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: _showAddFeeDialog,
         icon: const Icon(Icons.add),
         label: const Text("CREATE NEW FEE"),
+      ),
+    );
+  }
+
+  Widget _buildSkeleton(BuildContext context) {
+    return SingleChildScrollView(
+      padding: context.pagePadding,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Skeleton(width: 120, height: 16, borderRadius: 4),
+          const SizedBox(height: 16),
+          GridView.builder(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: context.isTablet ? 2 : 1,
+              mainAxisExtent: 200,
+              crossAxisSpacing: 16,
+              mainAxisSpacing: 16,
+            ),
+            itemCount: 2,
+            itemBuilder: (context, index) => const Card(child: Padding(padding: EdgeInsets.all(16), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
+                Skeleton(width: 40, height: 40, borderRadius: 20),
+                Skeleton(width: 80, height: 24, borderRadius: 4),
+              ]),
+              SizedBox(height: 12),
+              Skeleton(width: 150, height: 16, borderRadius: 4),
+              SizedBox(height: 8),
+              Skeleton(width: 100, height: 12, borderRadius: 4),
+              Spacer(),
+              Row(children: [
+                Skeleton(width: 80, height: 20, borderRadius: 4),
+                Spacer(),
+                Skeleton(width: 32, height: 32, borderRadius: 16),
+                SizedBox(width: 8),
+                Skeleton(width: 32, height: 32, borderRadius: 16),
+              ]),
+            ]))),
+          ),
+          const SizedBox(height: 32),
+          Skeleton(width: 120, height: 16, borderRadius: 4),
+          const SizedBox(height: 16),
+          GridView.builder(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: context.isTablet ? 2 : 1,
+              mainAxisExtent: 200,
+              crossAxisSpacing: 16,
+              mainAxisSpacing: 16,
+            ),
+            itemCount: 2,
+            itemBuilder: (context, index) => const Card(child: Padding(padding: EdgeInsets.all(16), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
+                Skeleton(width: 40, height: 40, borderRadius: 20),
+                Skeleton(width: 80, height: 24, borderRadius: 4),
+              ]),
+              SizedBox(height: 12),
+              Skeleton(width: 150, height: 16, borderRadius: 4),
+              SizedBox(height: 8),
+              Skeleton(width: 100, height: 12, borderRadius: 4),
+              Spacer(),
+              Row(children: [
+                Skeleton(width: 80, height: 20, borderRadius: 4),
+                Spacer(),
+                Skeleton(width: 32, height: 32, borderRadius: 16),
+                SizedBox(width: 8),
+                Skeleton(width: 32, height: 32, borderRadius: 16),
+              ]),
+            ]))),
+          ),
+        ],
       ),
     );
   }
@@ -217,7 +287,6 @@ class _FeeStructurePageState extends State<FeeStructurePage> {
   }
 
   void _showAddFeeDialog() async {
-    setState(() => _isLoading = true);
     try {
       final classes = await ApiService.getAccountantFeeCreateData();
       if (mounted) {
@@ -225,18 +294,15 @@ class _FeeStructurePageState extends State<FeeStructurePage> {
           context: context,
           isScrollControlled: true,
           backgroundColor: Colors.transparent,
-          builder: (context) => FeeFormDialog(title: "Create Fee Structure", buttonLabel: "SAVE STRUCTURE", classes: classes, onSuccess: _fetchFees),
+          builder: (context) => FeeFormDialog(title: "Create Fee Structure", buttonLabel: "SAVE STRUCTURE", classes: classes, onSuccess: _refreshFees),
         );
       }
     } catch (e) {
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Error: $e")));
-    } finally {
-      if (mounted) setState(() => _isLoading = false);
     }
   }
 
   void _showEditFeeDialog(Fee fee) async {
-    setState(() => _isLoading = true);
     try {
       final targetId = fee.encryptedId ?? fee.id.toString();
       final editData = await ApiService.getAccountantFeeEditData(targetId);
@@ -250,14 +316,12 @@ class _FeeStructurePageState extends State<FeeStructurePage> {
             buttonLabel: "UPDATE STRUCTURE",
             classes: editData['classes'] ?? [],
             fee: Fee.fromJson(editData['fee'] ?? editData),
-            onSuccess: _fetchFees,
+            onSuccess: _refreshFees,
           ),
         );
       }
     } catch (e) {
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Error: $e")));
-    } finally {
-      if (mounted) setState(() => _isLoading = false);
     }
   }
 }
@@ -393,7 +457,7 @@ class _FeeFormDialogState extends State<FeeFormDialog> {
 
   Widget _buildDropdownField(List<dynamic> classes) {
     return DropdownButtonFormField<dynamic>(
-      value: _selectedClassId,
+      initialValue: _selectedClassId,
       isExpanded: true,
       hint: const Text("Institute-Wide"),
       items: [

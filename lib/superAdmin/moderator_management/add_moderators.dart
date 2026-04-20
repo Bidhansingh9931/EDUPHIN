@@ -411,7 +411,7 @@ class _AddModeratorScreenState extends State<AddModeratorScreen> {
           SizedBox(height: context.scale(8)),
           DropdownButtonFormField<String>(
             isExpanded: true,
-            value: value,
+            initialValue: value,
             style: TextStyle(fontSize: context.font(14), color: theme.textTheme.bodyMedium?.color),
             items: items.map((e) => DropdownMenuItem(value: e, child: Text(e.toUpperCase(), style: TextStyle(fontSize: context.font(12))))).toList(),
             onChanged: onChanged,

@@ -6,6 +6,8 @@ import 'package:eduphin/manager_dashboard/manageClasses/classList/section/create
 import 'package:eduphin/manager_dashboard/manageClasses/classList/section/edit_section.dart';
 import 'package:eduphin/manager_dashboard/manageClasses/classList/section/studentList/student_list.dart';
 import 'package:eduphin/services/api_service.dart';
+import 'package:eduphin/services/caching_service.dart';
+import 'package:eduphin/services/common_widgets.dart';
 import 'package:eduphin/services/responsive_helper.dart';
 import 'package:flutter/material.dart';
 
@@ -28,19 +30,49 @@ class SectionsPage extends StatefulWidget {
 class _SectionsPageState extends State<SectionsPage> {
   bool _isLoading = true;
   List<Section> _sections = [];
-  String _error = '';
+  Object? _error;
+  static const String _cacheKey = 'manager_classes'; // Sharing cache with ClassListPage
 
   @override
   void initState() {
     super.initState();
+    _loadCachedData();
     _fetchSections();
+  }
+
+  Future<void> _loadCachedData() async {
+    final cachedData = await CachingService.getCache(_cacheKey);
+    if (cachedData != null && mounted) {
+      _processSectionsFromCache(cachedData);
+    }
+  }
+
+  void _processSectionsFromCache(dynamic data) {
+    final List allClasses = data as List? ?? [];
+    final currentClass = allClasses.firstWhere(
+      (classData) => (classData['id'] is int ? classData['id'] : int.tryParse(classData['id'].toString())) == widget.classId,
+      orElse: () => null,
+    );
+
+    if (currentClass != null) {
+      final sectionsData = currentClass['sections'] as List? ?? [];
+      final fetchedSections = sectionsData
+          .map((sectionJson) => Section.fromJson(sectionJson))
+          .toList();
+
+      if (mounted) {
+        setState(() {
+          _sections = fetchedSections;
+        });
+      }
+    }
   }
 
   Future<void> _fetchSections() async {
     if (!mounted) return;
     setState(() {
       _isLoading = true;
-      _error = '';
+      _error = null;
     });
 
     try {
@@ -51,6 +83,8 @@ class _SectionsPageState extends State<SectionsPage> {
 
       if (response.statusCode == 200 && responseData['status'] == true) {
         final List allClasses = responseData['data'] as List? ?? [];
+        await CachingService.setCache(_cacheKey, allClasses);
+        
         final currentClass = allClasses.firstWhere(
               (classData) => (classData['id'] is int ? classData['id'] : int.tryParse(classData['id'].toString())) == widget.classId,
           orElse: () => null,
@@ -65,6 +99,7 @@ class _SectionsPageState extends State<SectionsPage> {
           if (mounted) {
             setState(() {
               _sections = fetchedSections;
+              _isLoading = false;
             });
           }
         } else {
@@ -74,15 +109,10 @@ class _SectionsPageState extends State<SectionsPage> {
         throw Exception(
             responseData['message'] ?? "Failed to fetch sections for class.");
       }
-    } on Exception catch (e) {
+    } catch (e) {
       if (mounted) {
         setState(() {
-          _error = e.toString().replaceFirst('Exception: ', '');
-        });
-      }
-    } finally {
-      if (mounted) {
-        setState(() {
+          _error = e;
           _isLoading = false;
         });
       }
@@ -138,67 +168,113 @@ class _SectionsPageState extends State<SectionsPage> {
 
   Widget _buildBody() {
     final theme = context.theme;
-    if (_isLoading) {
-      return Center(child: CircularProgressIndicator(color: theme.colorScheme.primary));
-    }
-    if (_error.isNotEmpty) {
-      return Center(
-        child: Padding(
-          padding: context.pagePadding,
-          child: Text(_error, textAlign: TextAlign.center, style: TextStyle(color: theme.colorScheme.error, fontSize: context.font(14))),
+    
+    return LoadingWrapper(
+      isLoading: _isLoading,
+      hasData: _sections.isNotEmpty,
+      error: _error,
+      onRetry: _fetchSections,
+      skeleton: _buildSkeleton(),
+      child: RefreshIndicator(
+        onRefresh: _fetchSections,
+        color: theme.colorScheme.primary,
+        child: _sections.isEmpty
+            ? Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(Icons.layers_clear_outlined, size: context.scale(64), color: theme.colorScheme.outlineVariant),
+                    SizedBox(height: context.scale(16)),
+                    Text("No sections found for this class.", style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: context.font(16))),
+                  ],
+                ),
+              )
+            : context.responsive(
+                ListView.separated(
+                  padding: EdgeInsets.fromLTRB(context.scale(16), context.scale(16), context.scale(16), context.scale(100)),
+                  itemCount: _sections.length,
+                  separatorBuilder: (context, index) => SizedBox(height: context.scale(16)),
+                  itemBuilder: (context, index) {
+                    final section = _sections[index];
+                    return SectionCard(section: section, onUpdate: _fetchSections);
+                  },
+                ),
+                tablet: GridView.builder(
+                  padding: EdgeInsets.fromLTRB(context.scale(16), context.scale(16), context.scale(16), context.scale(100)),
+                  itemCount: _sections.length,
+                  gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                    crossAxisCount: 2,
+                    mainAxisSpacing: context.scale(16),
+                    crossAxisSpacing: context.scale(16),
+                    mainAxisExtent: context.scale(200),
+                  ),
+                  itemBuilder: (context, index) {
+                    final section = _sections[index];
+                    return SectionCard(section: section, onUpdate: _fetchSections);
+                  },
+                ),
+                desktop: GridView.builder(
+                  padding: EdgeInsets.fromLTRB(context.scale(16), context.scale(16), context.scale(16), context.scale(100)),
+                  itemCount: _sections.length,
+                  gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                    crossAxisCount: 3,
+                    mainAxisSpacing: context.scale(20),
+                    crossAxisSpacing: context.scale(20),
+                    mainAxisExtent: context.scale(200),
+                  ),
+                  itemBuilder: (context, index) {
+                    final section = _sections[index];
+                    return SectionCard(section: section, onUpdate: _fetchSections);
+                  },
+                ),
+              ),
+      ),
+    );
+  }
+
+  Widget _buildSkeleton() {
+    return ListView.separated(
+      padding: EdgeInsets.fromLTRB(context.scale(16), context.scale(16), context.scale(16), context.scale(100)),
+      itemCount: 5,
+      separatorBuilder: (context, index) => SizedBox(height: context.scale(16)),
+      itemBuilder: (context, index) => Container(
+        height: context.scale(200),
+        padding: EdgeInsets.all(context.scale(16)),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(context.scale(16)),
+          border: Border.all(color: context.theme.colorScheme.outlineVariant),
         ),
-      );
-    }
-    if (_sections.isEmpty) {
-      return Center(
         child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Icon(Icons.layers_clear_outlined, size: context.scale(64), color: theme.colorScheme.outlineVariant),
-            SizedBox(height: context.scale(16)),
-            Text("No sections found for this class.", style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: context.font(16))),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                SkeletonBox(height: context.scale(24), width: context.scale(120)),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    SkeletonBox(height: context.scale(10), width: context.scale(50)),
+                    SizedBox(height: context.scale(4)),
+                    SkeletonBox(height: context.scale(20), width: context.scale(30)),
+                  ],
+                ),
+              ],
+            ),
+            SizedBox(height: context.scale(8)),
+            SkeletonBox(height: context.scale(14), width: context.scale(150)),
+            const Spacer(),
+            Divider(color: context.theme.colorScheme.outlineVariant, height: context.scale(24)),
+            Row(
+              children: List.generate(3, (index) => Expanded(
+                child: Padding(
+                  padding: EdgeInsets.symmetric(horizontal: context.scale(4)),
+                  child: SkeletonBox(height: context.scale(36), borderRadius: context.scale(8)),
+                ),
+              )),
+            ),
           ],
         ),
-      );
-    }
-
-    return context.responsive(
-      ListView.separated(
-        padding: EdgeInsets.fromLTRB(context.scale(16), context.scale(16), context.scale(16), context.scale(100)),
-        itemCount: _sections.length,
-        separatorBuilder: (context, index) => SizedBox(height: context.scale(16)),
-        itemBuilder: (context, index) {
-          final section = _sections[index];
-          return SectionCard(section: section, onUpdate: _fetchSections);
-        },
-      ),
-      tablet: GridView.builder(
-        padding: EdgeInsets.fromLTRB(context.scale(16), context.scale(16), context.scale(16), context.scale(100)),
-        itemCount: _sections.length,
-        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-          crossAxisCount: 2,
-          mainAxisSpacing: context.scale(16),
-          crossAxisSpacing: context.scale(16),
-          mainAxisExtent: context.scale(200),
-        ),
-        itemBuilder: (context, index) {
-          final section = _sections[index];
-          return SectionCard(section: section, onUpdate: _fetchSections);
-        },
-      ),
-      desktop: GridView.builder(
-        padding: EdgeInsets.fromLTRB(context.scale(16), context.scale(16), context.scale(16), context.scale(100)),
-        itemCount: _sections.length,
-        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-          crossAxisCount: 3,
-          mainAxisSpacing: context.scale(20),
-          crossAxisSpacing: context.scale(20),
-          mainAxisExtent: context.scale(200),
-        ),
-        itemBuilder: (context, index) {
-          final section = _sections[index];
-          return SectionCard(section: section, onUpdate: _fetchSections);
-        },
       ),
     );
   }
@@ -470,4 +546,5 @@ class _DeleteSectionDialogState extends State<DeleteSectionDialog> {
     );
   }
 }
+
 

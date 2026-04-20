@@ -1,4 +1,5 @@
 import 'package:eduphin/services/responsive_helper.dart';
+import 'package:eduphin/services/common_widgets.dart';
 import 'package:flutter/material.dart';
 import 'package:eduphin/services/api_service.dart';
 import 'package:eduphin/accountant/dashboard/accountant_dashboard_model.dart';
@@ -13,56 +14,18 @@ class ExamPaperSchedulePage extends StatefulWidget {
 }
 
 class _ExamPaperSchedulePageState extends State<ExamPaperSchedulePage> {
-  bool _isLoading = true;
-  Exam? _exam;
-  List<ExamPaperSchedule> _schedules = [];
+  late Stream<Map<String, dynamic>> _scheduleStream;
 
   @override
   void initState() {
     super.initState();
-    _fetchSchedule();
+    _scheduleStream = ApiService.getAccountantExamScheduleStream(widget.examId);
   }
 
-  Future<void> _fetchSchedule() async {
-    if (!mounted) return;
-    setState(() => _isLoading = true);
-    try {
-      final data = await ApiService.getAccountantExamSchedule(widget.examId);
-      if (mounted) {
-        setState(() {
-          final examData = data['exam'] ?? data;
-          _exam = (examData is Map<String, dynamic>) ? Exam.fromJson(examData) : null;
-          
-          final schedulesData = data['schedules'] ?? [];
-          if (schedulesData is List) {
-            _schedules = schedulesData
-                .map((e) => ExamPaperSchedule.fromJson(e))
-                .toList();
-          } else {
-            _schedules = [];
-          }
-        });
-      }
-    } catch (e) {
-      debugPrint("Schedule Fetch Error: $e");
-      if (mounted) {
-        final currentTheme = Theme.of(context);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(e.toString().replaceAll("Exception: ", "")),
-            backgroundColor: currentTheme.colorScheme.error,
-            behavior: SnackBarBehavior.floating,
-            action: SnackBarAction(
-              label: "Retry",
-              textColor: currentTheme.colorScheme.onError,
-              onPressed: _fetchSchedule,
-            ),
-          ),
-        );
-      }
-    } finally {
-      if (mounted) setState(() => _isLoading = false);
-    }
+  void _refresh() {
+    setState(() {
+      _scheduleStream = ApiService.getAccountantExamScheduleStream(widget.examId);
+    });
   }
 
   @override
@@ -71,50 +34,107 @@ class _ExamPaperSchedulePageState extends State<ExamPaperSchedulePage> {
     return Scaffold(
       backgroundColor: theme.colorScheme.surface,
       appBar: AppBar(
-        title: Text("Exam Schedule", style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold, fontSize: context.font(20))),
+        title: Text("Exam Schedule",
+            style: theme.textTheme.titleLarge?.copyWith(
+                fontWeight: FontWeight.bold, fontSize: context.font(20))),
         centerTitle: false,
       ),
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : RefreshIndicator(
-              onRefresh: _fetchSchedule,
-              child: SingleChildScrollView(
-                physics: const AlwaysScrollableScrollPhysics(),
-                padding: context.pagePadding,
-                child: Center(
-                  child: ConstrainedBox(
-                    constraints: BoxConstraints(maxWidth: context.scale(1000)),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        if (_exam != null) _buildHeader(context),
-                        SizedBox(height: context.spacing * 1.5),
-                        Text(
-                          "Paper Schedule",
-                          style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
-                        ),
-                        SizedBox(height: context.spacing),
-                        if (_schedules.isEmpty) 
-                          _buildEmptyState(context)
-                        else
-                          ListView.separated(
-                            shrinkWrap: true,
-                            physics: const NeverScrollableScrollPhysics(),
-                            itemCount: _schedules.length,
-                            separatorBuilder: (context, index) => SizedBox(height: context.spacing),
-                            itemBuilder: (context, index) => _buildScheduleCard(context, _schedules[index]),
+      body: StreamBuilder<Map<String, dynamic>>(
+        stream: _scheduleStream,
+        builder: (context, snapshot) {
+          return LoadingWrapper<Map<String, dynamic>>(
+            snapshot: snapshot,
+            onRetry: _refresh,
+            skeleton: _buildSkeleton(context),
+            builder: (data) {
+              final examData = data['exam'] ?? data;
+              final exam = (examData is Map<String, dynamic>)
+                  ? Exam.fromJson(examData)
+                  : null;
+
+              final schedulesData = data['schedules'] ?? [];
+              final schedules = (schedulesData is List)
+                  ? schedulesData
+                      .map((e) => ExamPaperSchedule.fromJson(e))
+                      .toList()
+                  : <ExamPaperSchedule>[];
+
+              return RefreshIndicator(
+                onRefresh: () async => _refresh(),
+                child: SingleChildScrollView(
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  padding: context.pagePadding,
+                  child: Center(
+                    child: ConstrainedBox(
+                      constraints: BoxConstraints(maxWidth: context.scale(1000)),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          if (exam != null) _buildHeader(context, exam, schedules.length),
+                          SizedBox(height: context.spacing * 1.5),
+                          Text(
+                            "Paper Schedule",
+                            style: theme.textTheme.titleMedium
+                                ?.copyWith(fontWeight: FontWeight.bold),
                           ),
-                        SizedBox(height: context.spacing * 2),
-                      ],
+                          SizedBox(height: context.spacing),
+                          if (schedules.isEmpty)
+                            _buildEmptyState(context)
+                          else
+                            ListView.separated(
+                              shrinkWrap: true,
+                              physics: const NeverScrollableScrollPhysics(),
+                              itemCount: schedules.length,
+                              separatorBuilder: (context, index) =>
+                                  SizedBox(height: context.spacing),
+                              itemBuilder: (context, index) =>
+                                  _buildScheduleCard(context, schedules[index]),
+                            ),
+                          SizedBox(height: context.spacing * 2),
+                        ],
+                      ),
                     ),
                   ),
                 ),
-              ),
-            ),
+              );
+            },
+          );
+        },
+      ),
     );
   }
 
-  Widget _buildHeader(BuildContext context) {
+  Widget _buildSkeleton(BuildContext context) {
+    return SingleChildScrollView(
+      padding: context.pagePadding,
+      child: Center(
+        child: ConstrainedBox(
+          constraints: BoxConstraints(maxWidth: context.scale(1000)),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Skeleton(height: context.scale(120), borderRadius: context.scale(20)),
+              SizedBox(height: context.spacing * 1.5),
+              Skeleton(width: context.scale(150), height: context.scale(20)),
+              SizedBox(height: context.spacing),
+              ListView.separated(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                itemCount: 5,
+                separatorBuilder: (_, __) => SizedBox(height: context.spacing),
+                itemBuilder: (_, __) => Skeleton(
+                  height: context.scale(80),
+                  borderRadius: context.scale(16),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildHeader(BuildContext context, Exam exam, int scheduleCount) {
     final theme = context.theme;
     return Container(
       width: double.infinity,
@@ -143,7 +163,7 @@ class _ExamPaperSchedulePageState extends State<ExamPaperSchedulePage> {
               SizedBox(width: context.spacing),
               Expanded(
                 child: Text(
-                  _exam?.name ?? "Examination",
+                  exam.name,
                   style: theme.textTheme.headlineSmall?.copyWith(
                     fontWeight: FontWeight.bold,
                     color: theme.colorScheme.onPrimaryContainer,
@@ -156,9 +176,9 @@ class _ExamPaperSchedulePageState extends State<ExamPaperSchedulePage> {
           SizedBox(height: context.spacing * 1.5),
           Row(
             children: [
-              _buildHeaderStat(context, "TOTAL PAPERS", _schedules.length.toString()),
+              _buildHeaderStat(context, "TOTAL PAPERS", scheduleCount.toString()),
               SizedBox(width: context.spacing * 2),
-              _buildHeaderStat(context, "STATUS", _exam?.status?.toUpperCase() ?? "ACTIVE"),
+              _buildHeaderStat(context, "STATUS", exam.status?.toUpperCase() ?? "ACTIVE"),
             ],
           ),
         ],

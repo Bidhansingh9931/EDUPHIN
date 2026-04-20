@@ -1,7 +1,9 @@
 import 'dart:convert';
+import 'package:eduphin/services/common_widgets.dart';
 import 'package:eduphin/services/responsive_helper.dart';
 import 'package:flutter/material.dart';
 import '../services/api_service.dart';
+import '../services/caching_service.dart';
 import 'counselor_models.dart';
 
 class CounselorClassRoutinePage extends StatefulWidget {
@@ -19,15 +21,28 @@ class _CounselorClassRoutinePageState extends State<CounselorClassRoutinePage> {
   @override
   void initState() {
     super.initState();
+    _loadCachedData();
     _fetchSchedules();
+  }
+
+  Future<void> _loadCachedData() async {
+    final cachedData = await CachingService.getData('counselor_schedules');
+    if (cachedData != null && mounted) {
+      setState(() {
+        _schedules = (cachedData as List).map((json) => ClassSchedule.fromJson(json)).toList();
+        _isLoading = false;
+      });
+    }
   }
 
   Future<void> _fetchSchedules() async {
     if (!mounted) return;
-    setState(() {
-      _isLoading = true;
-      _errorMessage = null;
-    });
+    if (_schedules.isEmpty) {
+      setState(() {
+        _isLoading = true;
+        _errorMessage = null;
+      });
+    }
     try {
       final response = await ApiService.get('counselor/schedules');
       if (response.statusCode == 200) {
@@ -42,6 +57,8 @@ class _CounselorClassRoutinePageState extends State<CounselorClassRoutinePage> {
               rawList = scheduleData['data'];
             }
             
+            CachingService.saveData('counselor_schedules', rawList);
+
             _schedules = rawList.map((json) => ClassSchedule.fromJson(json)).toList();
             _isLoading = false;
           });
@@ -76,11 +93,12 @@ class _CounselorClassRoutinePageState extends State<CounselorClassRoutinePage> {
         ),
         centerTitle: false,
       ),
-      body: RefreshIndicator(
+      body: LoadingWrapper(
+        isLoading: _isLoading,
+        hasData: _schedules.isNotEmpty,
+        skeleton: _buildSkeleton(context),
         onRefresh: _fetchSchedules,
-        child: _isLoading
-            ? const Center(child: CircularProgressIndicator())
-            : _errorMessage != null
+        child: _errorMessage != null && _schedules.isEmpty
                 ? Center(
                     child: Padding(
                       padding: EdgeInsets.all(context.spacing * 1.5),
@@ -164,4 +182,23 @@ class _CounselorClassRoutinePageState extends State<CounselorClassRoutinePage> {
       ),
     );
   }
+
+  Widget _buildSkeleton(BuildContext context) {
+    return SingleChildScrollView(
+      padding: context.pagePadding,
+      child: Column(
+        children: [
+          Skeleton(height: context.scale(60)),
+          SizedBox(height: context.spacing),
+          ...List.generate(8, (index) => Column(
+            children: [
+              Skeleton(height: context.scale(50)),
+              SizedBox(height: context.scale(2)),
+            ],
+          )),
+        ],
+      ),
+    );
+  }
 }
+

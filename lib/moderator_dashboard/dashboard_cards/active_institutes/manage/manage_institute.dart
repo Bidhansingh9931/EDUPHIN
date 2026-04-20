@@ -260,7 +260,7 @@ class _ManageInstitutePageState extends State<ManageInstitute> {
           Text("Failed to load employees", style: TextStyle(fontWeight: FontWeight.bold, fontSize: context.font(16), color: colorScheme.onSurface)),
           SizedBox(height: context.scale(24)),
           ElevatedButton.icon(
-            onPressed: _fetchEmployees, 
+            onPressed: _fetchEmployees,
             icon: const Icon(Icons.refresh_rounded),
             label: Text("Retry", style: TextStyle(fontSize: context.font(16))),
             style: ElevatedButton.styleFrom(

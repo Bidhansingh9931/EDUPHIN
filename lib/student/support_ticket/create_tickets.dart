@@ -218,7 +218,7 @@ class _CreateSupportTicketPageState extends State<CreateSupportTicketPage> {
   Widget _buildDropdown(BuildContext context) {
     final colorScheme = context.theme.colorScheme;
     return DropdownButtonFormField<String>(
-      value: priorityValue,
+      initialValue: priorityValue,
       dropdownColor: colorScheme.surfaceContainerHighest,
       isExpanded: true,
       items: ["Low", "Medium", "High"]

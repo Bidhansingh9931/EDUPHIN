@@ -2,6 +2,8 @@ import 'dart:convert';
 import 'package:eduphin/services/responsive_helper.dart';
 import 'package:flutter/material.dart';
 import '../../services/api_service.dart';
+import '../../services/caching_service.dart';
+import '../../services/common_widgets.dart';
 import '../counselor_models.dart';
 
 class ExploreEventsPage extends StatefulWidget {
@@ -19,18 +21,39 @@ class _ManageEventsPageState extends State<ExploreEventsPage> {
   bool _isLoading = true;
   List<Event> _events = [];
   String? _errorMessage;
+  final String _cacheKey = 'counselor_events_data';
 
   @override
   void initState() {
     super.initState();
+    _loadCachedData();
     _fetchEvents();
   }
 
-  Future<void> _fetchEvents() async {
+  Future<void> _loadCachedData() async {
+    final cachedData = await CachingService.getData(_cacheKey);
+    if (cachedData != null && mounted) {
+      _processData(cachedData);
+    }
+  }
+
+  void _processData(dynamic data) {
+    final jsonResponse = data is String ? jsonDecode(data) : data;
+    final List eventsData = jsonResponse['events'] ?? jsonResponse['data'] ?? [];
     setState(() {
-      _isLoading = true;
+      _events = eventsData.map((e) => Event.fromJson(e)).toList();
+      _isLoading = false;
       _errorMessage = null;
     });
+  }
+
+  Future<void> _fetchEvents() async {
+    if (_events.isEmpty) {
+      setState(() {
+        _isLoading = true;
+        _errorMessage = null;
+      });
+    }
     try {
       final queryParams = <String, String>{};
       if (status != null && status != "All Events") {
@@ -44,22 +67,27 @@ class _ManageEventsPageState extends State<ExploreEventsPage> {
       if (!mounted) return;
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
-        setState(() {
-          final List eventsData = data['events'] ?? data['data'] ?? [];
-          _events = eventsData.map((e) => Event.fromJson(e)).toList();
-          _isLoading = false;
-        });
+        if ((status == null || status == "All Events") && (type == null || type == "All Categories")) {
+          await CachingService.saveData(_cacheKey, data);
+        }
+        if (mounted) {
+          _processData(data);
+        }
       } else {
+        if (mounted && _events.isEmpty) {
+          setState(() {
+            _errorMessage = ApiService.errorMessage(response, "Failed to load events");
+            _isLoading = false;
+          });
+        }
+      }
+    } catch (e) {
+      if (mounted && _events.isEmpty) {
         setState(() {
-          _errorMessage = ApiService.errorMessage(response, "Failed to load events");
+          _errorMessage = e.toString().replaceFirst("Exception: ", "");
           _isLoading = false;
         });
       }
-    } catch (e) {
-      setState(() {
-        _errorMessage = "Error: $e";
-        _isLoading = false;
-      });
     }
   }
 
@@ -138,6 +166,27 @@ class _ManageEventsPageState extends State<ExploreEventsPage> {
     );
   }
 
+  Widget _buildSkeleton() {
+    return SingleChildScrollView(
+      padding: context.pagePadding,
+      child: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 1000),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Skeleton(width: double.infinity, height: 180),
+              SizedBox(height: context.spacing * 1.5),
+              const Skeleton(width: 120, height: 24),
+              SizedBox(height: context.spacing),
+              const Skeleton(width: double.infinity, height: 400),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     _colorScheme = context.theme.colorScheme;
@@ -145,7 +194,10 @@ class _ManageEventsPageState extends State<ExploreEventsPage> {
       appBar: AppBar(
         title: const Text("Manage Events"),
       ),
-      body: RefreshIndicator(
+      body: LoadingWrapper(
+        isLoading: _isLoading,
+        hasData: _events.isNotEmpty,
+        skeleton: _buildSkeleton(),
         onRefresh: _fetchEvents,
         child: SingleChildScrollView(
           physics: const AlwaysScrollableScrollPhysics(),
@@ -239,14 +291,22 @@ class _ManageEventsPageState extends State<ExploreEventsPage> {
                   SizedBox(height: context.spacing),
 
                   /// TABLE / LIST
-                  if (_isLoading)
-                    Padding(
-                        padding: EdgeInsets.all(context.spacing * 2),
-                        child: const Center(child: CircularProgressIndicator()))
-                  else if (_errorMessage != null)
+                  if (_errorMessage != null && _events.isEmpty)
                     Center(
-                        child: Text(_errorMessage!,
-                            style: TextStyle(color: context.theme.colorScheme.error)))
+                      child: Padding(
+                        padding: EdgeInsets.all(context.scale(24.0)),
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(Icons.error_outline, color: _colorScheme.error, size: context.scale(48)),
+                            SizedBox(height: context.spacing),
+                            Text(_errorMessage!, textAlign: TextAlign.center, style: TextStyle(color: _colorScheme.error, fontSize: context.font(14))),
+                            SizedBox(height: context.spacing),
+                            FilledButton.icon(onPressed: _fetchEvents, icon: const Icon(Icons.refresh), label: const Text("RETRY")),
+                          ],
+                        ),
+                      ),
+                    )
                   else if (_events.isEmpty)
                     Padding(
                         padding: EdgeInsets.all(context.spacing * 2),
@@ -397,3 +457,5 @@ class _ManageEventsPageState extends State<ExploreEventsPage> {
     );
   }
 }
+
+

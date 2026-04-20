@@ -300,7 +300,7 @@ class _AddAssignmentPageState extends State<AddAssignmentPage> {
 
   Widget _buildClassDropdown() {
     return DropdownButtonFormField<int>(
-      value: _selectedClassId,
+      initialValue: _selectedClassId,
       items: _classes.map<DropdownMenuItem<int>>((c) => DropdownMenuItem(value: c['id'], child: Text(c['name'] ?? ''))).toList(),
       onChanged: (value) {
         setState(() {
@@ -328,7 +328,7 @@ class _AddAssignmentPageState extends State<AddAssignmentPage> {
   Widget _buildSectionDropdown() {
     return DropdownButtonFormField<int>(
       key: ValueKey('section_$_selectedClassId'),
-      value: _selectedSectionId,
+      initialValue: _selectedSectionId,
       items: _sections.map<DropdownMenuItem<int>>((s) => DropdownMenuItem(value: s['id'], child: Text(s['name'] ?? ''))).toList(),
       onChanged: (value) => setState(() => _selectedSectionId = value),
       decoration: InputDecoration(
@@ -344,7 +344,7 @@ class _AddAssignmentPageState extends State<AddAssignmentPage> {
 
   Widget _buildSubjectDropdown() {
     return DropdownButtonFormField<int>(
-      value: _selectedSubjectId,
+      initialValue: _selectedSubjectId,
       items: _subjects.map<DropdownMenuItem<int>>((s) => DropdownMenuItem(value: s['id'], child: Text(s['name'] ?? ''))).toList(),
       onChanged: (value) => setState(() => _selectedSubjectId = value),
       decoration: InputDecoration(

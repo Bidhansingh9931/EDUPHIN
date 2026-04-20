@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../services/api_service.dart';
+import '../../services/common_widgets.dart';
 import 'staff_models.dart';
 import 'create_ticket.dart';
 import 'ticket_details.dart';
@@ -14,7 +15,7 @@ class StaffSupportTicketsPage extends StatefulWidget {
 }
 
 class _StaffSupportTicketsPageState extends State<StaffSupportTicketsPage> {
-  late Future<List<SupportTicket>> _ticketsFuture;
+  late Stream<List<SupportTicket>> _ticketsStream;
   final TextEditingController _searchController = TextEditingController();
   String _selectedPriority = "all";
   String _selectedStatus = "all";
@@ -27,7 +28,7 @@ class _StaffSupportTicketsPageState extends State<StaffSupportTicketsPage> {
 
   void _loadTickets() {
     setState(() {
-      _ticketsFuture = ApiService.getStaffTickets({
+      _ticketsStream = ApiService.getStaffTicketsStream({
         'title': _searchController.text.trim(),
         'priority': _selectedPriority,
         'status': _selectedStatus,
@@ -75,7 +76,7 @@ class _StaffSupportTicketsPageState extends State<StaffSupportTicketsPage> {
                       FilledButton.icon(
                         onPressed: () async {
                           await Navigator.push(context, MaterialPageRoute(builder: (context) => const StaffCreateTicketPage()));
-                          _loadTickets();
+                          if (context.mounted) _loadTickets();
                         },
                         icon: Icon(Icons.add_rounded, size: context.scale(18)),
                         label: Text("NEW TICKET", style: TextStyle(fontSize: context.font(12))),
@@ -204,38 +205,53 @@ class _StaffSupportTicketsPageState extends State<StaffSupportTicketsPage> {
   }
 
   Widget _buildTicketList(BuildContext context) {
-    return FutureBuilder<List<SupportTicket>>(
-      future: _ticketsFuture,
+    return StreamBuilder<List<SupportTicket>>(
+      stream: _ticketsStream,
       builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return Center(
-            child: Padding(
-              padding: EdgeInsets.all(context.scale(40)),
-              child: const CircularProgressIndicator(),
-            ),
-          );
-        } else if (snapshot.hasError) {
-          return _buildEmptyState(context, "Error loading tickets", Icons.error_outline);
-        } else if (!snapshot.hasData || snapshot.data!.isEmpty) {
-          return _buildEmptyState(context, "No support tickets found", Icons.confirmation_number_outlined);
-        }
-
-        final tickets = snapshot.data!;
-        return GridView.builder(
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-            crossAxisCount: context.responsive<int>(1, tablet: 2, desktop: 2),
-            crossAxisSpacing: context.scale(16),
-            mainAxisSpacing: context.scale(16),
-            mainAxisExtent: context.scale(140),
-          ),
-          itemCount: tickets.length,
-          itemBuilder: (context, index) {
-            final ticket = tickets[index];
-            return _buildTicketCard(context, ticket);
-          },
+        return LoadingWrapper<List<SupportTicket>>(
+          snapshot: snapshot,
+          skeleton: _buildSkeleton(context),
+          builder: (tickets) => _buildContent(context, tickets),
+          onRetry: _loadTickets,
         );
+      },
+    );
+  }
+
+  Widget _buildContent(BuildContext context, List<SupportTicket> tickets) {
+    if (tickets.isEmpty) {
+      return _buildEmptyState(context, "No support tickets found", Icons.confirmation_number_outlined);
+    }
+    return GridView.builder(
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: context.responsive<int>(1, tablet: 2, desktop: 2),
+        crossAxisSpacing: context.scale(16),
+        mainAxisSpacing: context.scale(16),
+        mainAxisExtent: context.scale(140),
+      ),
+      itemCount: tickets.length,
+      itemBuilder: (context, index) {
+        final ticket = tickets[index];
+        return _buildTicketCard(context, ticket);
+      },
+    );
+  }
+
+  Widget _buildSkeleton(BuildContext context) {
+    return GridView.builder(
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: context.responsive<int>(1, tablet: 2, desktop: 2),
+        crossAxisSpacing: context.scale(16),
+        mainAxisSpacing: context.scale(16),
+        mainAxisExtent: context.scale(140),
+      ),
+      itemCount: 6,
+      itemBuilder: (context, index) {
+        return const Skeleton(height: 140, borderRadius: 20);
       },
     );
   }

@@ -1,4 +1,6 @@
 import 'dart:convert';
+import 'package:eduphin/services/common_widgets.dart';
+import 'package:eduphin/services/caching_service.dart';
 import 'package:eduphin/services/responsive_helper.dart';
 import 'package:http/http.dart' as http;
 import 'package:flutter/material.dart';
@@ -82,6 +84,7 @@ class _MySalaryPageState extends State<MySalaryPage> {
   bool _isSaving = false;
   final List<PastSalaryRecord> _pastRecords = [];
   Map<String, dynamic>? _accountDetails;
+  Object? _error;
 
   // Text editing controllers for the form fields
   final _bankAccountController = TextEditingController();
@@ -93,7 +96,7 @@ class _MySalaryPageState extends State<MySalaryPage> {
   @override
   void initState() {
     super.initState();
-    _fetchSalaryData();
+    _loadCacheAndFetch();
   }
 
   @override
@@ -106,9 +109,41 @@ class _MySalaryPageState extends State<MySalaryPage> {
     super.dispose();
   }
 
+  Future<void> _loadCacheAndFetch() async {
+    final cachedData = await CacheService.getCache('manager_my_salary');
+    if (cachedData != null && mounted) {
+      _processData(cachedData);
+    }
+    _fetchSalaryData();
+  }
+
+  void _processData(Map<String, dynamic> data) {
+    _accountDetails = data['account'] as Map<String, dynamic>?;
+    if (_accountDetails != null) {
+      final details = SalaryDetails.fromJson(_accountDetails!);
+      final records = (data['salaries'] as List)
+          .map((record) => PastSalaryRecord.fromJson(record))
+          .toList();
+
+      setState(() {
+        _pastRecords.clear();
+        _pastRecords.addAll(records);
+
+        _bankAccountController.text = details.bankAccount;
+        _ifscController.text = details.ifsc;
+        _bankNameController.text = details.bankName;
+        _employerBranchController.text = details.employerBranch;
+        _zoneController.text = details.zone;
+      });
+    }
+  }
+
   Future<void> _fetchSalaryData() async {
     if (!mounted) return;
-    setState(() => _isLoading = true);
+    setState(() {
+      _isLoading = true;
+      _error = null;
+    });
 
     try {
       final token = await ApiService.getToken();
@@ -126,27 +161,9 @@ class _MySalaryPageState extends State<MySalaryPage> {
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
-        
-        _accountDetails = data['account'] as Map<String, dynamic>?;
-        if (_accountDetails == null) {
-          throw Exception("Could not retrieve account details.");
-        }
-
-        final details = SalaryDetails.fromJson(_accountDetails!);
-        final records = (data['salaries'] as List)
-            .map((record) => PastSalaryRecord.fromJson(record))
-            .toList();
-
+        await CacheService.setCache('manager_my_salary', data);
+        _processData(data);
         setState(() {
-          _pastRecords.clear();
-          _pastRecords.addAll(records);
-
-          _bankAccountController.text = details.bankAccount;
-          _ifscController.text = details.ifsc;
-          _bankNameController.text = details.bankName;
-          _employerBranchController.text = details.employerBranch;
-          _zoneController.text = details.zone;
-
           _isLoading = false;
         });
       } else {
@@ -154,10 +171,10 @@ class _MySalaryPageState extends State<MySalaryPage> {
       }
     } catch (e) {
       if (!mounted) return;
-      setState(() => _isLoading = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error: ${e.toString()}')),
-      );
+      setState(() {
+        _isLoading = false;
+        _error = e;
+      });
     }
   }
 
@@ -244,7 +261,7 @@ class _MySalaryPageState extends State<MySalaryPage> {
         ),
         centerTitle: true,
       ),
-      bottomNavigationBar: _isLoading
+      bottomNavigationBar: _isLoading && _accountDetails == null
           ? null
           : Container(
               padding: EdgeInsets.fromLTRB(context.scale(16), context.scale(8), context.scale(16), context.scale(24)),
@@ -269,22 +286,41 @@ class _MySalaryPageState extends State<MySalaryPage> {
                 ),
               ),
             ),
-      body: _isLoading
-          ? Center(child: CircularProgressIndicator(color: theme.colorScheme.primary))
-          : SingleChildScrollView(
-              padding: context.pagePadding,
-              child: Center(
-                child: ConstrainedBox(
-                  constraints: BoxConstraints(maxWidth: context.scale(1000)),
-                  child: context.responsive(
-                    _buildNarrowLayout(),
-                    tablet: _buildWideLayout(),
-                  ),
-                ),
+      body: LoadingWrapper(
+        isLoading: _isLoading,
+        hasData: _accountDetails != null,
+        error: _error,
+        onRetry: _fetchSalaryData,
+        skeleton: _buildSkeleton(),
+        child: SingleChildScrollView(
+          padding: context.pagePadding,
+          child: Center(
+            child: ConstrainedBox(
+              constraints: BoxConstraints(maxWidth: context.scale(1000)),
+              child: context.responsive(
+                _buildNarrowLayout(),
+                tablet: _buildWideLayout(),
               ),
             ),
+          ),
+        ),
+      ),
     );
   }
+
+  Widget _buildSkeleton() {
+    return SingleChildScrollView(
+      padding: context.pagePadding,
+      child: Column(
+        children: [
+          SkeletonBox(height: context.scale(300), borderRadius: context.scale(16)),
+          SizedBox(height: context.scale(24)),
+          SkeletonBox(height: context.scale(400), borderRadius: context.scale(16)),
+        ],
+      ),
+    );
+  }
+
 
   // --- LAYOUTS ---
 
@@ -468,4 +504,5 @@ class CustomTextField extends StatelessWidget {
     );
   }
 }
+
 

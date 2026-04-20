@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:eduphin/services/responsive_helper.dart';
+import 'package:eduphin/services/common_widgets.dart';
 import '../../services/api_service.dart';
 import 'staff_models.dart';
 
@@ -13,7 +14,7 @@ class StaffExamPaperSchedulePage extends StatefulWidget {
 }
 
 class _StaffExamPaperSchedulePageState extends State<StaffExamPaperSchedulePage> {
-  late Future<Map<String, dynamic>> _scheduleFuture;
+  late Stream<Map<String, dynamic>> _scheduleStream;
 
   @override
   void initState() {
@@ -23,7 +24,7 @@ class _StaffExamPaperSchedulePageState extends State<StaffExamPaperSchedulePage>
 
   void _loadSchedule() {
     setState(() {
-      _scheduleFuture = ApiService.getStaffExamSchedule(widget.examId);
+      _scheduleStream = ApiService.getStaffExamScheduleStream(widget.examId);
     });
   }
 
@@ -36,61 +37,61 @@ class _StaffExamPaperSchedulePageState extends State<StaffExamPaperSchedulePage>
         title: const Text("Examination Schedule"),
         centerTitle: true,
       ),
-      body: FutureBuilder<Map<String, dynamic>>(
-        future: _scheduleFuture,
+      body: StreamBuilder<Map<String, dynamic>>(
+        stream: _scheduleStream,
         builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
-          } else if (snapshot.hasError) {
-            return _buildErrorState(snapshot.error.toString());
-          } else if (!snapshot.hasData) {
-            return Center(child: Text("No schedule found", style: theme.textTheme.bodyMedium?.copyWith(color: theme.hintColor)));
-          }
+          return LoadingWrapper<Map<String, dynamic>>(
+            snapshot: snapshot,
+            skeleton: _buildSkeleton(context),
+            builder: (data) {
+              final schedules = (data['schedules'] as List).map((s) => ExamPaperSchedule.fromJson(s)).toList();
 
-          final data = snapshot.data!;
-          final schedules = (data['schedules'] as List).map((s) => ExamPaperSchedule.fromJson(s)).toList();
-
-          return SingleChildScrollView(
-            physics: const AlwaysScrollableScrollPhysics(),
-            padding: context.pagePadding,
-            child: Center(
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 1200),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    _buildHeaderCard(context),
-                    SizedBox(height: context.spacing * 2),
-                    Text(
-                      "Examination Papers",
-                      style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold, fontSize: context.font(20)),
-                    ),
-                    SizedBox(height: context.spacing),
-                    if (schedules.isEmpty)
-                      _buildEmptyState(context)
-                    else
-                      LayoutBuilder(
-                        builder: (context, constraints) {
-                          final crossAxisCount = constraints.maxWidth > 900 ? 3 : (constraints.maxWidth > 600 ? 2 : 1);
-                          return GridView.builder(
-                            shrinkWrap: true,
-                            physics: const NeverScrollableScrollPhysics(),
-                            itemCount: schedules.length,
-                            gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                              crossAxisCount: crossAxisCount,
-                              crossAxisSpacing: context.spacing,
-                              mainAxisSpacing: context.spacing,
-                              mainAxisExtent: context.scale(160),
+              return RefreshIndicator(
+                onRefresh: () async => _loadSchedule(),
+                child: SingleChildScrollView(
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  padding: context.pagePadding,
+                  child: Center(
+                    child: ConstrainedBox(
+                      constraints: const BoxConstraints(maxWidth: 1200),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          _buildHeaderCard(context),
+                          SizedBox(height: context.spacing * 2),
+                          Text(
+                            "Examination Papers",
+                            style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold, fontSize: context.font(20)),
+                          ),
+                          SizedBox(height: context.spacing),
+                          if (schedules.isEmpty)
+                            _buildEmptyState(context)
+                          else
+                            LayoutBuilder(
+                              builder: (context, constraints) {
+                                final crossAxisCount = constraints.maxWidth > 900 ? 3 : (constraints.maxWidth > 600 ? 2 : 1);
+                                return GridView.builder(
+                                  shrinkWrap: true,
+                                  physics: const NeverScrollableScrollPhysics(),
+                                  itemCount: schedules.length,
+                                  gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                                    crossAxisCount: crossAxisCount,
+                                    crossAxisSpacing: context.spacing,
+                                    mainAxisSpacing: context.spacing,
+                                    mainAxisExtent: context.scale(160),
+                                  ),
+                                  itemBuilder: (context, index) => _buildPaperCard(context, schedules[index]),
+                                );
+                              },
                             ),
-                            itemBuilder: (context, index) => _buildPaperCard(context, schedules[index]),
-                          );
-                        },
+                          SizedBox(height: context.spacing * 2),
+                        ],
                       ),
-                    SizedBox(height: context.spacing * 2),
-                  ],
+                    ),
+                  ),
                 ),
-              ),
-            ),
+              );
+            },
           );
         },
       ),
@@ -190,33 +191,54 @@ class _StaffExamPaperSchedulePageState extends State<StaffExamPaperSchedulePage>
     );
   }
 
-  Widget _buildErrorState(String error) {
-    final theme = context.theme;
-    return Center(
-      child: Padding(
-        padding: context.pagePadding,
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.error_outline_rounded, color: theme.colorScheme.error, size: context.scale(60)),
-            SizedBox(height: context.spacing * 1.5),
-            Text(
-              "Failed to load schedule",
-              style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
-            ),
-            SizedBox(height: context.scale(12)),
-            Text(
-              error,
-              textAlign: TextAlign.center,
-              style: theme.textTheme.bodyMedium?.copyWith(color: theme.hintColor),
-            ),
-            SizedBox(height: context.spacing * 2),
-            FilledButton.tonal(
-              onPressed: _loadSchedule,
-              child: const Text("RETRY"),
-            ),
-          ],
-        ),
+  Widget _buildSkeleton(BuildContext context) {
+    return SingleChildScrollView(
+      padding: context.pagePadding,
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final crossAxisCount = constraints.maxWidth > 900 ? 3 : (constraints.maxWidth > 600 ? 2 : 1);
+          return Column(
+            children: [
+              Skeleton(width: double.infinity, height: context.scale(180), borderRadius: context.scale(24)),
+              SizedBox(height: context.spacing * 2),
+              Align(
+                alignment: Alignment.centerLeft,
+                child: Skeleton(width: context.scale(200), height: context.scale(24)),
+              ),
+              SizedBox(height: context.spacing),
+              GridView.builder(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                itemCount: 4,
+                gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: crossAxisCount,
+                  crossAxisSpacing: context.spacing,
+                  mainAxisSpacing: context.spacing,
+                  mainAxisExtent: context.scale(170),
+                ),
+                itemBuilder: (context, index) => Container(
+                  padding: EdgeInsets.all(context.scale(20)),
+                  decoration: BoxDecoration(
+                    color: context.theme.colorScheme.surfaceContainerLow,
+                    borderRadius: BorderRadius.circular(context.scale(20)),
+                    border: Border.all(color: context.theme.colorScheme.outlineVariant, width: 0.5),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Skeleton(width: context.scale(120), height: context.scale(18)),
+                      SizedBox(height: context.scale(16)),
+                      Skeleton(width: context.scale(100), height: context.scale(14)),
+                      SizedBox(height: context.scale(12)),
+                      Skeleton(width: context.scale(140), height: context.scale(14)),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          );
+        },
       ),
     );
   }

@@ -2,6 +2,8 @@ import 'dart:convert';
 import 'package:eduphin/manager_dashboard/studyMaterial/add_note.dart';
 import 'package:eduphin/manager_dashboard/studyMaterial/edit_note.dart';
 import 'package:eduphin/services/api_service.dart';
+import 'package:eduphin/services/common_widgets.dart';
+import 'package:eduphin/services/caching_service.dart';
 import 'package:eduphin/services/responsive_helper.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
@@ -81,6 +83,7 @@ class _NotesPageState extends State<NotesPage> {
   List<StudyMaterial> allMaterials = [];
   List<StudyMaterial> filteredMaterials = [];
   bool isLoading = true;
+  Object? _error;
 
   @override
   void initState() {
@@ -89,41 +92,28 @@ class _NotesPageState extends State<NotesPage> {
   }
 
   Future<void> _fetchData() async {
-    if (!mounted) return;
+    const cacheKey = 'manager_notes';
+    
     setState(() {
       isLoading = true;
+      _error = null;
+    });
+
+    // Try loading from cache
+    CacheService.getCache(cacheKey).then((cachedData) {
+      if (cachedData != null && mounted && allMaterials.isEmpty) {
+        _processResponse(cachedData);
+      }
     });
 
     try {
       final response = await ApiService.get('manager/study/notes');
       if (response.statusCode == 200) {
         final responseData = jsonDecode(response.body)['data'];
-
-        final List<ApiClass> fetchedClasses = (responseData['classes'] as List)
-            .map((data) => ApiClass.fromJson(data))
-            .toList();
-        final List<ApiSection> fetchedSections = (responseData['sections'] as List)
-            .map((data) => ApiSection.fromJson(data))
-            .toList();
-
-        final classMap = {for (var e in fetchedClasses) e.id: e.name};
-        final sectionMap = {for (var e in fetchedSections) e.id: e.name};
-
-        final teachers = responseData['teachers'] as List;
-        final Map<int, String> teacherMap = {for (var t in teachers) t['id']: t['name'] ?? 'N/A'};
-
-        final List<StudyMaterial> fetchedMaterials = (responseData['study_materials'] as List)
-            .map((data) => StudyMaterial.fromJson(data, classMap, sectionMap, teacherMap))
-            .toList();
-
+        await CacheService.setCache(cacheKey, responseData);
         if (mounted) {
-          setState(() {
-            classes = fetchedClasses;
-            sections = fetchedSections;
-            allMaterials = fetchedMaterials;
-            _filterMaterials();
-            isLoading = false;
-          });
+          _processResponse(responseData);
+          setState(() => isLoading = false);
         }
       } else {
         throw Exception(ApiService.errorMessage(response, 'Failed to load data'));
@@ -132,12 +122,36 @@ class _NotesPageState extends State<NotesPage> {
       if (mounted) {
         setState(() {
           isLoading = false;
+          _error = e;
         });
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error fetching data: ${e.toString().replaceFirst('Exception: ', '')}')),
-        );
       }
     }
+  }
+
+  void _processResponse(dynamic responseData) {
+    final List<ApiClass> fetchedClasses = (responseData['classes'] as List)
+        .map((data) => ApiClass.fromJson(data))
+        .toList();
+    final List<ApiSection> fetchedSections = (responseData['sections'] as List)
+        .map((data) => ApiSection.fromJson(data))
+        .toList();
+
+    final classMap = {for (var e in fetchedClasses) e.id: e.name};
+    final sectionMap = {for (var e in fetchedSections) e.id: e.name};
+
+    final teachers = responseData['teachers'] as List;
+    final Map<int, String> teacherMap = {for (var t in teachers) t['id']: t['name'] ?? 'N/A'};
+
+    final List<StudyMaterial> fetchedMaterials = (responseData['study_materials'] as List)
+        .map((data) => StudyMaterial.fromJson(data, classMap, sectionMap, teacherMap))
+        .toList();
+
+    setState(() {
+      classes = fetchedClasses;
+      sections = fetchedSections;
+      allMaterials = fetchedMaterials;
+      _filterMaterials();
+    });
   }
 
   void _filterMaterials() {
@@ -202,24 +216,48 @@ class _NotesPageState extends State<NotesPage> {
         label: const Text('Create New'),
         icon: const Icon(Icons.add),
       ),
-      body: isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : Padding(
-              padding: context.pagePadding.copyWith(bottom: 0),
-              child: Column(
-                children: [
-                  _buildFilterSection(theme),
-                  SizedBox(height: context.md),
-                  Expanded(
-                    child: context.responsive(
-                      _buildListView(),
-                      tablet: _buildGridView(),
-                      desktop: _buildGridView(),
-                    ),
-                  ),
-                ],
+      body: LoadingWrapper(
+        isLoading: isLoading,
+        hasData: allMaterials.isNotEmpty,
+        error: _error,
+        onRetry: _fetchData,
+        skeleton: _buildSkeleton(context),
+        child: Padding(
+          padding: context.pagePadding.copyWith(bottom: 0),
+          child: Column(
+            children: [
+              _buildFilterSection(theme),
+              SizedBox(height: context.md),
+              Expanded(
+                child: context.responsive(
+                  _buildListView(),
+                  tablet: _buildGridView(),
+                  desktop: _buildGridView(),
+                ),
               ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSkeleton(BuildContext context) {
+    return Padding(
+      padding: context.pagePadding,
+      child: Column(
+        children: [
+          const SkeletonBox(height: 100),
+          SizedBox(height: context.md),
+          Expanded(
+            child: ListView.separated(
+              itemCount: 5,
+              separatorBuilder: (context, index) => SizedBox(height: context.sm),
+              itemBuilder: (context, index) => const SkeletonBox(height: 120),
             ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -279,7 +317,7 @@ class _NotesPageState extends State<NotesPage> {
         const SizedBox(height: 6),
         DropdownButtonFormField<String>(
           isExpanded: true,
-          value: dropdownValue,
+          initialValue: dropdownValue,
           dropdownColor: theme.colorScheme.surfaceContainerLow,
           style: theme.textTheme.bodyLarge,
           decoration: InputDecoration(
@@ -410,3 +448,4 @@ class _StudyMaterialCard extends StatelessWidget {
     );
   }
 }
+

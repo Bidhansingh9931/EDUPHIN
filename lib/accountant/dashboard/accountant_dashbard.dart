@@ -3,6 +3,7 @@ import 'package:eduphin/services/responsive_helper.dart';
 import 'package:eduphin/login_logout/login.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import '../../services/common_widgets.dart';
 import 'accountant_profile.dart';
 import 'generate_virtual_card.dart';
 import 'fee_structure.dart';
@@ -25,7 +26,7 @@ class AccountantDashboard extends StatefulWidget {
 }
 
 class _AccountantDashboardState extends State<AccountantDashboard> {
-  late Future<accountant_model.AccountantDashboardData> _dashboardFuture;
+  Stream<accountant_model.AccountantDashboardData>? _dashboardStream;
 
   @override
   void initState() {
@@ -35,7 +36,7 @@ class _AccountantDashboardState extends State<AccountantDashboard> {
 
   void _refreshData() {
     setState(() {
-      _dashboardFuture = ApiService.getAccountantDashboard();
+      _dashboardStream = ApiService.getAccountantDashboardStream().asBroadcastStream();
     });
   }
 
@@ -91,94 +92,117 @@ class _AccountantDashboardState extends State<AccountantDashboard> {
           const SizedBox(width: 8),
         ],
       ),
-      body: RefreshIndicator(
-        onRefresh: () async => _refreshData(),
-        child: FutureBuilder<accountant_model.AccountantDashboardData>(
-          future: _dashboardFuture,
-          builder: (context, snapshot) {
-            if (snapshot.connectionState == ConnectionState.waiting) {
-              return const Center(child: CircularProgressIndicator());
-            } else if (snapshot.hasError) {
-              return Center(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(Icons.error_outline, color: colorScheme.error, size: 48),
-                    const SizedBox(height: 16),
-                    Text("Error: ${snapshot.error}", style: TextStyle(color: isDark ? Colors.white : Colors.black)),
-                    TextButton(onPressed: _refreshData, child: const Text("Retry")),
-                  ],
-                ),
-              );
-            } else if (!snapshot.hasData) {
-              return Center(child: Text("No data found", style: TextStyle(color: isDark ? Colors.white : Colors.black)));
-            }
+      body: StreamBuilder<accountant_model.AccountantDashboardData>(
+        stream: _dashboardStream,
+        builder: (context, snapshot) {
+          return RefreshIndicator(
+            onRefresh: () async {
+              _refreshData();
+              await _dashboardStream?.first;
+            },
+            child: LoadingWrapper<accountant_model.AccountantDashboardData>(
+              snapshot: snapshot,
+              skeleton: _buildSkeleton(context),
+              onRetry: _refreshData,
+              builder: (data) => _buildContent(context, data),
+            ),
+          );
+        },
+      ),
+    );
+  }
 
-            final data = snapshot.data!;
-            return SingleChildScrollView(
-              padding: context.pagePadding,
-              physics: const AlwaysScrollableScrollPhysics(),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  _buildGenerateCardButton(context),
-                  SizedBox(height: context.md),
-                  _buildStatsGrid(context, data),
-                  SizedBox(height: context.md),
-                  if (context.isTablet || context.isDesktop)
-                    Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Expanded(
-                          flex: 5,
-                          child: Column(
-                            children: [
-                              _buildQuickActions(context),
-                              SizedBox(height: context.md),
-                              _buildMySalarySection(context, data.lastSalary),
-                              SizedBox(height: context.md),
-                              _buildListSection(context, "Institute Salaries", Icons.account_balance_wallet_outlined, data.salaryList, "salary"),
-                              SizedBox(height: context.md),
-                              _buildListSection(context, "Recent Payments", Icons.history_rounded, data.payments, "payment"),
-                              SizedBox(height: context.md),
-                              _buildListSection(context, "Fines & Penalties", Icons.gavel_rounded, data.fines, "fine"),
-                            ],
-                          ),
-                        ),
-                        SizedBox(width: context.md),
-                        Expanded(
-                          flex: 7,
-                          child: Column(
-                            children: [
-                              _buildProfileOverview(context, data.userDetail),
-                              SizedBox(height: context.md),
-                              _buildMenuGrid(context, data),
-                            ],
-                          ),
-                        ),
-                      ],
-                    )
-                  else ...[
-                    _buildQuickActions(context),
-                    SizedBox(height: context.md),
-                    _buildProfileOverview(context, data.userDetail),
-                    SizedBox(height: context.md),
-                    _buildMySalarySection(context, data.lastSalary),
-                    SizedBox(height: context.md),
-                    _buildMenuGrid(context, data),
-                    SizedBox(height: context.md),
-                    _buildListSection(context, "Institute Salaries", Icons.account_balance_wallet_outlined, data.salaryList, "salary"),
-                    SizedBox(height: context.md),
-                    _buildListSection(context, "Recent Payments", Icons.history_rounded, data.payments, "payment"),
-                    SizedBox(height: context.md),
-                    _buildListSection(context, "Fines & Penalties", Icons.gavel_rounded, data.fines, "fine"),
-                  ],
-                  SizedBox(height: context.xl),
-                ],
-              ),
-            );
-          },
-        ),
+  Widget _buildContent(BuildContext context, accountant_model.AccountantDashboardData data) {
+    return SingleChildScrollView(
+      padding: context.pagePadding,
+      physics: const AlwaysScrollableScrollPhysics(),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _buildGenerateCardButton(context),
+          SizedBox(height: context.md),
+          _buildStatsGrid(context, data),
+          SizedBox(height: context.md),
+          if (context.isTablet || context.isDesktop)
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(
+                  flex: 5,
+                  child: Column(
+                    children: [
+                      _buildQuickActions(context),
+                      SizedBox(height: context.md),
+                      _buildMySalarySection(context, data.lastSalary),
+                      SizedBox(height: context.md),
+                      _buildListSection(context, "Institute Salaries", Icons.account_balance_wallet_outlined, data.salaryList, "salary"),
+                      SizedBox(height: context.md),
+                      _buildListSection(context, "Recent Payments", Icons.history_rounded, data.payments, "payment"),
+                      SizedBox(height: context.md),
+                      _buildListSection(context, "Fines & Penalties", Icons.gavel_rounded, data.fines, "fine"),
+                    ],
+                  ),
+                ),
+                SizedBox(width: context.md),
+                Expanded(
+                  flex: 7,
+                  child: Column(
+                    children: [
+                      _buildProfileOverview(context, data.userDetail),
+                      SizedBox(height: context.md),
+                      _buildMenuGrid(context, data),
+                    ],
+                  ),
+                ),
+              ],
+            )
+          else ...[
+            _buildQuickActions(context),
+            SizedBox(height: context.md),
+            _buildProfileOverview(context, data.userDetail),
+            SizedBox(height: context.md),
+            _buildMySalarySection(context, data.lastSalary),
+            SizedBox(height: context.md),
+            _buildMenuGrid(context, data),
+            SizedBox(height: context.md),
+            _buildListSection(context, "Institute Salaries", Icons.account_balance_wallet_outlined, data.salaryList, "salary"),
+            SizedBox(height: context.md),
+            _buildListSection(context, "Recent Payments", Icons.history_rounded, data.payments, "payment"),
+            SizedBox(height: context.md),
+            _buildListSection(context, "Fines & Penalties", Icons.gavel_rounded, data.fines, "fine"),
+          ],
+          SizedBox(height: context.xl),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSkeleton(BuildContext context) {
+    return SingleChildScrollView(
+      padding: context.pagePadding,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Skeleton(height: 50, width: double.infinity),
+          SizedBox(height: context.md),
+          GridView.count(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            crossAxisCount: context.isMobile ? 2 : 4,
+            crossAxisSpacing: context.sm,
+            mainAxisSpacing: context.sm,
+            childAspectRatio: context.isMobile ? 1.5 : 1.3,
+            children: List.generate(4, (index) => const Skeleton(borderRadius: 16)),
+          ),
+          SizedBox(height: context.md),
+          const Skeleton(height: 180, width: double.infinity, borderRadius: 16),
+          SizedBox(height: context.md),
+          const Skeleton(height: 250, width: double.infinity, borderRadius: 16),
+          SizedBox(height: context.md),
+          const Skeleton(height: 150, width: double.infinity, borderRadius: 16),
+          SizedBox(height: context.md),
+          const Skeleton(height: 300, width: double.infinity, borderRadius: 16),
+        ],
       ),
     );
   }

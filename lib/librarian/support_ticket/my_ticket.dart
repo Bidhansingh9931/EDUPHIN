@@ -1,8 +1,10 @@
+import '../../services/common_widgets.dart';
 import '../../services/responsive_helper.dart';
 import 'package:flutter/material.dart';
 import '../../services/api_service.dart';
 import '../librarian_models.dart';
 import 'create_ticket.dart';
+import '../librarian_skeleton_widgets.dart';
 
 import 'ticket_details.dart';
 
@@ -17,21 +19,22 @@ class _MyTicketsPageState extends State<MyTicketsPage> {
   String selectedPriority = "all";
   String selectedStatus = "all";
   String searchQuery = "";
-  late Future<List<SupportTicket>> _ticketsFuture;
+  final GlobalKey<RefreshIndicatorState> _refreshKey = GlobalKey<RefreshIndicatorState>();
+  Stream<List<SupportTicket>>? _ticketsStream;
 
   @override
   void initState() {
     super.initState();
-    _loadTickets();
+    _refreshStream();
   }
 
-  void _loadTickets() {
+  void _refreshStream() {
     setState(() {
-      _ticketsFuture = ApiService.getLibrarianTickets({
+      _ticketsStream = ApiService.getLibrarianTicketsStream({
         'priority': selectedPriority,
         'status': selectedStatus,
         'search': searchQuery,
-      });
+      }).asBroadcastStream();
     });
   }
 
@@ -51,71 +54,34 @@ class _MyTicketsPageState extends State<MyTicketsPage> {
           child: Column(
             children: [
               Expanded(
-                child: SingleChildScrollView(
-                  padding: context.pagePadding,
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      /// FILTER SECTION
-                      Card(
-                        elevation: 0,
-                        color: colorScheme.surfaceContainerLow,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(context.scale(20)),
-                          side: BorderSide(color: colorScheme.outlineVariant.withValues(alpha: 0.5), width: 0.5),
-                        ),
-                        child: Padding(
-                          padding: EdgeInsets.all(context.md),
-                          child: Column(
-                            children: [
-                              context.responsive(
-                                Column(
-                                  children: [
-                                    TextField(
-                                      onChanged: (val) {
-                                        setState(() => searchQuery = val);
-                                        _loadTickets();
-                                      },
-                                      decoration: InputDecoration(
-                                        hintText: "Search by Title...",
-                                        prefixIcon: const Icon(Icons.search),
-                                        filled: true,
-                                        fillColor: colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
-                                        border: OutlineInputBorder(
-                                          borderRadius: BorderRadius.circular(context.scale(12)),
-                                          borderSide: BorderSide(color: colorScheme.outlineVariant.withValues(alpha: 0.5)),
-                                        ),
-                                        enabledBorder: OutlineInputBorder(
-                                          borderRadius: BorderRadius.circular(context.scale(12)),
-                                          borderSide: BorderSide(color: colorScheme.outlineVariant.withValues(alpha: 0.5)),
-                                        ),
-                                        focusedBorder: OutlineInputBorder(
-                                          borderRadius: BorderRadius.circular(context.scale(12)),
-                                          borderSide: BorderSide(color: colorScheme.primary, width: 1),
-                                        ),
-                                        contentPadding: EdgeInsets.symmetric(horizontal: context.scale(16)),
-                                      ),
-                                    ),
-                                    SizedBox(height: context.sm),
-                                    _buildDropdown(context, selectedPriority, {
-                                      "all": "All Priorities",
-                                      "low": "Low",
-                                      "medium": "Medium",
-                                      "high": "High"
-                                    }, (val) {
-                                      setState(() => selectedPriority = val!);
-                                      _loadTickets();
-                                    }),
-                                  ],
-                                ),
-                                tablet: Row(
-                                  children: [
-                                    Expanded(
-                                      flex: 2,
-                                      child: TextField(
+                child: RefreshIndicator(
+                  key: _refreshKey,
+                  onRefresh: () async => _refreshStream(),
+                  child: SingleChildScrollView(
+                    physics: const AlwaysScrollableScrollPhysics(),
+                    padding: context.pagePadding,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        /// FILTER SECTION
+                        Card(
+                          elevation: 0,
+                          color: colorScheme.surfaceContainerLow,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(context.scale(20)),
+                            side: BorderSide(color: colorScheme.outlineVariant.withValues(alpha: 0.5), width: 0.5),
+                          ),
+                          child: Padding(
+                            padding: EdgeInsets.all(context.md),
+                            child: Column(
+                              children: [
+                                context.responsive(
+                                  Column(
+                                    children: [
+                                      TextField(
                                         onChanged: (val) {
-                                          setState(() => searchQuery = val);
-                                          _loadTickets();
+                                          searchQuery = val;
+                                          _refreshStream();
                                         },
                                         decoration: InputDecoration(
                                           hintText: "Search by Title...",
@@ -137,134 +103,180 @@ class _MyTicketsPageState extends State<MyTicketsPage> {
                                           contentPadding: EdgeInsets.symmetric(horizontal: context.scale(16)),
                                         ),
                                       ),
-                                    ),
-                                    SizedBox(width: context.sm),
-                                    Expanded(
-                                      child: _buildDropdown(context, selectedPriority, {
+                                      SizedBox(height: context.sm),
+                                      _buildDropdown(context, selectedPriority, {
                                         "all": "All Priorities",
                                         "low": "Low",
                                         "medium": "Medium",
                                         "high": "High"
                                       }, (val) {
-                                        setState(() => selectedPriority = val!);
-                                        _loadTickets();
+                                        selectedPriority = val!;
+                                        _refreshStream();
                                       }),
-                                    ),
-                                  ],
+                                    ],
+                                  ),
+                                  tablet: Row(
+                                    children: [
+                                      Expanded(
+                                        flex: 2,
+                                        child: TextField(
+                                          onChanged: (val) {
+                                            searchQuery = val;
+                                            _refreshStream();
+                                          },
+                                          decoration: InputDecoration(
+                                            hintText: "Search by Title...",
+                                            prefixIcon: const Icon(Icons.search),
+                                            filled: true,
+                                            fillColor: colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
+                                            border: OutlineInputBorder(
+                                              borderRadius: BorderRadius.circular(context.scale(12)),
+                                              borderSide: BorderSide(color: colorScheme.outlineVariant.withValues(alpha: 0.5)),
+                                            ),
+                                            enabledBorder: OutlineInputBorder(
+                                              borderRadius: BorderRadius.circular(context.scale(12)),
+                                              borderSide: BorderSide(color: colorScheme.outlineVariant.withValues(alpha: 0.5)),
+                                            ),
+                                            focusedBorder: OutlineInputBorder(
+                                              borderRadius: BorderRadius.circular(context.scale(12)),
+                                              borderSide: BorderSide(color: colorScheme.primary, width: 1),
+                                            ),
+                                            contentPadding: EdgeInsets.symmetric(horizontal: context.scale(16)),
+                                          ),
+                                        ),
+                                      ),
+                                      SizedBox(width: context.sm),
+                                      Expanded(
+                                        child: _buildDropdown(context, selectedPriority, {
+                                          "all": "All Priorities",
+                                          "low": "Low",
+                                          "medium": "Medium",
+                                          "high": "High"
+                                        }, (val) {
+                                          selectedPriority = val!;
+                                          _refreshStream();
+                                        }),
+                                      ),
+                                    ],
+                                  ),
                                 ),
-                              ),
-                              SizedBox(height: context.sm),
-                              _buildDropdown(context, selectedStatus, {
-                                "all": "All Statuses",
-                                "open": "Open",
-                                "closed": "Closed",
-                                "pending": "Pending"
-                              }, (val) {
-                                setState(() => selectedStatus = val!);
-                                _loadTickets();
-                              }),
-                            ],
+                                SizedBox(height: context.sm),
+                                _buildDropdown(context, selectedStatus, {
+                                  "all": "All Statuses",
+                                  "open": "Open",
+                                  "closed": "Closed",
+                                  "pending": "Pending"
+                                }, (val) {
+                                  selectedStatus = val!;
+                                  _refreshStream();
+                                }),
+                              ],
+                            ),
                           ),
                         ),
-                      ),
 
-                      SizedBox(height: context.md),
+                        SizedBox(height: context.md),
 
-                      /// DATA TABLE SECTION
-                      Card(
-                        elevation: 0,
-                        color: colorScheme.surfaceContainerLow,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(context.scale(20)),
-                          side: BorderSide(color: colorScheme.outlineVariant.withValues(alpha: 0.5), width: 0.5),
-                        ),
-                        clipBehavior: Clip.antiAlias,
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.stretch,
-                          children: [
-                            Padding(
-                              padding: EdgeInsets.all(context.md),
-                              child: Text(
-                                "Recent Tickets",
-                                style: theme.textTheme.titleMedium?.copyWith(
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                            ),
-                            FutureBuilder<List<SupportTicket>>(
-                              future: _ticketsFuture,
-                              builder: (context, snapshot) {
-                                if (snapshot.connectionState == ConnectionState.waiting) {
-                                  return Padding(
-                                    padding: EdgeInsets.all(context.xl),
-                                    child: const Center(child: CircularProgressIndicator()),
-                                  );
-                                } else if (snapshot.hasError) {
-                                  return Padding(
-                                    padding: EdgeInsets.all(context.xl),
-                                    child: Center(child: Text("Error: ${snapshot.error}")),
-                                  );
-                                } else if (!snapshot.hasData || snapshot.data!.isEmpty) {
-                                  return Padding(
-                                    padding: EdgeInsets.all(context.xl),
-                                    child: const Center(child: Text("No tickets found")),
+                        /// DATA TABLE SECTION
+                        StreamBuilder<List<SupportTicket>>(
+                          stream: _ticketsStream,
+                          builder: (context, snapshot) {
+                            return LoadingWrapper<List<SupportTicket>>(
+                              snapshot: snapshot,
+                              skeleton: const TicketSkeleton(),
+                              onRetry: _refreshStream,
+                              builder: (tickets) {
+                                if (tickets.isEmpty) {
+                                  return Card(
+                                    elevation: 0,
+                                    color: colorScheme.surfaceContainerLow,
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(context.scale(20)),
+                                      side: BorderSide(color: colorScheme.outlineVariant.withValues(alpha: 0.5), width: 0.5),
+                                    ),
+                                    child: Padding(
+                                      padding: EdgeInsets.all(context.xl),
+                                      child: const Center(child: Text("No tickets found")),
+                                    ),
                                   );
                                 }
-
-                                return SingleChildScrollView(
-                                  scrollDirection: Axis.horizontal,
-                                  child: DataTable(
-                                    headingRowColor: WidgetStateProperty.all(colorScheme.surfaceContainer),
-                                    dataRowMinHeight: context.scale(60),
-                                    dataRowMaxHeight: context.scale(70),
-                                    columnSpacing: context.md,
-                                    columns: [
-                                      DataColumn(
-                                        label: Text(
-                                          "#ID",
-                                          style: TextStyle(fontWeight: FontWeight.bold, fontSize: context.font(14)),
+                                return Card(
+                                  elevation: 0,
+                                  color: colorScheme.surfaceContainerLow,
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(context.scale(20)),
+                                    side: BorderSide(color: colorScheme.outlineVariant.withValues(alpha: 0.5), width: 0.5),
+                                  ),
+                                  clipBehavior: Clip.antiAlias,
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                                    children: [
+                                      Padding(
+                                        padding: EdgeInsets.all(context.md),
+                                        child: Text(
+                                          "Recent Tickets",
+                                          style: theme.textTheme.titleMedium?.copyWith(
+                                            fontWeight: FontWeight.bold,
+                                          ),
                                         ),
                                       ),
-                                      DataColumn(
-                                        label: Text(
-                                          "Title",
-                                          style: TextStyle(fontWeight: FontWeight.bold, fontSize: context.font(14)),
-                                        ),
-                                      ),
-                                      DataColumn(
-                                        label: Text(
-                                          "Priority",
-                                          style: TextStyle(fontWeight: FontWeight.bold, fontSize: context.font(14)),
-                                        ),
-                                      ),
-                                      DataColumn(
-                                        label: Text(
-                                          "Status",
-                                          style: TextStyle(fontWeight: FontWeight.bold, fontSize: context.font(14)),
-                                        ),
-                                      ),
-                                      DataColumn(
-                                        label: Text(
-                                          "Category",
-                                          style: TextStyle(fontWeight: FontWeight.bold, fontSize: context.font(14)),
-                                        ),
-                                      ),
-                                      DataColumn(
-                                        label: Text(
-                                          "Action",
-                                          style: TextStyle(fontWeight: FontWeight.bold, fontSize: context.font(14)),
+                                      SingleChildScrollView(
+                                        scrollDirection: Axis.horizontal,
+                                        child: DataTable(
+                                          headingRowColor: WidgetStateProperty.all(colorScheme.surfaceContainer),
+                                          dataRowMinHeight: context.scale(60),
+                                          dataRowMaxHeight: context.scale(70),
+                                          columnSpacing: context.md,
+                                          columns: [
+                                            DataColumn(
+                                              label: Text(
+                                                "#ID",
+                                                style: TextStyle(fontWeight: FontWeight.bold, fontSize: context.font(14)),
+                                              ),
+                                            ),
+                                            DataColumn(
+                                              label: Text(
+                                                "Title",
+                                                style: TextStyle(fontWeight: FontWeight.bold, fontSize: context.font(14)),
+                                              ),
+                                            ),
+                                            DataColumn(
+                                              label: Text(
+                                                "Priority",
+                                                style: TextStyle(fontWeight: FontWeight.bold, fontSize: context.font(14)),
+                                              ),
+                                            ),
+                                            DataColumn(
+                                              label: Text(
+                                                "Status",
+                                                style: TextStyle(fontWeight: FontWeight.bold, fontSize: context.font(14)),
+                                              ),
+                                            ),
+                                            DataColumn(
+                                              label: Text(
+                                                "Category",
+                                                style: TextStyle(fontWeight: FontWeight.bold, fontSize: context.font(14)),
+                                              ),
+                                            ),
+                                            DataColumn(
+                                              label: Text(
+                                                "Action",
+                                                style: TextStyle(fontWeight: FontWeight.bold, fontSize: context.font(14)),
+                                              ),
+                                            ),
+                                          ],
+                                          rows: tickets.map((ticket) => _buildDataRow(context, ticket)).toList(),
                                         ),
                                       ),
                                     ],
-                                    rows: snapshot.data!.map((ticket) => _buildDataRow(context, ticket)).toList(),
                                   ),
                                 );
                               },
-                            ),
-                          ],
+                            );
+                          },
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
                 ),
               ),
@@ -280,7 +292,7 @@ class _MyTicketsPageState extends State<MyTicketsPage> {
                         context,
                         MaterialPageRoute(builder: (context) => const CreateTicketPage()),
                       );
-                      if (result == true) _loadTickets();
+                      if (result == true) _refreshStream();
                     },
                     style: FilledButton.styleFrom(
                       padding: EdgeInsets.symmetric(vertical: context.md),
@@ -298,10 +310,10 @@ class _MyTicketsPageState extends State<MyTicketsPage> {
     );
   }
 
-  Widget _buildDropdown(BuildContext context, String value, Map<String, String> items, Function(String?) onChanged) {
+  Widget _buildDropdown(BuildContext context, String initialValue, Map<String, String> items, Function(String?) onChanged) {
     final colorScheme = context.theme.colorScheme;
     return DropdownButtonFormField<String>(
-      value: value,
+      value: initialValue,
       isExpanded: true,
       decoration: InputDecoration(
         filled: true,
@@ -346,7 +358,7 @@ class _MyTicketsPageState extends State<MyTicketsPage> {
           Navigator.push(
             context,
             MaterialPageRoute(builder: (context) => LibrarianTicketDetailsPage(ticketId: ticket.id)),
-          ).then((_) => _loadTickets());
+          ).then((_) => _refreshStream());
         },
       )),
     ]);

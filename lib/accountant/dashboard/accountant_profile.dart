@@ -1,3 +1,4 @@
+import 'package:eduphin/login_logout/login.dart';
 import 'dart:io';
 import 'dart:typed_data';
 import 'package:flutter/foundation.dart' show kIsWeb;
@@ -17,11 +18,11 @@ class AccountantProfile extends StatefulWidget {
 }
 
 class _AccountantProfileState extends State<AccountantProfile> {
-  bool _isLoading = true;
-  UserDetail? _user;
+  bool _isActionLoading = false;
   File? _image;
   Uint8List? _imageBytes;
   String? _fileName;
+  late Stream<UserDetail> _profileStream;
 
   final _formKey = GlobalKey<FormState>();
   final _nameController = TextEditingController();
@@ -47,42 +48,27 @@ class _AccountantProfileState extends State<AccountantProfile> {
   @override
   void initState() {
     super.initState();
-    _fetchProfile();
+    _profileStream = ApiService.getAccountantProfileStream();
   }
 
-  Future<void> _fetchProfile() async {
-    if (!mounted) return;
-    try {
-      final user = await ApiService.getAccountantProfile();
-      if (mounted) {
-        setState(() {
-          _user = user;
-          _nameController.text = user.name;
-          _emailController.text = user.email ?? '';
-          _phoneController.text = user.phone ?? '';
-          _altPhoneController.text = user.alternatePhone ?? '';
-          _dobController.text = user.dateOfBirth ?? '';
-          _addressController.text = user.address ?? '';
-          _cityController.text = user.city ?? '';
-          _stateController.text = user.state ?? '';
-          _pincodeController.text = user.pincode ?? '';
-          _bankAccountController.text = user.bankAccountNumber ?? '';
-          _ifscController.text = user.ifscCode ?? '';
-          _bankNameController.text = user.bankName ?? '';
-          _branchController.text = user.branchName ?? '';
-          _emergencyNameController.text = user.emergencyContactName ?? '';
-          _emergencyPhoneController.text = user.emergencyContactNumber ?? '';
-          _gender = user.gender;
-          _relationshipStatus = user.relationshipStatus;
-          _isLoading = false;
-        });
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Error: $e")));
-        setState(() => _isLoading = false);
-      }
-    }
+  void _populateFields(UserDetail user) {
+    _nameController.text = user.name;
+    _emailController.text = user.email ?? '';
+    _phoneController.text = user.phone ?? '';
+    _altPhoneController.text = user.alternatePhone ?? '';
+    _dobController.text = user.dateOfBirth ?? '';
+    _addressController.text = user.address ?? '';
+    _cityController.text = user.city ?? '';
+    _stateController.text = user.state ?? '';
+    _pincodeController.text = user.pincode ?? '';
+    _bankAccountController.text = user.bankAccountNumber ?? '';
+    _ifscController.text = user.ifscCode ?? '';
+    _bankNameController.text = user.bankName ?? '';
+    _branchController.text = user.branchName ?? '';
+    _emergencyNameController.text = user.emergencyContactName ?? '';
+    _emergencyPhoneController.text = user.emergencyContactNumber ?? '';
+    _gender = user.gender;
+    _relationshipStatus = user.relationshipStatus;
   }
 
   Future<void> _updateProfile() async {
@@ -93,7 +79,7 @@ class _AccountantProfileState extends State<AccountantProfile> {
       return;
     }
 
-    setState(() => _isLoading = true);
+    setState(() => _isActionLoading = true);
     try {
       final Map<String, String> data = {
         'gender': _gender ?? 'Male',
@@ -130,14 +116,15 @@ class _AccountantProfileState extends State<AccountantProfile> {
           _image = null;
           _imageBytes = null;
           _fileName = null;
+          _profileStream = ApiService.getAccountantProfileStream();
         });
-        _fetchProfile();
       }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Update failed: $e")));
-        setState(() => _isLoading = false);
       }
+    } finally {
+      if (mounted) setState(() => _isActionLoading = false);
     }
   }
 
@@ -163,225 +150,272 @@ class _AccountantProfileState extends State<AccountantProfile> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: Text("Accountant Profile", style: TextStyle(fontSize: context.font(20))),
-        actions: [
-          IconButton(
-            tooltip: "Logout",
-            icon: const Icon(Icons.logout),
-            onPressed: () async {
-              final confirmed = await showDialog<bool>(
-                context: context,
-                builder: (context) => AlertDialog(
-                  title: const Text("Logout"),
-                  content: const Text("Are you sure you want to logout?"),
-                  actions: [
-                    TextButton(onPressed: () => Navigator.pop(context, false), child: const Text("Cancel")),
-                    TextButton(
-                      onPressed: () => Navigator.pop(context, true),
-                      child: const Text("Logout", style: TextStyle(color: Colors.red)),
-                    ),
-                  ],
-                ),
-              );
-
-              if (confirmed == true) {
-                if (mounted) setState(() => _isLoading = true);
-                try {
-                  await ApiService.logout();
-                  if (mounted) {
-                    Navigator.pushNamedAndRemoveUntil(context, '/login', (route) => false);
-                  }
-                } catch (e) {
-                  if (mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Logout failed: $e")));
-                    setState(() => _isLoading = false);
-                  }
-                }
-              }
-            },
-          ),
-        ],
-      ),
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : SingleChildScrollView(
-              padding: context.pagePadding,
-              child: Center(
-                child: ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 1000),
-                  child: Form(
-                    key: _formKey,
-                    child: Column(
-                      children: [
-                        _buildHeader(context),
-                        SizedBox(height: context.xl),
-                        AdaptiveFieldRow(children: [
-                          ProfileSection(
-                            title: "Account Info",
-                            icon: Icons.account_circle_outlined,
-                            children: [
-                              ProfileTextField(
-                                label: "Full Name",
-                                controller: _nameController,
-                                enabled: false,
-                                icon: Icons.person_outline,
-                              ),
-                              ProfileTextField(
-                                label: "Email Address",
-                                controller: _emailController,
-                                enabled: false,
-                                icon: Icons.email_outlined,
-                              ),
-                            ],
-                          ),
-                          ProfileSection(
-                            title: "Personal Info",
-                            icon: Icons.person_outline,
-                            children: [
-                              AdaptiveFieldRow(children: [
-                                ProfileDropdown(
-                                  label: "Gender",
-                                  value: _gender,
-                                  items: const ['Male', 'Female', 'Other'],
-                                  onChanged: (v) => setState(() => _gender = v),
-                                  icon: Icons.wc_outlined,
-                                ),
-                                ProfileDropdown(
-                                  label: "Relationship",
-                                  value: _relationshipStatus,
-                                  items: const ['Single', 'Married', 'Divorced', 'Widowed'],
-                                  onChanged: (v) => setState(() => _relationshipStatus = v),
-                                  icon: Icons.favorite_outline,
-                                ),
-                              ]),
-                              ProfileTextField(
-                                label: "Date of Birth",
-                                controller: _dobController,
-                                readOnly: true,
-                                icon: Icons.calendar_today_rounded,
-                                onTap: () async {
-                                  DateTime? picked = await showDatePicker(
-                                    context: context,
-                                    initialDate: DateTime.now().subtract(const Duration(days: 365 * 18)),
-                                    firstDate: DateTime(1950),
-                                    lastDate: DateTime.now(),
-                                  );
-                                  if (picked != null) {
-                                    setState(() => _dobController.text = DateFormat('yyyy-MM-dd').format(picked));
-                                  }
-                                },
-                              ),
-                            ],
-                          ),
-                        ]),
-                        AdaptiveFieldRow(children: [
-                          ProfileSection(
-                            title: "Contact Details",
-                            icon: Icons.contact_phone_outlined,
-                            children: [
-                              ProfileTextField(
-                                label: "Phone Number",
-                                controller: _phoneController,
-                                keyboardType: TextInputType.phone,
-                                icon: Icons.phone_android,
-                              ),
-                              ProfileTextField(
-                                label: "Alternate Phone",
-                                controller: _altPhoneController,
-                                keyboardType: TextInputType.phone,
-                                icon: Icons.phone,
-                              ),
-                            ],
-                          ),
-                          ProfileSection(
-                            title: "Residential Address",
-                            icon: Icons.home_outlined,
-                            children: [
-                              ProfileTextField(
-                                label: "Full Address",
-                                controller: _addressController,
-                                icon: Icons.map_outlined,
-                                maxLines: 2,
-                              ),
-                              AdaptiveFieldRow(children: [
-                                ProfileTextField(label: "City", controller: _cityController),
-                                ProfileTextField(label: "State", controller: _stateController),
-                              ]),
-                              ProfileTextField(
-                                label: "Pincode",
-                                controller: _pincodeController,
-                                keyboardType: TextInputType.number,
-                                icon: Icons.pin_drop_outlined,
-                              ),
-                            ],
-                          ),
-                        ]),
-                        ProfileSection(
-                          title: "Banking & Documents",
-                          icon: Icons.account_balance_outlined,
-                          children: [
-                            ProfileTextField(
-                              label: "Bank Name",
-                              controller: _bankNameController,
-                              icon: Icons.account_balance_outlined,
-                            ),
-                            ProfileTextField(
-                              label: "Account Number",
-                              controller: _bankAccountController,
-                              keyboardType: TextInputType.number,
-                              icon: Icons.numbers,
-                            ),
-                            AdaptiveFieldRow(children: [
-                              ProfileTextField(label: "IFSC Code", controller: _ifscController),
-                              ProfileTextField(label: "Branch", controller: _branchController),
-                            ]),
-                          ],
+    return StreamBuilder<UserDetail>(
+      stream: _profileStream,
+      builder: (context, snapshot) {
+        return Scaffold(
+          appBar: AppBar(
+            title: Text("Accountant Profile", style: TextStyle(fontSize: context.font(20))),
+            actions: [
+              IconButton(
+                tooltip: "Logout",
+                icon: const Icon(Icons.logout),
+                onPressed: () async {
+                  final confirmed = await showDialog<bool>(
+                    context: context,
+                    builder: (context) => AlertDialog(
+                      title: const Text("Logout"),
+                      content: const Text("Are you sure you want to logout?"),
+                      actions: [
+                        TextButton(onPressed: () => Navigator.pop(context, false), child: const Text("Cancel")),
+                        TextButton(
+                          onPressed: () => Navigator.pop(context, true),
+                          child: const Text("Logout", style: TextStyle(color: Colors.red)),
                         ),
-                        ProfileSection(
-                          title: "Security",
-                          icon: Icons.security_outlined,
-                          children: [
-                            AdaptiveFieldRow(children: [
-                              ProfileTextField(
-                                label: "New Password (Optional)",
-                                controller: _passwordController,
-                                isPassword: true,
-                                icon: Icons.lock_outline,
-                              ),
-                              ProfileTextField(
-                                label: "Confirm New Password",
-                                controller: _passwordConfirmationController,
-                                isPassword: true,
-                                icon: Icons.lock_outline,
-                              ),
-                            ]),
-                          ],
-                        ),
-                        SizedBox(height: context.xl),
-                        SizedBox(
-                          width: double.infinity,
-                          child: ElevatedButton(
-                            onPressed: _updateProfile,
-                            style: ElevatedButton.styleFrom(
-                              padding: EdgeInsets.symmetric(vertical: context.scale(16)),
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(context.scale(12))),
-                            ),
-                            child: Text("SAVE CHANGES", style: TextStyle(fontSize: context.font(14))),
-                          ),
-                        ),
-                        SizedBox(height: context.xl),
                       ],
                     ),
-                  ),
-                ),
+                  );
+
+                  if (confirmed == true) {
+                    await ApiService.logout();
+                    if (context.mounted) {
+                      Navigator.of(context).pushAndRemoveUntil(
+                        MaterialPageRoute(builder: (context) => const LoginPage()),
+                        (route) => false,
+                      );
+                    }
+                  }
+                },
               ),
-            ),
+            ],
+          ),
+          body: LoadingWrapper<UserDetail>(
+            snapshot: snapshot,
+            skeleton: _buildSkeleton(context),
+            onRetry: () => setState(() => _profileStream = ApiService.getAccountantProfileStream()),
+            builder: (user) {
+              _populateFields(user);
+              return Stack(
+                children: [
+                  SingleChildScrollView(
+                    padding: context.pagePadding,
+                    child: Center(
+                      child: ConstrainedBox(
+                        constraints: const BoxConstraints(maxWidth: 1000),
+                        child: Form(
+                          key: _formKey,
+                          child: Column(
+                            children: [
+                              _buildHeader(context, user),
+                              SizedBox(height: context.xl),
+                              AdaptiveFieldRow(children: [
+                                ProfileSection(
+                                  title: "Account Info",
+                                  icon: Icons.account_circle_outlined,
+                                  children: [
+                                    ProfileTextField(
+                                      label: "Full Name",
+                                      controller: _nameController,
+                                      enabled: false,
+                                      icon: Icons.person_outline,
+                                    ),
+                                    ProfileTextField(
+                                      label: "Email Address",
+                                      controller: _emailController,
+                                      enabled: false,
+                                      icon: Icons.email_outlined,
+                                    ),
+                                  ],
+                                ),
+                                ProfileSection(
+                                  title: "Personal Info",
+                                  icon: Icons.person_outline,
+                                  children: [
+                                    AdaptiveFieldRow(children: [
+                                      ProfileDropdown(
+                                        label: "Gender",
+                                        value: _gender,
+                                        items: const ['Male', 'Female', 'Other'],
+                                        onChanged: (v) => setState(() => _gender = v),
+                                        icon: Icons.wc_outlined,
+                                      ),
+                                      ProfileDropdown(
+                                        label: "Relationship",
+                                        value: _relationshipStatus,
+                                        items: const ['Single', 'Married', 'Divorced', 'Widowed'],
+                                        onChanged: (v) => setState(() => _relationshipStatus = v),
+                                        icon: Icons.favorite_outline,
+                                      ),
+                                    ]),
+                                    ProfileTextField(
+                                      label: "Date of Birth",
+                                      controller: _dobController,
+                                      readOnly: true,
+                                      icon: Icons.calendar_today_rounded,
+                                      onTap: () async {
+                                        DateTime? picked = await showDatePicker(
+                                          context: context,
+                                          initialDate: DateTime.now().subtract(const Duration(days: 365 * 18)),
+                                          firstDate: DateTime(1950),
+                                          lastDate: DateTime.now(),
+                                        );
+                                        if (picked != null) {
+                                          setState(() => _dobController.text = DateFormat('yyyy-MM-dd').format(picked));
+                                        }
+                                      },
+                                    ),
+                                  ],
+                                ),
+                              ]),
+                              AdaptiveFieldRow(children: [
+                                ProfileSection(
+                                  title: "Contact Details",
+                                  icon: Icons.contact_phone_outlined,
+                                  children: [
+                                    ProfileTextField(
+                                      label: "Phone Number",
+                                      controller: _phoneController,
+                                      keyboardType: TextInputType.phone,
+                                      icon: Icons.phone_android,
+                                    ),
+                                    ProfileTextField(
+                                      label: "Alternate Phone",
+                                      controller: _altPhoneController,
+                                      keyboardType: TextInputType.phone,
+                                      icon: Icons.phone,
+                                    ),
+                                  ],
+                                ),
+                                ProfileSection(
+                                  title: "Residential Address",
+                                  icon: Icons.home_outlined,
+                                  children: [
+                                    ProfileTextField(
+                                      label: "Full Address",
+                                      controller: _addressController,
+                                      icon: Icons.map_outlined,
+                                      maxLines: 2,
+                                    ),
+                                    AdaptiveFieldRow(children: [
+                                      ProfileTextField(label: "City", controller: _cityController),
+                                      ProfileTextField(label: "State", controller: _stateController),
+                                    ]),
+                                    ProfileTextField(
+                                      label: "Pincode",
+                                      controller: _pincodeController,
+                                      keyboardType: TextInputType.number,
+                                      icon: Icons.pin_drop_outlined,
+                                    ),
+                                  ],
+                                ),
+                              ]),
+                              ProfileSection(
+                                title: "Banking & Documents",
+                                icon: Icons.account_balance_outlined,
+                                children: [
+                                  ProfileTextField(
+                                    label: "Bank Name",
+                                    controller: _bankNameController,
+                                    icon: Icons.account_balance_outlined,
+                                  ),
+                                  ProfileTextField(
+                                    label: "Account Number",
+                                    controller: _bankAccountController,
+                                    keyboardType: TextInputType.number,
+                                    icon: Icons.numbers,
+                                  ),
+                                  AdaptiveFieldRow(children: [
+                                    ProfileTextField(label: "IFSC Code", controller: _ifscController),
+                                    ProfileTextField(label: "Branch", controller: _branchController),
+                                  ]),
+                                ],
+                              ),
+                              ProfileSection(
+                                title: "Security",
+                                icon: Icons.security_outlined,
+                                children: [
+                                  AdaptiveFieldRow(children: [
+                                    ProfileTextField(
+                                      label: "New Password (Optional)",
+                                      controller: _passwordController,
+                                      isPassword: true,
+                                      icon: Icons.lock_outline,
+                                    ),
+                                    ProfileTextField(
+                                      label: "Confirm New Password",
+                                      controller: _passwordConfirmationController,
+                                      isPassword: true,
+                                      icon: Icons.lock_outline,
+                                    ),
+                                  ]),
+                                ],
+                              ),
+                              SizedBox(height: context.xl),
+                              SizedBox(
+                                width: double.infinity,
+                                child: ElevatedButton(
+                                  onPressed: _updateProfile,
+                                  style: ElevatedButton.styleFrom(
+                                    padding: EdgeInsets.symmetric(vertical: context.scale(16)),
+                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(context.scale(12))),
+                                  ),
+                                  child: Text("SAVE CHANGES", style: TextStyle(fontSize: context.font(14))),
+                                ),
+                              ),
+                              SizedBox(height: context.xl),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                  if (_isActionLoading)
+                    const Center(child: CircularProgressIndicator()),
+                ],
+              );
+            },
+          ),
+        );
+      },
+    );
+
+  }
+
+  Widget _buildSkeleton(BuildContext context) {
+    return SingleChildScrollView(
+      padding: context.pagePadding,
+      child: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 1000),
+          child: Column(
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Skeleton(height: context.scale(120), width: context.scale(120), borderRadius: context.scale(60)),
+                  SizedBox(width: context.xl),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Skeleton(height: context.font(24), width: context.scale(200)),
+                      SizedBox(height: context.scale(8)),
+                      Skeleton(height: context.font(16), width: context.scale(150)),
+                    ],
+                  ),
+                ],
+              ),
+              SizedBox(height: context.xl),
+              Skeleton(height: context.scale(150), width: double.infinity, borderRadius: context.scale(12)),
+              SizedBox(height: context.xl),
+              Skeleton(height: context.scale(150), width: double.infinity, borderRadius: context.scale(12)),
+            ],
+          ),
+        ),
+      ),
     );
   }
 
-  Widget _buildHeader(BuildContext context) {
+  Widget _buildHeader(BuildContext context, UserDetail? user) {
     return Flex(
       direction: context.isMobile ? Axis.vertical : Axis.horizontal,
       mainAxisAlignment: MainAxisAlignment.center,
@@ -390,7 +424,7 @@ class _AccountantProfileState extends State<AccountantProfile> {
           radius: context.scale(60),
           localImage: _image,
           webImage: _imageBytes,
-          imageUrl: ApiService.getStorageUrl(_user?.photo),
+          imageUrl: ApiService.getStorageUrl(user?.photo),
           onCameraTap: _pickImage,
         ),
         if (!context.isMobile) SizedBox(width: context.xl),

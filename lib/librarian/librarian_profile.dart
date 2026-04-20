@@ -1,4 +1,6 @@
 import 'dart:io';
+import 'dart:async';
+import 'package:eduphin/librarian/librarian_skeleton_widgets.dart';
 import 'package:eduphin/services/common_widgets.dart';
 import 'package:eduphin/login_logout/login.dart';
 import 'package:eduphin/services/responsive_helper.dart';
@@ -16,8 +18,10 @@ class LibrarianProfilePage extends StatefulWidget {
 }
 
 class _LibrarianProfilePageState extends State<LibrarianProfilePage> {
-  bool _isLoading = true;
+  bool _isLoading = false;
   UserDetail? _profile;
+  late Stream<UserDetail> _profileStream;
+  StreamSubscription<UserDetail>? _profileSubscription;
   File? _imageFile;
   Uint8List? _webImage;
   String? _fileName;
@@ -44,38 +48,58 @@ class _LibrarianProfilePageState extends State<LibrarianProfilePage> {
   @override
   void initState() {
     super.initState();
-    _fetchProfile();
+    _refreshData();
+  }
+
+  @override
+  void dispose() {
+    _profileSubscription?.cancel();
+    _addressController.dispose();
+    _cityController.dispose();
+    _stateController.dispose();
+    _pincodeController.dispose();
+    _phoneController.dispose();
+    _altPhoneController.dispose();
+    _bankAccController.dispose();
+    _ifscController.dispose();
+    _bankNameController.dispose();
+    _branchNameController.dispose();
+    _emergencyNameController.dispose();
+    _emergencyPhoneController.dispose();
+    _passwordController.dispose();
+    _confirmPasswordController.dispose();
+    super.dispose();
+  }
+
+  void _refreshData() {
+    _profileSubscription?.cancel();
+    _profileStream = ApiService.getLibrarianProfileStream().asBroadcastStream();
+    _profileSubscription = _profileStream.listen((profile) {
+      if (mounted) {
+        setState(() {
+          _profile = profile;
+          _addressController.text = profile.address ?? "";
+          _cityController.text = profile.city ?? "";
+          _stateController.text = profile.state ?? "";
+          _pincodeController.text = profile.pincode ?? "";
+          _phoneController.text = profile.phone ?? "";
+          _altPhoneController.text = profile.alternatePhone ?? "";
+          _bankAccController.text = profile.bankAccountNumber ?? "";
+          _ifscController.text = profile.ifscCode ?? "";
+          _bankNameController.text = profile.bankName ?? "";
+          _branchNameController.text = profile.branchName ?? "";
+          _emergencyNameController.text = profile.emergencyContactName ?? "";
+          _emergencyPhoneController.text = profile.emergencyContactNumber ?? "";
+          _selectedGender = profile.gender ?? "Male";
+          _selectedDob = profile.dob ?? "";
+          _selectedStatus = profile.relationshipStatus ?? "Single";
+        });
+      }
+    });
   }
 
   Future<void> _fetchProfile() async {
-    try {
-      final profile = await ApiService.getLibrarianProfile();
-      if (!mounted) return;
-      setState(() {
-        _profile = profile;
-        _addressController.text = profile.address ?? "";
-        _cityController.text = profile.city ?? "";
-        _stateController.text = profile.state ?? "";
-        _pincodeController.text = profile.pincode ?? "";
-        _phoneController.text = profile.phone ?? "";
-        _altPhoneController.text = profile.alternatePhone ?? "";
-        _bankAccController.text = profile.bankAccountNumber ?? "";
-        _ifscController.text = profile.ifscCode ?? "";
-        _bankNameController.text = profile.bankName ?? "";
-        _branchNameController.text = profile.branchName ?? "";
-        _emergencyNameController.text = profile.emergencyContactName ?? "";
-        _emergencyPhoneController.text = profile.emergencyContactNumber ?? "";
-        _selectedGender = profile.gender ?? "Male";
-        _selectedDob = profile.dob ?? "";
-        _selectedStatus = profile.relationshipStatus ?? "Single";
-        _isLoading = false;
-      });
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Error fetching profile: $e")));
-        setState(() => _isLoading = false);
-      }
-    }
+    _refreshData();
   }
 
   Future<void> _pickImage() async {
@@ -168,12 +192,6 @@ class _LibrarianProfilePageState extends State<LibrarianProfilePage> {
   Widget build(BuildContext context) {
     final theme = context.theme;
 
-    if (_isLoading && _profile == null) {
-      return Scaffold(
-        body: Center(child: CircularProgressIndicator(color: theme.colorScheme.primary)),
-      );
-    }
-
     return Scaffold(
       backgroundColor: theme.colorScheme.surface,
       appBar: AppBar(
@@ -185,179 +203,191 @@ class _LibrarianProfilePageState extends State<LibrarianProfilePage> {
           style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold, fontSize: context.font(20)),
         ),
       ),
-      body: SingleChildScrollView(
-        padding: context.pagePadding,
-        child: Center(
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 800),
-            child: Column(
-              children: [
-                /// TOP PROFILE CARD
-                _buildHeaderCard(context, theme),
+      body: StreamBuilder<UserDetail>(
+        stream: _profileStream,
+        builder: (context, snapshot) {
+          return LoadingWrapper<UserDetail>(
+            snapshot: snapshot,
+            skeleton: const ProfileSkeleton(),
+            onRetry: _refreshData,
+            builder: (profile) {
+              return SingleChildScrollView(
+                padding: context.pagePadding,
+                child: Center(
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 800),
+                    child: Column(
+                      children: [
+                        /// TOP PROFILE CARD
+                        _buildHeaderCard(context, theme, profile),
 
-                SizedBox(height: context.lg),
+                        SizedBox(height: context.lg),
 
-                /// PERSONAL INFORMATION
-                ProfileSection(
-                  title: "Personal Details",
-                  icon: Icons.person_outline_rounded,
-                  children: [
-                    AdaptiveFieldRow(children: [
-                      ProfileDropdown(
-                        label: "Gender",
-                        icon: Icons.wc_rounded,
-                        value: _selectedGender,
-                        items: const ["Male", "Female", "Other"],
-                        onChanged: (val) {
-                          setState(() => _selectedGender = val!);
-                        },
-                      ),
-                      ProfileTextField(
-                        label: "Date of Birth",
-                        controller: TextEditingController(text: _selectedDob),
-                        readOnly: true,
-                        onTap: () => _selectDate(context),
-                        icon: Icons.calendar_today_rounded,
-                      ),
-                    ]),
-                    AdaptiveFieldRow(children: [
-                      ProfileTextField(
-                        label: "Phone Number",
-                        controller: _phoneController,
-                        icon: Icons.phone_android_rounded,
-                        keyboardType: TextInputType.phone,
-                      ),
-                      ProfileDropdown(
-                        label: "Relationship Status",
-                        icon: Icons.favorite_border_rounded,
-                        value: _selectedStatus,
-                        items: const ["Single", "Married", "Divorced", "Widowed"],
-                        onChanged: (val) {
-                          setState(() => _selectedStatus = val!);
-                        },
-                      ),
-                    ]),
-                  ],
-                ),
+                        /// PERSONAL INFORMATION
+                        ProfileSection(
+                          title: "Personal Details",
+                          icon: Icons.person_outline_rounded,
+                          children: [
+                            AdaptiveFieldRow(children: [
+                              ProfileDropdown(
+                                label: "Gender",
+                                icon: Icons.wc_rounded,
+                                value: _selectedGender,
+                                items: const ["Male", "Female", "Other"],
+                                onChanged: (val) {
+                                  setState(() => _selectedGender = val!);
+                                },
+                              ),
+                              ProfileTextField(
+                                label: "Date of Birth",
+                                controller: TextEditingController(text: _selectedDob),
+                                readOnly: true,
+                                onTap: () => _selectDate(context),
+                                icon: Icons.calendar_today_rounded,
+                              ),
+                            ]),
+                            AdaptiveFieldRow(children: [
+                              ProfileTextField(
+                                label: "Phone Number",
+                                controller: _phoneController,
+                                icon: Icons.phone_android_rounded,
+                                keyboardType: TextInputType.phone,
+                              ),
+                              ProfileDropdown(
+                                label: "Relationship Status",
+                                icon: Icons.favorite_border_rounded,
+                                value: _selectedStatus,
+                                items: const ["Single", "Married", "Divorced", "Widowed"],
+                                onChanged: (val) {
+                                  setState(() => _selectedStatus = val!);
+                                },
+                              ),
+                            ]),
+                          ],
+                        ),
 
-                /// ADDRESS INFORMATION
-                ProfileSection(
-                  title: "Address Information",
-                  icon: Icons.location_on_outlined,
-                  children: [
-                    ProfileTextField(
-                      label: "Full Address",
-                      icon: Icons.home_outlined,
-                      controller: _addressController,
-                      maxLines: 2,
-                    ),
-                    AdaptiveFieldRow(children: [
-                      ProfileTextField(label: "City", icon: Icons.location_city_rounded, controller: _cityController),
-                      ProfileTextField(label: "State", icon: Icons.map_rounded, controller: _stateController),
-                    ]),
-                    ProfileTextField(label: "Postal Code (PINCODE)", icon: Icons.pin_drop_rounded, controller: _pincodeController, keyboardType: TextInputType.number),
-                  ],
-                ),
+                        /// ADDRESS INFORMATION
+                        ProfileSection(
+                          title: "Address Information",
+                          icon: Icons.location_on_outlined,
+                          children: [
+                            ProfileTextField(
+                              label: "Full Address",
+                              icon: Icons.home_outlined,
+                              controller: _addressController,
+                              maxLines: 2,
+                            ),
+                            AdaptiveFieldRow(children: [
+                              ProfileTextField(label: "City", icon: Icons.location_city_rounded, controller: _cityController),
+                              ProfileTextField(label: "State", icon: Icons.map_rounded, controller: _stateController),
+                            ]),
+                            ProfileTextField(label: "Postal Code (PINCODE)", icon: Icons.pin_drop_rounded, controller: _pincodeController, keyboardType: TextInputType.number),
+                          ],
+                        ),
 
-                /// BANKING INFORMATION
-                ProfileSection(
-                  title: "Banking Information",
-                  icon: Icons.account_balance_outlined,
-                  children: [
-                    AdaptiveFieldRow(children: [
-                      ProfileTextField(label: "Account Number", icon: Icons.numbers_rounded, controller: _bankAccController, keyboardType: TextInputType.number),
-                      ProfileTextField(label: "IFSC Code", icon: Icons.code_rounded, controller: _ifscController),
-                    ]),
-                    AdaptiveFieldRow(children: [
-                      ProfileTextField(label: "Bank Name", icon: Icons.account_balance_rounded, controller: _bankNameController),
-                      ProfileTextField(label: "Branch Name", icon: Icons.store_rounded, controller: _branchNameController),
-                    ]),
-                  ],
-                ),
+                        /// BANKING INFORMATION
+                        ProfileSection(
+                          title: "Banking Information",
+                          icon: Icons.account_balance_outlined,
+                          children: [
+                            AdaptiveFieldRow(children: [
+                              ProfileTextField(label: "Account Number", icon: Icons.numbers_rounded, controller: _bankAccController, keyboardType: TextInputType.number),
+                              ProfileTextField(label: "IFSC Code", icon: Icons.code_rounded, controller: _ifscController),
+                            ]),
+                            AdaptiveFieldRow(children: [
+                              ProfileTextField(label: "Bank Name", icon: Icons.account_balance_rounded, controller: _bankNameController),
+                              ProfileTextField(label: "Branch Name", icon: Icons.store_rounded, controller: _branchNameController),
+                            ]),
+                          ],
+                        ),
 
-                /// EMERGENCY CONTACT
-                ProfileSection(
-                  title: "Emergency Contact",
-                  icon: Icons.emergency_outlined,
-                  children: [
-                    AdaptiveFieldRow(children: [
-                      ProfileTextField(label: "Contact Name", icon: Icons.person_pin_rounded, controller: _emergencyNameController),
-                      ProfileTextField(label: "Contact Number", icon: Icons.phone_rounded, controller: _emergencyPhoneController, keyboardType: TextInputType.phone),
-                    ]),
-                  ],
-                ),
+                        /// EMERGENCY CONTACT
+                        ProfileSection(
+                          title: "Emergency Contact",
+                          icon: Icons.emergency_outlined,
+                          children: [
+                            AdaptiveFieldRow(children: [
+                              ProfileTextField(label: "Contact Name", icon: Icons.person_pin_rounded, controller: _emergencyNameController),
+                              ProfileTextField(label: "Contact Number", icon: Icons.phone_rounded, controller: _emergencyPhoneController, keyboardType: TextInputType.phone),
+                            ]),
+                          ],
+                        ),
 
-                /// SECURITY
-                ProfileSection(
-                  title: "Security Settings",
-                  icon: Icons.lock_outline_rounded,
-                  children: [
-                    AdaptiveFieldRow(children: [
-                      ProfileTextField(label: "New Password", controller: _passwordController, isPassword: true, icon: Icons.lock_open_rounded),
-                      ProfileTextField(label: "Confirm Password", controller: _confirmPasswordController, isPassword: true, icon: Icons.lock_rounded),
-                    ]),
-                    Text(
-                      "Leave password fields empty if you don't want to change it.",
-                      style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.outline),
-                    ),
-                  ],
-                ),
+                        /// SECURITY
+                        ProfileSection(
+                          title: "Security Settings",
+                          icon: Icons.lock_outline_rounded,
+                          children: [
+                            AdaptiveFieldRow(children: [
+                              ProfileTextField(label: "New Password", controller: _passwordController, isPassword: true, icon: Icons.lock_open_rounded),
+                              ProfileTextField(label: "Confirm Password", controller: _confirmPasswordController, isPassword: true, icon: Icons.lock_rounded),
+                            ]),
+                            Text(
+                              "Leave password fields empty if you don't want to change it.",
+                              style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.outline),
+                            ),
+                          ],
+                        ),
 
-                SizedBox(height: context.xl),
+                        SizedBox(height: context.xl),
 
-                FilledButton.icon(
-                  onPressed: _isLoading ? null : _saveProfile,
-                  icon: _isLoading 
-                    ? SizedBox(width: context.scale(20), height: context.scale(20), child: CircularProgressIndicator(strokeWidth: 2, color: theme.colorScheme.onPrimary)) 
-                    : const Icon(Icons.check_circle_outline_rounded),
-                  label: const Text("UPDATE PROFILE"),
-                  style: FilledButton.styleFrom(
-                    minimumSize: Size(double.infinity, context.scale(56)),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(context.scale(16))),
-                  ),
-                ),
-                SizedBox(height: context.md),
-                FilledButton.tonalIcon(
-                  onPressed: () async {
-                    final confirmed = await showDialog<bool>(
-                      context: context,
-                      builder: (context) => AlertDialog(
-                        title: const Text("Confirm Logout"),
-                        content: const Text("Are you sure you want to log out of your account?"),
-                        actions: [
-                          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text("CANCEL")),
-                          TextButton(
-                            onPressed: () => Navigator.pop(context, true),
-                            child: Text("LOGOUT", style: TextStyle(color: theme.colorScheme.error, fontWeight: FontWeight.bold)),
+                        FilledButton.icon(
+                          onPressed: _isLoading ? null : _saveProfile,
+                          icon: _isLoading
+                              ? SizedBox(width: context.scale(20), height: context.scale(20), child: CircularProgressIndicator(strokeWidth: 2, color: theme.colorScheme.onPrimary))
+                              : const Icon(Icons.check_circle_outline_rounded),
+                          label: const Text("UPDATE PROFILE"),
+                          style: FilledButton.styleFrom(
+                            minimumSize: Size(double.infinity, context.scale(56)),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(context.scale(16))),
                           ),
-                        ],
-                      ),
-                    );
-                    if (confirmed == true) {
-                      await ApiService.logout();
-                      if (context.mounted) {
-                        Navigator.pushAndRemoveUntil(context, MaterialPageRoute(builder: (c) => const LoginPage()), (r) => false);
-                      }
-                    }
-                  },
-                  icon: Icon(Icons.logout_rounded, color: theme.colorScheme.error),
-                  label: Text("LOGOUT FROM ACCOUNT", style: TextStyle(color: theme.colorScheme.error, fontWeight: FontWeight.bold)),
-                  style: FilledButton.styleFrom(
-                    minimumSize: Size(double.infinity, context.scale(56)),
-                    backgroundColor: theme.colorScheme.error.withValues(alpha: 0.1),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(context.scale(16))),
+                        ),
+                        SizedBox(height: context.md),
+                        FilledButton.tonalIcon(
+                          onPressed: () async {
+                            final confirmed = await showDialog<bool>(
+                              context: context,
+                              builder: (context) => AlertDialog(
+                                title: const Text("Confirm Logout"),
+                                content: const Text("Are you sure you want to log out of your account?"),
+                                actions: [
+                                  TextButton(onPressed: () => Navigator.pop(context, false), child: const Text("CANCEL")),
+                                  TextButton(
+                                    onPressed: () => Navigator.pop(context, true),
+                                    child: Text("LOGOUT", style: TextStyle(color: theme.colorScheme.error, fontWeight: FontWeight.bold)),
+                                  ),
+                                ],
+                              ),
+                            );
+                            if (confirmed == true) {
+                              await ApiService.logout();
+                              if (context.mounted) {
+                                Navigator.pushAndRemoveUntil(context, MaterialPageRoute(builder: (c) => const LoginPage()), (r) => false);
+                              }
+                            }
+                          },
+                          icon: Icon(Icons.logout_rounded, color: theme.colorScheme.error),
+                          label: Text("LOGOUT FROM ACCOUNT", style: TextStyle(color: theme.colorScheme.error, fontWeight: FontWeight.bold)),
+                          style: FilledButton.styleFrom(
+                            minimumSize: Size(double.infinity, context.scale(56)),
+                            backgroundColor: theme.colorScheme.error.withValues(alpha: 0.1),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(context.scale(16))),
+                          ),
+                        ),
+                        SizedBox(height: context.xl * 2),
+                      ],
+                    ),
                   ),
                 ),
-                SizedBox(height: context.xl * 2),
-              ],
-            ),
-          ),
-        ),
+              );
+            },
+          );
+        },
       ),
     );
   }
 
-  Widget _buildHeaderCard(BuildContext context, ThemeData theme) {
+  Widget _buildHeaderCard(BuildContext context, ThemeData theme, UserDetail profile) {
     return Container(
       width: double.infinity,
       padding: EdgeInsets.all(context.lg),
@@ -376,20 +406,20 @@ class _LibrarianProfilePageState extends State<LibrarianProfilePage> {
       child: context.isMobile
           ? Column(
               children: [
-                _buildProfileAvatar(context, theme),
+                _buildProfileAvatar(context, theme, profile),
                 SizedBox(height: context.md),
-                ..._buildProfileInfo(context, theme),
+                ..._buildProfileInfo(context, theme, profile),
               ],
             )
           : Row(
               crossAxisAlignment: CrossAxisAlignment.center,
               children: [
-                _buildProfileAvatar(context, theme),
+                _buildProfileAvatar(context, theme, profile),
                 SizedBox(width: context.lg),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
-                    children: _buildProfileInfo(context, theme),
+                    children: _buildProfileInfo(context, theme, profile),
                   ),
                 ),
                 _buildHeaderBadge(context, theme),
@@ -423,27 +453,27 @@ class _LibrarianProfilePageState extends State<LibrarianProfilePage> {
     );
   }
 
-  Widget _buildProfileAvatar(BuildContext context, ThemeData theme) {
+  Widget _buildProfileAvatar(BuildContext context, ThemeData theme, UserDetail profile) {
     return ProfileAvatar(
       radius: context.scale(55),
       localImage: _imageFile,
       webImage: _webImage,
-      imageUrl: ApiService.getStorageUrl(_profile?.photo),
+      imageUrl: ApiService.getStorageUrl(profile.photo),
       onCameraTap: _pickImage,
       borderWidth: 3,
     );
   }
 
-  List<Widget> _buildProfileInfo(BuildContext context, ThemeData theme) {
+  List<Widget> _buildProfileInfo(BuildContext context, ThemeData theme, UserDetail profile) {
     return [
       Text(
-        _profile?.fullName ?? "N/A",
+        profile.fullName ?? "N/A",
         textAlign: context.isMobile ? TextAlign.center : TextAlign.start,
         style: theme.textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold, color: theme.colorScheme.onSurface),
       ),
       SizedBox(height: context.xs),
       Text(
-        "Librarian • Employee ID: ${_profile?.employeeId ?? 'N/A'}",
+        "Librarian • Employee ID: ${profile.employeeId ?? 'N/A'}",
         textAlign: context.isMobile ? TextAlign.center : TextAlign.start,
         style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.secondary, fontWeight: FontWeight.w500),
       ),

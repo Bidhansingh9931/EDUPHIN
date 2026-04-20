@@ -25,6 +25,22 @@ class SupportTicket {
     required this.createdAt,
   });
 
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'encrypted_id': encryptedId,
+      'title': title,
+      'description': description,
+      'priority': priority,
+      'status': status,
+      'category': category,
+      'user_id': userId,
+      'user': user?.toJson(),
+      'assigned_to': assignedTo,
+      'created_at': createdAt,
+    };
+  }
+
   factory SupportTicket.fromJson(Map<String, dynamic> json) {
     return SupportTicket(
       id: int.tryParse(json['id']?.toString() ?? '') ?? 0,
@@ -48,6 +64,14 @@ class TicketUser {
   final String? email;
 
   TicketUser({required this.id, required this.name, this.email});
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'name': name,
+      'email': email,
+    };
+  }
 
   factory TicketUser.fromJson(Map<String, dynamic> json) {
     return TicketUser(

@@ -306,7 +306,7 @@ class _RegisteredEventsPageState extends State<RegisteredEventsPage> {
         Text(label, style: theme.textTheme.labelSmall?.copyWith(color: colorScheme.onSurfaceVariant, fontWeight: FontWeight.bold, fontSize: context.font(12))),
         SizedBox(height: context.scale(8)),
         DropdownButtonFormField<String>(
-          value: value,
+          initialValue: value,
           dropdownColor: colorScheme.surfaceContainerLow,
           onChanged: onChanged,
           items: items.map((e) => DropdownMenuItem(value: e, child: Text(e, style: TextStyle(fontSize: context.font(14))))).toList(),

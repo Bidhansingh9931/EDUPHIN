@@ -3,6 +3,8 @@ import '../../services/api_service.dart';
 import '../../teacher/dashboard/ticket_details_models.dart';
 import '../../teacher/dashboard/ticket_models.dart';
 import '../../services/responsive_helper.dart';
+import '../librarian_skeleton_widgets.dart';
+import '../../services/common_widgets.dart';
 import 'package:intl/intl.dart';
 
 class LibrarianTicketDetailsPage extends StatefulWidget {
@@ -14,7 +16,7 @@ class LibrarianTicketDetailsPage extends StatefulWidget {
 }
 
 class _LibrarianTicketDetailsPageState extends State<LibrarianTicketDetailsPage> {
-  late Future<TicketDetails> _detailsFuture;
+  late Stream<TicketDetails> _detailsStream;
   final TextEditingController _replyController = TextEditingController();
   bool _isSubmitting = false;
 
@@ -26,7 +28,7 @@ class _LibrarianTicketDetailsPageState extends State<LibrarianTicketDetailsPage>
 
   void _loadDetails() {
     setState(() {
-      _detailsFuture = ApiService.getLibrarianTicketDetails(widget.ticketId.toString());
+      _detailsStream = ApiService.getLibrarianTicketDetailsStream(widget.ticketId.toString()).asBroadcastStream();
     });
   }
 
@@ -56,54 +58,54 @@ class _LibrarianTicketDetailsPageState extends State<LibrarianTicketDetailsPage>
         title: Text("Ticket #${widget.ticketId}"),
         centerTitle: false,
       ),
-      body: FutureBuilder<TicketDetails>(
-        future: _detailsFuture,
+      body: StreamBuilder<TicketDetails>(
+        stream: _detailsStream,
         builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
-          } else if (snapshot.hasError) {
-            return Center(child: Text("Error: ${snapshot.error}"));
-          } else if (!snapshot.hasData) {
-            return const Center(child: Text("No details found"));
-          }
-
-          final ticket = snapshot.data!.ticket;
-          final replies = snapshot.data!.replies;
-
-          return Column(
-            children: [
-              Expanded(
-                child: SingleChildScrollView(
-                  padding: context.pagePadding,
-                  child: Center(
-                    child: ConstrainedBox(
-                      constraints: const BoxConstraints(maxWidth: 800),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          _buildTicketHeader(context, ticket, theme),
-                          SizedBox(height: context.md),
-                          Padding(
-                            padding: EdgeInsets.symmetric(horizontal: context.xs),
-                            child: Text(
-                              "Conversation",
-                              style: theme.textTheme.titleMedium?.copyWith(
-                                fontWeight: FontWeight.bold,
-                                color: colorScheme.onSurface,
-                              ),
+          return LoadingWrapper<TicketDetails>(
+            snapshot: snapshot,
+            skeleton: const TicketSkeleton(),
+            onRetry: _loadDetails,
+            builder: (data) {
+              return Column(
+                children: [
+                  Expanded(
+                    child: RefreshIndicator(
+                      onRefresh: () async => _loadDetails(),
+                      child: SingleChildScrollView(
+                        physics: const AlwaysScrollableScrollPhysics(),
+                        padding: context.pagePadding,
+                        child: Center(
+                          child: ConstrainedBox(
+                            constraints: const BoxConstraints(maxWidth: 800),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                _buildTicketHeader(context, data.ticket, theme),
+                                SizedBox(height: context.md),
+                                Padding(
+                                  padding: EdgeInsets.symmetric(horizontal: context.xs),
+                                  child: Text(
+                                    "Conversation",
+                                    style: theme.textTheme.titleMedium?.copyWith(
+                                      fontWeight: FontWeight.bold,
+                                      color: colorScheme.onSurface,
+                                    ),
+                                  ),
+                                ),
+                                SizedBox(height: context.sm),
+                                ...data.replies.map((reply) => _buildReplyCard(context, reply, theme)),
+                                SizedBox(height: context.md),
+                              ],
                             ),
                           ),
-                          SizedBox(height: context.sm),
-                          ...replies.map((reply) => _buildReplyCard(context, reply, theme)),
-                          SizedBox(height: context.md),
-                        ],
+                        ),
                       ),
                     ),
                   ),
-                ),
-              ),
-              _buildReplyInput(context, theme),
-            ],
+                  _buildReplyInput(context, theme),
+                ],
+              );
+            },
           );
         },
       ),

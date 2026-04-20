@@ -33,9 +33,9 @@ class _AddBookScreenState extends State<AddBookScreen> {
     super.initState();
     _titleController = TextEditingController(text: widget.book?.title ?? "");
     _authorController = TextEditingController(text: widget.book?.author ?? "");
-    _editionController = TextEditingController(text: ""); 
-    _volumeController = TextEditingController(text: ""); 
-    _publisherController = TextEditingController(text: ""); 
+    _editionController = TextEditingController(text: widget.book?.edition ?? "");
+    _volumeController = TextEditingController(text: widget.book?.volume ?? "");
+    _publisherController = TextEditingController(text: widget.book?.publisher ?? "");
     _yearController = TextEditingController(text: widget.book?.publicationYear ?? "");
     _isbnController = TextEditingController(text: widget.book?.isbn ?? "");
     _categoryController = TextEditingController(text: widget.book?.category ?? "");

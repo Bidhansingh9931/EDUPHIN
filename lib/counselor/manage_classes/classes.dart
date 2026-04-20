@@ -2,6 +2,8 @@ import 'dart:convert';
 import 'package:eduphin/services/responsive_helper.dart';
 import 'package:flutter/material.dart';
 import '../../services/api_service.dart';
+import '../../services/caching_service.dart';
+import '../../services/common_widgets.dart';
 import '../counselor_models.dart';
 
 class ManageClassesPage extends StatefulWidget {
@@ -15,185 +17,263 @@ class _ManageClassesPageState extends State<ManageClassesPage> {
   bool _isLoading = true;
   List<ClassInfo> _classes = [];
   String? _errorMessage;
+  final String _cacheKey = 'counselor_manage_classes_data';
 
   @override
   void initState() {
     super.initState();
+    _loadCachedData();
     _fetchClasses();
   }
 
-  Future<void> _fetchClasses() async {
-    if (!mounted) return;
+  Future<void> _loadCachedData() async {
+    final cachedData = await CachingService.getData(_cacheKey);
+    if (cachedData != null && mounted) {
+      _processData(cachedData);
+    }
+  }
+
+  void _processData(dynamic data) {
+    final jsonResponse = data is String ? jsonDecode(data) : data;
+    final responseData = jsonResponse['data'] is Map ? jsonResponse['data'] : jsonResponse;
+    
+    final List classesJson = responseData['classes'] is List ? responseData['classes'] : [];
+    final List sectionsJson = responseData['sections'] is List ? responseData['sections'] : [];
+
     setState(() {
-      _isLoading = true;
+      _classes = classesJson.map((classMap) {
+        final classId = classMap['id'];
+        final classSections = sectionsJson.where((s) => s['class_id'] == classId).toList();
+        
+        final fullClassMap = Map<String, dynamic>.from(classMap);
+        fullClassMap['sections'] = classSections;
+        
+        return ClassInfo.fromJson(fullClassMap);
+      }).toList();
+      _isLoading = false;
       _errorMessage = null;
     });
+  }
+
+  Future<void> _fetchClasses() async {
+    if (_classes.isEmpty) {
+      setState(() {
+        _isLoading = true;
+        _errorMessage = null;
+      });
+    }
     try {
       final response = await ApiService.get('counselor/classes');
-      if (!mounted) return;
       if (response.statusCode == 200) {
-        final jsonResponse = jsonDecode(response.body);
-        final data = jsonResponse['data'] is Map ? jsonResponse['data'] : jsonResponse;
-        
-        final List classesJson = data['classes'] is List ? data['classes'] : [];
-        final List sectionsJson = data['sections'] is List ? data['sections'] : [];
-
-        setState(() {
-          _classes = classesJson.map((classMap) {
-            // Link sections to their respective classes based on class_id
-            final classId = classMap['id'];
-            final classSections = sectionsJson.where((s) => s['class_id'] == classId).toList();
-            
-            // Inject sections into the map so ClassInfo.fromJson can pick them up
-            final fullClassMap = Map<String, dynamic>.from(classMap);
-            fullClassMap['sections'] = classSections;
-            
-            return ClassInfo.fromJson(fullClassMap);
-          }).toList();
-          _isLoading = false;
-        });
+        final data = jsonDecode(response.body);
+        await CachingService.saveData(_cacheKey, data);
+        if (mounted) {
+          _processData(data);
+        }
       } else {
-        setState(() {
-          _errorMessage = "Failed to load classes";
-          _isLoading = false;
-        });
+        if (mounted && _classes.isEmpty) {
+          setState(() {
+            _errorMessage = ApiService.errorMessage(response, "Failed to load classes");
+            _isLoading = false;
+          });
+        }
       }
     } catch (e) {
-      if (mounted) {
+      if (mounted && _classes.isEmpty) {
         setState(() {
-          _errorMessage = "Error: $e";
+          _errorMessage = e.toString().replaceFirst("Exception: ", "");
           _isLoading = false;
         });
       }
     }
   }
 
+  Widget _buildSkeleton() {
+    return GridView.builder(
+      padding: context.pagePadding,
+      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: context.responsive(1, tablet: 2, desktop: 3),
+        mainAxisExtent: context.scale(200),
+        crossAxisSpacing: context.spacing,
+        mainAxisSpacing: context.spacing,
+      ),
+      itemCount: 6,
+      itemBuilder: (context, index) => Card(
+        elevation: 0,
+        child: Padding(
+          padding: EdgeInsets.all(context.spacing),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  const Skeleton(width: 40, height: 40, borderRadius: BorderRadius.all(Radius.circular(20))),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Skeleton(width: 120, height: 16),
+                        const SizedBox(height: 8),
+                        const Skeleton(width: 60, height: 12),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              const Spacer(),
+              const Skeleton(width: 80, height: 12),
+              const SizedBox(height: 12),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: List.generate(3, (i) => const Skeleton(width: 50, height: 24, borderRadius: BorderRadius.all(Radius.circular(12)))),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
+    final theme = context.theme;
     return Scaffold(
       appBar: AppBar(
         title: const Text("Manage Classes"),
       ),
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : _errorMessage != null
+      body: RefreshIndicator(
+        onRefresh: _fetchClasses,
+        child: LoadingWrapper(
+          isLoading: _isLoading,
+          hasData: _classes.isNotEmpty,
+          skeleton: _buildSkeleton(),
+          child: _errorMessage != null && _classes.isEmpty
               ? Center(
                   child: Padding(
-                    padding: EdgeInsets.all(context.spacing),
-                    child: Text(_errorMessage!,
-                        textAlign: TextAlign.center,
-                        style: TextStyle(color: context.theme.colorScheme.error)),
+                    padding: EdgeInsets.all(context.scale(24.0)),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(Icons.error_outline, color: theme.colorScheme.error, size: context.scale(48)),
+                        SizedBox(height: context.md),
+                        Text(_errorMessage!, textAlign: TextAlign.center, style: TextStyle(color: theme.colorScheme.error, fontSize: context.font(14))),
+                        SizedBox(height: context.lg),
+                        FilledButton.icon(onPressed: _fetchClasses, icon: const Icon(Icons.refresh), label: const Text("RETRY")),
+                      ],
+                    ),
                   ),
                 )
-              : RefreshIndicator(
-                  onRefresh: _fetchClasses,
-                  child: _classes.isEmpty
-                      ? ListView(
-                          children: [
-                            SizedBox(height: context.scale(200)),
-                            Center(
-                                child: Text("No classes found",
-                                    style: TextStyle(color: context.theme.hintColor))),
-                          ],
-                        )
-                      : Center(
-                          child: ConstrainedBox(
-                            constraints: const BoxConstraints(maxWidth: 1200),
-                            child: GridView.builder(
-                              padding: context.pagePadding,
-                              gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                                crossAxisCount: context.responsive(1, tablet: 2, desktop: 3),
-                                mainAxisExtent: context.scale(200),
-                                crossAxisSpacing: context.spacing,
-                                mainAxisSpacing: context.spacing,
+              : _classes.isEmpty
+                  ? ListView(
+                      children: [
+                        SizedBox(height: context.scale(200)),
+                        Center(
+                            child: Text("No classes found",
+                                style: TextStyle(color: context.theme.hintColor))),
+                      ],
+                    )
+                  : Center(
+                      child: ConstrainedBox(
+                        constraints: const BoxConstraints(maxWidth: 1200),
+                        child: GridView.builder(
+                          padding: context.pagePadding,
+                          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                            crossAxisCount: context.responsive(1, tablet: 2, desktop: 3),
+                            mainAxisExtent: context.scale(200),
+                            crossAxisSpacing: context.spacing,
+                            mainAxisSpacing: context.spacing,
+                          ),
+                          itemCount: _classes.length,
+                          itemBuilder: (context, index) {
+                            final classInfo = _classes[index];
+                            final isActive = classInfo.status == 1;
+                            return Card(
+                              elevation: 0,
+                              color: context.theme.colorScheme.surfaceContainerLow,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(context.scale(12)),
+                                side: BorderSide(
+                                  color: context.theme.colorScheme.outlineVariant,
+                                  width: 1,
+                                ),
                               ),
-                              itemCount: _classes.length,
-                              itemBuilder: (context, index) {
-                                final classInfo = _classes[index];
-                                final isActive = classInfo.status == 1;
-                                return Card(
-                                  elevation: 0,
-                                  color: context.theme.colorScheme.surfaceContainerLow,
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(context.scale(12)),
-                                    side: BorderSide(
-                                      color: context.theme.colorScheme.outlineVariant,
-                                      width: 1,
-                                    ),
-                                  ),
-                                  child: Padding(
-                                    padding: EdgeInsets.all(context.spacing),
-                                    child: Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
+                              child: Padding(
+                                padding: EdgeInsets.all(context.spacing),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Row(
                                       children: [
-                                        Row(
-                                          children: [
-                                            CircleAvatar(
-                                              radius: context.scale(20),
-                                              backgroundColor: context.theme.colorScheme.primary
-                                                  .withValues(alpha: 0.1),
-                                              child: Icon(Icons.class_outlined,
-                                                  color: context.theme.colorScheme.primary,
-                                                  size: context.scale(20)),
-                                            ),
-                                            SizedBox(width: context.sm),
-                                            Expanded(
-                                              child: Column(
-                                                crossAxisAlignment: CrossAxisAlignment.start,
-                                                children: [
-                                                  Text(classInfo.name,
-                                                      style: TextStyle(
-                                                          fontWeight: FontWeight.bold,
-                                                          fontSize: context.font(16))),
-                                                  Text(isActive ? "ACTIVE" : "INACTIVE",
-                                                      style: TextStyle(
-                                                          color: isActive ? Colors.green : Colors.red,
-                                                          fontSize: context.font(10),
-                                                          fontWeight: FontWeight.bold)),
-                                                ],
-                                              ),
-                                            ),
-                                            IconButton(
-                                                onPressed: () {},
-                                                icon: Icon(Icons.edit_outlined,
-                                                    size: context.scale(20))),
-                                          ],
+                                        CircleAvatar(
+                                          radius: context.scale(20),
+                                          backgroundColor: context.theme.colorScheme.primary
+                                              .withValues(alpha: 0.1),
+                                          child: Icon(Icons.class_outlined,
+                                              color: context.theme.colorScheme.primary,
+                                              size: context.scale(20)),
                                         ),
-                                        const Spacer(),
-                                        Text("SECTIONS",
-                                            style: context.theme.textTheme.labelSmall?.copyWith(
-                                                color: context.theme.hintColor,
-                                                fontWeight: FontWeight.bold,
-                                                fontSize: context.font(10))),
-                                        SizedBox(height: context.xs),
+                                        SizedBox(width: context.sm),
                                         Expanded(
-                                          flex: 2,
-                                          child: SingleChildScrollView(
-                                            child: Wrap(
-                                              spacing: context.xs,
-                                              runSpacing: context.xs,
-                                              children: classInfo.sections
-                                                  .map((s) => Chip(
-                                                        label: Text(s.name,
-                                                            style: TextStyle(fontSize: context.font(11))),
-                                                        padding: EdgeInsets.zero,
-                                                        visualDensity: VisualDensity.compact,
-                                                        materialTapTargetSize:
-                                                            MaterialTapTargetSize.shrinkWrap,
-                                                      ))
-                                                  .toList(),
-                                            ),
+                                          child: Column(
+                                            crossAxisAlignment: CrossAxisAlignment.start,
+                                            children: [
+                                              Text(classInfo.name,
+                                                  style: TextStyle(
+                                                      fontWeight: FontWeight.bold,
+                                                      fontSize: context.font(16))),
+                                              Text(isActive ? "ACTIVE" : "INACTIVE",
+                                                  style: TextStyle(
+                                                      color: isActive ? Colors.green : Colors.red,
+                                                      fontSize: context.font(10),
+                                                      fontWeight: FontWeight.bold)),
+                                            ],
                                           ),
                                         ),
+                                        IconButton(
+                                            onPressed: () {},
+                                            icon: Icon(Icons.edit_outlined,
+                                                size: context.scale(20))),
                                       ],
                                     ),
-                                  ),
-                                );
-                              },
-                            ),
-                          ),
+                                    const Spacer(),
+                                    Text("SECTIONS",
+                                        style: context.theme.textTheme.labelSmall?.copyWith(
+                                            color: context.theme.hintColor,
+                                            fontWeight: FontWeight.bold,
+                                            fontSize: context.font(10))),
+                                    SizedBox(height: context.xs),
+                                    Expanded(
+                                      flex: 2,
+                                      child: SingleChildScrollView(
+                                        child: Wrap(
+                                          spacing: context.xs,
+                                          runSpacing: context.xs,
+                                          children: classInfo.sections
+                                              .map((s) => Chip(
+                                                    label: Text(s.name,
+                                                        style: TextStyle(fontSize: context.font(11))),
+                                                    padding: EdgeInsets.zero,
+                                                    visualDensity: VisualDensity.compact,
+                                                    materialTapTargetSize:
+                                                        MaterialTapTargetSize.shrinkWrap,
+                                                  ))
+                                              .toList(),
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            );
+                          },
                         ),
-                ),
+                      ),
+                    ),
+        ),
+      ),
     );
   }
 }
+

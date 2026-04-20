@@ -1,8 +1,9 @@
-import 'package:eduphin/services/common_widgets.dart';
-import 'dart:convert';
 import 'package:eduphin/services/responsive_helper.dart';
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import '../../services/api_service.dart';
+import '../../services/caching_service.dart';
+import '../../services/common_widgets.dart';
 import '../counselor_models.dart';
 
 class CounselorPage extends StatefulWidget {
@@ -16,46 +17,109 @@ class _CounselorPageState extends State<CounselorPage> {
   bool _isLoading = true;
   List<UserDetail> _counselors = [];
   String? _errorMessage;
+  final String _cacheKey = 'counselor_manage_counselor_data';
 
   @override
   void initState() {
     super.initState();
+    _loadCachedData();
     _fetchCounselors();
   }
 
+  Future<void> _loadCachedData() async {
+    final cachedData = await CachingService.getData(_cacheKey);
+    if (cachedData != null && mounted) {
+      final List usersData = cachedData['data'] ?? cachedData['users'] ?? [];
+      setState(() {
+        _counselors = usersData.map((json) => UserDetail.fromJson(json)).toList();
+        _isLoading = false;
+      });
+    }
+  }
+
   Future<void> _fetchCounselors() async {
-    if (!mounted) return;
-    setState(() {
-      _isLoading = true;
-      _errorMessage = null;
-    });
+    if (_counselors.isEmpty) {
+      setState(() {
+        _isLoading = true;
+        _errorMessage = null;
+      });
+    }
     try {
       final response = await ApiService.get('counselor/users/4');
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
+        await CachingService.saveData(_cacheKey, data);
         if (mounted) {
           setState(() {
             final List usersData = data['data'] ?? data['users'] ?? [];
             _counselors = usersData.map((json) => UserDetail.fromJson(json)).toList();
             _isLoading = false;
+            _errorMessage = null;
           });
         }
       } else {
-        if (mounted) {
+        if (mounted && _counselors.isEmpty) {
           setState(() {
-            _errorMessage = "Failed to load counselors";
+            _errorMessage = ApiService.errorMessage(response, "Failed to load counselors");
             _isLoading = false;
           });
         }
       }
     } catch (e) {
-      if (mounted) {
+      if (mounted && _counselors.isEmpty) {
         setState(() {
-          _errorMessage = "Error: $e";
+          _errorMessage = e.toString().replaceFirst("Exception: ", "");
           _isLoading = false;
         });
       }
     }
+  }
+
+  Widget _buildSkeleton() {
+    return Padding(
+      padding: context.pagePadding,
+      child: Column(
+        children: [
+          const Skeleton(width: double.infinity, height: 50),
+          const SizedBox(height: 16),
+          Expanded(
+            child: GridView.builder(
+              gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: context.responsive(1, tablet: 2, desktop: 3),
+                mainAxisExtent: context.scale(110),
+                crossAxisSpacing: context.spacing,
+                mainAxisSpacing: context.spacing,
+              ),
+              itemCount: 9,
+              itemBuilder: (context, index) => Card(
+                elevation: 0,
+                child: Padding(
+                  padding: const EdgeInsets.all(12.0),
+                  child: Row(
+                    children: [
+                      const Skeleton(width: 50, height: 50, borderRadius: 25),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            const Skeleton(width: 120, height: 16),
+                            const SizedBox(height: 8),
+                            const Skeleton(width: 80, height: 12),
+                          ],
+                        ),
+                      ),
+                      const Skeleton(width: 60, height: 24, borderRadius: 12),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   @override
@@ -65,17 +129,26 @@ class _CounselorPageState extends State<CounselorPage> {
       appBar: AppBar(
         title: Text("Counselors Directory", style: TextStyle(fontSize: context.font(20))),
       ),
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : _errorMessage != null
+      body: RefreshIndicator(
+        onRefresh: _fetchCounselors,
+        child: LoadingWrapper(
+          isLoading: _isLoading,
+          hasData: _counselors.isNotEmpty,
+          skeleton: _buildSkeleton(),
+          child: _errorMessage != null && _counselors.isEmpty
               ? Center(
                   child: Padding(
                     padding: EdgeInsets.all(context.spacing),
-                    child: Text(_errorMessage!,
-                        textAlign: TextAlign.center,
-                        style: TextStyle(
-                            color: theme.colorScheme.error,
-                            fontSize: context.font(14))),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(Icons.error_outline, color: theme.colorScheme.error, size: context.scale(48)),
+                        SizedBox(height: context.md),
+                        Text(_errorMessage!, textAlign: TextAlign.center, style: TextStyle(color: theme.colorScheme.error, fontSize: context.font(14))),
+                        SizedBox(height: context.lg),
+                        FilledButton.icon(onPressed: _fetchCounselors, icon: const Icon(Icons.refresh), label: const Text("RETRY")),
+                      ],
+                    ),
                   ),
                 )
               : Center(
@@ -95,82 +168,81 @@ class _CounselorPageState extends State<CounselorPage> {
                           ),
                         ),
                         Expanded(
-                          child: RefreshIndicator(
-                            onRefresh: _fetchCounselors,
-                            child: _counselors.isEmpty
-                                ? ListView(
-                                    children: [
-                                      SizedBox(height: context.screenHeight * 0.2),
-                                      Center(
-                                        child: Text(
-                                          "No counselors found",
-                                          style: TextStyle(color: theme.hintColor, fontSize: context.font(14)),
-                                        ),
+                          child: _counselors.isEmpty
+                              ? ListView(
+                                  children: [
+                                    SizedBox(height: context.screenHeight * 0.2),
+                                    Center(
+                                      child: Text(
+                                        "No counselors found",
+                                        style: TextStyle(color: theme.hintColor, fontSize: context.font(14)),
                                       ),
-                                    ],
-                                  )
-                                : GridView.builder(
-                                    padding: context.pagePadding,
-                                    gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                                      crossAxisCount: context.responsive(1, tablet: 2, desktop: 3),
-                                      mainAxisExtent: context.scale(110),
-                                      crossAxisSpacing: context.spacing,
-                                      mainAxisSpacing: context.spacing,
                                     ),
-                                    itemCount: _counselors.length,
-                                    itemBuilder: (context, index) {
-                                      final counselor = _counselors[index];
-                                      final displayName = counselor.fullName;
-
-                                      return Card(
-                                        elevation: 0,
-                                        margin: EdgeInsets.zero,
-                                        color: theme.colorScheme.surfaceContainerLow,
-                                        shape: RoundedRectangleBorder(
-                                          borderRadius: BorderRadius.circular(context.scale(12)),
-                                          side: BorderSide(color: theme.colorScheme.outlineVariant),
-                                        ),
-                                        child: ListTile(
-                                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(context.scale(12))),
-                                          contentPadding: EdgeInsets.symmetric(horizontal: context.scale(12), vertical: context.scale(4)),
-                                          leading: ProfileAvatar(
-                                            radius: context.scale(24),
-                                            imageUrl: ApiService.getStorageUrl(counselor.photo),
-                                          ),
-                                          title: Text(
-                                            displayName,
-                                            style: TextStyle(fontWeight: FontWeight.bold, fontSize: context.font(14)),
-                                            maxLines: 1,
-                                            overflow: TextOverflow.ellipsis,
-                                          ),
-                                          subtitle: Column(
-                                            crossAxisAlignment: CrossAxisAlignment.start,
-                                            mainAxisSize: MainAxisSize.min,
-                                            children: [
-                                              Text(
-                                                counselor.employeeId != null ? 'ID: ${counselor.employeeId}' : 'ID: N/A',
-                                                style: TextStyle(color: theme.hintColor, fontSize: context.font(12)),
-                                              ),
-                                              if (counselor.email != null)
-                                                Text(
-                                                  counselor.email!,
-                                                  style: TextStyle(color: theme.hintColor, fontSize: context.font(11)),
-                                                  maxLines: 1,
-                                                  overflow: TextOverflow.ellipsis,
-                                                ),
-                                            ],
-                                          ),
-                                          trailing: _statusBadge(context, counselor.status ?? "Active"),
-                                        ),
-                                      );
-                                    },
+                                  ],
+                                )
+                              : GridView.builder(
+                                  padding: context.pagePadding,
+                                  gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                                    crossAxisCount: context.responsive(1, tablet: 2, desktop: 3),
+                                    mainAxisExtent: context.scale(110),
+                                    crossAxisSpacing: context.spacing,
+                                    mainAxisSpacing: context.spacing,
                                   ),
-                          ),
+                                  itemCount: _counselors.length,
+                                  itemBuilder: (context, index) {
+                                    final counselor = _counselors[index];
+                                    final displayName = counselor.fullName;
+
+                                    return Card(
+                                      elevation: 0,
+                                      margin: EdgeInsets.zero,
+                                      color: theme.colorScheme.surfaceContainerLow,
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(context.scale(12)),
+                                        side: BorderSide(color: theme.colorScheme.outlineVariant),
+                                      ),
+                                      child: ListTile(
+                                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(context.scale(12))),
+                                        contentPadding: EdgeInsets.symmetric(horizontal: context.scale(12), vertical: context.scale(4)),
+                                        leading: ProfileAvatar(
+                                          radius: context.scale(24),
+                                          imageUrl: ApiService.getStorageUrl(counselor.photo),
+                                        ),
+                                        title: Text(
+                                          displayName,
+                                          style: TextStyle(fontWeight: FontWeight.bold, fontSize: context.font(14)),
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                        subtitle: Column(
+                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            Text(
+                                              counselor.employeeId != null ? 'ID: ${counselor.employeeId}' : 'ID: N/A',
+                                              style: TextStyle(color: theme.hintColor, fontSize: context.font(12)),
+                                            ),
+                                            if (counselor.email != null)
+                                              Text(
+                                                counselor.email!,
+                                                style: TextStyle(color: theme.hintColor, fontSize: context.font(11)),
+                                                maxLines: 1,
+                                                overflow: TextOverflow.ellipsis,
+                                              ),
+                                          ],
+                                        ),
+                                        trailing: _statusBadge(context, counselor.status ?? "Active"),
+                                      ),
+                                    );
+                                  },
+                                ),
                         ),
                       ],
                     ),
                   ),
                 ),
+        ),
+      ),
     );
   }
 
@@ -192,5 +264,5 @@ class _CounselorPageState extends State<CounselorPage> {
       ),
     );
   }
-
 }
+

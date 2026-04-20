@@ -2,6 +2,8 @@ import 'package:eduphin/services/responsive_helper.dart';
 import 'package:eduphin/teacher/dashboard/app_drawer.dart';
 import 'package:flutter/material.dart';
 import '../../services/api_service.dart';
+import '../librarian_skeleton_widgets.dart';
+import '../../services/common_widgets.dart';
 
 class IssueHistoryPage extends StatefulWidget {
   final String issueId;
@@ -15,32 +17,18 @@ class _IssueHistoryPageState extends State<IssueHistoryPage> {
   final TextEditingController _fromController = TextEditingController();
   final TextEditingController _toController = TextEditingController();
 
-  bool _isLoading = true;
-  List<dynamic> _logs = [];
+  late Stream<List<dynamic>> _logsStream;
 
   @override
   void initState() {
     super.initState();
-    _fetchLogs();
+    _refreshStream();
   }
 
-  Future<void> _fetchLogs() async {
-    if (!mounted) return;
-    setState(() => _isLoading = true);
-    try {
-      final logs = await ApiService.getIssueAuditLogs(widget.issueId);
-      if (mounted) {
-        setState(() {
-          _logs = logs;
-          _isLoading = false;
-        });
-      }
-    } catch (e) {
-      if (mounted) {
-        setState(() => _isLoading = false);
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Error: $e")));
-      }
-    }
+  void _refreshStream() {
+    setState(() {
+      _logsStream = ApiService.getIssueAuditLogsStream(widget.issueId).asBroadcastStream();
+    });
   }
 
   Future<void> _selectDate(BuildContext context, TextEditingController controller) async {
@@ -67,169 +55,178 @@ class _IssueHistoryPageState extends State<IssueHistoryPage> {
       appBar: AppBar(
         title: Text("Issue History #${widget.issueId}"),
       ),
-      body: _isLoading 
-          ? const Center(child: CircularProgressIndicator())
-          : RefreshIndicator(
-              onRefresh: _fetchLogs,
-              child: SingleChildScrollView(
-                physics: const AlwaysScrollableScrollPhysics(),
-                padding: context.pagePadding,
-                child: Center(
-                  child: ConstrainedBox(
-                    constraints: const BoxConstraints(maxWidth: 1200),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        /// FILTER SECTION
-                        Card(
-                          elevation: 0,
-                          color: theme.colorScheme.surfaceContainerLow,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(context.md),
-                            side: BorderSide(color: theme.colorScheme.outlineVariant, width: 0.5),
+      body: StreamBuilder<List<dynamic>>(
+        stream: _logsStream,
+        builder: (context, snapshot) {
+          return LoadingWrapper<List<dynamic>>(
+            snapshot: snapshot,
+            skeleton: const TableSkeleton(),
+            onRetry: _refreshStream,
+            builder: (logs) {
+              return RefreshIndicator(
+                onRefresh: () async => _refreshStream(),
+                child: SingleChildScrollView(
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  padding: context.pagePadding,
+                  child: Center(
+                    child: ConstrainedBox(
+                      constraints: const BoxConstraints(maxWidth: 1200),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          /// FILTER SECTION
+                          Card(
+                            elevation: 0,
+                            color: theme.colorScheme.surfaceContainerLow,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(context.md),
+                              side: BorderSide(color: theme.colorScheme.outlineVariant, width: 0.5),
+                            ),
+                            child: Padding(
+                              padding: EdgeInsets.all(context.md),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Row(
+                                    children: [
+                                      Icon(Icons.filter_list_rounded, color: theme.colorScheme.primary, size: context.scale(20)),
+                                      SizedBox(width: context.sm),
+                                      Text(
+                                        "Filter History Logs",
+                                        style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold, fontSize: context.font(16)),
+                                      ),
+                                    ],
+                                  ),
+                                  SizedBox(height: context.md),
+                                  _buildResponsiveRow(context, [
+                                    _buildDateField(context, "Action From", _fromController),
+                                    _buildDateField(context, "Action To", _toController),
+                                  ]),
+                                  SizedBox(height: context.sm),
+                                  Row(
+                                    children: [
+                                      Expanded(
+                                        child: FilledButton.icon(
+                                          onPressed: () {
+                                            // Local filtering logic
+                                          },
+                                          icon: const Icon(Icons.search_rounded),
+                                          label: const Text("APPLY FILTERS"),
+                                          style: FilledButton.styleFrom(
+                                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(context.sm)),
+                                          ),
+                                        ),
+                                      ),
+                                      SizedBox(width: context.md),
+                                      Expanded(
+                                        child: FilledButton.tonalIcon(
+                                          onPressed: () {
+                                            setState(() {
+                                              _fromController.clear();
+                                              _toController.clear();
+                                            });
+                                          },
+                                          icon: const Icon(Icons.refresh_rounded),
+                                          label: const Text("RESET"),
+                                          style: FilledButton.styleFrom(
+                                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(context.sm)),
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  )
+                                ],
+                              ),
+                            ),
                           ),
-                          child: Padding(
-                            padding: EdgeInsets.all(context.md),
+
+                          SizedBox(height: context.lg),
+
+                          /// RECORDS SECTION
+                          Card(
+                            elevation: 0,
+                            clipBehavior: Clip.antiAlias,
+                            color: theme.colorScheme.surfaceContainerLow,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(context.md),
+                              side: BorderSide(color: theme.colorScheme.outlineVariant, width: 0.5),
+                            ),
                             child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
+                              crossAxisAlignment: CrossAxisAlignment.stretch,
                               children: [
-                                Row(
-                                  children: [
-                                    Icon(Icons.filter_list_rounded, color: theme.colorScheme.primary, size: context.scale(20)),
-                                    SizedBox(width: context.sm),
-                                    Text(
-                                      "Filter History Logs",
-                                      style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold, fontSize: context.font(16)),
-                                    ),
-                                  ],
+                                Padding(
+                                  padding: EdgeInsets.all(context.md),
+                                  child: Row(
+                                    children: [
+                                      Icon(Icons.history_rounded, color: theme.colorScheme.primary, size: context.scale(20)),
+                                      SizedBox(width: context.sm),
+                                      Text(
+                                        "Audit Trail",
+                                        style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold, fontSize: context.font(16)),
+                                      ),
+                                      const Spacer(),
+                                      _exportIcon(context, Icons.description_rounded, "PDF", Colors.teal),
+                                      _exportIcon(context, Icons.table_chart_rounded, "Excel", Colors.green),
+                                    ],
+                                  ),
                                 ),
+                                const Divider(height: 1),
+                                if (logs.isEmpty)
+                                  Padding(
+                                    padding: EdgeInsets.symmetric(vertical: context.xl),
+                                    child: Center(
+                                      child: Column(
+                                        children: [
+                                          Icon(Icons.history_toggle_off_rounded, size: context.scale(48), color: theme.colorScheme.outlineVariant),
+                                          SizedBox(height: context.sm),
+                                          Text("No history records found", style: theme.textTheme.bodyLarge?.copyWith(color: theme.colorScheme.outline, fontSize: context.font(16))),
+                                        ],
+                                      ),
+                                    ),
+                                  )
+                                else
+                                  SingleChildScrollView(
+                                    scrollDirection: Axis.horizontal,
+                                    child: DataTable(
+                                      columnSpacing: context.md,
+                                      headingRowColor: WidgetStateProperty.all(theme.colorScheme.surfaceContainer),
+                                      dataRowMinHeight: context.scale(60),
+                                      dataRowMaxHeight: context.scale(70),
+                                      columns: [
+                                        DataColumn(label: Text("#", style: theme.textTheme.labelLarge?.copyWith(fontWeight: FontWeight.bold, fontSize: context.font(12)))),
+                                        DataColumn(label: Text("ACTION", style: theme.textTheme.labelLarge?.copyWith(fontWeight: FontWeight.bold, fontSize: context.font(12)))),
+                                        DataColumn(label: Text("PERFORMED BY", style: theme.textTheme.labelLarge?.copyWith(fontWeight: FontWeight.bold, fontSize: context.font(12)))),
+                                        DataColumn(label: Text("DATE & TIME", style: theme.textTheme.labelLarge?.copyWith(fontWeight: FontWeight.bold, fontSize: context.font(12)))),
+                                        DataColumn(label: Text("IP ADDRESS", style: theme.textTheme.labelLarge?.copyWith(fontWeight: FontWeight.bold, fontSize: context.font(12)))),
+                                      ],
+                                      rows: logs.asMap().entries.map((entry) {
+                                        int index = entry.key + 1;
+                                        var log = entry.value;
+                                        return DataRow(cells: [
+                                          DataCell(Text(index.toString(), style: TextStyle(fontSize: context.font(14)))),
+                                          DataCell(Text(log['event'] ?? "N/A", style: TextStyle(fontWeight: FontWeight.bold, fontSize: context.font(14)))),
+                                          DataCell(Text(log['user']?['name'] ?? "System", style: TextStyle(fontSize: context.font(14)))),
+                                          DataCell(Text(log['created_at'] ?? "N/A", style: TextStyle(fontSize: context.font(14)))),
+                                          DataCell(Text(log['ip_address'] ?? "N/A", style: theme.textTheme.bodySmall?.copyWith(fontSize: context.font(12)))),
+                                        ]);
+                                      }).toList(),
+                                    ),
+                                  ),
                                 SizedBox(height: context.md),
-                                _buildResponsiveRow(context, [
-                                  _buildDateField(context, "Action From", _fromController),
-                                  _buildDateField(context, "Action To", _toController),
-                                ]),
-                                SizedBox(height: context.sm),
-                                Row(
-                                  children: [
-                                    Expanded(
-                                      child: FilledButton.icon(
-                                        onPressed: () {
-                                          // Local filtering logic
-                                        },
-                                        icon: const Icon(Icons.search_rounded),
-                                        label: const Text("APPLY FILTERS"),
-                                        style: FilledButton.styleFrom(
-                                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(context.sm)),
-                                        ),
-                                      ),
-                                    ),
-                                    SizedBox(width: context.md),
-                                    Expanded(
-                                      child: FilledButton.tonalIcon(
-                                        onPressed: () {
-                                          setState(() {
-                                            _fromController.clear();
-                                            _toController.clear();
-                                          });
-                                        },
-                                        icon: const Icon(Icons.refresh_rounded),
-                                        label: const Text("RESET"),
-                                        style: FilledButton.styleFrom(
-                                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(context.sm)),
-                                        ),
-                                      ),
-                                    ),
-                                  ],
-                                )
                               ],
                             ),
                           ),
-                        ),
-
-                        SizedBox(height: context.lg),
-
-                        /// RECORDS SECTION
-                        Card(
-                          elevation: 0,
-                          clipBehavior: Clip.antiAlias,
-                          color: theme.colorScheme.surfaceContainerLow,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(context.md),
-                            side: BorderSide(color: theme.colorScheme.outlineVariant, width: 0.5),
-                          ),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.stretch,
-                            children: [
-                              Padding(
-                                padding: EdgeInsets.all(context.md),
-                                child: Row(
-                                  children: [
-                                    Icon(Icons.history_rounded, color: theme.colorScheme.primary, size: context.scale(20)),
-                                    SizedBox(width: context.sm),
-                                    Text(
-                                      "Audit Trail",
-                                      style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold, fontSize: context.font(16)),
-                                    ),
-                                    const Spacer(),
-                                    _exportIcon(context, Icons.description_rounded, "PDF", Colors.teal),
-                                    _exportIcon(context, Icons.table_chart_rounded, "Excel", Colors.green),
-                                  ],
-                                ),
-                              ),
-                              const Divider(height: 1),
-
-                              if (_logs.isEmpty)
-                                Padding(
-                                  padding: EdgeInsets.symmetric(vertical: context.xl),
-                                  child: Center(
-                                    child: Column(
-                                      children: [
-                                        Icon(Icons.history_toggle_off_rounded, size: context.scale(48), color: theme.colorScheme.outlineVariant),
-                                        SizedBox(height: context.sm),
-                                        Text("No history records found", style: theme.textTheme.bodyLarge?.copyWith(color: theme.colorScheme.outline, fontSize: context.font(16))),
-                                      ],
-                                    ),
-                                  ),
-                                )
-                              else
-                                SingleChildScrollView(
-                                  scrollDirection: Axis.horizontal,
-                                  child: DataTable(
-                                    columnSpacing: context.md,
-                                    headingRowColor: WidgetStateProperty.all(theme.colorScheme.surfaceContainer),
-                                    dataRowMinHeight: context.scale(60),
-                                    dataRowMaxHeight: context.scale(70),
-                                    columns: [
-                                      DataColumn(label: Text("#", style: theme.textTheme.labelLarge?.copyWith(fontWeight: FontWeight.bold, fontSize: context.font(12)))),
-                                      DataColumn(label: Text("ACTION", style: theme.textTheme.labelLarge?.copyWith(fontWeight: FontWeight.bold, fontSize: context.font(12)))),
-                                      DataColumn(label: Text("PERFORMED BY", style: theme.textTheme.labelLarge?.copyWith(fontWeight: FontWeight.bold, fontSize: context.font(12)))),
-                                      DataColumn(label: Text("DATE & TIME", style: theme.textTheme.labelLarge?.copyWith(fontWeight: FontWeight.bold, fontSize: context.font(12)))),
-                                      DataColumn(label: Text("IP ADDRESS", style: theme.textTheme.labelLarge?.copyWith(fontWeight: FontWeight.bold, fontSize: context.font(12)))),
-                                    ],
-                                    rows: _logs.asMap().entries.map((entry) {
-                                      int index = entry.key + 1;
-                                      var log = entry.value;
-                                      return DataRow(cells: [
-                                        DataCell(Text(index.toString(), style: TextStyle(fontSize: context.font(14)))),
-                                        DataCell(Text(log['event'] ?? "N/A", style: TextStyle(fontWeight: FontWeight.bold, fontSize: context.font(14)))),
-                                        DataCell(Text(log['user']?['name'] ?? "System", style: TextStyle(fontSize: context.font(14)))),
-                                        DataCell(Text(log['created_at'] ?? "N/A", style: TextStyle(fontSize: context.font(14)))),
-                                        DataCell(Text(log['ip_address'] ?? "N/A", style: theme.textTheme.bodySmall?.copyWith(fontSize: context.font(12)))),
-                                      ]);
-                                    }).toList(),
-                                  ),
-                                ),
-                              SizedBox(height: context.md),
-                            ],
-                          ),
-                        ),
-                        SizedBox(height: context.xl),
-                      ],
+                          SizedBox(height: context.xl),
+                        ],
+                      ),
                     ),
                   ),
                 ),
-              ),
-            ),
+              );
+            },
+          );
+        },
+      ),
     );
   }
 

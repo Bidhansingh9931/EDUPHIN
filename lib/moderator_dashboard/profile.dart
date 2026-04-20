@@ -213,7 +213,7 @@ class _ModeratorProfilePageState extends State<ModeratorProfilePage> {
                       children: [
                         _buildHeader(context, data, imageUrl),
                         SizedBox(height: context.scale(32)),
-                        
+
                         ProfileSection(title: "Personal Details", icon: Icons.person_outline_rounded, children: [
                           AdaptiveFieldRow(children: [
                             ProfileDropdown(

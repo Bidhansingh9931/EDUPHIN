@@ -319,7 +319,7 @@ class _AddInstituteScreenState extends State<AddInstituteScreen> {
           Text("Institute Status", style: theme.textTheme.labelMedium?.copyWith(color: theme.hintColor, fontSize: context.font(12))),
           SizedBox(height: context.scale(8)),
           DropdownButtonFormField<String>(
-            initialValue: _status,
+            value: _status,
             style: TextStyle(fontSize: context.font(14), color: theme.textTheme.bodyMedium?.color),
             items: ["Active", "Inactive"].map((e) => DropdownMenuItem(value: e, child: Text(e))).toList(),
             onChanged: (v) => setState(() => _status = v!),

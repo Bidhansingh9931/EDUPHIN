@@ -2,6 +2,8 @@ import 'dart:convert';
 
 import 'package:eduphin/manager_dashboard/feeStructure/studentFeeDetails/edit_fine.dart';
 import 'package:eduphin/services/api_service.dart';
+import 'package:eduphin/services/common_widgets.dart';
+import 'package:eduphin/services/caching_service.dart';
 import 'package:eduphin/services/responsive_helper.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
@@ -162,21 +164,56 @@ class FeeDetailsPage extends StatefulWidget {
 }
 
 class _FeeDetailsPageState extends State<FeeDetailsPage> {
-  late Future<StudentFeeDetails> _feeDetailsFuture;
+  StudentFeeDetails? _feeDetails;
+  bool _isLoading = true;
+  Object? _error;
 
   @override
   void initState() {
     super.initState();
-    _feeDetailsFuture = _fetchFeeDetails();
+    _loadCachedData().then((_) => _fetchFeeDetails());
   }
 
-  Future<StudentFeeDetails> _fetchFeeDetails() async {
-    final response = await ApiService.get('manager/fees/student/${widget.studentId}');
-    if (response.statusCode == 200) {
-      final data = jsonDecode(response.body);
-      return StudentFeeDetails.fromJson(data);
-    } else {
-      throw Exception(ApiService.errorMessage(response, 'Failed to load fee details'));
+  String get _cacheKey => 'fee_details_${widget.studentId}';
+
+  Future<void> _loadCachedData() async {
+    final cachedData = await CacheService.getCache(_cacheKey);
+    if (cachedData != null && mounted) {
+      setState(() {
+        _feeDetails = StudentFeeDetails.fromJson(cachedData);
+        _isLoading = false;
+      });
+    }
+  }
+
+  Future<void> _fetchFeeDetails() async {
+    if (!mounted) return;
+    setState(() {
+      _isLoading = _feeDetails == null;
+      _error = null;
+    });
+
+    try {
+      final response = await ApiService.get('manager/fees/student/${widget.studentId}');
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        await CacheService.setCache(_cacheKey, data);
+        if (mounted) {
+          setState(() {
+            _feeDetails = StudentFeeDetails.fromJson(data);
+            _isLoading = false;
+          });
+        }
+      } else {
+        throw Exception(ApiService.errorMessage(response, 'Failed to load fee details'));
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+          _error = e;
+        });
+      }
     }
   }
 
@@ -204,51 +241,46 @@ class _FeeDetailsPageState extends State<FeeDetailsPage> {
         ),
         centerTitle: true,
       ),
-      body: FutureBuilder<StudentFeeDetails>(
-        future: _feeDetailsFuture,
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return Center(child: CircularProgressIndicator(color: theme.colorScheme.primary));
-          } else if (snapshot.hasError) {
-            String errorMsg = snapshot.error.toString().replaceFirst('Exception: ', '');
-            return Center(child: Padding(
-              padding: context.pagePadding,
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(errorMsg, 
-                    textAlign: TextAlign.center,
-                    style: TextStyle(color: theme.colorScheme.error, fontSize: context.font(14))),
-                  SizedBox(height: context.md),
-                  FilledButton.icon(
-                    onPressed: () => setState(() {
-                      _feeDetailsFuture = _fetchFeeDetails();
-                    }),
-                    icon: const Icon(Icons.refresh),
-                    label: const Text("Retry"),
-                  )
-                ],
-              ),
-            ));
-          } else if (snapshot.hasData) {
-            final data = snapshot.data!;
-            return Center(
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 1200),
-                child: SingleChildScrollView(
-                  padding: context.pagePadding,
-                  child: context.responsive(
-                    _buildNarrowLayout(data),
-                    tablet: _buildWideLayout(data),
-                    desktop: _buildWideLayout(data),
+      body: LoadingWrapper(
+        isLoading: _isLoading,
+        hasData: _feeDetails != null,
+        error: _error,
+        onRetry: _fetchFeeDetails,
+        skeleton: _buildSkeleton(context),
+        child: _feeDetails == null
+            ? Center(child: Text("No fee details available.", style: TextStyle(fontSize: context.font(16), color: theme.colorScheme.onSurfaceVariant)))
+            : RefreshIndicator(
+                onRefresh: _fetchFeeDetails,
+                child: Center(
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 1200),
+                    child: SingleChildScrollView(
+                      physics: const AlwaysScrollableScrollPhysics(),
+                      padding: context.pagePadding,
+                      child: context.responsive(
+                        _buildNarrowLayout(_feeDetails!),
+                        tablet: _buildWideLayout(_feeDetails!),
+                        desktop: _buildWideLayout(_feeDetails!),
+                      ),
+                    ),
                   ),
                 ),
               ),
-            );
-          } else {
-            return Center(child: Text("No fee details available.", style: TextStyle(fontSize: context.font(16), color: theme.colorScheme.onSurfaceVariant)));
-          }
-        },
+      ),
+    );
+  }
+
+  Widget _buildSkeleton(BuildContext context) {
+    return SingleChildScrollView(
+      padding: context.pagePadding,
+      child: Column(
+        children: [
+          const SkeletonBox(height: 150, borderRadius: 16),
+          SizedBox(height: context.spacing),
+          const SkeletonBox(height: 200, borderRadius: 16),
+          SizedBox(height: context.spacing),
+          const SkeletonBox(height: 250, borderRadius: 16),
+        ],
       ),
     );
   }
@@ -674,3 +706,4 @@ class CustomPaymentHistoryContainerBox extends StatelessWidget {
     );
   }
 }
+

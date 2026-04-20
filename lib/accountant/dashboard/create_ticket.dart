@@ -232,7 +232,7 @@ class _CreateTicketPageState extends State<CreateTicketPage> {
           SizedBox(height: context.scale(8)),
           DropdownButtonFormField<String>(
             isExpanded: true,
-            value: _priority,
+            initialValue: _priority,
             items: ['low', 'medium', 'high'].map((String val) {
               return DropdownMenuItem<String>(
                 value: val,

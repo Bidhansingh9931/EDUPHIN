@@ -1,4 +1,6 @@
 import 'dart:convert';
+import 'package:eduphin/services/common_widgets.dart';
+import 'package:eduphin/services/caching_service.dart';
 import 'package:eduphin/manager_dashboard/studyMaterial/add_assignment.dart';
 import 'package:eduphin/manager_dashboard/studyMaterial/edit_assignment.dart';
 import 'package:eduphin/services/api_service.dart';
@@ -83,54 +85,73 @@ class _AssignmentsPageState extends State<AssignmentsPage> {
   List<ApiSection> sections = [];
   List<Assignment> allAssignments = [];
   Map<String, List<Assignment>> filteredAssignments = {};
+  Object? _error;
 
   @override
   void initState() {
     super.initState();
+    _loadCacheAndFetch();
+  }
+
+  Future<void> _loadCacheAndFetch() async {
+    final cachedData = await CacheService.getCache('manager_assignments');
+    if (cachedData != null && mounted) {
+      final responseData = cachedData;
+      _processData(responseData);
+    }
     _fetchData();
+  }
+
+  void _processData(dynamic responseData) {
+    final List<ApiClass> fetchedClasses = (responseData['classes'] as List)
+        .map((data) => ApiClass.fromJson(data))
+        .toList();
+    final List<ApiSection> fetchedSections = (responseData['sections'] as List)
+        .map((data) => ApiSection.fromJson(data))
+        .toList();
+
+    final classMap = {for (var e in fetchedClasses) e.id: e.name};
+    final sectionMap = {for (var e in fetchedSections) e.id: e.name};
+
+    final schedules = responseData['schedules'] as List;
+    final Map<int, String> subjectMap = {for (var s in schedules) s['subject_id']: s['subject']?['name'] ?? 'N/A'};
+    final Map<int, String> teacherMap = {for (var s in schedules) s['teacher_id']: s['teacher']?['name'] ?? 'N/A'};
+
+    final List<Assignment> fetchedAssignments = (responseData['assignments'] as List)
+        .map((data) => Assignment.fromJson(data, classMap, sectionMap, subjectMap, teacherMap))
+        .toList();
+
+    setState(() {
+      classes = fetchedClasses;
+      sections = fetchedSections;
+      allAssignments = fetchedAssignments;
+      if (classes.isNotEmpty && selectedClass == null) {
+        selectedClass = classes.first.name;
+      }
+      if (sections.isNotEmpty && selectedSection == null) {
+        selectedSection = sections.first.name;
+      }
+      _filterAssignments();
+    });
   }
 
   Future<void> _fetchData() async {
     if (!mounted) return;
     setState(() {
       isLoading = true;
+      _error = null;
     });
 
     try {
       final response = await ApiService.get('manager/study/assignments');
       if (response.statusCode == 200) {
-        final responseData = jsonDecode(response.body)['data'];
-
-        final List<ApiClass> fetchedClasses = (responseData['classes'] as List)
-            .map((data) => ApiClass.fromJson(data))
-            .toList();
-        final List<ApiSection> fetchedSections = (responseData['sections'] as List)
-            .map((data) => ApiSection.fromJson(data))
-            .toList();
-
-        final classMap = {for (var e in fetchedClasses) e.id: e.name};
-        final sectionMap = {for (var e in fetchedSections) e.id: e.name};
-
-        final schedules = responseData['schedules'] as List;
-        final Map<int, String> subjectMap = {for (var s in schedules) s['subject_id']: s['subject']?['name'] ?? 'N/A'};
-        final Map<int, String> teacherMap = {for (var s in schedules) s['teacher_id']: s['teacher']?['name'] ?? 'N/A'};
-
-        final List<Assignment> fetchedAssignments = (responseData['assignments'] as List)
-            .map((data) => Assignment.fromJson(data, classMap, sectionMap, subjectMap, teacherMap))
-            .toList();
+        final data = jsonDecode(response.body);
+        final responseData = data['data'];
+        await CacheService.setCache('manager_assignments', responseData);
 
         if (mounted) {
+          _processData(responseData);
           setState(() {
-            classes = fetchedClasses;
-            sections = fetchedSections;
-            allAssignments = fetchedAssignments;
-            if (classes.isNotEmpty) {
-               selectedClass = classes.first.name;
-            }
-            if (sections.isNotEmpty) {
-              selectedSection = sections.first.name;
-            }
-            _filterAssignments();
             isLoading = false;
           });
         }
@@ -140,14 +161,9 @@ class _AssignmentsPageState extends State<AssignmentsPage> {
     } catch (e) {
       if (mounted) {
         setState(() {
+          _error = e;
           isLoading = false;
         });
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error fetching data: $e'),
-            backgroundColor: Theme.of(context).colorScheme.error,
-          ),
-        );
       }
     }
   }
@@ -248,24 +264,48 @@ class _AssignmentsPageState extends State<AssignmentsPage> {
           ),
         ),
       ),
-      body: isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : Padding(
-              padding: context.pagePadding.copyWith(bottom: 0),
-              child: Column(
-                children: [
-                  _buildFilterSection(theme),
-                  SizedBox(height: context.md),
-                  Expanded(
-                    child: filteredAssignments.isNotEmpty
-                        ? _buildAssignmentsList()
-                        : const Center(
-                            child: Text("No assignments found for the selected filters."),
-                          ),
-                  )
-                ],
-              ),
+      body: LoadingWrapper(
+        isLoading: isLoading,
+        hasData: filteredAssignments.isNotEmpty,
+        error: _error,
+        onRetry: _fetchData,
+        skeleton: _buildSkeleton(),
+        child: Padding(
+          padding: context.pagePadding.copyWith(bottom: 0),
+          child: Column(
+            children: [
+              _buildFilterSection(theme),
+              SizedBox(height: context.md),
+              Expanded(
+                child: filteredAssignments.isNotEmpty
+                    ? _buildAssignmentsList()
+                    : const Center(
+                        child: Text("No assignments found for the selected filters."),
+                      ),
+              )
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSkeleton() {
+    return Padding(
+      padding: context.pagePadding,
+      child: Column(
+        children: [
+          SkeletonBox(height: context.scale(100), borderRadius: context.scale(20)),
+          SizedBox(height: context.md),
+          ...List.generate(
+            3,
+            (index) => Padding(
+              padding: EdgeInsets.only(bottom: context.md),
+              child: SkeletonBox(height: context.scale(200), borderRadius: context.scale(18)),
             ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -309,7 +349,7 @@ class _AssignmentsPageState extends State<AssignmentsPage> {
         const SizedBox(height: 6),
         DropdownButtonFormField<String>(
           isExpanded: true,
-          value: dropdownValue,
+          initialValue: dropdownValue,
           dropdownColor: theme.colorScheme.surfaceContainerLow,
           style: theme.textTheme.bodyLarge,
           decoration: InputDecoration(
@@ -488,3 +528,4 @@ class _AssignmentCard extends StatelessWidget {
     );
   }
 }
+

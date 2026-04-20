@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:eduphin/services/responsive_helper.dart';
+import 'package:eduphin/services/common_widgets.dart';
 import '../../librarian/librarian_models.dart';
 import '../../services/api_service.dart';
-import '../../teacher/dashboard/common_widgets.dart';
+import '../../teacher/dashboard/common_widgets.dart' as teacher_common;
 
 class MyLendingBooksPage extends StatefulWidget {
   const MyLendingBooksPage({super.key});
@@ -13,8 +14,7 @@ class MyLendingBooksPage extends StatefulWidget {
 }
 
 class _MyLendingBooksPageState extends State<MyLendingBooksPage> {
-  bool _isLoading = true;
-  List<IssuedBook> _lendingBooks = [];
+  Stream<List<IssuedBook>>? _lendingStream;
 
   final TextEditingController _bookTitleController = TextEditingController();
   final TextEditingController _dateFromController = TextEditingController();
@@ -27,44 +27,31 @@ class _MyLendingBooksPageState extends State<MyLendingBooksPage> {
     _fetchLendingBooks();
   }
 
-  Future<void> _fetchLendingBooks() async {
-    setState(() => _isLoading = true);
-    try {
-      final Map<String, String> filters = {};
-      if (_bookTitleController.text.isNotEmpty) filters['book_title'] = _bookTitleController.text;
-      
-      // The API likely expects yyyy-MM-dd. We should ensure conversion if needed, 
-      // but buildDateField in common_widgets uses dd-MM-yyyy.
-      // For consistency with existing logic, let's handle the format.
-      if (_dateFromController.text.isNotEmpty) {
-        try {
-          DateTime dt = DateFormat('dd-MM-yyyy').parse(_dateFromController.text);
-          filters['issued_from'] = DateFormat('yyyy-MM-dd').format(dt);
-        } catch (_) {
-          filters['issued_from'] = _dateFromController.text;
-        }
+  void _fetchLendingBooks() {
+    final Map<String, String> filters = {};
+    if (_bookTitleController.text.isNotEmpty) filters['book_title'] = _bookTitleController.text;
+    
+    if (_dateFromController.text.isNotEmpty) {
+      try {
+        DateTime dt = DateFormat('dd-MM-yyyy').parse(_dateFromController.text);
+        filters['issued_from'] = DateFormat('yyyy-MM-dd').format(dt);
+      } catch (_) {
+        filters['issued_from'] = _dateFromController.text;
       }
-      if (_dateToController.text.isNotEmpty) {
-        try {
-          DateTime dt = DateFormat('dd-MM-yyyy').parse(_dateToController.text);
-          filters['due_to'] = DateFormat('yyyy-MM-dd').format(dt);
-        } catch (_) {
-          filters['due_to'] = _dateToController.text;
-        }
-      }
-      if (_searchController.text.isNotEmpty) filters['search'] = _searchController.text;
-
-      final books = await ApiService.getStaffIssuedBooks(filters);
-      if (!mounted) return;
-      setState(() {
-        _lendingBooks = books;
-        _isLoading = false;
-      });
-    } catch (e) {
-      if (!mounted) return;
-      setState(() => _isLoading = false);
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Error fetching books: $e")));
     }
+    if (_dateToController.text.isNotEmpty) {
+      try {
+        DateTime dt = DateFormat('dd-MM-yyyy').parse(_dateToController.text);
+        filters['due_to'] = DateFormat('yyyy-MM-dd').format(dt);
+      } catch (_) {
+        filters['due_to'] = _dateToController.text;
+      }
+    }
+    if (_searchController.text.isNotEmpty) filters['search'] = _searchController.text;
+
+    setState(() {
+      _lendingStream = ApiService.getStaffIssuedBooksStream(filters);
+    });
   }
 
   @override
@@ -76,27 +63,25 @@ class _MyLendingBooksPageState extends State<MyLendingBooksPage> {
         title: const Text("My Lending Books"),
         centerTitle: true,
       ),
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : RefreshIndicator(
-              onRefresh: _fetchLendingBooks,
-              child: SingleChildScrollView(
-                physics: const AlwaysScrollableScrollPhysics(),
-                padding: context.pagePadding,
-                child: Center(
-                  child: ConstrainedBox(
-                    constraints: const BoxConstraints(maxWidth: 1200),
-                    child: Column(
-                      children: [
-                        _buildFilterCard(context),
-                        SizedBox(height: context.spacing),
-                        _buildRecordsCard(context),
-                      ],
-                    ),
-                  ),
-                ),
+      body: RefreshIndicator(
+        onRefresh: () async => _fetchLendingBooks(),
+        child: SingleChildScrollView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          padding: context.pagePadding,
+          child: Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 1200),
+              child: Column(
+                children: [
+                  _buildFilterCard(context),
+                  SizedBox(height: context.spacing),
+                  _buildRecordsCard(context),
+                ],
               ),
             ),
+          ),
+        ),
+      ),
     );
   }
 
@@ -181,8 +166,8 @@ class _MyLendingBooksPageState extends State<MyLendingBooksPage> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        buildLabel(context, label),
-        buildTextField(context, controller, hint),
+        teacher_common.buildLabel(context, label),
+        teacher_common.buildTextField(context, controller, hint),
       ],
     );
   }
@@ -191,8 +176,8 @@ class _MyLendingBooksPageState extends State<MyLendingBooksPage> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        buildLabel(context, label),
-        buildDateField(context, controller, "dd-mm-yyyy"),
+        teacher_common.buildLabel(context, label),
+        teacher_common.buildDateField(context, controller, "dd-mm-yyyy"),
       ],
     );
   }
@@ -264,28 +249,39 @@ class _MyLendingBooksPageState extends State<MyLendingBooksPage> {
               ],
             ),
           ),
-          if (_lendingBooks.isEmpty)
-            Center(
-              child: Padding(
-                padding: EdgeInsets.symmetric(vertical: context.scale(64)),
-                child: Column(
-                  children: [
-                    Icon(Icons.library_books_outlined, size: context.scale(48), color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.5)),
-                    SizedBox(height: context.scale(16)),
-                    Text("No lending records found", style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onSurfaceVariant, fontWeight: FontWeight.bold)),
-                  ],
-                ),
-              ),
-            )
-          else
-            _buildLendingTable(context),
+          StreamBuilder<List<IssuedBook>>(
+            stream: _lendingStream,
+            builder: (context, snapshot) {
+              return LoadingWrapper<List<IssuedBook>>(
+                snapshot: snapshot,
+                skeleton: _buildSkeleton(context),
+                builder: (books) {
+                  if (books.isEmpty) {
+                    return Center(
+                      child: Padding(
+                        padding: EdgeInsets.symmetric(vertical: context.scale(64)),
+                        child: Column(
+                          children: [
+                            Icon(Icons.library_books_outlined, size: context.scale(48), color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.5)),
+                            SizedBox(height: context.scale(16)),
+                            Text("No lending records found", style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onSurfaceVariant, fontWeight: FontWeight.bold)),
+                          ],
+                        ),
+                      ),
+                    );
+                  }
+                  return _buildLendingTable(context, books);
+                },
+              );
+            }
+          ),
           SizedBox(height: context.spacing),
         ],
       ),
     );
   }
 
-  Widget _buildLendingTable(BuildContext context) {
+  Widget _buildLendingTable(BuildContext context, List<IssuedBook> lendingBooks) {
     final theme = context.theme;
     return SingleChildScrollView(
       scrollDirection: Axis.horizontal,
@@ -304,7 +300,7 @@ class _MyLendingBooksPageState extends State<MyLendingBooksPage> {
           DataColumn(label: _tableHeader(context, "Days Overdue")),
           DataColumn(label: _tableHeader(context, "Return At")),
         ],
-        rows: _lendingBooks.asMap().entries.map((entry) {
+        rows: lendingBooks.asMap().entries.map((entry) {
           int index = entry.key + 1;
           IssuedBook ib = entry.value;
           return _buildDataRow(context, index.toString(), ib);
@@ -382,5 +378,27 @@ class _MyLendingBooksPageState extends State<MyLendingBooksPage> {
     } catch (e) {
       return dateStr;
     }
+  }
+
+  Widget _buildSkeleton(BuildContext context) {
+    return Padding(
+      padding: EdgeInsets.all(context.scale(20)),
+      child: Column(
+        children: List.generate(5, (index) => Padding(
+          padding: EdgeInsets.only(bottom: context.scale(12)),
+          child: Row(
+            children: [
+              Skeleton(width: context.scale(30), height: context.scale(20)),
+              SizedBox(width: context.scale(24)),
+              Skeleton(width: context.scale(50), height: context.scale(20)),
+              SizedBox(width: context.scale(24)),
+              Expanded(child: Skeleton(height: context.scale(20))),
+              SizedBox(width: context.scale(24)),
+              Skeleton(width: context.scale(80), height: context.scale(20)),
+            ],
+          ),
+        )),
+      ),
+    );
   }
 }

@@ -1,4 +1,5 @@
 import 'package:eduphin/services/responsive_helper.dart';
+import 'package:eduphin/services/common_widgets.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../services/api_service.dart';
@@ -13,7 +14,7 @@ class StaffExaminationsPage extends StatefulWidget {
 }
 
 class _StaffExaminationsPageState extends State<StaffExaminationsPage> {
-  late Future<List<Exam>> _examsFuture;
+  late Stream<List<Exam>> _examsStream;
 
   @override
   void initState() {
@@ -23,7 +24,7 @@ class _StaffExaminationsPageState extends State<StaffExaminationsPage> {
 
   void _loadExams() {
     setState(() {
-      _examsFuture = ApiService.getStaffExams();
+      _examsStream = ApiService.getStaffExamsStream();
     });
   }
 
@@ -42,33 +43,29 @@ class _StaffExaminationsPageState extends State<StaffExaminationsPage> {
           child: Center(
             child: ConstrainedBox(
               constraints: const BoxConstraints(maxWidth: 1200),
-              child: FutureBuilder<List<Exam>>(
-                future: _examsFuture,
+              child: StreamBuilder<List<Exam>>(
+                stream: _examsStream,
                 builder: (context, snapshot) {
-                  if (snapshot.connectionState == ConnectionState.waiting) {
-                    return Padding(
-                      padding: EdgeInsets.all(context.scale(64)),
-                      child: const Center(child: CircularProgressIndicator()),
-                    );
-                  } else if (snapshot.hasError) {
-                    return _buildErrorState(context, snapshot.error.toString());
-                  } else if (!snapshot.hasData || snapshot.data!.isEmpty) {
-                    return _buildEmptyState(context);
-                  }
+                  return LoadingWrapper<List<Exam>>(
+                    snapshot: snapshot,
+                    skeleton: _buildSkeleton(context),
+                    builder: (exams) {
+                      if (exams.isEmpty) return _buildEmptyState(context);
 
-                  final exams = snapshot.data!;
-                  return GridView.builder(
-                    padding: context.pagePadding,
-                    shrinkWrap: true,
-                    physics: const NeverScrollableScrollPhysics(),
-                    gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                      crossAxisCount: context.responsive(1, tablet: 2, desktop: 3),
-                      crossAxisSpacing: context.spacing,
-                      mainAxisSpacing: context.spacing,
-                      mainAxisExtent: context.scale(240),
-                    ),
-                    itemCount: exams.length,
-                    itemBuilder: (context, index) => _buildExamCard(context, exams[index]),
+                      return GridView.builder(
+                        padding: context.pagePadding,
+                        shrinkWrap: true,
+                        physics: const NeverScrollableScrollPhysics(),
+                        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                          crossAxisCount: context.responsive(1, tablet: 2, desktop: 3),
+                          crossAxisSpacing: context.spacing,
+                          mainAxisSpacing: context.spacing,
+                          mainAxisExtent: context.scale(240),
+                        ),
+                        itemCount: exams.length,
+                        itemBuilder: (context, index) => _buildExamCard(context, exams[index]),
+                      );
+                    },
                   );
                 },
               ),
@@ -213,30 +210,48 @@ class _StaffExaminationsPageState extends State<StaffExaminationsPage> {
     );
   }
 
-  Widget _buildErrorState(BuildContext context, String error) {
-    final theme = context.theme;
-    return Center(
-      child: Padding(
-        padding: EdgeInsets.all(context.scale(32)),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.error_outline_rounded, color: theme.colorScheme.error, size: context.scale(60)),
-            SizedBox(height: context.scale(16)),
-            Text("Oops! Failed to load exams", 
-              style: TextStyle(fontSize: context.font(16), fontWeight: FontWeight.bold)),
-            SizedBox(height: context.scale(8)),
-            Text(error, textAlign: TextAlign.center, style: TextStyle(color: theme.hintColor, fontSize: context.font(13))),
-            SizedBox(height: context.scale(24)),
-            FilledButton.icon(
-              onPressed: _loadExams, 
-              icon: const Icon(Icons.refresh),
-              label: const Text("TRY AGAIN"),
-            ),
-          ],
+  Widget _buildSkeleton(BuildContext context) {
+    return GridView.builder(
+      padding: context.pagePadding,
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: context.responsive(1, tablet: 2, desktop: 3),
+        crossAxisSpacing: context.spacing,
+        mainAxisSpacing: context.spacing,
+        mainAxisExtent: context.scale(240),
+      ),
+      itemCount: 6,
+      itemBuilder: (context, index) => Card(
+        elevation: 0,
+        margin: EdgeInsets.zero,
+        color: context.theme.colorScheme.surfaceContainerLow,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(context.scale(20)),
+          side: BorderSide(color: context.theme.colorScheme.outlineVariant),
+        ),
+        child: Padding(
+          padding: EdgeInsets.all(context.scale(24)),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Skeleton(width: context.scale(44), height: context.scale(44), borderRadius: context.scale(12)),
+                  const Spacer(),
+                  Skeleton(width: context.scale(60), height: context.scale(20), borderRadius: context.scale(6)),
+                ],
+              ),
+              SizedBox(height: context.scale(16)),
+              Skeleton(width: double.infinity, height: context.scale(18)),
+              SizedBox(height: context.scale(8)),
+              Skeleton(width: context.scale(150), height: context.scale(18)),
+              const Spacer(),
+              Skeleton(width: double.infinity, height: context.scale(44), borderRadius: context.scale(12)),
+            ],
+          ),
         ),
       ),
     );
   }
 }
-

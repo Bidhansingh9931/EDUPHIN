@@ -2,6 +2,8 @@ import 'dart:convert';
 import 'package:eduphin/manager_dashboard/examinations/edit_schedule.dart';
 import 'package:eduphin/manager_dashboard/examinations/add_schedule.dart';
 import 'package:eduphin/services/api_service.dart';
+import 'package:eduphin/services/caching_service.dart';
+import 'package:eduphin/services/common_widgets.dart';
 import 'package:eduphin/services/responsive_helper.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
@@ -69,34 +71,62 @@ class ManageSchedulePage extends StatefulWidget {
 }
 
 class _ManageSchedulePageState extends State<ManageSchedulePage> {
-  late Future<List<ExamPaper>> _scheduleFuture;
+  bool _isLoading = true;
+  List<ExamPaper> _papers = [];
+  Object? _error;
 
   @override
   void initState() {
     super.initState();
-    _scheduleFuture = _fetchSchedule();
+    _loadCacheAndFetch();
   }
 
-  Future<List<ExamPaper>> _fetchSchedule() async {
+  Future<void> _loadCacheAndFetch() async {
+    final cacheKey = 'manager_exam_schedule_${widget.examId}';
+    final cachedData = await CachingService.getCache(cacheKey);
+    if (cachedData != null && mounted) {
+      final List<dynamic> paperJson = cachedData;
+      setState(() {
+        _papers = paperJson.map((json) => ExamPaper.fromJson(json)).toList();
+      });
+    }
+    _fetchSchedule();
+  }
+
+  Future<void> _fetchSchedule() async {
+    if (!mounted) return;
+    setState(() {
+      _isLoading = true;
+      _error = null;
+    });
+
     try {
       final response = await ApiService.get('manager/exams/${widget.examId}/schedule');
       if (response.statusCode == 200) {
-        final List<dynamic> jsonData = json.decode(response.body)['data'] ?? [];
-        return jsonData.map((e) => ExamPaper.fromJson(e)).toList();
+        final body = json.decode(response.body);
+        final List<dynamic> paperJson = body['data'] ?? [];
+        await CachingService.setCache('manager_exam_schedule_${widget.examId}', paperJson);
+        if (mounted) {
+          setState(() {
+            _papers = paperJson.map((json) => ExamPaper.fromJson(json)).toList();
+            _isLoading = false;
+          });
+        }
       } else {
         throw Exception('Failed to load schedule. Status code: ${response.statusCode}');
       }
     } catch (e) {
-      rethrow;
+      if (mounted) {
+        setState(() {
+          _error = e;
+          _isLoading = false;
+        });
+      }
     }
   }
 
   void _refreshSchedule() {
-    if (mounted) {
-      setState(() {
-        _scheduleFuture = _fetchSchedule();
-      });
-    }
+    _fetchSchedule();
   }
 
   Future<void> _deleteSchedule(int paperId) async {
@@ -121,9 +151,7 @@ class _ManageSchedulePageState extends State<ManageSchedulePage> {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Schedule deleted successfully!')),
         );
-        setState(() {
-          _scheduleFuture = _fetchSchedule();
-        });
+        _refreshSchedule();
       } else {
         throw Exception('Failed to delete schedule. Status: ${response.statusCode}');
       }
@@ -143,9 +171,7 @@ class _ManageSchedulePageState extends State<ManageSchedulePage> {
       ),
     ).then((value) {
       if (value == true) {
-        setState(() {
-          _scheduleFuture = _fetchSchedule();
-        });
+        _refreshSchedule();
       }
     });
   }
@@ -166,62 +192,65 @@ class _ManageSchedulePageState extends State<ManageSchedulePage> {
         icon: Icon(Icons.add, size: context.scale(24)),
         label: Text("Add Schedule", style: TextStyle(fontSize: context.font(14), fontWeight: FontWeight.bold)),
       ),
-      body: FutureBuilder<List<ExamPaper>>(
-        future: _scheduleFuture,
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
-          } else if (snapshot.hasError) {
-            return Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(Icons.error_outline, size: context.scale(48), color: theme.colorScheme.error),
-                  SizedBox(height: context.md),
-                  Text('Error: ${snapshot.error}', textAlign: TextAlign.center, style: theme.textTheme.bodyMedium),
-                  SizedBox(height: context.md),
-                  ElevatedButton(
-                    onPressed: () => setState(() => _scheduleFuture = _fetchSchedule()),
-                    child: const Text('Retry'),
-                  ),
-                ],
-              ),
-            );
-          } else if (!snapshot.hasData || snapshot.data!.isEmpty) {
-            return Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(Icons.calendar_today_outlined, size: context.scale(64), color: theme.colorScheme.outlineVariant),
-                  SizedBox(height: context.md),
-                  Text('No schedule found for this exam.', style: theme.textTheme.titleMedium?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
-                ],
-              ),
-            );
-          }
-
-          final papers = snapshot.data!;
-
-          return Center(
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 1200),
-              child: GridView.builder(
-                padding: EdgeInsets.fromLTRB(context.spacing, context.spacing, context.spacing, context.scale(80)),
-                gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                  crossAxisCount: context.responsive(1, tablet: 2, desktop: 3),
-                  crossAxisSpacing: context.spacing,
-                  mainAxisSpacing: context.spacing,
-                  mainAxisExtent: context.scale(320),
-                ),
-                itemCount: papers.length,
-                itemBuilder: (context, index) => _buildPaperItem(papers[index]),
-              ),
+      body: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 1200),
+          child: LoadingWrapper(
+            isLoading: _isLoading,
+            hasData: _papers.isNotEmpty,
+            error: _error,
+            onRetry: _refreshSchedule,
+            skeleton: _buildSkeleton(),
+            child: RefreshIndicator(
+              onRefresh: () async => _refreshSchedule(),
+              child: _papers.isEmpty
+                  ? SingleChildScrollView(
+                      physics: const AlwaysScrollableScrollPhysics(),
+                      child: Container(
+                        height: MediaQuery.of(context).size.height * 0.7,
+                        alignment: Alignment.center,
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(Icons.calendar_today_outlined, size: context.scale(64), color: theme.colorScheme.outlineVariant),
+                            SizedBox(height: context.md),
+                            Text('No schedule found for this exam.', style: theme.textTheme.titleMedium?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
+                          ],
+                        ),
+                      ),
+                    )
+                  : GridView.builder(
+                      padding: EdgeInsets.fromLTRB(context.spacing, context.spacing, context.spacing, context.scale(80)),
+                      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                        crossAxisCount: context.responsive(1, tablet: 2, desktop: 3),
+                        crossAxisSpacing: context.spacing,
+                        mainAxisSpacing: context.spacing,
+                        mainAxisExtent: context.scale(320),
+                      ),
+                      itemCount: _papers.length,
+                      itemBuilder: (context, index) => _buildPaperItem(_papers[index]),
+                    ),
             ),
-          );
-        },
+          ),
+        ),
       ),
     );
   }
+
+  Widget _buildSkeleton() {
+    return GridView.builder(
+      padding: EdgeInsets.all(context.spacing),
+      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: context.responsive(1, tablet: 2, desktop: 3),
+        crossAxisSpacing: context.spacing,
+        mainAxisSpacing: context.spacing,
+        mainAxisExtent: context.scale(320),
+      ),
+      itemCount: 6,
+      itemBuilder: (context, index) => SkeletonBox(height: context.scale(320), borderRadius: context.scale(16)),
+    );
+  }
+
 
   Widget _buildPaperItem(ExamPaper paper) {
     final theme = context.theme;
@@ -368,3 +397,4 @@ class _ManageSchedulePageState extends State<ManageSchedulePage> {
     );
   }
 }
+

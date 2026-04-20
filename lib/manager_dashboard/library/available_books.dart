@@ -1,6 +1,8 @@
 import 'dart:convert';
 import 'package:eduphin/manager_dashboard/library/add_book.dart';
 import 'package:eduphin/services/api_service.dart';
+import 'package:eduphin/services/caching_service.dart';
+import 'package:eduphin/services/common_widgets.dart';
 import 'package:eduphin/services/responsive_helper.dart';
 import 'package:eduphin/teacher/dashboard/common_widgets.dart';
 import 'package:eduphin/teacher/dashboard/library_models.dart';
@@ -16,7 +18,7 @@ class AvailableBooksScreen extends StatefulWidget {
 class _AvailableBooksScreenState extends State<AvailableBooksScreen> {
   final searchController = TextEditingController();
   bool _isLoading = true;
-  String _error = '';
+  Object? _error;
 
   List<Book> _allBooks = [];
   List<Book> _filteredBooks = [];
@@ -24,10 +26,28 @@ class _AvailableBooksScreenState extends State<AvailableBooksScreen> {
   @override
   void initState() {
     super.initState();
-    _fetchBooks();
+    _loadCachedData().then((_) => _fetchBooks());
+  }
+
+  Future<void> _loadCachedData() async {
+    final cache = await CacheService.getCache('available_books');
+    if (cache != null && mounted) {
+      final List<dynamic> bookData = cache;
+      setState(() {
+        _allBooks = bookData.map((data) => Book.fromJson(data)).toList();
+        _filterBooks(searchController.text);
+        _isLoading = false;
+      });
+    }
   }
 
   Future<void> _fetchBooks() async {
+    if (mounted) {
+      setState(() {
+        _isLoading = _allBooks.isEmpty;
+        _error = null;
+      });
+    }
     try {
       final response = await ApiService.get('manager/books');
 
@@ -35,29 +55,24 @@ class _AvailableBooksScreenState extends State<AvailableBooksScreen> {
         final body = json.decode(response.body);
         if (body['status'] == true) {
           final List<dynamic> bookData = body['data']['data'];
+          await CacheService.setCache('available_books', bookData);
           if (mounted) {
             setState(() {
               _allBooks = bookData.map((data) => Book.fromJson(data)).toList();
-              _filteredBooks = _allBooks;
+              _filterBooks(searchController.text);
               _isLoading = false;
             });
           }
         } else {
-          setState(() {
-            _error = 'Failed to load books: ${body['message']}';
-            _isLoading = false;
-          });
+          throw Exception(body['message'] ?? 'Failed to load books');
         }
       } else {
-        setState(() {
-          _error = 'Failed to load books. Status code: ${response.statusCode}';
-          _isLoading = false;
-        });
+        throw Exception('Failed to load books. Status code: ${response.statusCode}');
       }
     } catch (e) {
       if (mounted) {
         setState(() {
-          _error = 'An error occurred: $e';
+          _error = e;
           _isLoading = false;
         });
       }
@@ -144,27 +159,88 @@ class _AvailableBooksScreenState extends State<AvailableBooksScreen> {
               ),
               SizedBox(height: context.md),
               Expanded(
-                child: _isLoading
-                    ? Center(child: CircularProgressIndicator(color: theme.colorScheme.primary))
-                    : _error.isNotEmpty
-                        ? Center(child: Text(_error, style: TextStyle(color: theme.colorScheme.error)))
-                        : _filteredBooks.isEmpty
-                            ? Center(
-                                child: Column(
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  children: [
-                                    Icon(Icons.search_off_rounded, size: context.scale(64), color: theme.colorScheme.outlineVariant.withValues(alpha: 0.5)),
-                                    SizedBox(height: context.scale(16)),
-                                    Text("No books found matching your search.", style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: context.font(16))),
-                                  ],
-                                ),
-                              )
-                            : context.responsive(
-                                _buildListView(_filteredBooks),
-                                tablet: _buildGridView(_filteredBooks, crossAxisCount: 2),
-                                desktop: _buildGridView(_filteredBooks, crossAxisCount: 3),
-                              ),
+                child: LoadingWrapper(
+                  isLoading: _isLoading,
+                  hasData: _allBooks.isNotEmpty,
+                  error: _error,
+                  onRetry: _fetchBooks,
+                  skeleton: _buildSkeleton(context),
+                  child: _filteredBooks.isEmpty
+                      ? Center(
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(Icons.search_off_rounded, size: context.scale(64), color: theme.colorScheme.outlineVariant.withValues(alpha: 0.5)),
+                              SizedBox(height: context.scale(16)),
+                              Text("No books found matching your search.", style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: context.font(16))),
+                            ],
+                          ),
+                        )
+                      : RefreshIndicator(
+                          onRefresh: _fetchBooks,
+                          child: context.responsive(
+                            _buildListView(_filteredBooks),
+                            tablet: _buildGridView(_filteredBooks, crossAxisCount: 2),
+                            desktop: _buildGridView(_filteredBooks, crossAxisCount: 3),
+                          ),
+                        ),
+                ),
               )
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSkeleton(BuildContext context) {
+    return ListView.builder(
+      padding: context.pagePadding,
+      itemCount: 5,
+      itemBuilder: (context, index) => Padding(
+        padding: EdgeInsets.only(bottom: context.md),
+        child: Container(
+          padding: EdgeInsets.all(context.spacing),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(context.scale(16)),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  const SkeletonBox(width: 30, height: 20),
+                  const SizedBox(width: 12),
+                  const Expanded(child: SkeletonBox(height: 20)),
+                ],
+              ),
+              const SizedBox(height: 16),
+              Row(
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const SkeletonBox(height: 12, width: 60),
+                        const SizedBox(height: 4),
+                        const SkeletonBox(height: 16),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const SkeletonBox(height: 12, width: 60),
+                        const SizedBox(height: 4),
+                        const SkeletonBox(height: 16),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
             ],
           ),
         ),
@@ -175,6 +251,7 @@ class _AvailableBooksScreenState extends State<AvailableBooksScreen> {
   Widget _buildListView(List<Book> books) {
     return ListView.builder(
       padding: context.pagePadding.copyWith(bottom: context.xl * 2),
+      physics: const AlwaysScrollableScrollPhysics(),
       itemCount: books.length,
       itemBuilder: (context, index) {
         return Padding(
@@ -198,6 +275,7 @@ class _AvailableBooksScreenState extends State<AvailableBooksScreen> {
   Widget _buildGridView(List<Book> books, {required int crossAxisCount}) {
     return GridView.builder(
       padding: context.pagePadding.copyWith(bottom: context.xl * 2),
+      physics: const AlwaysScrollableScrollPhysics(),
       itemCount: books.length,
       gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
         crossAxisCount: crossAxisCount,

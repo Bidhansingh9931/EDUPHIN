@@ -1,7 +1,9 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:eduphin/services/common_widgets.dart';
 import '../../services/api_service.dart';
+import '../../services/caching_service.dart';
 import '../../services/responsive_helper.dart';
 import '../counselor_models.dart';
 import 'ticket_details.dart';
@@ -14,41 +16,118 @@ class AssignedTicketsPage extends StatefulWidget {
 }
 
 class _AssignedTicketsPageState extends State<AssignedTicketsPage> {
-  late ColorScheme _colorScheme;
   bool _isLoading = true;
   List<SupportTicket> _tickets = [];
   String? _errorMessage;
+  final String _cacheKey = 'counselor_assigned_tickets_data';
 
   @override
   void initState() {
     super.initState();
+    _loadCachedData();
     _fetchTickets();
   }
 
+  Future<void> _loadCachedData() async {
+    final cachedData = await CachingService.getCache(_cacheKey);
+    if (cachedData != null && mounted) {
+      _processData(cachedData);
+    }
+  }
+
+  void _processData(dynamic data) {
+    final jsonResponse = data is String ? jsonDecode(data) : data;
+    final List ticketsData = jsonResponse['data'] ?? jsonResponse['tickets'] ?? jsonResponse['assigned_tickets'] ?? [];
+    setState(() {
+      _tickets = ticketsData.map((j) => SupportTicket.fromJson(j)).toList();
+      _isLoading = false;
+      _errorMessage = null;
+    });
+  }
+
   Future<void> _fetchTickets() async {
-    setState(() => _isLoading = true);
+    if (_tickets.isEmpty) {
+      setState(() {
+        _isLoading = true;
+        _errorMessage = null;
+      });
+    }
     try {
       final response = await ApiService.get('counselor/tickets/assigned');
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
-        setState(() {
-          final List ticketsData = data['data'] ?? data['tickets'] ?? [];
-          _tickets = ticketsData.map((j) => SupportTicket.fromJson(j)).toList();
-          _isLoading = false;
-        });
+        await CachingService.setCache(_cacheKey, data);
+        if (mounted) {
+          _processData(data);
+        }
       } else {
-        setState(() {
-          _errorMessage = "Failed to load assigned tickets";
-          _isLoading = false;
-        });
+        if (mounted && _tickets.isEmpty) {
+          setState(() {
+            _errorMessage = ApiService.errorMessage(response, "Failed to load assigned tickets");
+            _isLoading = false;
+          });
+        }
       }
     } catch (e) {
       debugPrint("Error: $e");
-      setState(() {
-        _errorMessage = "Error: $e";
-        _isLoading = false;
-      });
+      if (mounted && _tickets.isEmpty) {
+        setState(() {
+          _errorMessage = e.toString().replaceFirst("Exception: ", "");
+          _isLoading = false;
+        });
+      }
     }
+  }
+
+  Widget _buildSkeleton() {
+    return GridView.builder(
+      padding: context.pagePadding,
+      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: context.responsive(1, tablet: 2, desktop: 3),
+        crossAxisSpacing: context.spacing,
+        mainAxisSpacing: context.spacing,
+        mainAxisExtent: context.scale(280),
+      ),
+      itemCount: 6,
+      itemBuilder: (context, index) {
+        return Card(
+          elevation: 0,
+          margin: EdgeInsets.zero,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(context.scale(20)),
+          ),
+          child: Padding(
+            padding: EdgeInsets.all(context.scale(20)),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Skeleton(width: 60, height: 16),
+                    const Skeleton(width: 80, height: 24, borderRadius: 6),
+                  ],
+                ),
+                SizedBox(height: context.scale(16)),
+                const Skeleton(width: double.infinity, height: 24),
+                SizedBox(height: 8),
+                const Skeleton(width: 150, height: 24),
+                SizedBox(height: context.scale(12)),
+                Row(
+                  children: [
+                    const Skeleton(width: 80, height: 16),
+                    const Spacer(),
+                    const Skeleton(width: 80, height: 16),
+                  ],
+                ),
+                const Spacer(),
+                const Skeleton(width: double.infinity, height: 48, borderRadius: 12),
+              ],
+            ),
+          ),
+        );
+      },
+    );
   }
 
   @override
@@ -59,20 +138,21 @@ class _AssignedTicketsPageState extends State<AssignedTicketsPage> {
       appBar: AppBar(
         title: Text("Assigned Tickets", style: TextStyle(fontSize: context.font(20))),
       ),
-      body: RefreshIndicator(
+      body: LoadingWrapper(
+        isLoading: _isLoading,
+        hasData: _tickets.isNotEmpty,
+        error: _errorMessage,
+        skeleton: _buildSkeleton(),
         onRefresh: _fetchTickets,
-        child: _isLoading
-            ? Center(child: CircularProgressIndicator(color: colorScheme.primary))
-            : _errorMessage != null
-                ? Center(child: Text(_errorMessage!, style: TextStyle(color: colorScheme.error)))
-                : _tickets.isEmpty
-                    ? _buildEmptyState()
-                    : Center(
-                        child: ConstrainedBox(
-                          constraints: const BoxConstraints(maxWidth: 1200),
-                          child: _buildTicketList(),
-                        ),
-                      ),
+        onRetry: _fetchTickets,
+        child: _tickets.isEmpty
+            ? _buildEmptyState()
+            : Center(
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 1200),
+                  child: _buildTicketList(),
+                ),
+              ),
       ),
     );
   }
@@ -239,3 +319,4 @@ class _AssignedTicketsPageState extends State<AssignedTicketsPage> {
     }
   }
 }
+

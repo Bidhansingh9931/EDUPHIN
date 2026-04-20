@@ -94,7 +94,7 @@ class _AddStudentRemarkPageState extends State<AddStudentRemarkPage> {
               Text("Add remark for ${widget.studentName}", style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
               const SizedBox(height: 20),
               DropdownButtonFormField<String>(
-                value: _remarkType,
+                initialValue: _remarkType,
                 decoration: const InputDecoration(labelText: "Remark Type", border: OutlineInputBorder()),
                 items: ['Positive', 'Negative'].map((t) => DropdownMenuItem(value: t, child: Text(t))).toList(),
                 onChanged: (val) => setState(() => _remarkType = val!),

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../services/api_service.dart';
 import '../../services/responsive_helper.dart';
+import '../../services/common_widgets.dart';
 import 'ticket_details.dart';
 import 'package:eduphin/teacher/dashboard/ticket_models.dart' show SupportTicket;
 
@@ -13,7 +14,7 @@ class StaffAssignedTicketsPage extends StatefulWidget {
 }
 
 class _StaffAssignedTicketsPageState extends State<StaffAssignedTicketsPage> {
-  late Future<List<SupportTicket>> _assignedTicketsFuture;
+  late Stream<List<SupportTicket>> _assignedTicketsStream;
   final TextEditingController _searchController = TextEditingController();
   String _selectedPriority = "all";
   String _selectedStatus = "all";
@@ -26,7 +27,7 @@ class _StaffAssignedTicketsPageState extends State<StaffAssignedTicketsPage> {
 
   void _loadTickets() {
     setState(() {
-      _assignedTicketsFuture = ApiService.getStaffAssignedTickets({
+      _assignedTicketsStream = ApiService.getStaffAssignedTicketsStream({
         'search': _searchController.text.trim(),
         'priority': _selectedPriority,
         'status': _selectedStatus,
@@ -62,41 +63,29 @@ class _StaffAssignedTicketsPageState extends State<StaffAssignedTicketsPage> {
                   SizedBox(height: context.xl),
                   _buildSectionHeader("Support Queue", Icons.confirmation_number_outlined),
                   SizedBox(height: context.md),
-                  FutureBuilder<List<SupportTicket>>(
-                    future: _assignedTicketsFuture,
+                  StreamBuilder<List<SupportTicket>>(
+                    stream: _assignedTicketsStream,
                     builder: (context, snapshot) {
-                      if (snapshot.connectionState == ConnectionState.waiting) {
-                        return Padding(
-                          padding: EdgeInsets.all(context.scale(32)),
-                          child: const Center(child: CircularProgressIndicator()),
-                        );
-                      } else if (snapshot.hasError) {
-                        return Padding(
-                          padding: EdgeInsets.all(context.scale(32)),
-                          child: Center(
-                            child: Text(
-                              "Error: ${snapshot.error.toString().replaceFirst('Exception: ', '')}",
-                              textAlign: TextAlign.center,
-                              style: TextStyle(color: colorScheme.error),
-                            ),
-                          ),
-                        );
-                      } else if (!snapshot.hasData || snapshot.data!.isEmpty) {
-                        return _buildEmptyState(context);
-                      }
+                      return LoadingWrapper<List<SupportTicket>>(
+                        snapshot: snapshot,
+                        skeleton: _buildSkeleton(context),
+                        builder: (tickets) {
+                          if (tickets.isEmpty) return _buildEmptyState(context);
 
-                      final tickets = snapshot.data!;
-                      return GridView.builder(
-                        shrinkWrap: true,
-                        physics: const NeverScrollableScrollPhysics(),
-                        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                          crossAxisCount: context.responsive(1, tablet: 2, desktop: 3),
-                          crossAxisSpacing: context.spacing,
-                          mainAxisSpacing: context.spacing,
-                          mainAxisExtent: context.scale(260),
-                        ),
-                        itemCount: tickets.length,
-                        itemBuilder: (context, index) => _buildTicketItem(context, tickets[index]),
+                          return GridView.builder(
+                            shrinkWrap: true,
+                            physics: const NeverScrollableScrollPhysics(),
+                            gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                              crossAxisCount: context.responsive(1, tablet: 2, desktop: 3),
+                              crossAxisSpacing: context.spacing,
+                              mainAxisSpacing: context.spacing,
+                              mainAxisExtent: context.scale(260),
+                            ),
+                            itemCount: tickets.length,
+                            itemBuilder: (context, index) => _buildTicketItem(context, tickets[index]),
+                          );
+                        },
+                        onRetry: _loadTickets,
                       );
                     },
                   ),
@@ -362,6 +351,58 @@ class _StaffAssignedTicketsPageState extends State<StaffAssignedTicketsPage> {
       case 'open': return Colors.blue;
       default: return Colors.grey;
     }
+  }
+
+  Widget _buildSkeleton(BuildContext context) {
+    return GridView.builder(
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: context.responsive(1, tablet: 2, desktop: 3),
+        crossAxisSpacing: context.spacing,
+        mainAxisSpacing: context.spacing,
+        mainAxisExtent: context.scale(260),
+      ),
+      itemCount: 6,
+      itemBuilder: (context, index) => Card(
+        elevation: 0,
+        margin: EdgeInsets.zero,
+        color: context.theme.colorScheme.surfaceContainerLow,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(context.scale(16)),
+          side: BorderSide(color: context.theme.colorScheme.outlineVariant.withValues(alpha: 0.5), width: 0.5),
+        ),
+        child: Padding(
+          padding: EdgeInsets.all(context.spacing),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Skeleton(width: context.scale(60), height: context.scale(16)),
+                  Skeleton(width: context.scale(80), height: context.scale(24), borderRadius: context.scale(6)),
+                ],
+              ),
+              SizedBox(height: context.md),
+              Skeleton(width: double.infinity, height: context.scale(20)),
+              SizedBox(height: context.scale(8)),
+              Skeleton(width: context.scale(150), height: context.scale(20)),
+              const Spacer(),
+              Row(
+                children: [
+                  Skeleton(width: context.scale(100), height: context.scale(14)),
+                  const Spacer(),
+                  Skeleton(width: context.scale(80), height: context.scale(14)),
+                ],
+              ),
+              SizedBox(height: context.md),
+              Skeleton(width: double.infinity, height: context.scale(44), borderRadius: context.scale(12)),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 }
 

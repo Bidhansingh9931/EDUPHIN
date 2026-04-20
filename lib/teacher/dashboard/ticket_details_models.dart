@@ -7,6 +7,13 @@ class TicketDetails {
 
   TicketDetails({required this.ticket, required this.replies});
 
+  Map<String, dynamic> toJson() {
+    return {
+      'ticket': ticket.toJson(),
+      'replies': replies.map((r) => r.toJson()).toList(),
+    };
+  }
+
   factory TicketDetails.fromJson(Map<String, dynamic> json) {
     return TicketDetails(
       ticket: SupportTicket.fromJson(json['ticket'] ?? {}),
@@ -35,6 +42,20 @@ class TicketReply {
     this.userName,
     this.userRole,
   });
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'user_id': userId,
+      'message': message,
+      'attachment': attachment,
+      'created_at': createdAt,
+      'user': {
+        'name': userName,
+        'role': userRole,
+      },
+    };
+  }
 
   factory TicketReply.fromJson(Map<String, dynamic> json) {
     final user = json['user'] as Map<String, dynamic>? ?? {};

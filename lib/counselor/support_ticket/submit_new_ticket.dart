@@ -12,7 +12,6 @@ class CreateSupportTicketPage extends StatefulWidget {
 }
 
 class _CreateSupportTicketPageState extends State<CreateSupportTicketPage> {
-  late ColorScheme _colorScheme;
   String priorityValue = "Low";
   bool _isSubmitting = false;
 

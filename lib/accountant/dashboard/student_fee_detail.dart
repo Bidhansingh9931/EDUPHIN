@@ -1,8 +1,10 @@
 import 'dart:convert';
+import 'package:eduphin/services/common_widgets.dart';
 import 'package:eduphin/services/responsive_helper.dart';
 import 'package:flutter/material.dart';
 import 'package:eduphin/services/api_service.dart';
 import 'package:intl/intl.dart';
+import 'package:eduphin/teacher/dashboard/common_widgets.dart';
 
 class StudentFeeDetailPage extends StatefulWidget {
   const StudentFeeDetailPage({super.key});
@@ -12,167 +14,117 @@ class StudentFeeDetailPage extends StatefulWidget {
 }
 
 class _StudentFeeDetailPageState extends State<StudentFeeDetailPage> {
-  bool _isLoading = false;
+  late Stream<List<dynamic>> _studentsStream;
+  Stream<Map<String, dynamic>>? _studentDetailsStream;
+  
   List<dynamic> _classes = [];
   List<dynamic> _sections = [];
   dynamic _selectedClassId;
   dynamic _selectedSectionId;
-  List<dynamic> _students = [];
-  Map<String, dynamic>? _studentDetails;
-  dynamic _selectedStudentId;
+  String? _selectedStudentId;
+  
+  bool _isProcessing = false;
 
   @override
   void initState() {
     super.initState();
-    _fetchInitialData();
+    _fetchStudents();
   }
 
-  Future<void> _fetchInitialData() async {
-    if (!mounted) return;
-    setState(() => _isLoading = true);
-    try {
-      final response = await ApiService.get('accountants/students');
-      if (response.statusCode == 200 && mounted) {
-        final body = jsonDecode(response.body);
-        final data = body['data'] ?? body;
-        setState(() {
-          _classes = data['classes'] ?? [];
-          _sections = data['sections'] ?? [];
-          _students = data['students'] ?? [];
-        });
-      }
-    } catch (e) {
-      debugPrint("Initial Data Error: $e");
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Error: $e")));
-    } finally {
-      if (mounted) setState(() => _isLoading = false);
-    }
-  }
-
-  Future<void> _fetchStudents() async {
-    if (!mounted) return;
-    setState(() => _isLoading = true);
-    try {
+  void _fetchStudents() {
+    setState(() {
       final Map<String, String> query = {};
       if (_selectedClassId != null) query['class_filter'] = _selectedClassId.toString();
       if (_selectedSectionId != null) query['section_filter'] = _selectedSectionId.toString();
-
-      final students = await ApiService.getAccountantStudents(query);
-      if (mounted) {
-        setState(() {
-          _students = students;
-          _studentDetails = null;
-          _selectedStudentId = null;
-        });
-      }
-    } catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Error: $e")));
-    } finally {
-      if (mounted) setState(() => _isLoading = false);
-    }
+      _studentsStream = ApiService.getAccountantStudentsStream(query);
+    });
   }
 
-  Future<void> _fetchStudentDetails(dynamic id) async {
-    if (!mounted || id == null) return;
-
-    final String studentId = id.toString();
-    setState(() => _isLoading = true);
-    try {
-      debugPrint("Fetching details for student: $studentId");
-      final details = await ApiService.getAccountantStudentFeeDetails(studentId);
-      if (mounted) {
-        setState(() {
-          _studentDetails = details;
-          _selectedStudentId = studentId;
-        });
-        debugPrint("Successfully loaded details for $studentId");
-      }
-    } catch (e) {
-      debugPrint("Student Fee Detail Error: $e");
-      if (mounted) {
-        String msg = e.toString();
-        if (msg.startsWith('Exception: ')) msg = msg.replaceFirst('Exception: ', '');
-        
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(msg),
-            backgroundColor: Colors.red,
-            duration: const Duration(seconds: 5),
-            action: SnackBarAction(label: "Retry", textColor: Colors.white, onPressed: () => _fetchStudentDetails(id)),
-          ),
-        );
-      }
-    } finally {
-      if (mounted) setState(() => _isLoading = false);
-    }
+  void _fetchStudentDetails(String studentId) {
+    setState(() {
+      _selectedStudentId = studentId;
+      _studentDetailsStream = ApiService.getAccountantStudentFeeDetailsStream(studentId);
+    });
   }
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
+    final theme = context.theme;
     final bool isMobile = !context.isTablet;
-    final bool showDetails = _studentDetails != null;
+    final bool showDetails = _selectedStudentId != null;
 
     return Scaffold(
       appBar: AppBar(
         title: Text(showDetails && isMobile ? "Student Details" : "Student Fees Management"),
         leading: showDetails && isMobile
             ? IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () => setState(() {
-            _studentDetails = null;
-            _selectedStudentId = null;
-          }),
-        )
+                icon: const Icon(Icons.arrow_back),
+                onPressed: () => setState(() {
+                  _selectedStudentId = null;
+                  _studentDetailsStream = null;
+                }),
+              )
             : null,
       ),
-      body: Stack(
-        children: [
-          SingleChildScrollView(
-            padding: context.pagePadding,
-            child: Center(
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 1000),
-                child: Column(
-                  children: [
-                    if (!showDetails || !isMobile) ...[
-                      _buildFilterSection(context),
-                      const SizedBox(height: 24),
-                    ],
-                    if (context.isTablet)
-                      Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Expanded(flex: 4, child: _buildStudentList(context)),
-                          const SizedBox(width: 24),
-                          Expanded(flex: 6, child: showDetails ? _buildDetailedView(context) : _buildEmptyDetail(context)),
+      body: StreamBuilder<List<dynamic>>(
+        stream: _studentsStream,
+        builder: (context, studentsSnapshot) {
+          return LoadingWrapper<List<dynamic>>(
+            snapshot: studentsSnapshot,
+            onRetry: _fetchStudents,
+            skeleton: _buildSkeleton(context),
+            builder: (students) {
+              return SingleChildScrollView(
+                padding: context.pagePadding,
+                child: Center(
+                  child: ConstrainedBox(
+                    constraints: BoxConstraints(maxWidth: context.scale(1000)),
+                    child: Column(
+                      children: [
+                        if (!showDetails || !isMobile) ...[
+                          _buildFilterSection(context),
+                          SizedBox(height: context.spacing),
                         ],
-                      )
-                    else ...[
-                      if (!showDetails) _buildStudentList(context) else _buildDetailedView(context),
-                    ],
-                    const SizedBox(height: 40),
-                  ],
+                        if (context.isTablet)
+                          Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Expanded(flex: 4, child: _buildStudentList(context, students)),
+                              SizedBox(width: context.spacing),
+                              Expanded(
+                                flex: 6,
+                                child: _selectedStudentId != null ? _buildDetailsStreamWrapper() : _buildEmptyDetail(context),
+                              ),
+                            ],
+                          )
+                        else if (!showDetails)
+                          _buildStudentList(context, students)
+                        else
+                          _buildDetailsStreamWrapper(),
+                        SizedBox(height: context.spacing * 2),
+                      ],
+                    ),
+                  ),
                 ),
-              ),
-            ),
-          ),
-          if (_isLoading) const Center(child: CircularProgressIndicator()),
-        ],
+              );
+            },
+          );
+        },
       ),
     );
   }
 
-  Widget _buildEmptyDetail(BuildContext context) {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(40.0),
-        child: Center(
+  Widget _buildSkeleton(BuildContext context) {
+    return SingleChildScrollView(
+      padding: context.pagePadding,
+      child: Center(
+        child: ConstrainedBox(
+          constraints: BoxConstraints(maxWidth: context.scale(1000)),
           child: Column(
             children: [
-              Icon(Icons.person_search_outlined, size: 64, color: Theme.of(context).hintColor.withValues(alpha: 0.3)),
-              const SizedBox(height: 16),
-              Text("Select a student to view details", style: TextStyle(color: Theme.of(context).hintColor)),
+              Skeleton(height: context.scale(180), width: double.infinity, borderRadius: context.scale(16)),
+              SizedBox(height: context.spacing),
+              _buildStudentListSkeleton(),
             ],
           ),
         ),
@@ -180,42 +132,89 @@ class _StudentFeeDetailPageState extends State<StudentFeeDetailPage> {
     );
   }
 
-  Widget _buildDetailedView(BuildContext context) {
+  Widget _buildDetailsStreamWrapper() {
+    return StreamBuilder<Map<String, dynamic>>(
+      key: ValueKey(_selectedStudentId),
+      stream: _studentDetailsStream,
+      builder: (context, snapshot) {
+        return LoadingWrapper<Map<String, dynamic>>(
+          snapshot: snapshot,
+          onRetry: () => _fetchStudentDetails(_selectedStudentId!),
+          skeleton: _buildDetailsSkeleton(),
+          builder: (data) => _buildDetailedView(context, data),
+        );
+      },
+    );
+  }
+
+  Widget _buildEmptyDetail(BuildContext context) {
+    return Card(
+      elevation: 0,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(context.scale(16)),
+        side: BorderSide(color: context.theme.colorScheme.outlineVariant, width: 0.5),
+      ),
+      child: Padding(
+        padding: EdgeInsets.all(context.scale(40.0)),
+        child: Center(
+          child: Column(
+            children: [
+              Icon(Icons.person_search_outlined, size: context.scale(64), color: context.theme.hintColor.withValues(alpha: 0.3)),
+              SizedBox(height: context.spacing),
+              Text("Select a student to view details", style: TextStyle(color: context.theme.hintColor)),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDetailedView(BuildContext context, Map<String, dynamic> data) {
     return Column(
       children: [
-        _buildStudentInfoCard(context),
-        const SizedBox(height: 20),
-        _buildFeeSummarySection(context),
-        const SizedBox(height: 20),
-        _buildFineDetailsSection(context),
-        const SizedBox(height: 20),
-        _buildPaymentHistorySection(context),
+        if (_isProcessing) const LinearProgressIndicator(),
+        _buildStudentInfoCard(context, data),
+        SizedBox(height: context.spacing),
+        _buildFeeSummarySection(context, data),
+        SizedBox(height: context.spacing),
+        _buildFineDetailsSection(context, data),
+        SizedBox(height: context.spacing),
+        _buildPaymentHistorySection(context, data),
       ],
     );
   }
 
   Widget _buildFilterSection(BuildContext context) {
-    final theme = Theme.of(context);
+    final theme = context.theme;
     return Card(
+      elevation: 0,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(context.scale(16)),
+        side: BorderSide(color: theme.colorScheme.outlineVariant, width: 0.5),
+      ),
       child: Padding(
-        padding: const EdgeInsets.all(20),
+        padding: EdgeInsets.all(context.spacing),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text("Filter Students", style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
-            const SizedBox(height: 16),
+            SizedBox(height: context.spacing),
             Row(
               children: [
                 Expanded(child: _buildDropdownField(context, _classes, _selectedClassId, "All Classes", (val) => setState(() => _selectedClassId = val))),
-                const SizedBox(width: 12),
+                SizedBox(width: context.spacing / 2),
                 Expanded(child: _buildDropdownField(context, _sections, _selectedSectionId, "All Sections", (val) => setState(() => _selectedSectionId = val), isSection: true)),
               ],
             ),
-            const SizedBox(height: 16),
+            SizedBox(height: context.spacing),
             SizedBox(
               width: double.infinity,
               child: ElevatedButton(
                 onPressed: _fetchStudents,
+                style: ElevatedButton.styleFrom(
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(context.scale(12))),
+                  padding: EdgeInsets.symmetric(vertical: context.scale(12)),
+                ),
                 child: const Text("APPLY FILTERS"),
               ),
             ),
@@ -227,102 +226,110 @@ class _StudentFeeDetailPageState extends State<StudentFeeDetailPage> {
 
   Widget _buildDropdownField(BuildContext context, List<dynamic> items, dynamic value, String hint, Function(dynamic) onChanged, {bool isSection = false}) {
     return DropdownButtonFormField<dynamic>(
-      value: value,
+      initialValue: value,
       isExpanded: true,
-      hint: Text(hint, style: const TextStyle(fontSize: 13)),
+      hint: Text(hint, style: TextStyle(fontSize: context.font(13))),
       items: [
         DropdownMenuItem<dynamic>(value: null, child: Text(hint)),
         ...items.map((c) => DropdownMenuItem<dynamic>(
-          value: c['id'],
-          child: Text((isSection ? (c['section_name'] ?? c['name']) : c['name'])?.toString() ?? 'N/A'),
-        )),
+              value: c['id'],
+              child: Text((isSection ? (c['section_name'] ?? c['name']) : c['name'])?.toString() ?? 'N/A'),
+            )),
       ],
       onChanged: onChanged,
-      decoration: const InputDecoration(contentPadding: EdgeInsets.symmetric(horizontal: 12)),
+      decoration: InputDecoration(
+        contentPadding: EdgeInsets.symmetric(horizontal: context.scale(12)),
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(context.scale(12))),
+      ),
     );
   }
 
-  Widget _buildStudentList(BuildContext context) {
-    final theme = Theme.of(context);
+  Widget _buildStudentList(BuildContext context, List<dynamic> students) {
+    final theme = context.theme;
     return Card(
+      elevation: 0,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(context.scale(16)),
+        side: BorderSide(color: theme.colorScheme.outlineVariant, width: 0.5),
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Padding(
-            padding: const EdgeInsets.all(20.0),
+            padding: EdgeInsets.all(context.spacing),
             child: Text("Student Directory", style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
           ),
           const Divider(height: 1),
-          if (_students.isEmpty && !_isLoading)
-            const Padding(padding: EdgeInsets.all(40), child: Center(child: Text("No students found")))
+          if (students.isEmpty)
+            Padding(padding: EdgeInsets.all(context.scale(40)), child: const Center(child: Text("No students found")))
           else
             ListView.separated(
               shrinkWrap: true,
               physics: const NeverScrollableScrollPhysics(),
-              itemCount: _students.length,
+              itemCount: students.length,
               separatorBuilder: (context, index) => const Divider(height: 1),
               itemBuilder: (context, index) {
-                final student = _students[index];
+                final student = students[index];
                 final studentId = student['encrypted_id'] ?? student['id'].toString();
                 final isSelected = _selectedStudentId == studentId;
                 return ListTile(
                   selected: isSelected,
                   selectedTileColor: theme.colorScheme.primary.withValues(alpha: 0.05),
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
+                  contentPadding: EdgeInsets.symmetric(horizontal: context.spacing, vertical: context.scale(4)),
                   leading: CircleAvatar(
-                    radius: 16,
+                    radius: context.scale(16),
                     backgroundColor: theme.colorScheme.primary.withValues(alpha: 0.1),
-                    child: Text("${index + 1}", style: TextStyle(fontSize: 10, color: theme.colorScheme.primary, fontWeight: FontWeight.bold)),
+                    child: Text("${index + 1}", style: TextStyle(fontSize: context.font(10), color: theme.colorScheme.primary, fontWeight: FontWeight.bold)),
                   ),
                   title: Text(
-                    "${student['first_name'] ?? ''} ${student['last_name'] ?? ''}".trim().isEmpty
-                        ? (student["name"]?.toString() ?? student["user"]?["name"]?.toString() ?? 'N/A')
-                        : "${student['first_name'] ?? ''} ${student['last_name'] ?? ''}",
-                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                    "${student['first_name'] ?? ''} ${student['last_name'] ?? ''}".trim().isEmpty ? (student["name"]?.toString() ?? student["user"]?["name"]?.toString() ?? 'N/A') : "${student['first_name'] ?? ''} ${student['last_name'] ?? ''}",
+                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: context.font(14)),
                   ),
-                  subtitle: Text("${student["class"]?["name"] ?? 'N/A'} - ${student["section"]?["section_name"] ?? student["section"]?["name"] ?? 'N/A'}", style: TextStyle(fontSize: 11, color: theme.hintColor)),
-                  onTap: () {
-                    final targetId = student['encrypted_id'] ?? student['id'].toString();
-                    _fetchStudentDetails(targetId);
-                  },
+                  subtitle: Text("${student["class"]?["name"] ?? 'N/A'} - ${student["section"]?["section_name"] ?? student["section"]?["name"] ?? 'N/A'}", style: TextStyle(fontSize: context.font(11), color: theme.hintColor)),
+                  onTap: () => _fetchStudentDetails(studentId),
                 );
               },
             ),
-          const SizedBox(height: 12),
+          SizedBox(height: context.scale(12)),
         ],
       ),
     );
   }
 
-  Widget _buildStudentInfoCard(BuildContext context) {
-    if (_studentDetails == null || _studentDetails!['student'] == null) return const SizedBox();
-    final theme = Theme.of(context);
-    final info = _studentDetails!['student'];
-    final summary = _studentDetails!['summary'] ?? {};
+  Widget _buildStudentInfoCard(BuildContext context, Map<String, dynamic> data) {
+    final info = data['student'];
+    if (info == null) return const SizedBox();
+    final theme = context.theme;
+    final summary = data['summary'] ?? {};
     return Card(
-      color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
+      elevation: 0,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(context.scale(16)),
+        side: BorderSide(color: theme.colorScheme.outlineVariant, width: 0.5),
+      ),
+      color: theme.colorScheme.surfaceContainerLow,
       child: Padding(
-        padding: const EdgeInsets.all(20),
+        padding: EdgeInsets.all(context.spacing),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(
               children: [
-                CircleAvatar(backgroundColor: theme.colorScheme.primary, radius: 20, child: const Icon(Icons.person, color: Colors.white, size: 20)),
-                const SizedBox(width: 12),
+                CircleAvatar(backgroundColor: theme.colorScheme.primary, radius: context.scale(24), child: Icon(Icons.person, color: Colors.white, size: context.scale(24))),
+                SizedBox(width: context.spacing),
                 Expanded(
                   child: Text(
                     "${info['first_name'] ?? ''} ${info['last_name'] ?? ''}".trim().isEmpty ? (info['name']?.toString() ?? 'N/A') : "${info['first_name'] ?? ''} ${info['last_name'] ?? ''}",
-                    style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+                    style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold, fontSize: context.font(18)),
                   ),
                 ),
               ],
             ),
-            const SizedBox(height: 24),
+            SizedBox(height: context.spacing),
             _buildDetailGrid(context, info),
-            const Divider(height: 40),
+            Divider(height: context.scale(40), color: theme.colorScheme.outlineVariant),
             Text("Financial Overview", style: theme.textTheme.labelMedium?.copyWith(fontWeight: FontWeight.bold, color: theme.hintColor)),
-            const SizedBox(height: 16),
+            SizedBox(height: context.spacing),
             _buildSummaryRow(context, "Total Payable", "₹${summary['total_payable'] ?? '0'}", theme.colorScheme.primary),
             _buildSummaryRow(context, "Total Paid", "₹${summary['total_paid'] ?? '0'}", Colors.green),
             _buildSummaryRow(context, "Balance Due", "₹${summary['due'] ?? '0'}", Colors.orange, isBold: true),
@@ -334,8 +341,8 @@ class _StudentFeeDetailPageState extends State<StudentFeeDetailPage> {
 
   Widget _buildDetailGrid(BuildContext context, dynamic info) {
     return Wrap(
-      spacing: 24,
-      runSpacing: 12,
+      spacing: context.spacing,
+      runSpacing: context.scale(12),
       children: [
         _infoItem(context, "Roll No", info['roll_no']?.toString() ?? 'N/A'),
         _infoItem(context, "Class", "${info['class']?['name'] ?? 'N/A'} - ${info['section']?['section_name'] ?? info['section']?['name'] ?? 'N/A'}"),
@@ -348,47 +355,52 @@ class _StudentFeeDetailPageState extends State<StudentFeeDetailPage> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(label, style: TextStyle(color: Theme.of(context).hintColor, fontSize: 10, fontWeight: FontWeight.bold)),
-        Text(value, style: const TextStyle(fontWeight: FontWeight.w500, fontSize: 13)),
+        Text(label, style: TextStyle(color: context.theme.hintColor, fontSize: context.font(10), fontWeight: FontWeight.bold)),
+        Text(value, style: TextStyle(fontWeight: FontWeight.w500, fontSize: context.font(13))),
       ],
     );
   }
 
   Widget _buildSummaryRow(BuildContext context, String label, String value, Color color, {bool isBold = false}) {
     return Padding(
-      padding: const EdgeInsets.only(bottom: 8.0),
+      padding: EdgeInsets.only(bottom: context.scale(8.0)),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(label, style: const TextStyle(fontSize: 13)),
-          Text(value, style: TextStyle(color: color, fontSize: 15, fontWeight: isBold ? FontWeight.bold : FontWeight.w500)),
+          Text(label, style: TextStyle(fontSize: context.font(13))),
+          Text(value, style: TextStyle(color: color, fontSize: context.font(15), fontWeight: isBold ? FontWeight.bold : FontWeight.w500)),
         ],
       ),
     );
   }
 
-  Widget _buildFeeSummarySection(BuildContext context) {
-    final theme = Theme.of(context);
-    final List<dynamic> fees = _studentDetails!['fees'] ?? [];
-    final overridesData = _studentDetails!['overrides'];
+  Widget _buildFeeSummarySection(BuildContext context, Map<String, dynamic> data) {
+    final theme = context.theme;
+    final List<dynamic> fees = data['fees'] ?? [];
+    final overridesData = data['overrides'];
     final Map<String, dynamic> overrides = (overridesData is Map) ? Map<String, dynamic>.from(overridesData) : {};
 
     return Card(
+      elevation: 0,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(context.scale(16)),
+        side: BorderSide(color: theme.colorScheme.outlineVariant, width: 0.5),
+      ),
       child: Column(
         children: [
           Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(color: theme.colorScheme.primary, borderRadius: const BorderRadius.vertical(top: Radius.circular(16))),
-            child: const Row(
+            padding: EdgeInsets.all(context.spacing),
+            decoration: BoxDecoration(color: theme.colorScheme.primary, borderRadius: BorderRadius.vertical(top: Radius.circular(context.scale(16)))),
+            child: Row(
               children: [
-                Icon(Icons.receipt_long, color: Colors.white, size: 20),
-                SizedBox(width: 12),
-                Text("Assigned Fee Components", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                Icon(Icons.receipt_long, color: Colors.white, size: context.scale(20)),
+                SizedBox(width: context.spacing / 2),
+                const Text("Assigned Fee Components", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
               ],
             ),
           ),
           if (fees.isEmpty)
-            const Padding(padding: EdgeInsets.all(32), child: Text("No fees assigned"))
+            Padding(padding: EdgeInsets.all(context.scale(32)), child: const Text("No fees assigned"))
           else
             ListView.separated(
               shrinkWrap: true,
@@ -403,26 +415,34 @@ class _StudentFeeDetailPageState extends State<StudentFeeDetailPage> {
                 final amount = isOverridden ? overrideData['overridden_amount'] : fee['amount'];
 
                 return ListTile(
-                  title: Text(fee['fee_name'] ?? 'Fee', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
-                  subtitle: isOverridden ? const Text("Manual Override Applied", style: TextStyle(color: Colors.orange, fontSize: 10, fontWeight: FontWeight.bold)) : null,
+                  title: Text(fee['fee_name'] ?? 'Fee', style: TextStyle(fontWeight: FontWeight.bold, fontSize: context.font(14))),
+                  subtitle: isOverridden ? Text("Manual Override Applied", style: TextStyle(color: Colors.orange, fontSize: context.font(10), fontWeight: FontWeight.bold)) : null,
                   trailing: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Text("₹$amount", style: TextStyle(fontWeight: FontWeight.bold, color: isOverridden ? Colors.orange : null)),
-                      const SizedBox(width: 8),
-                      IconButton(icon: const Icon(Icons.edit_outlined, size: 18), onPressed: () => _showOverrideDialog(feeId, amount.toString(), overrideData?['reason'] ?? '')),
+                      Text("₹$amount", style: TextStyle(fontWeight: FontWeight.bold, color: isOverridden ? Colors.orange : null, fontSize: context.font(14))),
+                      SizedBox(width: context.scale(8)),
+                      IconButton(icon: Icon(Icons.edit_outlined, size: context.scale(18)), onPressed: () => _showOverrideDialog(feeId, amount.toString(), overrideData?['reason'] ?? '')),
                     ],
                   ),
                 );
               },
             ),
           Padding(
-            padding: const EdgeInsets.all(16.0),
-            child: ElevatedButton.icon(
-              onPressed: _showPaymentDialog,
-              icon: const Icon(Icons.payment, size: 18),
-              label: const Text("COLLECT PAYMENT"),
-              style: ElevatedButton.styleFrom(backgroundColor: Colors.green, foregroundColor: Colors.white),
+            padding: EdgeInsets.all(context.spacing),
+            child: SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                onPressed: _showPaymentDialog,
+                icon: Icon(Icons.payment, size: context.scale(18)),
+                label: const Text("COLLECT PAYMENT"),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.green,
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(context.scale(12))),
+                  padding: EdgeInsets.symmetric(vertical: context.scale(12)),
+                ),
+              ),
             ),
           ),
         ],
@@ -430,49 +450,54 @@ class _StudentFeeDetailPageState extends State<StudentFeeDetailPage> {
     );
   }
 
-  Widget _buildFineDetailsSection(BuildContext context) {
-    final theme = Theme.of(context);
-    final finesData = _studentDetails!['fines'];
+  Widget _buildFineDetailsSection(BuildContext context, Map<String, dynamic> data) {
+    final theme = context.theme;
+    final finesData = data['fines'];
     final List<dynamic> fines = (finesData is List) ? finesData : [];
     return Card(
+      elevation: 0,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(context.scale(16)),
+        side: BorderSide(color: theme.colorScheme.outlineVariant, width: 0.5),
+      ),
       child: Column(
         children: [
           Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(color: theme.colorScheme.error, borderRadius: const BorderRadius.vertical(top: Radius.circular(16))),
+            padding: EdgeInsets.all(context.spacing),
+            decoration: BoxDecoration(color: theme.colorScheme.error, borderRadius: BorderRadius.vertical(top: Radius.circular(context.scale(16)))),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                const Row(
+                Row(
                   children: [
-                    Icon(Icons.warning_amber, color: Colors.white, size: 20),
-                    SizedBox(width: 12),
-                    Text("Late Fines / Penalties", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                    Icon(Icons.warning_amber, color: Colors.white, size: context.scale(20)),
+                    SizedBox(width: context.spacing / 2),
+                    const Text("Late Fines / Penalties", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
                   ],
                 ),
                 TextButton.icon(
                   onPressed: _showAddFineDialog,
-                  icon: const Icon(Icons.add, size: 14, color: Colors.white),
-                  label: const Text("ADD FINE", style: TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold)),
+                  icon: Icon(Icons.add, size: context.scale(14), color: Colors.white),
+                  label: Text("ADD FINE", style: TextStyle(color: Colors.white, fontSize: context.font(11), fontWeight: FontWeight.bold)),
                   style: TextButton.styleFrom(backgroundColor: Colors.white.withValues(alpha: 0.2)),
                 ),
               ],
             ),
           ),
           if (fines.isEmpty)
-            const Padding(padding: EdgeInsets.all(32), child: Text("No fines recorded"))
+            Padding(padding: EdgeInsets.all(context.scale(32)), child: const Text("No fines recorded"))
           else
             ...fines.map((fine) {
               final fineId = fine['encrypted_id'] ?? fine['id'].toString();
               return ListTile(
-                leading: const Icon(Icons.error_outline, color: Colors.red),
-                title: Text(fine['reason'] ?? 'Fine', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
-                subtitle: Text(fine['created_at']?.toString().split('T')[0] ?? '', style: const TextStyle(fontSize: 11)),
+                leading: Icon(Icons.error_outline, color: Colors.red, size: context.scale(24)),
+                title: Text(fine['reason'] ?? 'Fine', style: TextStyle(fontWeight: FontWeight.bold, fontSize: context.font(13))),
+                subtitle: Text(fine['created_at']?.toString().split('T')[0] ?? '', style: TextStyle(fontSize: context.font(11))),
                 trailing: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Text("₹${fine['amount']}", style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.red)),
-                    IconButton(icon: const Icon(Icons.delete_outline, size: 18, color: Colors.red), onPressed: () => _deleteFine(fineId)),
+                    Text("₹${fine['amount']}", style: TextStyle(fontWeight: FontWeight.bold, color: Colors.red, fontSize: context.font(14))),
+                    IconButton(icon: Icon(Icons.delete_outline, size: context.scale(18), color: Colors.red), onPressed: () => _deleteFine(fineId)),
                   ],
                 ),
               );
@@ -482,34 +507,39 @@ class _StudentFeeDetailPageState extends State<StudentFeeDetailPage> {
     );
   }
 
-  Widget _buildPaymentHistorySection(BuildContext context) {
-    final theme = Theme.of(context);
-    final paymentsData = _studentDetails!['payments'];
+  Widget _buildPaymentHistorySection(BuildContext context, Map<String, dynamic> data) {
+    final theme = context.theme;
+    final paymentsData = data['payments'];
     final List<dynamic> history = (paymentsData is List) ? paymentsData : [];
     return Card(
+      elevation: 0,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(context.scale(16)),
+        side: BorderSide(color: theme.colorScheme.outlineVariant, width: 0.5),
+      ),
       child: Column(
         children: [
           Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(color: theme.colorScheme.secondary, borderRadius: const BorderRadius.vertical(top: Radius.circular(16))),
-            child: const Row(
+            padding: EdgeInsets.all(context.spacing),
+            decoration: BoxDecoration(color: theme.colorScheme.secondary, borderRadius: BorderRadius.vertical(top: Radius.circular(context.scale(16)))),
+            child: Row(
               children: [
-                Icon(Icons.history, color: Colors.white, size: 20),
-                SizedBox(width: 12),
-                Text("Transaction History", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                Icon(Icons.history, color: Colors.white, size: context.scale(20)),
+                SizedBox(width: context.spacing / 2),
+                const Text("Transaction History", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
               ],
             ),
           ),
           if (history.isEmpty)
-            const Padding(padding: EdgeInsets.all(32), child: Text("No transactions yet"))
+            Padding(padding: EdgeInsets.all(context.scale(32)), child: const Text("No transactions yet"))
           else
             ...history.map((pay) => ListTile(
-              leading: const CircleAvatar(backgroundColor: Colors.green, radius: 14, child: Icon(Icons.arrow_downward, size: 14, color: Colors.white)),
-              title: Text("₹${pay['paid_amount']}", style: const TextStyle(fontWeight: FontWeight.bold)),
-              subtitle: Text("${pay['payment_date']} • ${pay['mode']}", style: const TextStyle(fontSize: 11)),
-              trailing: const Icon(Icons.receipt_long_outlined, size: 20),
-              onTap: () {},
-            )),
+                  leading: CircleAvatar(backgroundColor: Colors.green, radius: context.scale(14), child: Icon(Icons.arrow_downward, size: context.scale(14), color: Colors.white)),
+                  title: Text("₹${pay['paid_amount']}", style: TextStyle(fontWeight: FontWeight.bold, fontSize: context.font(14))),
+                  subtitle: Text("${pay['payment_date']} • ${pay['mode']}", style: TextStyle(fontSize: context.font(11))),
+                  trailing: Icon(Icons.receipt_long_outlined, size: context.scale(20)),
+                  onTap: () {},
+                )),
         ],
       ),
     );
@@ -525,35 +555,35 @@ class _StudentFeeDetailPageState extends State<StudentFeeDetailPage> {
         isScrollControlled: true,
         backgroundColor: Colors.transparent,
         builder: (sheetContext) {
-          final theme = Theme.of(sheetContext);
+          final theme = sheetContext.theme;
           return Container(
-            decoration: BoxDecoration(color: theme.scaffoldBackgroundColor, borderRadius: const BorderRadius.vertical(top: Radius.circular(24))),
-            padding: EdgeInsets.only(bottom: MediaQuery.of(sheetContext).viewInsets.bottom, top: 24, left: 24, right: 24),
+            decoration: BoxDecoration(color: theme.scaffoldBackgroundColor, borderRadius: BorderRadius.vertical(top: Radius.circular(context.scale(24)))),
+            padding: EdgeInsets.only(bottom: MediaQuery.of(sheetContext).viewInsets.bottom, top: context.scale(24), left: context.scale(24), right: context.scale(24)),
             child: SingleChildScrollView(
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   const Text("Record Payment", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-                  const SizedBox(height: 24),
+                  SizedBox(height: context.spacing),
                   TextField(controller: amountController, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: "Amount (₹)")),
-                  const SizedBox(height: 20),
+                  SizedBox(height: context.spacing),
                   DropdownButtonFormField<String>(
-                    value: selectedMode,
+                    initialValue: selectedMode,
                     items: ['Cash', 'UPI', 'Bank Transfer', 'Cheque'].map((m) => DropdownMenuItem(value: m, child: Text(m))).toList(),
                     onChanged: (v) => selectedMode = v!,
                     decoration: const InputDecoration(labelText: "Mode"),
                   ),
-                  const SizedBox(height: 20),
+                  SizedBox(height: context.spacing),
                   TextField(controller: remarkController, decoration: const InputDecoration(labelText: "Remarks (Optional)")),
-                  const SizedBox(height: 32),
+                  SizedBox(height: context.spacing * 1.5),
                   SizedBox(
                     width: double.infinity,
                     child: ElevatedButton(
                       onPressed: () async {
                         if (amountController.text.isEmpty) return;
                         Navigator.pop(sheetContext);
-                        setState(() => _isLoading = true);
+                        setState(() => _isProcessing = true);
                         try {
                           await ApiService.storeAccountantPayment({
                             'student_id': _selectedStudentId,
@@ -562,23 +592,26 @@ class _StudentFeeDetailPageState extends State<StudentFeeDetailPage> {
                             'mode': selectedMode,
                             'remarks': remarkController.text,
                           });
-                          _fetchStudentDetails(_selectedStudentId);
+                          _fetchStudentDetails(_selectedStudentId!);
                         } catch (e) {
                           if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Error: $e")));
                         } finally {
-                          if (mounted) setState(() => _isLoading = false);
+                          if (mounted) setState(() => _isProcessing = false);
                         }
                       },
+                      style: ElevatedButton.styleFrom(
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(context.scale(12))),
+                        padding: EdgeInsets.symmetric(vertical: context.scale(12)),
+                      ),
                       child: const Text("SUBMIT PAYMENT"),
                     ),
                   ),
-                  const SizedBox(height: 40),
+                  SizedBox(height: context.scale(40)),
                 ],
               ),
             ),
           );
-        }
-    );
+        });
   }
 
   void _showOverrideDialog(String feeId, String currentAmount, String currentReason) {
@@ -592,7 +625,7 @@ class _StudentFeeDetailPageState extends State<StudentFeeDetailPage> {
           mainAxisSize: MainAxisSize.min,
           children: [
             TextField(controller: amountController, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: "New Amount")),
-            const SizedBox(height: 12),
+            SizedBox(height: context.spacing / 2),
             TextField(controller: reasonController, decoration: const InputDecoration(labelText: "Reason")),
           ],
         ),
@@ -601,17 +634,17 @@ class _StudentFeeDetailPageState extends State<StudentFeeDetailPage> {
           ElevatedButton(
             onPressed: () async {
               Navigator.pop(dialogContext);
-              setState(() => _isLoading = true);
+              setState(() => _isProcessing = true);
               try {
                 await ApiService.storeFeeOverride(_selectedStudentId.toString(), feeId, {
                   'overridden_amount': amountController.text,
                   'reason': reasonController.text,
                 });
-                _fetchStudentDetails(_selectedStudentId);
+                _fetchStudentDetails(_selectedStudentId!);
               } catch (e) {
                 if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Error: $e")));
               } finally {
-                if (mounted) setState(() => _isLoading = false);
+                if (mounted) setState(() => _isProcessing = false);
               }
             },
             child: const Text("APPLY"),
@@ -632,7 +665,7 @@ class _StudentFeeDetailPageState extends State<StudentFeeDetailPage> {
           mainAxisSize: MainAxisSize.min,
           children: [
             TextField(controller: reasonController, decoration: const InputDecoration(labelText: "Reason")),
-            const SizedBox(height: 12),
+            SizedBox(height: context.spacing / 2),
             TextField(controller: amountController, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: "Amount")),
           ],
         ),
@@ -641,18 +674,18 @@ class _StudentFeeDetailPageState extends State<StudentFeeDetailPage> {
           ElevatedButton(
             onPressed: () async {
               Navigator.pop(dialogContext);
-              setState(() => _isLoading = true);
+              setState(() => _isProcessing = true);
               try {
                 await ApiService.storeOrUpdateFine({
                   'student_id': _selectedStudentId,
                   'amount': amountController.text,
                   'reason': reasonController.text,
                 });
-                _fetchStudentDetails(_selectedStudentId);
+                _fetchStudentDetails(_selectedStudentId!);
               } catch (e) {
                 if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Error: $e")));
               } finally {
-                if (mounted) setState(() => _isLoading = false);
+                if (mounted) setState(() => _isProcessing = false);
               }
             },
             child: const Text("ADD"),
@@ -663,14 +696,102 @@ class _StudentFeeDetailPageState extends State<StudentFeeDetailPage> {
   }
 
   Future<void> _deleteFine(String fineId) async {
-    setState(() => _isLoading = true);
+    setState(() => _isProcessing = true);
     try {
       await ApiService.deleteFine(fineId);
-      _fetchStudentDetails(_selectedStudentId);
+      _fetchStudentDetails(_selectedStudentId!);
     } catch (e) {
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Error: $e")));
     } finally {
-      if (mounted) setState(() => _isLoading = false);
+      if (mounted) setState(() => _isProcessing = false);
     }
+  }
+
+  Widget _buildStudentListSkeleton() {
+    return Card(
+      elevation: 0,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(context.scale(16)),
+        side: BorderSide(color: context.theme.colorScheme.outlineVariant, width: 0.5),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: EdgeInsets.all(context.spacing),
+            child: Skeleton(height: context.font(16), width: context.scale(120)),
+          ),
+          const Divider(height: 1),
+          ...List.generate(
+            5,
+            (index) => ListTile(
+              leading: Skeleton(width: context.scale(32), height: context.scale(32), borderRadius: context.scale(16)),
+              title: Skeleton(height: context.font(14), width: context.scale(150)),
+              subtitle: Skeleton(height: context.font(11), width: context.scale(100)),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDetailsSkeleton() {
+    return Column(
+      children: [
+        Card(
+          elevation: 0,
+          color: context.theme.colorScheme.surfaceContainerLow,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(context.scale(16)),
+            side: BorderSide(color: context.theme.colorScheme.outlineVariant, width: 0.5),
+          ),
+          child: Padding(
+            padding: EdgeInsets.all(context.spacing),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Skeleton(width: context.scale(48), height: context.scale(48), borderRadius: context.scale(24)),
+                    SizedBox(width: context.spacing),
+                    Skeleton(height: context.font(18), width: context.scale(150)),
+                  ],
+                ),
+                SizedBox(height: context.spacing),
+                Wrap(
+                  spacing: context.spacing,
+                  runSpacing: context.scale(12),
+                  children: List.generate(
+                    3,
+                    (index) => Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Skeleton(height: context.font(10), width: context.scale(40)),
+                        SizedBox(height: context.scale(4)),
+                        Skeleton(height: context.font(13), width: context.scale(80)),
+                      ],
+                    ),
+                  ),
+                ),
+                Divider(height: context.scale(40), color: context.theme.colorScheme.outlineVariant),
+                ...List.generate(
+                  3,
+                  (index) => Padding(
+                    padding: EdgeInsets.only(bottom: context.scale(8.0)),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Skeleton(height: context.font(13), width: context.scale(80)),
+                        Skeleton(height: context.font(15), width: context.scale(60)),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
   }
 }

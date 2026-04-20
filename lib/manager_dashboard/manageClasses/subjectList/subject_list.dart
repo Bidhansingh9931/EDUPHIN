@@ -3,6 +3,8 @@ import 'dart:ui';
 import 'package:eduphin/manager_dashboard/manageClasses/subjectList/create_new_subject.dart';
 import 'package:eduphin/manager_dashboard/manageClasses/subjectList/edit_suject.dart';
 import 'package:eduphin/services/api_service.dart';
+import 'package:eduphin/services/caching_service.dart';
+import 'package:eduphin/services/common_widgets.dart';
 import 'package:eduphin/services/responsive_helper.dart';
 import 'package:flutter/material.dart';
 
@@ -49,17 +51,32 @@ class SubjectListPage extends StatefulWidget {
 class _SubjectListPageState extends State<SubjectListPage> {
   bool _isLoading = true;
   List<Subject> _subjects = [];
+  Object? _error;
+  static const String _cacheKey = 'manager_subjects_list';
 
   @override
   void initState() {
     super.initState();
+    _loadCachedData();
     _fetchSubjects();
+  }
+
+  Future<void> _loadCachedData() async {
+    final cachedData = await CacheService.getCache(_cacheKey);
+    if (cachedData != null && mounted) {
+      setState(() {
+        _subjects = (cachedData as List)
+            .map((subjectJson) => Subject.fromJson(subjectJson))
+            .toList();
+      });
+    }
   }
 
   Future<void> _fetchSubjects() async {
     if (!mounted) return;
     setState(() {
       _isLoading = true;
+      _error = null;
     });
 
     try {
@@ -70,6 +87,9 @@ class _SubjectListPageState extends State<SubjectListPage> {
           final subjectsData = (data['data'] as List)
               .map((subjectJson) => Subject.fromJson(subjectJson))
               .toList();
+          
+          await CacheService.setCache(_cacheKey, data['data']);
+
           setState(() {
             _subjects = subjectsData;
             _isLoading = false;
@@ -82,10 +102,8 @@ class _SubjectListPageState extends State<SubjectListPage> {
       if (mounted) {
         setState(() {
           _isLoading = false;
+          _error = e;
         });
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(e.toString())),
-        );
       }
     }
   }
@@ -145,32 +163,80 @@ class _SubjectListPageState extends State<SubjectListPage> {
         ),
         centerTitle: false,
       ),
-      body: _isLoading
-          ? Center(child: CircularProgressIndicator(color: theme.colorScheme.primary))
-          : RefreshIndicator(
-              onRefresh: _fetchSubjects,
-              color: theme.colorScheme.primary,
-              child: _subjects.isEmpty
-                  ? Center(
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(Icons.subject_outlined, size: context.scale(64), color: theme.colorScheme.outlineVariant.withValues(alpha: 0.5)),
-                          SizedBox(height: context.scale(16)),
-                          Text('No subjects found.', style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: context.font(16))),
-                        ],
-                      ),
-                    )
-                  : Center(
-                      child: ConstrainedBox(
-                        constraints: const BoxConstraints(maxWidth: 1200),
-                        child: context.responsive(
-                          _buildListView(),
-                          tablet: _buildGridView(),
-                        ),
-                      ),
+      body: LoadingWrapper(
+        isLoading: _isLoading,
+        hasData: _subjects.isNotEmpty,
+        error: _error,
+        onRetry: _fetchSubjects,
+        skeleton: _buildSkeleton(),
+        child: RefreshIndicator(
+          onRefresh: _fetchSubjects,
+          color: theme.colorScheme.primary,
+          child: _subjects.isEmpty
+              ? Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.subject_outlined, size: context.scale(64), color: theme.colorScheme.outlineVariant.withValues(alpha: 0.5)),
+                      SizedBox(height: context.scale(16)),
+                      Text('No subjects found.', style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: context.font(16))),
+                    ],
+                  ),
+                )
+              : Center(
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 1200),
+                    child: context.responsive(
+                      _buildListView(),
+                      tablet: _buildGridView(),
                     ),
+                  ),
+                ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSkeleton() {
+    return ListView.separated(
+      padding: context.pagePadding,
+      itemCount: 5,
+      separatorBuilder: (context, index) => SizedBox(height: context.scale(16)),
+      itemBuilder: (context, index) => Container(
+        padding: EdgeInsets.all(context.scale(16)),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(context.scale(16)),
+          border: Border.all(color: context.theme.colorScheme.outlineVariant),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                SkeletonBox(height: context.scale(22), width: context.scale(150)),
+                SkeletonBox(height: context.scale(24), width: context.scale(60)),
+              ],
             ),
+            SizedBox(height: context.scale(12)),
+            SkeletonBox(height: context.scale(14), width: double.infinity),
+            SizedBox(height: context.scale(8)),
+            SkeletonBox(height: context.scale(14), width: context.scale(200)),
+            SizedBox(height: context.scale(20)),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: List.generate(3, (index) => Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  SkeletonBox(height: context.scale(10), width: context.scale(60)),
+                  SizedBox(height: context.scale(4)),
+                  SkeletonBox(height: context.scale(14), width: context.scale(40)),
+                ],
+              )),
+            ),
+          ],
+        ),
+      ),
     );
   }
 
@@ -440,3 +506,4 @@ class DeleteSubjectDialog extends StatelessWidget {
     );
   }
 }
+

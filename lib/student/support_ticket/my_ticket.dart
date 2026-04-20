@@ -475,7 +475,7 @@ class _SupportTicketsPageState extends State<SupportTicketsPage> {
     final theme = context.theme;
     final colorScheme = theme.colorScheme;
     return DropdownButtonFormField<String>(
-      value: value,
+      initialValue: value,
       dropdownColor: colorScheme.surfaceContainerHighest,
       isExpanded: true,
       items: items.map((String item) {

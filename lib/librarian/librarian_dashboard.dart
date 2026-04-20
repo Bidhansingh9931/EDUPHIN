@@ -27,38 +27,18 @@ class LibrarianDashboard extends StatefulWidget {
 }
 
 class _LibrarianDashboardState extends State<LibrarianDashboard> {
-  bool _isLoading = true;
-  LibrarianDashboardData? _dashboardData;
-  String? _error;
+  late Stream<LibrarianDashboardData> _dashboardStream;
 
   @override
   void initState() {
     super.initState();
-    _refreshData();
+    _dashboardStream = ApiService.getLibrarianDashboardStream().asBroadcastStream();
   }
 
-  Future<void> _refreshData() async {
-    if (!mounted) return;
+  void _refreshData() {
     setState(() {
-      _isLoading = true;
-      _error = null;
+      _dashboardStream = ApiService.getLibrarianDashboardStream().asBroadcastStream();
     });
-    try {
-      final data = await ApiService.getLibrarianDashboard();
-      if (mounted) {
-        setState(() {
-          _dashboardData = data;
-          _isLoading = false;
-        });
-      }
-    } catch (e) {
-      if (mounted) {
-        setState(() {
-          _error = e.toString();
-          _isLoading = false;
-        });
-      }
-    }
   }
 
   @override
@@ -76,41 +56,72 @@ class _LibrarianDashboardState extends State<LibrarianDashboard> {
           ),
         ),
         actions: [
-          if (_dashboardData?.userDetail?.photo != null)
-            Padding(
-              padding: EdgeInsets.only(right: context.md),
-              child: InkWell(
-                onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const LibrarianProfilePage())).then((_) => _refreshData()),
-                borderRadius: BorderRadius.circular(context.scale(20)),
-                child: ProfileAvatar(
-                  imageUrl: ApiService.getStorageUrl(_dashboardData!.userDetail!.photo),
-                  radius: context.scale(18),
+          StreamBuilder<LibrarianDashboardData>(
+            stream: _dashboardStream,
+            builder: (context, snapshot) {
+              final user = snapshot.data?.userDetail;
+              if (user?.photo == null) return const SizedBox.shrink();
+              return Padding(
+                padding: EdgeInsets.only(right: context.md),
+                child: InkWell(
+                  onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const LibrarianProfilePage())).then((_) => _refreshData()),
+                  borderRadius: BorderRadius.circular(context.scale(20)),
+                  child: ProfileAvatar(
+                    imageUrl: ApiService.getStorageUrl(user!.photo),
+                    radius: context.scale(18),
+                    borderWidth: 1.5,
+                  ),
                 ),
-              ),
-            ),
+              );
+            },
+          ),
         ],
       ),
       body: RefreshIndicator(
-        onRefresh: _refreshData,
-        child: _isLoading
-            ? const Center(child: CircularProgressIndicator())
-            : _error != null
-                ? Center(
-                    child: Padding(
-                      padding: EdgeInsets.all(context.lg),
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(Icons.error_outline_rounded, size: 48, color: theme.colorScheme.error),
-                          SizedBox(height: context.md),
-                          Text('Error: $_error', textAlign: TextAlign.center, style: TextStyle(color: theme.colorScheme.error)),
-                          SizedBox(height: context.lg),
-                          ElevatedButton(onPressed: _refreshData, child: const Text('Retry')),
-                        ],
-                      ),
-                    ),
-                  )
-                : _buildDashboardContent(_dashboardData!),
+        onRefresh: () async => _refreshData(),
+        child: StreamBuilder<LibrarianDashboardData>(
+          stream: _dashboardStream,
+          builder: (context, snapshot) {
+            return LoadingWrapper<LibrarianDashboardData>(
+              snapshot: snapshot,
+              skeleton: _buildSkeleton(context),
+              onRetry: _refreshData,
+              builder: (data) => _buildDashboardContent(data),
+            );
+          },
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSkeleton(BuildContext context) {
+    return SingleChildScrollView(
+      child: Padding(
+        padding: context.pagePadding,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Skeleton(height: context.scale(180), borderRadius: 24),
+            SizedBox(height: context.xl),
+            const Skeleton(height: 20, width: 120),
+            SizedBox(height: context.md),
+            Row(
+              children: [
+                Expanded(child: Skeleton(height: context.scale(80), borderRadius: 20)),
+                SizedBox(width: context.sm),
+                Expanded(child: Skeleton(height: context.scale(80), borderRadius: 20)),
+                SizedBox(width: context.sm),
+                Expanded(child: Skeleton(height: context.scale(80), borderRadius: 20)),
+              ],
+            ),
+            SizedBox(height: context.xl),
+            const Skeleton(height: 20, width: 150),
+            SizedBox(height: context.md),
+            Skeleton(height: context.scale(150), borderRadius: 24),
+            SizedBox(height: context.xl),
+            Skeleton(height: context.scale(300), borderRadius: 24),
+          ],
+        ),
       ),
     );
   }

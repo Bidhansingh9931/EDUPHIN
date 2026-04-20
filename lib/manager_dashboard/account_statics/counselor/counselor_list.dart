@@ -5,6 +5,7 @@ import 'package:csv/csv.dart';
 import 'package:eduphin/manager_dashboard/account_statics/counselor/add_counselor.dart';
 import 'package:eduphin/services/api_service.dart';
 import 'package:eduphin/services/common_widgets.dart';
+import 'package:eduphin/services/caching_service.dart';
 import 'package:eduphin/services/responsive_helper.dart';
 import 'package:flutter/material.dart';
 import 'package:open_file/open_file.dart';
@@ -52,6 +53,7 @@ class CounselorListPage extends StatefulWidget {
 
 class _CounselorListPageState extends State<CounselorListPage> {
   bool _isLoading = true;
+  Object? _error;
   int? _selectedRoleId;
   List<Role> _roles = [];
   List<Counselor> _counselors = [];
@@ -59,19 +61,49 @@ class _CounselorListPageState extends State<CounselorListPage> {
   @override
   void initState() {
     super.initState();
-    _fetchInitialData();
+    _loadCachedData().then((_) => _fetchInitialData());
+  }
+
+  Future<void> _loadCachedData() async {
+    final rolesCache = await CacheService.getCache('counselor_roles');
+    if (rolesCache != null && mounted) {
+      final List<dynamic> rolesData = rolesCache;
+      final List<Role> allRoles = rolesData
+          .map((role) => Role(id: role['role_id'], name: role['name']))
+          .toList();
+      final counselorRoles = allRoles.where((role) => role.name.toLowerCase().contains('counselor')).toList();
+
+      setState(() {
+        _roles = counselorRoles;
+        if (_roles.isNotEmpty) _selectedRoleId = _roles.first.id;
+      });
+
+      if (_selectedRoleId != null) {
+        final counselorCache = await CacheService.getCache('counselors_$_selectedRoleId');
+        if (counselorCache != null && mounted) {
+          setState(() {
+            _counselors = (counselorCache as List).map((json) => Counselor.fromJson(json)).toList();
+            _isLoading = false;
+          });
+        }
+      }
+    }
   }
 
   Future<void> _fetchInitialData() async {
     if (!mounted) return;
-    setState(() => _isLoading = true);
+    setState(() {
+      _isLoading = _roles.isEmpty;
+      _error = null;
+    });
 
     try {
       final response = await ApiService.get('manager/salary/accounts');
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
         final List<dynamic> rolesData = data['roles'];
-        
+        await CacheService.setCache('counselor_roles', rolesData);
+
         final List<Role> allRoles = rolesData
             .map((role) => Role(id: role['role_id'], name: role['name']))
             .toList();
@@ -96,21 +128,28 @@ class _CounselorListPageState extends State<CounselorListPage> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString())));
-        setState(() => _isLoading = false);
+        setState(() {
+          _error = e;
+          _isLoading = false;
+        });
       }
     }
   }
 
   Future<void> _fetchCounselorsForRole(int roleId) async {
     if (!mounted) return;
-    setState(() => _isLoading = true);
+    setState(() {
+      _isLoading = _counselors.isEmpty;
+      _error = null;
+    });
 
     try {
       final response = await ApiService.get('manager/users/$roleId');
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
         final List<dynamic> counselorsData = data['data'];
+        await CacheService.setCache('counselors_$roleId', counselorsData);
+
         if(mounted){
           setState(() {
             _counselors = counselorsData.map((json) => Counselor.fromJson(json)).toList();
@@ -122,8 +161,10 @@ class _CounselorListPageState extends State<CounselorListPage> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString())));
-        setState(() => _isLoading = false);
+        setState(() {
+          _error = e;
+          _isLoading = false;
+        });
       }
     }
   }
@@ -175,28 +216,95 @@ class _CounselorListPageState extends State<CounselorListPage> {
             IconButton(icon: Icon(Icons.download, size: context.scale(24)), onPressed: _downloadCounselorList),
           ],
         ),
-        body: SafeArea(
-          child: SingleChildScrollView(
-            padding: context.pagePadding,
-            child: Center(
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 1200),
-                child: CustomCounselorListBox(
-                  isLoading: _isLoading,
-                  counselors: _counselors,
-                  roles: _roles,
-                  selectedRoleId: _selectedRoleId,
-                  onRoleChanged: (int? newRoleId) {
-                    if (newRoleId != null) {
-                      setState(() => _selectedRoleId = newRoleId);
-                      _fetchCounselorsForRole(newRoleId);
-                    }
-                  },
+        body: LoadingWrapper(
+          isLoading: _isLoading,
+          hasData: _counselors.isNotEmpty || _roles.isNotEmpty,
+          error: _error,
+          onRetry: _fetchInitialData,
+          skeleton: _buildSkeleton(context),
+          child: SafeArea(
+            child: SingleChildScrollView(
+              padding: context.pagePadding,
+              child: Center(
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 1200),
+                  child: CustomCounselorListBox(
+                    isLoading: _isLoading,
+                    counselors: _counselors,
+                    roles: _roles,
+                    selectedRoleId: _selectedRoleId,
+                    onRoleChanged: (int? newRoleId) {
+                      if (newRoleId != null) {
+                        setState(() => _selectedRoleId = newRoleId);
+                        _fetchCounselorsForRole(newRoleId);
+                      }
+                    },
+                  ),
                 ),
               ),
             ),
+          )),
+    );
+  }
+
+  Widget _buildSkeleton(BuildContext context) {
+    return SingleChildScrollView(
+      padding: context.pagePadding,
+      child: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 1200),
+          child: Card(
+            elevation: 0,
+            color: Colors.white,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(context.scale(12))),
+            child: Padding(
+              padding: EdgeInsets.all(context.spacing),
+              child: Column(
+                children: [
+                  SkeletonBox(height: context.scale(56), borderRadius: context.scale(8)),
+                  SizedBox(height: context.scale(24)),
+                  GridView.builder(
+                    shrinkWrap: true,
+                    physics: const NeverScrollableScrollPhysics(),
+                    itemCount: 6,
+                    gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                      crossAxisCount: context.responsive(1, tablet: 2, desktop: 3),
+                      crossAxisSpacing: context.scale(16),
+                      mainAxisSpacing: context.scale(16),
+                      mainAxisExtent: context.scale(80),
+                    ),
+                    itemBuilder: (context, index) => Container(
+                      padding: EdgeInsets.all(context.scale(12)),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(context.scale(12)),
+                      ),
+                      child: Row(
+                        children: [
+                          CircleAvatar(radius: context.scale(24), backgroundColor: Colors.white),
+                          SizedBox(width: context.scale(16)),
+                          const Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                SkeletonBox(height: 16),
+                                SizedBox(height: 4),
+                                SkeletonBox(height: 12, width: 80),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
           ),
-        ));
+        ),
+      ),
+    );
   }
 }
 
@@ -242,9 +350,7 @@ class CustomCounselorListBox extends StatelessWidget {
               items: roles.map((role) => DropdownMenuItem(value: role.id, child: Text(role.name, style: theme.textTheme.bodyLarge?.copyWith(fontSize: context.font(16))))).toList(),
             ),
             SizedBox(height: context.scale(24)),
-            isLoading
-                ? Center(child: Padding(padding: EdgeInsets.all(context.scale(40)), child: const CircularProgressIndicator()))
-                : _buildContent(context),
+            _buildContent(context),
           ],
         ),
       ),
@@ -319,4 +425,5 @@ class CustomCounselorListBox extends StatelessWidget {
     );
   }
 }
+
 

@@ -5,7 +5,9 @@ import 'package:csv/csv.dart';
 import 'package:eduphin/manager_dashboard/account_statics/accountant/add_accountant.dart';
 import 'package:eduphin/services/api_service.dart';
 import 'package:eduphin/services/common_widgets.dart';
-import 'package:eduphin/services/responsive_helper.dart'; // Added responsive helper
+import 'package:eduphin/services/caching_service.dart';
+import 'package:eduphin/services/responsive_helper.dart';
+ // Added responsive helper
 import 'package:flutter/material.dart';
 import 'package:open_file/open_file.dart';
 import 'package:path_provider/path_provider.dart';
@@ -52,6 +54,7 @@ class AccountantListPage extends StatefulWidget {
 
 class _AccountantListPageState extends State<AccountantListPage> {
   bool _isLoading = true;
+  Object? _error;
   int? _selectedRoleId;
   List<Role> _roles = [];
   List<Accountant> _accountants = [];
@@ -59,13 +62,40 @@ class _AccountantListPageState extends State<AccountantListPage> {
   @override
   void initState() {
     super.initState();
-    _fetchInitialData();
+    _loadCachedData().then((_) => _fetchInitialData());
+  }
+
+  Future<void> _loadCachedData() async {
+    final rolesCache = await CacheService.getCache('accountant_roles');
+    if (rolesCache != null && mounted) {
+      final List<dynamic> rolesData = rolesCache;
+      final List<Role> allRoles = rolesData
+          .map((role) => Role(id: role['role_id'], name: role['name']))
+          .toList();
+      final accountantRoles = allRoles.where((role) => role.name.toLowerCase().contains('accountant')).toList();
+
+      setState(() {
+        _roles = accountantRoles;
+        if (_roles.isNotEmpty) _selectedRoleId = _roles.first.id;
+      });
+
+      if (_selectedRoleId != null) {
+        final accountantCache = await CacheService.getCache('accountants_$_selectedRoleId');
+        if (accountantCache != null && mounted) {
+          setState(() {
+            _accountants = (accountantCache as List).map((json) => Accountant.fromJson(json)).toList();
+            _isLoading = false;
+          });
+        }
+      }
+    }
   }
 
   Future<void> _fetchInitialData() async {
     if (!mounted) return;
     setState(() {
-      _isLoading = true;
+      _isLoading = _roles.isEmpty;
+      _error = null;
     });
 
     try {
@@ -73,13 +103,14 @@ class _AccountantListPageState extends State<AccountantListPage> {
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
         final List<dynamic> rolesData = data['roles'];
+        await CacheService.setCache('accountant_roles', rolesData);
         
         final List<Role> allRoles = rolesData
             .map((role) => Role(id: role['role_id'], name: role['name']))
             .toList();
 
         // Filter for roles that are considered 'accountants'
-        final accountantRoles = allRoles.where((role) => 
+        final accountantRoles = allRoles.where((role) =>
           role.name.toLowerCase().contains('accountant')
         ).toList();
 
@@ -99,8 +130,10 @@ class _AccountantListPageState extends State<AccountantListPage> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString())));
-        setState(() => _isLoading = false);
+        setState(() {
+          _error = e;
+          _isLoading = false;
+        });
       }
     }
   }
@@ -108,7 +141,8 @@ class _AccountantListPageState extends State<AccountantListPage> {
   Future<void> _fetchAccountantsForRole(int roleId) async {
     if (!mounted) return;
     setState(() {
-      _isLoading = true;
+      _isLoading = _accountants.isEmpty;
+      _error = null;
     });
 
     try {
@@ -116,6 +150,8 @@ class _AccountantListPageState extends State<AccountantListPage> {
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
         final List<dynamic> accountantsData = data['data'];
+        await CacheService.setCache('accountants_$roleId', accountantsData);
+
         if(mounted){
           setState(() {
             _accountants = accountantsData.map((json) => Accountant.fromJson(json)).toList();
@@ -127,8 +163,10 @@ class _AccountantListPageState extends State<AccountantListPage> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString())));
-        setState(() => _isLoading = false);
+        setState(() {
+          _error = e;
+          _isLoading = false;
+        });
       }
     }
   }
@@ -200,31 +238,98 @@ class _AccountantListPageState extends State<AccountantListPage> {
               ),
           ],
         ),
-        body: SafeArea(
-          child: SingleChildScrollView(
-            physics: const AlwaysScrollableScrollPhysics(),
-            padding: context.pagePadding,
-            child: Center(
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 1200), // Max width for large desktops
-                child: CustomAccountantListBox(
-                  isLoading: _isLoading,
-                  accountants: _accountants,
-                  roles: _roles,
-                  selectedRoleId: _selectedRoleId,
-                  onRoleChanged: (int? newRoleId) {
-                    if (newRoleId != null) {
-                      setState(() {
-                        _selectedRoleId = newRoleId;
-                      });
-                      _fetchAccountantsForRole(newRoleId);
-                    }
-                  },
+        body: LoadingWrapper(
+          isLoading: _isLoading,
+          hasData: _accountants.isNotEmpty || _roles.isNotEmpty,
+          error: _error,
+          onRetry: _fetchInitialData,
+          skeleton: _buildSkeleton(context),
+          child: SafeArea(
+            child: SingleChildScrollView(
+              physics: const AlwaysScrollableScrollPhysics(),
+              padding: context.pagePadding,
+              child: Center(
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 1200), // Max width for large desktops
+                  child: CustomAccountantListBox(
+                    isLoading: _isLoading,
+                    accountants: _accountants,
+                    roles: _roles,
+                    selectedRoleId: _selectedRoleId,
+                    onRoleChanged: (int? newRoleId) {
+                      if (newRoleId != null) {
+                        setState(() {
+                          _selectedRoleId = newRoleId;
+                        });
+                        _fetchAccountantsForRole(newRoleId);
+                      }
+                    },
+                  ),
                 ),
               ),
             ),
+          )),
+    );
+  }
+
+  Widget _buildSkeleton(BuildContext context) {
+    return SingleChildScrollView(
+      padding: context.pagePadding,
+      child: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 1200),
+          child: Card(
+            elevation: 0,
+            color: Colors.white,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(context.scale(12))),
+            child: Padding(
+              padding: EdgeInsets.all(context.spacing),
+              child: Column(
+                children: [
+                  SkeletonBox(height: context.scale(56), borderRadius: context.scale(12)),
+                  SizedBox(height: context.scale(24)),
+                  GridView.builder(
+                    shrinkWrap: true,
+                    physics: const NeverScrollableScrollPhysics(),
+                    itemCount: 6,
+                    gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                      crossAxisCount: context.responsive(1, tablet: 2, desktop: 3),
+                      crossAxisSpacing: context.scale(16),
+                      mainAxisSpacing: context.scale(16),
+                      mainAxisExtent: context.scale(80),
+                    ),
+                    itemBuilder: (context, index) => Container(
+                      padding: EdgeInsets.all(context.scale(12)),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(context.scale(12)),
+                      ),
+                      child: Row(
+                        children: [
+                          CircleAvatar(radius: context.scale(24), backgroundColor: Colors.white),
+                          SizedBox(width: context.scale(16)),
+                          const Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                SkeletonBox(height: 16),
+                                SizedBox(height: 4),
+                                SkeletonBox(height: 12, width: 80),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
           ),
-        ));
+        ),
+      ),
+    );
   }
 }
 
@@ -300,13 +405,7 @@ class CustomAccountantListBox extends StatelessWidget {
             ),
             SizedBox(height: context.scale(24)),
             
-            // Accountants List
-            isLoading
-                ? Padding(
-                    padding: EdgeInsets.symmetric(vertical: context.scale(40)),
-                    child: const Center(child: CircularProgressIndicator()),
-                  )
-                : _buildContent(context),
+            _buildContent(context),
           ],
         ),
       ),
@@ -417,4 +516,5 @@ class CustomAccountantListBox extends StatelessWidget {
     );
   }
 }
+
 

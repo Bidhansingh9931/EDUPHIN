@@ -1,3 +1,5 @@
+import 'package:eduphin/librarian/librarian_skeleton_widgets.dart';
+import 'package:eduphin/services/common_widgets.dart';
 import '../../services/responsive_helper.dart';
 import 'package:flutter/material.dart';
 import '../../../services/api_service.dart';
@@ -15,9 +17,10 @@ class IssuedBooksListPage extends StatefulWidget {
 }
 
 class _IssuedBooksListPageState extends State<IssuedBooksListPage> {
-  bool _isLoading = true;
+  bool _isLoading = false;
   List<IssuedBook> _issuedBooks = [];
   String selectedReturned = "All";
+  late Stream<List<IssuedBook>> _issuedBooksStream;
 
   final TextEditingController _bookTitleController = TextEditingController();
   final TextEditingController _userNameController = TextEditingController();
@@ -28,36 +31,27 @@ class _IssuedBooksListPageState extends State<IssuedBooksListPage> {
   @override
   void initState() {
     super.initState();
-    _fetchIssuedBooks();
+    _refreshData();
+  }
+
+  void _refreshData() {
+    final Map<String, String> filters = {};
+    if (_bookTitleController.text.isNotEmpty) filters['book_title'] = _bookTitleController.text;
+    if (_userNameController.text.isNotEmpty) filters['user_name'] = _userNameController.text;
+    if (_issuedFromController.text.isNotEmpty) filters['issued_from'] = _issuedFromController.text;
+    if (_dueFromController.text.isNotEmpty) filters['due_from'] = _dueFromController.text;
+    if (selectedReturned != "All") {
+      filters['returned_status'] = selectedReturned == "Yes" ? "returned" : "not_returned";
+    }
+    if (_searchController.text.isNotEmpty) filters['search'] = _searchController.text;
+
+    setState(() {
+      _issuedBooksStream = ApiService.getLibrarianIssuedBooksStream(filters).asBroadcastStream();
+    });
   }
 
   Future<void> _fetchIssuedBooks() async {
-    if (!mounted) return;
-    setState(() => _isLoading = true);
-    try {
-      final Map<String, String> filters = {};
-      if (_bookTitleController.text.isNotEmpty) filters['book_title'] = _bookTitleController.text;
-      if (_userNameController.text.isNotEmpty) filters['user_name'] = _userNameController.text;
-      if (_issuedFromController.text.isNotEmpty) filters['issued_from'] = _issuedFromController.text;
-      if (_dueFromController.text.isNotEmpty) filters['due_from'] = _dueFromController.text;
-      if (selectedReturned != "All") {
-        filters['returned_status'] = selectedReturned == "Yes" ? "returned" : "not_returned";
-      }
-      if (_searchController.text.isNotEmpty) filters['search'] = _searchController.text;
-
-      final books = await ApiService.getLibrarianIssuedBooks(filters);
-      if (mounted) {
-        setState(() {
-          _issuedBooks = books;
-          _isLoading = false;
-        });
-      }
-    } catch (e) {
-      if (mounted) {
-        setState(() => _isLoading = false);
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Error: $e")));
-      }
-    }
+    _refreshData();
   }
 
   Future<void> _selectDate(BuildContext context, TextEditingController controller) async {
@@ -101,220 +95,231 @@ class _IssuedBooksListPageState extends State<IssuedBooksListPage> {
         ],
       ),
       drawer: const AppDrawer(),
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : RefreshIndicator(
-              onRefresh: _fetchIssuedBooks,
-              child: SingleChildScrollView(
-                physics: const AlwaysScrollableScrollPhysics(),
-                padding: context.pagePadding,
-                child: Center(
-                  child: ConstrainedBox(
-                    constraints: const BoxConstraints(maxWidth: 1200),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        /// FILTER SECTION
-                        Card(
-                          elevation: 0,
-                          color: theme.colorScheme.surfaceContainerLow,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(context.scale(20)),
-                            side: BorderSide(color: theme.colorScheme.outlineVariant.withValues(alpha: 0.5), width: 0.5),
+      body: StreamBuilder<List<IssuedBook>>(
+        stream: _issuedBooksStream,
+        builder: (context, snapshot) {
+          return LoadingWrapper<List<IssuedBook>>(
+            snapshot: snapshot,
+            skeleton: const TableSkeleton(),
+            onRetry: _refreshData,
+            builder: (books) {
+              return RefreshIndicator(
+                onRefresh: () async => _refreshData(),
+                child: SingleChildScrollView(
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  padding: context.pagePadding,
+                  child: Center(
+                    child: ConstrainedBox(
+                      constraints: const BoxConstraints(maxWidth: 1200),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          /// FILTER SECTION
+                          Card(
+                            elevation: 0,
+                            color: theme.colorScheme.surfaceContainerLow,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(context.scale(20)),
+                              side: BorderSide(color: theme.colorScheme.outlineVariant.withValues(alpha: 0.5), width: 0.5),
+                            ),
+                            child: Padding(
+                              padding: EdgeInsets.all(context.spacing),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Row(
+                                    children: [
+                                      Icon(Icons.filter_list_rounded, color: theme.colorScheme.primary, size: context.scale(20)),
+                                      SizedBox(width: context.xs),
+                                      Text(
+                                        "Filter Records",
+                                        style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold, fontSize: context.font(16)),
+                                      ),
+                                    ],
+                                  ),
+                                  SizedBox(height: context.md),
+                                  _buildResponsiveRow(context, [
+                                    _buildInputField(context, "Book Title", "Search Book", _bookTitleController),
+                                    _buildInputField(context, "User Name", "Search User", _userNameController),
+                                  ]),
+                                  _buildResponsiveRow(context, [
+                                    _buildDateField(context, "Issued From", _issuedFromController),
+                                    _buildDateField(context, "Due From", _dueFromController),
+                                    _buildDropdownField(context, "Returned Status", selectedReturned, ["All", "Yes", "No"], (val) {
+                                      setState(() => selectedReturned = val!);
+                                    }),
+                                  ]),
+                                  SizedBox(height: context.sm),
+                                  Row(
+                                    children: [
+                                      Expanded(
+                                        child: FilledButton.icon(
+                                          onPressed: _fetchIssuedBooks,
+                                          icon: const Icon(Icons.search_rounded),
+                                          label: const Text("APPLY FILTERS"),
+                                          style: FilledButton.styleFrom(
+                                            minimumSize: Size(0, context.scale(48)),
+                                          ),
+                                        ),
+                                      ),
+                                      SizedBox(width: context.md),
+                                      Expanded(
+                                        child: FilledButton.tonalIcon(
+                                          onPressed: () {
+                                            setState(() {
+                                              _bookTitleController.clear();
+                                              _userNameController.clear();
+                                              _issuedFromController.clear();
+                                              _dueFromController.clear();
+                                              selectedReturned = "All";
+                                            });
+                                            _fetchIssuedBooks();
+                                          },
+                                          icon: const Icon(Icons.refresh_rounded),
+                                          label: const Text("RESET"),
+                                          style: FilledButton.styleFrom(
+                                            minimumSize: Size(0, context.scale(48)),
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  )
+                                ],
+                              ),
+                            ),
                           ),
-                          child: Padding(
-                            padding: EdgeInsets.all(context.spacing),
+
+                          SizedBox(height: context.lg),
+
+                          /// RESULTS TABLE
+                          Card(
+                            elevation: 0,
+                            clipBehavior: Clip.antiAlias,
+                            color: theme.colorScheme.surfaceContainerLow,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(context.scale(20)),
+                              side: BorderSide(color: theme.colorScheme.outlineVariant.withValues(alpha: 0.5), width: 0.5),
+                            ),
                             child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
+                              crossAxisAlignment: CrossAxisAlignment.stretch,
                               children: [
-                                Row(
-                                  children: [
-                                    Icon(Icons.filter_list_rounded, color: theme.colorScheme.primary, size: context.scale(20)),
-                                    SizedBox(width: context.xs),
-                                    Text(
-                                      "Filter Records",
-                                      style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold, fontSize: context.font(16)),
-                                    ),
-                                  ],
+                                Padding(
+                                  padding: EdgeInsets.all(context.spacing),
+                                  child: SearchBar(
+                                    controller: _searchController,
+                                    hintText: "Quick search by title or lender...",
+                                    onChanged: (val) => _fetchIssuedBooks(),
+                                    leading: const Icon(Icons.search_rounded),
+                                    elevation: WidgetStateProperty.all(0),
+                                    backgroundColor: WidgetStateProperty.all(theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.3)),
+                                    padding: WidgetStateProperty.all(EdgeInsets.symmetric(horizontal: context.md)),
+                                    shape: WidgetStateProperty.all(RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(context.scale(12)),
+                                      side: BorderSide(color: theme.colorScheme.outlineVariant.withValues(alpha: 0.5)),
+                                    )),
+                                  ),
                                 ),
-                                SizedBox(height: context.md),
-                                _buildResponsiveRow(context, [
-                                  _buildInputField(context, "Book Title", "Search Book", _bookTitleController),
-                                  _buildInputField(context, "User Name", "Search User", _userNameController),
-                                ]),
-                                _buildResponsiveRow(context, [
-                                  _buildDateField(context, "Issued From", _issuedFromController),
-                                  _buildDateField(context, "Due From", _dueFromController),
-                                  _buildDropdownField(context, "Returned Status", selectedReturned, ["All", "Yes", "No"], (val) {
-                                    setState(() => selectedReturned = val!);
-                                  }),
-                                ]),
-                                SizedBox(height: context.sm),
-                                Row(
-                                  children: [
-                                    Expanded(
-                                      child: FilledButton.icon(
-                                        onPressed: _fetchIssuedBooks,
-                                        icon: const Icon(Icons.search_rounded),
-                                        label: const Text("APPLY FILTERS"),
-                                        style: FilledButton.styleFrom(
-                                          minimumSize: Size(0, context.scale(48)),
-                                        ),
+                                if (books.isEmpty)
+                                  Padding(
+                                    padding: EdgeInsets.symmetric(vertical: context.xl),
+                                    child: Center(
+                                      child: Column(
+                                        children: [
+                                          Icon(Icons.library_books_rounded, size: context.scale(48), color: theme.colorScheme.outlineVariant),
+                                          SizedBox(height: context.sm),
+                                          Text("No issued books found", style: theme.textTheme.bodyLarge?.copyWith(color: theme.colorScheme.outline, fontSize: context.font(16))),
+                                        ],
                                       ),
                                     ),
-                                    SizedBox(width: context.md),
-                                    Expanded(
-                                      child: FilledButton.tonalIcon(
-                                        onPressed: () {
-                                          setState(() {
-                                            _bookTitleController.clear();
-                                            _userNameController.clear();
-                                            _issuedFromController.clear();
-                                            _dueFromController.clear();
-                                            selectedReturned = "All";
-                                          });
-                                          _fetchIssuedBooks();
-                                        },
-                                        icon: const Icon(Icons.refresh_rounded),
-                                        label: const Text("RESET"),
-                                        style: FilledButton.styleFrom(
-                                          minimumSize: Size(0, context.scale(48)),
-                                        ),
-                                      ),
+                                  )
+                                else
+                                  SingleChildScrollView(
+                                    scrollDirection: Axis.horizontal,
+                                    child: DataTable(
+                                      columnSpacing: context.md,
+                                      headingRowColor: WidgetStateProperty.all(theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.3)),
+                                      dataRowMinHeight: context.scale(60),
+                                      dataRowMaxHeight: context.scale(70),
+                                      columns: [
+                                        DataColumn(label: Text("#", style: theme.textTheme.labelLarge?.copyWith(fontWeight: FontWeight.bold, fontSize: context.font(12)))),
+                                        DataColumn(label: Text("TITLE", style: theme.textTheme.labelLarge?.copyWith(fontWeight: FontWeight.bold, fontSize: context.font(12)))),
+                                        DataColumn(label: Text("LENDER", style: theme.textTheme.labelLarge?.copyWith(fontWeight: FontWeight.bold, fontSize: context.font(12)))),
+                                        DataColumn(label: Text("DUE DATE", style: theme.textTheme.labelLarge?.copyWith(fontWeight: FontWeight.bold, fontSize: context.font(12)))),
+                                        DataColumn(label: Text("STATUS", style: theme.textTheme.labelLarge?.copyWith(fontWeight: FontWeight.bold, fontSize: context.font(12)))),
+                                        DataColumn(label: Text("ACTIONS", style: theme.textTheme.labelLarge?.copyWith(fontWeight: FontWeight.bold, fontSize: context.font(12)))),
+                                      ],
+                                      rows: books.asMap().entries.map((entry) {
+                                        int index = entry.key + 1;
+                                        IssuedBook ib = entry.value;
+                                        bool isReturned = ib.returnedAt != null;
+                                        return DataRow(
+                                          cells: [
+                                            DataCell(Text(index.toString(), style: TextStyle(fontSize: context.font(14)))),
+                                            DataCell(
+                                              SizedBox(
+                                                width: context.scale(200),
+                                                child: Text(
+                                                  ib.bookTitle ?? "N/A",
+                                                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: context.font(14)),
+                                                  overflow: TextOverflow.ellipsis,
+                                                ),
+                                              ),
+                                            ),
+                                            DataCell(Text(ib.lenderName ?? "N/A", style: TextStyle(fontSize: context.font(14)))),
+                                            DataCell(Text(ib.dueDate ?? "N/A", style: TextStyle(fontSize: context.font(14)))),
+                                            DataCell(_buildStatusBadge(context, isReturned)),
+                                            DataCell(Row(
+                                              children: [
+                                                if (!isReturned)
+                                                  IconButton.filledTonal(
+                                                    icon: const Icon(Icons.check_circle_rounded, size: 20),
+                                                    color: Colors.green,
+                                                    onPressed: () => _confirmReturn(ib),
+                                                    tooltip: "Mark as Returned",
+                                                  ),
+                                                SizedBox(width: context.xs),
+                                                IconButton.filledTonal(
+                                                  icon: const Icon(Icons.edit_rounded, size: 20),
+                                                  color: theme.colorScheme.primary,
+                                                  onPressed: () {
+                                                    Navigator.push(
+                                                      context,
+                                                      MaterialPageRoute(builder: (_) => EditIssuePage(issuedBook: ib)),
+                                                    ).then((value) {
+                                                      if (value == true) _fetchIssuedBooks();
+                                                    });
+                                                  },
+                                                ),
+                                                SizedBox(width: context.xs),
+                                                IconButton.filledTonal(
+                                                  icon: const Icon(Icons.delete_rounded, size: 20),
+                                                  color: theme.colorScheme.error,
+                                                  onPressed: () => _deleteIssuedBook(ib.id),
+                                                ),
+                                              ],
+                                            )),
+                                          ],
+                                        );
+                                      }).toList(),
                                     ),
-                                  ],
-                                )
+                                  ),
                               ],
                             ),
                           ),
-                        ),
-
-                        SizedBox(height: context.lg),
-
-                        /// RESULTS TABLE
-                        Card(
-                          elevation: 0,
-                          clipBehavior: Clip.antiAlias,
-                          color: theme.colorScheme.surfaceContainerLow,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(context.scale(20)),
-                            side: BorderSide(color: theme.colorScheme.outlineVariant.withValues(alpha: 0.5), width: 0.5),
-                          ),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.stretch,
-                            children: [
-                              Padding(
-                                padding: EdgeInsets.all(context.spacing),
-                                child: SearchBar(
-                                  controller: _searchController,
-                                  hintText: "Quick search by title or lender...",
-                                  onChanged: (val) => _fetchIssuedBooks(),
-                                  leading: const Icon(Icons.search_rounded),
-                                  elevation: WidgetStateProperty.all(0),
-                                  backgroundColor: WidgetStateProperty.all(theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.3)),
-                                  padding: WidgetStateProperty.all(EdgeInsets.symmetric(horizontal: context.md)),
-                                  shape: WidgetStateProperty.all(RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(context.scale(12)),
-                                    side: BorderSide(color: theme.colorScheme.outlineVariant.withValues(alpha: 0.5)),
-                                  )),
-                                ),
-                              ),
-                              if (_issuedBooks.isEmpty)
-                                Padding(
-                                  padding: EdgeInsets.symmetric(vertical: context.xl),
-                                  child: Center(
-                                    child: Column(
-                                      children: [
-                                        Icon(Icons.library_books_rounded, size: context.scale(48), color: theme.colorScheme.outlineVariant),
-                                        SizedBox(height: context.sm),
-                                        Text("No issued books found", style: theme.textTheme.bodyLarge?.copyWith(color: theme.colorScheme.outline, fontSize: context.font(16))),
-                                      ],
-                                    ),
-                                  ),
-                                )
-                              else
-                                SingleChildScrollView(
-                                  scrollDirection: Axis.horizontal,
-                                  child: DataTable(
-                                    columnSpacing: context.md,
-                                    headingRowColor: WidgetStateProperty.all(theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.3)),
-                                    dataRowMinHeight: context.scale(60),
-                                    dataRowMaxHeight: context.scale(70),
-                                    columns: [
-                                      DataColumn(label: Text("#", style: theme.textTheme.labelLarge?.copyWith(fontWeight: FontWeight.bold, fontSize: context.font(12)))),
-                                      DataColumn(label: Text("TITLE", style: theme.textTheme.labelLarge?.copyWith(fontWeight: FontWeight.bold, fontSize: context.font(12)))),
-                                      DataColumn(label: Text("LENDER", style: theme.textTheme.labelLarge?.copyWith(fontWeight: FontWeight.bold, fontSize: context.font(12)))),
-                                      DataColumn(label: Text("DUE DATE", style: theme.textTheme.labelLarge?.copyWith(fontWeight: FontWeight.bold, fontSize: context.font(12)))),
-                                      DataColumn(label: Text("STATUS", style: theme.textTheme.labelLarge?.copyWith(fontWeight: FontWeight.bold, fontSize: context.font(12)))),
-                                      DataColumn(label: Text("ACTIONS", style: theme.textTheme.labelLarge?.copyWith(fontWeight: FontWeight.bold, fontSize: context.font(12)))),
-                                    ],
-                                    rows: _issuedBooks.asMap().entries.map((entry) {
-                                      int index = entry.key + 1;
-                                      IssuedBook ib = entry.value;
-                                      bool isReturned = ib.returnedAt != null;
-                                      return DataRow(
-                                        cells: [
-                                          DataCell(Text(index.toString(), style: TextStyle(fontSize: context.font(14)))),
-                                          DataCell(
-                                            SizedBox(
-                                              width: context.scale(200),
-                                              child: Text(
-                                                ib.bookTitle ?? "N/A",
-                                                style: TextStyle(fontWeight: FontWeight.bold, fontSize: context.font(14)),
-                                                overflow: TextOverflow.ellipsis,
-                                              ),
-                                            ),
-                                          ),
-                                          DataCell(Text(ib.lenderName ?? "N/A", style: TextStyle(fontSize: context.font(14)))),
-                                          DataCell(Text(ib.dueDate ?? "N/A", style: TextStyle(fontSize: context.font(14)))),
-                                          DataCell(_buildStatusBadge(context, isReturned)),
-                                          DataCell(Row(
-                                            children: [
-                                              if (!isReturned)
-                                                IconButton.filledTonal(
-                                                  icon: const Icon(Icons.check_circle_rounded, size: 20),
-                                                  color: Colors.green,
-                                                  onPressed: () => _confirmReturn(ib),
-                                                  tooltip: "Mark as Returned",
-                                                ),
-                                              SizedBox(width: context.xs),
-                                              IconButton.filledTonal(
-                                                icon: const Icon(Icons.edit_rounded, size: 20),
-                                                color: theme.colorScheme.primary,
-                                                onPressed: () {
-                                                  Navigator.push(
-                                                    context,
-                                                    MaterialPageRoute(builder: (_) => EditIssuePage(issuedBook: ib)),
-                                                  ).then((value) {
-                                                    if (value == true) _fetchIssuedBooks();
-                                                  });
-                                                },
-                                              ),
-                                              SizedBox(width: context.xs),
-                                              IconButton.filledTonal(
-                                                icon: const Icon(Icons.delete_rounded, size: 20),
-                                                color: theme.colorScheme.error,
-                                                onPressed: () => _deleteIssuedBook(ib.id),
-                                              ),
-                                            ],
-                                          )),
-                                        ],
-                                      );
-                                    }).toList(),
-                                  ),
-                                ),
-                            ],
-                          ),
-                        ),
-                        SizedBox(height: context.xl),
-                      ],
+                          SizedBox(height: context.xl),
+                        ],
+                      ),
                     ),
                   ),
                 ),
-              ),
-            ),
+              );
+            },
+          );
+        },
+      ),
     );
   }
+
 
   Widget _buildStatusBadge(BuildContext context, bool isReturned) {
     final theme = context.theme;

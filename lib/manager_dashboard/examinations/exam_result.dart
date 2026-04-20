@@ -1,5 +1,7 @@
 import 'dart:convert';
 import 'package:eduphin/services/api_service.dart';
+import 'package:eduphin/services/caching_service.dart';
+import 'package:eduphin/services/common_widgets.dart';
 import 'package:eduphin/services/responsive_helper.dart';
 import 'package:eduphin/teacher/dashboard/common_widgets.dart';
 import 'package:flutter/material.dart';
@@ -18,6 +20,11 @@ class Exam {
       name: json['name']?.toString() ?? 'Unnamed Exam',
     );
   }
+
+  Map<String, dynamic> toJson() => {
+    'id': id,
+    'name': name,
+  };
 }
 
 class ExamPaper {
@@ -65,6 +72,21 @@ class ExamPaper {
       endTime: json['end_time']?.toString() ?? '',
     );
   }
+
+  Map<String, dynamic> toJson() => {
+    'id': id,
+    'exam_id': examId,
+    'class_id': classId,
+    'section_id': sectionId,
+    'subject_id': subjectId,
+    'class': {'name': className},
+    'section': {'name': sectionName},
+    'subject': {'name': subjectName},
+    'venue': venue,
+    'paper_date': date,
+    'start_time': startTime,
+    'end_time': endTime,
+  };
 }
 
 class ExamWithPapers {
@@ -72,6 +94,18 @@ class ExamWithPapers {
   final List<ExamPaper> papers;
 
   ExamWithPapers({required this.exam, required this.papers});
+
+  factory ExamWithPapers.fromJson(Map<String, dynamic> json) {
+    return ExamWithPapers(
+      exam: Exam.fromJson(json['exam']),
+      papers: (json['papers'] as List).map((p) => ExamPaper.fromJson(p)).toList(),
+    );
+  }
+
+  Map<String, dynamic> toJson() => {
+    'exam': exam.toJson(),
+    'papers': papers.map((p) => p.toJson()).toList(),
+  };
 }
 
 class ExamResultPage extends StatefulWidget {
@@ -82,15 +116,34 @@ class ExamResultPage extends StatefulWidget {
 }
 
 class _ExamResultPageState extends State<ExamResultPage> {
-  late Future<List<ExamWithPapers>> _examDataFuture;
+  bool _isLoading = true;
+  List<ExamWithPapers> _examData = [];
+  Object? _error;
 
   @override
   void initState() {
     super.initState();
-    _examDataFuture = _fetchExamData();
+    _loadCacheAndFetch();
   }
 
-  Future<List<ExamWithPapers>> _fetchExamData() async {
+  Future<void> _loadCacheAndFetch() async {
+    final cachedData = await CacheService.getCache('manager_exam_results');
+    if (cachedData != null && mounted) {
+      final List<dynamic> jsonList = cachedData;
+      setState(() {
+        _examData = jsonList.map((json) => ExamWithPapers.fromJson(json)).toList();
+      });
+    }
+    _fetchExamData();
+  }
+
+  Future<void> _fetchExamData() async {
+    if (!mounted) return;
+    setState(() {
+      _isLoading = true;
+      _error = null;
+    });
+
     try {
       final examsResponse = await ApiService.get('manager/exams');
       if (examsResponse.statusCode != 200) {
@@ -114,9 +167,23 @@ class _ExamResultPageState extends State<ExamResultPage> {
       }).toList();
 
       final results = await Future.wait(paperFutures);
-      return results.where((e) => e.papers.isNotEmpty).toList();
+      final filteredResults = results.where((e) => e.papers.isNotEmpty).toList();
+
+      await CacheService.setCache('manager_exam_results', filteredResults.map((e) => e.toJson()).toList());
+
+      if (mounted) {
+        setState(() {
+          _examData = filteredResults;
+          _isLoading = false;
+        });
+      }
     } catch (e) {
-      throw Exception('Failed to fetch exam data: $e');
+      if (mounted) {
+        setState(() {
+          _error = e;
+          _isLoading = false;
+        });
+      }
     }
   }
 
@@ -132,86 +199,111 @@ class _ExamResultPageState extends State<ExamResultPage> {
       body: Center(
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 1200),
-          child: FutureBuilder<List<ExamWithPapers>>(
-            future: _examDataFuture,
-            builder: (context, snapshot) {
-              if (snapshot.connectionState == ConnectionState.waiting) {
-                return const Center(child: CircularProgressIndicator());
-              } else if (snapshot.hasError) {
-                return Center(
-                  child: Padding(
-                    padding: context.pagePadding,
-                    child: Text('Error: ${snapshot.error.toString().replaceFirst("Exception: ", "")}', textAlign: TextAlign.center, style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.error)),
-                  ),
-                );
-              } else if (!snapshot.hasData || snapshot.data!.isEmpty) {
-                return Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(Icons.assignment_turned_in_outlined, size: context.scale(64), color: theme.colorScheme.outlineVariant),
-                      SizedBox(height: context.md),
-                      Text('No exam schedules found.', style: theme.textTheme.titleMedium?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
-                    ],
-                  ),
-                );
-              }
-
-              final examData = snapshot.data!;
-
-              return ListView.builder(
-                padding: context.pagePadding,
-                itemCount: examData.length,
-                itemBuilder: (context, index) {
-                  final examWithPapers = examData[index];
-                  return Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Padding(
-                        padding: EdgeInsets.symmetric(vertical: context.md),
+          child: LoadingWrapper(
+            isLoading: _isLoading,
+            hasData: _examData.isNotEmpty,
+            error: _error,
+            onRetry: _fetchExamData,
+            skeleton: _buildSkeleton(),
+            child: RefreshIndicator(
+              onRefresh: () async => _fetchExamData(),
+              child: _examData.isEmpty
+                  ? SingleChildScrollView(
+                      physics: const AlwaysScrollableScrollPhysics(),
+                      child: Container(
+                        height: MediaQuery.of(context).size.height * 0.7,
+                        alignment: Alignment.center,
                         child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            Text(
-                              examWithPapers.exam.name,
-                              style: theme.textTheme.titleLarge?.copyWith(
-                                fontWeight: FontWeight.bold,
-                                fontSize: context.font(18),
-                              ),
-                            ),
-                            Text(
-                              "Select a paper to manage marks",
-                              style: theme.textTheme.labelSmall?.copyWith(
-                                color: theme.colorScheme.onSurfaceVariant,
-                                fontSize: context.font(11),
-                              ),
-                            ),
+                            Icon(Icons.assignment_turned_in_outlined, size: context.scale(64), color: theme.colorScheme.outlineVariant),
+                            SizedBox(height: context.md),
+                            Text('No exam schedules found.', style: theme.textTheme.titleMedium?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
                           ],
                         ),
                       ),
-                      GridView.builder(
-                        shrinkWrap: true,
-                        physics: const NeverScrollableScrollPhysics(),
-                        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                          crossAxisCount: context.responsive(1, tablet: 2, desktop: 3),
-                          crossAxisSpacing: context.spacing,
-                          mainAxisSpacing: context.spacing,
-                          mainAxisExtent: context.scale(260),
-                        ),
-                        itemCount: examWithPapers.papers.length,
-                        itemBuilder: (context, pIndex) => _buildPaperItem(examWithPapers.papers[pIndex]),
-                      ),
-                      SizedBox(height: context.lg),
-                    ],
-                  );
-                },
-              );
-            },
+                    )
+                  : ListView.builder(
+                      padding: context.pagePadding,
+                      itemCount: _examData.length,
+                      itemBuilder: (context, index) {
+                        final examWithPapers = _examData[index];
+                        return Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Padding(
+                              padding: EdgeInsets.symmetric(vertical: context.md),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    examWithPapers.exam.name,
+                                    style: theme.textTheme.titleLarge?.copyWith(
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: context.font(18),
+                                    ),
+                                  ),
+                                  Text(
+                                    "Select a paper to manage marks",
+                                    style: theme.textTheme.labelSmall?.copyWith(
+                                      color: theme.colorScheme.onSurfaceVariant,
+                                      fontSize: context.font(11),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            GridView.builder(
+                              shrinkWrap: true,
+                              physics: const NeverScrollableScrollPhysics(),
+                              gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                                crossAxisCount: context.responsive(1, tablet: 2, desktop: 3),
+                                crossAxisSpacing: context.spacing,
+                                mainAxisSpacing: context.spacing,
+                                mainAxisExtent: context.scale(260),
+                              ),
+                              itemCount: examWithPapers.papers.length,
+                              itemBuilder: (context, pIndex) => _buildPaperItem(examWithPapers.papers[pIndex]),
+                            ),
+                            SizedBox(height: context.lg),
+                          ],
+                        );
+                      },
+                    ),
+            ),
           ),
         ),
       ),
     );
   }
+
+  Widget _buildSkeleton() {
+    return ListView.builder(
+      padding: context.pagePadding,
+      itemCount: 2,
+      itemBuilder: (context, index) => Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SkeletonBox(height: context.scale(40), width: context.scale(200)),
+          SizedBox(height: context.md),
+          GridView.builder(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: context.responsive(1, tablet: 2, desktop: 3),
+              crossAxisSpacing: context.spacing,
+              mainAxisSpacing: context.spacing,
+              mainAxisExtent: context.scale(260),
+            ),
+            itemCount: 3,
+            itemBuilder: (context, pIndex) => SkeletonBox(height: context.scale(260), borderRadius: context.scale(16)),
+          ),
+          SizedBox(height: context.lg),
+        ],
+      ),
+    );
+  }
+
 
   Widget _buildPaperItem(ExamPaper paper) {
     final theme = context.theme;

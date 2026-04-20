@@ -414,7 +414,7 @@ class _AddEmployeePageState extends State<AddEmployeePage> {
         Text(title, style: TextStyle(color: context.theme.colorScheme.onSurfaceVariant, fontSize: context.font(12), fontWeight: FontWeight.w500)),
         SizedBox(height: context.xs),
         DropdownButtonFormField<String>(
-          value: value,
+          initialValue: value,
           isExpanded: true,
           decoration: InputDecoration(
             filled: true,

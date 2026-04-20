@@ -34,15 +34,15 @@ class _AddNewBookPageState extends State<AddNewBookPage> {
     super.initState();
     _titleController = TextEditingController(text: widget.book?.title ?? "");
     _authorController = TextEditingController(text: widget.book?.author ?? "");
-    _editionController = TextEditingController(text: ""); 
-    _volumeController = TextEditingController(text: ""); 
-    _publisherController = TextEditingController(text: ""); 
+    _editionController = TextEditingController(text: widget.book?.edition ?? "");
+    _volumeController = TextEditingController(text: widget.book?.volume ?? "");
+    _publisherController = TextEditingController(text: widget.book?.publisher ?? "");
     _yearController = TextEditingController(text: widget.book?.publicationYear ?? "");
     _isbnController = TextEditingController(text: widget.book?.isbn ?? "");
     _categoryController = TextEditingController(text: widget.book?.category ?? "");
     _languageController = TextEditingController(text: widget.book?.language ?? "English");
     _quantityController = TextEditingController(text: widget.book?.quantity.toString() ?? "1");
-    
+
     if (widget.book?.format != null) {
       selectedFormat = widget.book!.format!;
     }
@@ -122,7 +122,7 @@ class _AddNewBookPageState extends State<AddNewBookPage> {
                       _buildSectionContainer(
                         context,
                         icon: Icons.info_outline_rounded,
-                        title: "Book Details",
+                        title: "Book Information",
                         children: [
                           _buildResponsiveRow(context, [
                             _buildInputField(context, "Title *", _titleController, required: true),
@@ -138,7 +138,7 @@ class _AddNewBookPageState extends State<AddNewBookPage> {
                           ]),
                         ],
                       ),
-                      SizedBox(height: context.lg),
+                      SizedBox(height: context.md),
                       _buildSectionContainer(
                         context,
                         icon: Icons.inventory_2_outlined,
@@ -162,7 +162,7 @@ class _AddNewBookPageState extends State<AddNewBookPage> {
                         children: [
                           if (widget.book == null) ...[
                             Expanded(
-                              child: FilledButton.tonalIcon(
+                              child: OutlinedButton(
                                 onPressed: _isLoading
                                     ? null
                                     : () {
@@ -179,11 +179,11 @@ class _AddNewBookPageState extends State<AddNewBookPage> {
                                         _quantityController.text = "1";
                                         setState(() => selectedFormat = "Hardcover");
                                       },
-                                icon: const Icon(Icons.refresh_rounded),
-                                label: const Text("RESET"),
-                                style: FilledButton.styleFrom(
-                                  minimumSize: Size(0, context.scale(48)),
+                                style: OutlinedButton.styleFrom(
+                                  padding: EdgeInsets.symmetric(vertical: context.md),
+                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(context.scale(12))),
                                 ),
+                                child: const Text("RESET"),
                               ),
                             ),
                             SizedBox(width: context.md),
@@ -195,7 +195,8 @@ class _AddNewBookPageState extends State<AddNewBookPage> {
                               icon: Icon(widget.book == null ? Icons.add_rounded : Icons.save_rounded),
                               label: Text(widget.book == null ? "ADD BOOK" : "UPDATE BOOK"),
                               style: FilledButton.styleFrom(
-                                minimumSize: Size(0, context.scale(48)),
+                                padding: EdgeInsets.symmetric(vertical: context.md),
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(context.scale(12))),
                               ),
                             ),
                           ),
@@ -277,6 +278,7 @@ class _AddNewBookPageState extends State<AddNewBookPage> {
 
   Widget _buildInputField(BuildContext context, String label, TextEditingController controller, {bool required = false, bool isNumber = false}) {
     final theme = context.theme;
+    final colorScheme = theme.colorScheme;
     return Padding(
       padding: EdgeInsets.only(bottom: context.md),
       child: Column(
@@ -284,9 +286,9 @@ class _AddNewBookPageState extends State<AddNewBookPage> {
         children: [
           Text(
             label,
-            style: theme.textTheme.labelMedium?.copyWith(
-              color: theme.colorScheme.outline,
+            style: theme.textTheme.labelLarge?.copyWith(
               fontWeight: FontWeight.bold,
+              color: colorScheme.onSurfaceVariant,
             ),
           ),
           SizedBox(height: context.xs),
@@ -294,12 +296,24 @@ class _AddNewBookPageState extends State<AddNewBookPage> {
             controller: controller,
             keyboardType: isNumber ? TextInputType.number : TextInputType.text,
             validator: required ? (val) => val == null || val.isEmpty ? "Required field" : null : null,
-            style: theme.textTheme.bodyMedium,
+            style: TextStyle(fontSize: context.font(14)),
             decoration: InputDecoration(
-              filled: true,
-              fillColor: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
               hintText: "Enter $label",
-              contentPadding: EdgeInsets.all(context.spacing),
+              filled: true,
+              fillColor: colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
+              contentPadding: EdgeInsets.all(context.scale(12)),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(context.scale(12)),
+                borderSide: BorderSide(color: colorScheme.outlineVariant.withValues(alpha: 0.5)),
+              ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(context.scale(12)),
+                borderSide: BorderSide(color: colorScheme.outlineVariant.withValues(alpha: 0.5)),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(context.scale(12)),
+                borderSide: BorderSide(color: colorScheme.primary, width: 1),
+              ),
             ),
           ),
         ],
@@ -309,6 +323,7 @@ class _AddNewBookPageState extends State<AddNewBookPage> {
 
   Widget _buildDropdownField(BuildContext context, String label, String value, List<String> items, Function(String?) onChanged) {
     final theme = context.theme;
+    final colorScheme = theme.colorScheme;
     return Padding(
       padding: EdgeInsets.only(bottom: context.md),
       child: Column(
@@ -316,22 +331,34 @@ class _AddNewBookPageState extends State<AddNewBookPage> {
         children: [
           Text(
             label,
-            style: theme.textTheme.labelMedium?.copyWith(
-              color: theme.colorScheme.outline,
+            style: theme.textTheme.labelLarge?.copyWith(
               fontWeight: FontWeight.bold,
+              color: colorScheme.onSurfaceVariant,
             ),
           ),
           SizedBox(height: context.xs),
           DropdownButtonFormField<String>(
             value: value,
             isExpanded: true,
-            style: theme.textTheme.bodyMedium,
+            style: TextStyle(fontSize: context.font(14), color: colorScheme.onSurface),
             decoration: InputDecoration(
               filled: true,
-              fillColor: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
-              contentPadding: EdgeInsets.symmetric(horizontal: context.spacing),
+              fillColor: colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
+              contentPadding: EdgeInsets.symmetric(horizontal: context.scale(12), vertical: context.scale(8)),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(context.scale(12)),
+                borderSide: BorderSide(color: colorScheme.outlineVariant.withValues(alpha: 0.5)),
+              ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(context.scale(12)),
+                borderSide: BorderSide(color: colorScheme.outlineVariant.withValues(alpha: 0.5)),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(context.scale(12)),
+                borderSide: BorderSide(color: colorScheme.primary, width: 1),
+              ),
             ),
-            items: items.map((e) => DropdownMenuItem(value: e, child: Text(e))).toList(),
+            items: items.map((e) => DropdownMenuItem(value: e, child: Text(e, style: TextStyle(fontSize: context.font(14))))).toList(),
             onChanged: onChanged,
           ),
         ],

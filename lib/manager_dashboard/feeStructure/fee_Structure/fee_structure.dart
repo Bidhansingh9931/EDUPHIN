@@ -1,5 +1,7 @@
 import 'dart:convert';
 import 'dart:ui';
+import 'package:eduphin/services/common_widgets.dart';
+import 'package:eduphin/services/caching_service.dart';
 import 'package:eduphin/manager_dashboard/feeStructure/fee_Structure/create_new_fee.dart';
 import 'package:eduphin/services/api_service.dart';
 import 'package:eduphin/services/responsive_helper.dart';
@@ -86,10 +88,31 @@ class _FeeStructurePageState extends State<FeeStructurePage> {
   bool _isLoading = true;
   List<InstituteFee> _instituteFees = [];
   List<ClassFee> _classFees = [];
+  Object? _error;
 
   @override
   void initState() {
     super.initState();
+    _loadCacheAndFetch();
+  }
+
+  Future<void> _loadCacheAndFetch() async {
+    final cachedData = await CacheService.getCache('fee_structure');
+    if (cachedData != null && mounted) {
+      final List<dynamic> instituteFeesData = cachedData['institute_fees'] as List? ?? [];
+      final List<dynamic> classFeesData = cachedData['class_fees'] as List? ?? [];
+
+      setState(() {
+        _instituteFees = instituteFeesData
+            .whereType<Map<String, dynamic>>()
+            .map((fee) => InstituteFee.fromJson(fee))
+            .toList();
+        _classFees = classFeesData
+            .whereType<Map<String, dynamic>>()
+            .map((fee) => ClassFee.fromJson(fee))
+            .toList();
+      });
+    }
     _fetchData();
   }
 
@@ -97,12 +120,14 @@ class _FeeStructurePageState extends State<FeeStructurePage> {
     if (!mounted) return;
     setState(() {
       _isLoading = true;
+      _error = null;
     });
 
     try {
       final response = await ApiService.get('manager/fees');
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
+        await CacheService.setCache('fee_structure', data);
 
         final List<dynamic> instituteFeesData = data['institute_fees'] as List? ?? [];
         final List<dynamic> classFeesData = data['class_fees'] as List? ?? [];
@@ -127,9 +152,7 @@ class _FeeStructurePageState extends State<FeeStructurePage> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(e.toString())),
-        );
+        setState(() => _error = e);
       }
     } finally {
       if (mounted) {
@@ -184,24 +207,29 @@ class _FeeStructurePageState extends State<FeeStructurePage> {
       body: Center(
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 1200),
-          child: _isLoading
-              ? const Center(child: CircularProgressIndicator())
-              : RefreshIndicator(
-                  onRefresh: _fetchData,
-                  child: SingleChildScrollView(
-                    padding: context.pagePadding,
-                    physics: const AlwaysScrollableScrollPhysics(),
-                    child: Column(
-                      children: [
-                        if (context.isMobile)
-                          _buildNarrowLayout()
-                        else
-                          _buildWideLayout(),
-                        SizedBox(height: context.scale(80)),
-                      ],
-                    ),
-                  ),
+          child: LoadingWrapper(
+            isLoading: _isLoading,
+            hasData: _instituteFees.isNotEmpty || _classFees.isNotEmpty,
+            error: _error,
+            onRetry: _fetchData,
+            skeleton: _buildSkeleton(),
+            child: RefreshIndicator(
+              onRefresh: _fetchData,
+              child: SingleChildScrollView(
+                padding: context.pagePadding,
+                physics: const AlwaysScrollableScrollPhysics(),
+                child: Column(
+                  children: [
+                    if (context.isMobile)
+                      _buildNarrowLayout()
+                    else
+                      _buildWideLayout(),
+                    SizedBox(height: context.scale(80)),
+                  ],
                 ),
+              ),
+            ),
+          ),
         ),
       ),
       floatingActionButton: FloatingActionButton.extended(
@@ -221,6 +249,38 @@ class _FeeStructurePageState extends State<FeeStructurePage> {
         icon: Icon(Icons.add, size: context.scale(20)),
       ),
       floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
+    );
+  }
+
+  Widget _buildSkeleton() {
+    return SingleChildScrollView(
+      padding: context.pagePadding,
+      child: Column(
+        children: [
+          _buildSkeletonSection(),
+          SizedBox(height: context.scale(24)),
+          _buildSkeletonSection(),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSkeletonSection() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        SkeletonBox(width: context.scale(150), height: context.scale(24)),
+        SizedBox(height: context.scale(8)),
+        SkeletonBox(width: context.scale(200), height: context.scale(16)),
+        SizedBox(height: context.scale(16)),
+        ...List.generate(
+          2,
+          (index) => Padding(
+            padding: EdgeInsets.only(bottom: context.scale(16)),
+            child: SkeletonBox(height: context.scale(180), borderRadius: context.scale(16)),
+          ),
+        ),
+      ],
     );
   }
 
@@ -713,3 +773,4 @@ class CustomSpecificContainerBox extends StatelessWidget {
     );
   }
 }
+

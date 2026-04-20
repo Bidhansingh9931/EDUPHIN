@@ -2,7 +2,10 @@ import 'dart:async';
 import 'dart:convert';
 
 import 'package:eduphin/services/api_service.dart';
+import 'package:eduphin/services/common_widgets.dart';
+import 'package:eduphin/services/caching_service.dart';
 import 'package:eduphin/services/responsive_helper.dart';
+import 'package:eduphin/teacher/dashboard/common_widgets.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
@@ -114,30 +117,64 @@ class _TicketDetailsPageState extends State<TicketDetailsPage> {
   final ScrollController _scrollController = ScrollController();
 
   bool _isLoading = true;
-  String? _error;
+  Object? _error;
   TicketDetails? _ticketDetails;
   final List<ChatMessage> _sessionMessages = [];
   int? _currentUserId;
+  late final String _cacheKey;
 
   @override
   void initState() {
     super.initState();
-    _fetchTicketDetails();
+    _cacheKey = 'ticket_details_${widget.ticketId}';
+    _loadData();
+  }
+
+  Future<void> _loadData() async {
+    await _loadCachedData();
+    await _fetchTicketDetails();
+  }
+
+  Future<void> _loadCachedData() async {
+    final cachedData = await CacheService.getCache(_cacheKey);
+    if (cachedData != null) {
+      if (mounted) {
+        setState(() {
+          _processData(cachedData['replies'], cachedData['profile']);
+          _isLoading = false;
+        });
+      }
+    }
+  }
+
+  void _processData(dynamic repliesData, dynamic profileData) {
+    final dynamic userIdDynamic = profileData['data']?['id'];
+    final currentUserId = int.tryParse(userIdDynamic.toString()) ?? 0;
+
+    if (currentUserId == 0) return;
+
+    final details = TicketDetails.fromJson(repliesData, currentUserId);
+
+    _currentUserId = currentUserId;
+    _ticketDetails = details;
+    _sessionMessages.clear();
+    _sessionMessages.addAll(details.messages);
   }
 
   Future<void> _fetchTicketDetails() async {
-    if (!mounted) return;
-    setState(() {
-      _isLoading = true;
-      _error = null;
-    });
+    if (_ticketDetails == null) {
+      setState(() {
+        _isLoading = true;
+        _error = null;
+      });
+    }
 
     try {
       // Pre-flight check for a valid ticket ID
       if (widget.ticketId == 'N/A' || widget.ticketId.isEmpty) {
         throw Exception('Invalid Ticket ID provided.');
       }
-      
+
       final results = await Future.wait([
         ApiService.get('manager/tickets/${widget.ticketId}/replies'),
         ApiService.get('manager/profile'),
@@ -149,42 +186,41 @@ class _TicketDetailsPageState extends State<TicketDetailsPage> {
       final profileResponse = results[1];
 
       if (repliesResponse.statusCode != 200) {
-        throw Exception('Failed to load ticket details: ${repliesResponse.body}');
+        throw Exception('Failed to load ticket details');
       }
       if (profileResponse.statusCode != 200) {
-        throw Exception('Failed to load user profile: ${profileResponse.body}');
+        throw Exception('Failed to load user profile');
       }
 
       final repliesData = jsonDecode(repliesResponse.body);
       final profileData = jsonDecode(profileResponse.body);
 
-      final dynamic userIdDynamic = profileData['data']?['id'];
-      final currentUserId = int.tryParse(userIdDynamic.toString()) ?? 0;
-
-      if (currentUserId == 0) {
-        throw Exception('Could not determine the current user ID.');
-      }
-
-      final details = TicketDetails.fromJson(repliesData, currentUserId);
-
-      setState(() {
-        _currentUserId = currentUserId;
-        _ticketDetails = details;
-        _sessionMessages.clear();
-        _sessionMessages.addAll(details.messages);
+      await CacheService.setCache(_cacheKey, {
+        'replies': repliesData,
+        'profile': profileData,
       });
 
+      if (mounted) {
+        setState(() {
+          _processData(repliesData, profileData);
+          _isLoading = false;
+          _error = null;
+        });
+      }
     } catch (e) {
       if (mounted) {
         setState(() {
-          _error = e.toString().replaceFirst('Exception: ', '');
+          _isLoading = false;
+          _error = e;
         });
+        if (_ticketDetails != null) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Error updating details: ${e.toString()}')),
+          );
+        }
       }
     } finally {
       if (mounted) {
-        setState(() {
-          _isLoading = false;
-        });
         _scrollToBottom();
       }
     }
@@ -263,55 +299,108 @@ class _TicketDetailsPageState extends State<TicketDetailsPage> {
   }
 
   Widget _buildBody(BuildContext context) {
-    if (_isLoading) {
-      return const Center(child: CircularProgressIndicator());
-    }
-    if (_error != null) {
-      return Center(
-        child: Padding(
-          padding: context.pagePadding,
-          child: Column(mainAxisSize: MainAxisSize.min, children: [
-            Icon(Icons.error_outline, size: context.scale(48), color: context.theme.colorScheme.error),
-            SizedBox(height: context.sm),
-            Text(_error!, textAlign: TextAlign.center, style: context.theme.textTheme.titleMedium),
-            SizedBox(height: context.md),
-            ElevatedButton.icon(
-              onPressed: _fetchTicketDetails,
-              icon: const Icon(Icons.refresh),
-              label: const Text("Retry"),
+    return LoadingWrapper(
+      isLoading: _isLoading,
+      hasData: _ticketDetails != null,
+      error: _error,
+      onRetry: _fetchTicketDetails,
+      skeleton: _buildSkeleton(),
+      child: _ticketDetails == null
+          ? const Center(child: Text("No details available."))
+          : Column(
+              children: [
+                Expanded(
+                  child: ListView.builder(
+                    controller: _scrollController,
+                    padding: context.pagePadding.copyWith(bottom: 100),
+                    itemCount: _sessionMessages.length + 1, // +1 for the header card
+                    itemBuilder: (context, index) {
+                      if (index == 0) {
+                        return Padding(
+                          padding: EdgeInsets.only(bottom: context.md),
+                          child: CustomTicketDetailsBox(
+                            ticket: _ticketDetails!,
+                          ),
+                        );
+                      }
+                      final message = _sessionMessages[index - 1];
+                      return ChatBubble(message: message);
+                    },
+                  ),
+                ),
+                _buildInputArea(context),
+              ],
             ),
-          ]),
-        ),
-      );
-    }
-    if (_ticketDetails == null) {
-      return Center(
-        child: Text("No details available.", style: context.theme.textTheme.titleMedium),
-      );
-    }
+    );
+  }
+
+  Widget _buildSkeleton() {
     return Column(
       children: [
         Expanded(
-          child: ListView.builder(
-            controller: _scrollController,
-            padding: context.pagePadding.copyWith(bottom: 100),
-            itemCount: _sessionMessages.length + 1, // +1 for the header card
-            itemBuilder: (context, index) {
-              if (index == 0) {
-                return Padding(
-                  padding: EdgeInsets.only(bottom: context.md),
-                  child: CustomTicketDetailsBox(
-                    ticket: _ticketDetails!,
-                  ),
-                );
-              }
-              final message = _sessionMessages[index - 1];
-              return ChatBubble(message: message);
-            },
+          child: ListView(
+            padding: context.pagePadding,
+            children: [
+              Container(
+                padding: context.pagePadding,
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(context.scale(16)),
+                  border: Border.all(color: Colors.grey.shade200),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Wrap(
+                      spacing: 20,
+                      runSpacing: 10,
+                      children: List.generate(5, (_) => const SkeletonBox(height: 35, width: 100)),
+                    ),
+                    const Padding(
+                      padding: EdgeInsets.symmetric(vertical: 16),
+                      child: Divider(),
+                    ),
+                    const SkeletonBox(height: 15, width: 120),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 20),
+              _buildSkeletonChatBubble(false),
+              _buildSkeletonChatBubble(true),
+              _buildSkeletonChatBubble(false),
+              _buildSkeletonChatBubble(true),
+            ],
           ),
         ),
-        _buildInputArea(context),
+        Container(
+          padding: EdgeInsets.all(context.spacing),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            border: Border(top: BorderSide(color: Colors.grey.shade200)),
+          ),
+          child: Row(
+            children: [
+              const Expanded(child: SkeletonBox(height: 50, borderRadius: 25)),
+              const SizedBox(width: 10),
+              const SkeletonBox(height: 50, width: 50, borderRadius: 25),
+            ],
+          ),
+        ),
       ],
+    );
+  }
+
+  Widget _buildSkeletonChatBubble(bool isUser) {
+    return Align(
+      alignment: isUser ? Alignment.centerRight : Alignment.centerLeft,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 8),
+        child: SkeletonBox(
+          height: 40,
+          width: 200,
+          borderRadius: 12,
+        ),
+      ),
     );
   }
 
@@ -553,7 +642,7 @@ class ChatBubble extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = context.theme;
     final isUser = message.isUser;
-    
+
     return Align(
       alignment: isUser ? Alignment.centerRight : Alignment.centerLeft,
       child: Container(
@@ -568,8 +657,8 @@ class ChatBubble extends StatelessWidget {
           right: isUser ? 0 : context.xl,
         ),
         decoration: BoxDecoration(
-          color: isUser 
-              ? theme.colorScheme.primaryContainer 
+          color: isUser
+              ? theme.colorScheme.primaryContainer
               : theme.colorScheme.surfaceContainerLowest,
           borderRadius: BorderRadius.only(
             topLeft: Radius.circular(context.scale(12)),
@@ -578,7 +667,7 @@ class ChatBubble extends StatelessWidget {
             bottomRight: Radius.circular(isUser ? 0 : context.scale(12)),
           ),
           border: Border.all(
-            color: isUser 
+            color: isUser
                 ? theme.colorScheme.primary.withValues(alpha: 0.2)
                 : theme.colorScheme.outlineVariant,
             width: 0.5,
@@ -596,3 +685,4 @@ class ChatBubble extends StatelessWidget {
     );
   }
 }
+

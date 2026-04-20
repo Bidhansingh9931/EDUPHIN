@@ -45,7 +45,7 @@ class _ExamListPageState extends State<ExamListPage> {
               } else if (snapshot.hasError) {
                 return _buildErrorState(snapshot.error.toString());
               }
-    
+
               final exams = snapshot.data?.exams ?? [];
               return ListView(
                 padding: context.pagePadding,

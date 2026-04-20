@@ -5,6 +5,7 @@ import 'package:csv/csv.dart';
 import 'package:eduphin/manager_dashboard/account_statics/institute_manager/add_manager.dart';
 import 'package:eduphin/services/api_service.dart';
 import 'package:eduphin/services/common_widgets.dart';
+import 'package:eduphin/services/caching_service.dart';
 import 'package:eduphin/services/responsive_helper.dart';
 import 'package:flutter/material.dart';
 import 'package:open_file/open_file.dart';
@@ -46,16 +47,51 @@ class _ManagerListPageState extends State<ManagerListPage> {
   int? _selectedRoleId;
   List<Role> _roles = [];
   List<Manager> _managers = [];
+  Object? _error;
 
   @override
   void initState() {
     super.initState();
+    _loadCacheAndFetch();
+  }
+
+  Future<void> _loadCacheAndFetch() async {
+    // 1. Load cached roles
+    final cachedRolesData = await CacheService.getCache('manager_roles');
+    if (cachedRolesData != null) {
+      final List<dynamic> rolesData = cachedRolesData;
+      final List<Role> allRoles = rolesData
+          .map((role) => Role(id: role['role_id'], name: role['name']))
+          .toList();
+      final managerRoles = allRoles.where((role) => 
+        role.name.toLowerCase().contains('manager')
+      ).toList();
+
+      if (managerRoles.isNotEmpty && mounted) {
+        setState(() {
+          _roles = managerRoles;
+          _selectedRoleId = managerRoles.first.id;
+        });
+        // 2. Load cached managers for the first role
+        final cachedManagersData = await CacheService.getCache('managers_${_selectedRoleId}');
+        if (cachedManagersData != null && mounted) {
+          setState(() {
+            _managers = (cachedManagersData as List).map((json) => Manager.fromJson(json)).toList();
+          });
+        }
+      }
+    }
+
+    // 3. Fetch fresh data
     _fetchInitialData();
   }
 
   Future<void> _fetchInitialData() async {
     if (!mounted) return;
-    setState(() => _isLoading = true);
+    setState(() {
+      _isLoading = true;
+      _error = null;
+    });
 
     try {
       final response = await ApiService.get('manager/salary/accounts');
@@ -63,6 +99,9 @@ class _ManagerListPageState extends State<ManagerListPage> {
         final data = jsonDecode(response.body);
         final List<dynamic> rolesData = data['roles'];
         
+        // Cache roles
+        await CacheService.setCache('manager_roles', rolesData);
+
         final List<Role> allRoles = rolesData
             .map((role) => Role(id: role['role_id'], name: role['name']))
             .toList();
@@ -75,7 +114,7 @@ class _ManagerListPageState extends State<ManagerListPage> {
           if (mounted) {
             setState(() {
               _roles = managerRoles;
-              _selectedRoleId = managerRoles.first.id;
+              _selectedRoleId = _selectedRoleId ?? managerRoles.first.id;
             });
             await _fetchManagersForRole(_selectedRoleId!);
           }
@@ -87,21 +126,40 @@ class _ManagerListPageState extends State<ManagerListPage> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString())));
-        setState(() => _isLoading = false);
+        setState(() {
+          _error = e;
+          _isLoading = false;
+        });
       }
     }
   }
 
   Future<void> _fetchManagersForRole(int roleId) async {
     if (!mounted) return;
-    setState(() => _isLoading = true);
+    setState(() {
+      _isLoading = true;
+      _error = null;
+    });
+
+    // Try to load cache for this specific role if we haven't already (or always to be safe)
+    if (_managers.isEmpty) {
+      final cachedManagersData = await CacheService.getCache('managers_$roleId');
+      if (cachedManagersData != null && mounted) {
+        setState(() {
+          _managers = (cachedManagersData as List).map((json) => Manager.fromJson(json)).toList();
+        });
+      }
+    }
 
     try {
       final response = await ApiService.get('manager/users/$roleId');
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
         final List<dynamic> managersData = data['data'];
+        
+        // Cache managers for this role
+        await CacheService.setCache('managers_$roleId', managersData);
+
         if(mounted){
           setState(() {
             _managers = managersData.map((json) => Manager.fromJson(json)).toList();
@@ -113,8 +171,10 @@ class _ManagerListPageState extends State<ManagerListPage> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString())));
-        setState(() => _isLoading = false);
+        setState(() {
+          _error = e;
+          _isLoading = false;
+        });
       }
     }
   }
@@ -174,6 +234,7 @@ class _ManagerListPageState extends State<ManagerListPage> {
               constraints: const BoxConstraints(maxWidth: 1200),
               child: CustomManagerListBox(
                 isLoading: _isLoading,
+                error: _error,
                 managers: _managers,
                 roles: _roles,
                 selectedRoleId: _selectedRoleId,
@@ -183,6 +244,7 @@ class _ManagerListPageState extends State<ManagerListPage> {
                     _fetchManagersForRole(newRoleId);
                   }
                 },
+                onRetry: _fetchInitialData,
               ),
             ),
           ),
@@ -194,18 +256,22 @@ class _ManagerListPageState extends State<ManagerListPage> {
 
 class CustomManagerListBox extends StatelessWidget {
   final bool isLoading;
+  final Object? error;
   final List<Manager> managers;
   final List<Role> roles;
   final int? selectedRoleId;
   final ValueChanged<int?> onRoleChanged;
+  final VoidCallback onRetry;
 
   const CustomManagerListBox({
     super.key,
     required this.isLoading,
+    this.error,
     required this.managers,
     required this.roles,
     required this.selectedRoleId,
     required this.onRoleChanged,
+    required this.onRetry,
   });
 
   @override
@@ -234,10 +300,27 @@ class CustomManagerListBox extends StatelessWidget {
               items: roles.map((role) => DropdownMenuItem(value: role.id, child: Text(role.name, style: theme.textTheme.bodyLarge?.copyWith(fontSize: context.font(16))))).toList(),
             ),
             SizedBox(height: context.scale(24)),
-            isLoading
-                ? Center(child: Padding(padding: EdgeInsets.all(context.scale(40)), child: const CircularProgressIndicator()))
-                : _buildContent(context),
+            LoadingWrapper(
+              isLoading: isLoading,
+              hasData: managers.isNotEmpty,
+              error: error,
+              onRetry: onRetry,
+              skeleton: _buildSkeleton(context),
+              child: _buildContent(context),
+            ),
           ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSkeleton(BuildContext context) {
+    return Column(
+      children: List.generate(
+        5,
+        (index) => Padding(
+          padding: EdgeInsets.only(bottom: context.scale(12)),
+          child: SkeletonBox(height: context.scale(80), borderRadius: context.scale(12)),
         ),
       ),
     );
@@ -311,4 +394,5 @@ class CustomManagerListBox extends StatelessWidget {
     );
   }
 }
+
 

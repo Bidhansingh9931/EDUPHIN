@@ -1,4 +1,3 @@
-import 'package:intl/intl.dart';
 
 class CounselorDashboardData {
   final UserDetail userDetail;
@@ -28,7 +27,7 @@ class CounselorDashboardData {
   factory CounselorDashboardData.fromJson(Map<String, dynamic> json) {
     final Map<String, dynamic> source = json['data'] is Map<String, dynamic> ? json['data'] : json;
 
-    List<T> _parseList<T>(dynamic data, T Function(Map<String, dynamic>) fromJson) {
+    List<T> parseList<T>(dynamic data, T Function(Map<String, dynamic>) fromJson) {
       if (data == null) return [];
       Iterable rawList = [];
       if (data is Iterable) {
@@ -42,14 +41,14 @@ class CounselorDashboardData {
     return CounselorDashboardData(
       userDetail: UserDetail.fromJson(source['userDetail'] is Map ? source['userDetail'] : (source['account'] is Map ? source['account'] : source)),
       lastSalary: source['lastSalary'] is Map ? Salary.fromJson(source['lastSalary']) : null,
-      events: _parseList(source['events'], Event.fromJson),
-      instituteExam: _parseList(source['exams'] ?? source['instituteexam'], ExamType.fromJson),
-      tickets: _parseList(source['myTickets'] ?? source['tickets'], SupportTicket.fromJson),
-      assignedTickets: _parseList(source['assignedTickets'] ?? source['assigntickets'], SupportTicket.fromJson),
-      sections: _parseList(source['sections'], Section.fromJson),
-      subjects: _parseList(source['subjects'] ?? source['subject'], Subject.fromJson),
-      schedules: _parseList(source['schedules'], ClassSchedule.fromJson),
-      accounts: _parseList(source['accounts'] ?? source['account'], UserDetail.fromJson),
+      events: parseList(source['events'], Event.fromJson),
+      instituteExam: parseList(source['exams'] ?? source['instituteexam'], ExamType.fromJson),
+      tickets: parseList(source['myTickets'] ?? source['tickets'], SupportTicket.fromJson),
+      assignedTickets: parseList(source['assignedTickets'] ?? source['assigntickets'], SupportTicket.fromJson),
+      sections: parseList(source['sections'], Section.fromJson),
+      subjects: parseList(source['subjects'] ?? source['subject'], Subject.fromJson),
+      schedules: parseList(source['schedules'], ClassSchedule.fromJson),
+      accounts: parseList(source['accounts'] ?? source['account'], UserDetail.fromJson),
     );
   }
 }

@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:eduphin/services/api_service.dart';
 import 'package:eduphin/teacher/dashboard/library_models.dart' as teacher_library;
 import 'package:eduphin/teacher/dashboard/common_widgets.dart';
-import 'package:intl/intl.dart';
+import 'package:eduphin/services/common_widgets.dart';
 
 class LibraryLendingPage extends StatefulWidget {
   const LibraryLendingPage({super.key});
@@ -17,6 +17,7 @@ class _LibraryLendingPageState extends State<LibraryLendingPage> {
   List<teacher_library.IssuedBook> _issuedBooks = [];
   int _currentPage = 1;
   int _totalPages = 1;
+  Stream<teacher_library.LendingPagination>? _lendingStream;
 
   final TextEditingController _bookTitleController = TextEditingController();
   final TextEditingController _issuedFromController = TextEditingController();
@@ -39,37 +40,17 @@ class _LibraryLendingPageState extends State<LibraryLendingPage> {
     super.dispose();
   }
 
-  Future<void> _fetchLendingRecords({int page = 1}) async {
-    if (!mounted) return;
-    setState(() => _isLoading = true);
-    try {
-      final filters = {
-        'book_title': _bookTitleController.text,
-        'issued_from': _issuedFromController.text,
-        'due_from': _dueFromController.text,
-        'due_to': _dueToController.text,
-        if (_selectedStatus != 'all') 'returned_status': _selectedStatus,
-      };
-      final result = await ApiService.getAccountantLendingBooks(filters, page);
-      if (mounted) {
-        setState(() {
-          _issuedBooks = result.issuedBooks;
-          _currentPage = result.currentPage;
-          _totalPages = result.lastPage;
-        });
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text("Error: $e"),
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
-      }
-    } finally {
-      if (mounted) setState(() => _isLoading = false);
-    }
+  void _fetchLendingRecords({int page = 1}) {
+    final filters = {
+      'book_title': _bookTitleController.text,
+      'issued_from': _issuedFromController.text,
+      'due_from': _dueFromController.text,
+      'due_to': _dueToController.text,
+      if (_selectedStatus != 'all') 'returned_status': _selectedStatus,
+    };
+    setState(() {
+      _lendingStream = ApiService.getAccountantLendingBooksStream(filters, page);
+    });
   }
 
   void _resetFilters() {
@@ -93,10 +74,21 @@ class _LibraryLendingPageState extends State<LibraryLendingPage> {
         title: const Text("Lending History"),
         centerTitle: true,
       ),
-      body: Stack(
-        children: [
-          RefreshIndicator(
-            onRefresh: () => _fetchLendingRecords(page: 1),
+      body: StreamBuilder<teacher_library.LendingPagination>(
+        stream: _lendingStream,
+        builder: (context, snapshot) {
+          if (snapshot.hasData) {
+            _issuedBooks = snapshot.data!.issuedBooks;
+            _currentPage = snapshot.data!.currentPage;
+            _totalPages = snapshot.data!.lastPage;
+          }
+          _isLoading = snapshot.connectionState == ConnectionState.waiting && !snapshot.hasData;
+
+          return RefreshIndicator(
+            onRefresh: () async {
+              _fetchLendingRecords(page: 1);
+              await _lendingStream?.first;
+            },
             child: SingleChildScrollView(
               physics: const AlwaysScrollableScrollPhysics(),
               padding: EdgeInsets.zero,
@@ -108,13 +100,18 @@ class _LibraryLendingPageState extends State<LibraryLendingPage> {
                       _buildFilterSection(context),
                       Padding(
                         padding: context.pagePadding,
-                        child: Column(
-                          children: [
-                            _buildLendingList(context),
-                            SizedBox(height: context.spacing * 2),
-                            if (_totalPages > 1) _buildPagination(context),
-                            SizedBox(height: context.spacing * 2),
-                          ],
+                        child: LoadingWrapper<teacher_library.LendingPagination>(
+                          snapshot: snapshot,
+                          onRetry: () => _fetchLendingRecords(page: _currentPage),
+                          skeleton: _buildSkeleton(context),
+                          builder: (data) => Column(
+                            children: [
+                              _buildLendingList(context),
+                              SizedBox(height: context.spacing * 2),
+                              if (_totalPages > 1) _buildPagination(context),
+                              SizedBox(height: context.spacing * 2),
+                            ],
+                          ),
                         ),
                       ),
                     ],
@@ -122,13 +119,8 @@ class _LibraryLendingPageState extends State<LibraryLendingPage> {
                 ),
               ),
             ),
-          ),
-          if (_isLoading)
-            Container(
-              color: theme.colorScheme.surface.withValues(alpha: 0.5),
-              child: const Center(child: CircularProgressIndicator()),
-            ),
-        ],
+          );
+        },
       ),
     );
   }
@@ -365,6 +357,72 @@ class _LibraryLendingPageState extends State<LibraryLendingPage> {
           icon: const Icon(Icons.chevron_right),
         ),
       ],
+    );
+  }
+
+  Widget _buildSkeleton(BuildContext context) {
+    return GridView.builder(
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: context.isDesktop ? 3 : (context.isTablet ? 2 : 1),
+        mainAxisExtent: context.scale(180),
+        crossAxisSpacing: context.spacing,
+        mainAxisSpacing: context.spacing,
+      ),
+      itemCount: 6,
+      itemBuilder: (context, index) => Container(
+        decoration: BoxDecoration(
+          color: context.theme.colorScheme.surfaceContainerLow,
+          borderRadius: BorderRadius.circular(context.scale(16)),
+          border: Border.all(color: context.theme.colorScheme.outlineVariant),
+        ),
+        padding: EdgeInsets.all(context.spacing),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Skeleton(height: context.scale(16), width: context.scale(150)),
+                      SizedBox(height: context.scale(8)),
+                      Skeleton(height: context.scale(12), width: context.scale(80)),
+                    ],
+                  ),
+                ),
+                Skeleton(height: context.scale(22), width: context.scale(65), borderRadius: context.scale(20)),
+              ],
+            ),
+            const Spacer(),
+            Divider(color: context.theme.colorScheme.outlineVariant, height: context.scale(24)),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Skeleton(height: context.scale(10), width: context.scale(40)),
+                    SizedBox(height: context.scale(4)),
+                    Skeleton(height: context.scale(14), width: context.scale(70)),
+                  ],
+                ),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    Skeleton(height: context.scale(10), width: context.scale(40)),
+                    SizedBox(height: context.scale(4)),
+                    Skeleton(height: context.scale(14), width: context.scale(70)),
+                  ],
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

@@ -208,7 +208,7 @@ class _ClassSchedulePageState extends State<ClassSchedulePage> {
 
                   /// SCHEDULE RESULT CARD
                   if (_errorMessage != null)
-                    Center(child: Text(_errorMessage!, style: TextStyle(color: theme.colorScheme.error)))
+                    Center(child: Text(_errorMessage!.toString(), style: TextStyle(color: theme.colorScheme.error)))
                   else if (_scheduleData != null)
                     Card(
                       elevation: 0,

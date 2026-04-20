@@ -1,3 +1,4 @@
+import 'package:eduphin/services/common_widgets.dart';
 import 'package:eduphin/services/responsive_helper.dart';
 import 'package:flutter/material.dart';
 import 'package:eduphin/services/api_service.dart';
@@ -14,9 +15,8 @@ class EventListPage extends StatefulWidget {
 
 class _EventListPageState extends State<EventListPage> with SingleTickerProviderStateMixin {
   late TabController _tabController;
-  bool _isLoading = true;
-  List<Event> _availableEvents = [];
-  List<EventRegistration> _registeredEvents = [];
+  late Stream<List<Event>> _eventsStream;
+  late Stream<List<EventRegistration>> _registeredStream;
 
   // Filters for Tab 0 (Explore)
   String _exploreStatus = 'Upcoming';
@@ -48,28 +48,17 @@ class _EventListPageState extends State<EventListPage> with SingleTickerProvider
     super.dispose();
   }
 
-  Future<void> _fetchData() async {
-    if (!mounted) return;
-    setState(() => _isLoading = true);
-    try {
-      if (_tabController.index == 0) {
-        final events = await ApiService.getAccountantEvents(
-          status: _exploreStatus == 'All Events' ? null : _exploreStatus.toLowerCase(),
-          type: _exploreType == 'All types' ? null : _exploreType.toLowerCase(),
-        );
-        if (mounted) setState(() => _availableEvents = events);
-      } else {
-        final registered = await ApiService.getAccountantRegisteredEvents(
-          status: _registeredStatus == 'All Status' ? null : _registeredStatus.toLowerCase(),
-          type: _registeredType == 'All types' ? null : _registeredType.toLowerCase(),
-        );
-        if (mounted) setState(() => _registeredEvents = registered);
-      }
-    } catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Error: $e")));
-    } finally {
-      if (mounted) setState(() => _isLoading = false);
-    }
+  void _fetchData() {
+    setState(() {
+      _eventsStream = ApiService.getAccountantEventsStream(
+        status: _exploreStatus == 'All Events' ? null : _exploreStatus.toLowerCase(),
+        type: _exploreType == 'All types' ? null : _exploreType.toLowerCase(),
+      );
+      _registeredStream = ApiService.getAccountantRegisteredEventsStream(
+        status: _registeredStatus == 'All Status' ? null : _registeredStatus.toLowerCase(),
+        type: _registeredType == 'All types' ? null : _registeredType.toLowerCase(),
+      );
+    });
   }
 
   Future<void> _register(Event event) async {
@@ -81,7 +70,6 @@ class _EventListPageState extends State<EventListPage> with SingleTickerProvider
       return;
     }
 
-    setState(() => _isLoading = true);
     try {
       await ApiService.accountantRegisterForEvent(eventId.toString());
       if (mounted) {
@@ -90,8 +78,6 @@ class _EventListPageState extends State<EventListPage> with SingleTickerProvider
       }
     } catch (e) {
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Error: $e")));
-    } finally {
-      if (mounted) setState(() => _isLoading = false);
     }
   }
 
@@ -120,7 +106,6 @@ class _EventListPageState extends State<EventListPage> with SingleTickerProvider
     );
 
     if (confirmed == true) {
-      setState(() => _isLoading = true);
       try {
         await ApiService.accountantCancelEvent(registrationId.toString(), reason: reasonController.text);
         if (mounted) {
@@ -128,9 +113,9 @@ class _EventListPageState extends State<EventListPage> with SingleTickerProvider
           _fetchData();
         }
       } catch (e) {
-        if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Error: $e")));
-      } finally {
-        if (mounted) setState(() => _isLoading = false);
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Error: $e")));
+        }
       }
     }
   }
@@ -139,7 +124,7 @@ class _EventListPageState extends State<EventListPage> with SingleTickerProvider
     final paymentController = TextEditingController();
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
+      builder: (dialogContext) => AlertDialog(
         title: const Text("Paid Event Registration"),
         content: Column(
           mainAxisSize: MainAxisSize.min,
@@ -156,12 +141,11 @@ class _EventListPageState extends State<EventListPage> with SingleTickerProvider
           ],
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: const Text("CANCEL")),
+          TextButton(onPressed: () => Navigator.pop(dialogContext), child: const Text("CANCEL")),
           ElevatedButton(
             onPressed: () async {
               if (paymentController.text.isEmpty) return;
-              Navigator.pop(context);
-              setState(() => _isLoading = true);
+              Navigator.pop(dialogContext);
               try {
                 await ApiService.accountantRegisterForEvent(eventId.toString(), paymentId: paymentController.text);
                 if (mounted) {
@@ -169,9 +153,9 @@ class _EventListPageState extends State<EventListPage> with SingleTickerProvider
                   _fetchData();
                 }
               } catch (e) {
-                if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Error: $e")));
-              } finally {
-                if (mounted) setState(() => _isLoading = false);
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Error: $e")));
+                }
               }
             },
             child: const Text("REGISTER"),
@@ -201,22 +185,20 @@ class _EventListPageState extends State<EventListPage> with SingleTickerProvider
           ],
         ),
       ),
-      body: _isLoading && (_availableEvents.isEmpty && _registeredEvents.isEmpty)
-          ? const Center(child: CircularProgressIndicator())
-          : Column(
+      body: Column(
+        children: [
+          _buildFilterBar(),
+          Expanded(
+            child: TabBarView(
+              controller: _tabController,
               children: [
-                _buildFilterBar(),
-                Expanded(
-                  child: TabBarView(
-                    controller: _tabController,
-                    children: [
-                      _buildEventList(),
-                      _buildRegisteredList(),
-                    ],
-                  ),
-                ),
+                _buildEventList(),
+                _buildRegisteredList(),
               ],
             ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -274,38 +256,152 @@ class _EventListPageState extends State<EventListPage> with SingleTickerProvider
   }
 
   Widget _buildEventList() {
-    if (_availableEvents.isEmpty) {
-      return _buildEmptyState("No upcoming events found");
-    }
-    return Center(
-      child: ConstrainedBox(
-        constraints: BoxConstraints(maxWidth: context.scale(1200)),
-        child: GridView.builder(
-          padding: context.pagePadding,
-          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-            crossAxisCount: context.isDesktop ? 3 : (context.isTablet ? 2 : 1),
-            mainAxisExtent: context.scale(360),
-            crossAxisSpacing: context.spacing,
-            mainAxisSpacing: context.spacing,
-          ),
-          itemCount: _availableEvents.length,
-          itemBuilder: (context, index) => _buildEventItem(_availableEvents[index]),
+    return StreamBuilder<List<Event>>(
+      stream: _eventsStream,
+      builder: (context, snapshot) {
+        return LoadingWrapper<List<Event>>(
+          snapshot: snapshot,
+          onRetry: _fetchData,
+          skeleton: _buildEventListSkeleton(),
+          builder: (events) {
+            if (events.isEmpty) {
+              return _buildEmptyState("No upcoming events found");
+            }
+            return Center(
+              child: ConstrainedBox(
+                constraints: BoxConstraints(maxWidth: context.scale(1200)),
+                child: GridView.builder(
+                  padding: context.pagePadding,
+                  gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                    crossAxisCount: context.isDesktop ? 3 : (context.isTablet ? 2 : 1),
+                    mainAxisExtent: context.scale(360),
+                    crossAxisSpacing: context.spacing,
+                    mainAxisSpacing: context.spacing,
+                  ),
+                  itemCount: events.length,
+                  itemBuilder: (context, index) => _buildEventItem(events[index]),
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Widget _buildRegisteredList() {
+    return StreamBuilder<List<EventRegistration>>(
+      stream: _registeredStream,
+      builder: (context, snapshot) {
+        return LoadingWrapper<List<EventRegistration>>(
+          snapshot: snapshot,
+          onRetry: _fetchData,
+          skeleton: _buildRegisteredListSkeleton(),
+          builder: (registrations) {
+            if (registrations.isEmpty) {
+              return _buildEmptyState("You haven't registered for any events yet");
+            }
+            return Center(
+              child: ConstrainedBox(
+                constraints: BoxConstraints(maxWidth: context.scale(800)),
+                child: ListView.builder(
+                  padding: context.pagePadding,
+                  itemCount: registrations.length,
+                  itemBuilder: (context, index) => _buildRegisteredItem(registrations[index]),
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Widget _buildEventListSkeleton() {
+    return GridView.builder(
+      padding: context.pagePadding,
+      physics: const NeverScrollableScrollPhysics(),
+      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: context.isDesktop ? 3 : (context.isTablet ? 2 : 1),
+        mainAxisExtent: context.scale(360),
+        crossAxisSpacing: context.spacing,
+        mainAxisSpacing: context.spacing,
+      ),
+      itemCount: 6,
+      itemBuilder: (context, index) => Card(
+        elevation: 0,
+        color: context.theme.colorScheme.surfaceContainerLow,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(context.scale(16)),
+          side: BorderSide(color: context.theme.colorScheme.outlineVariant, width: 0.5),
+        ),
+        clipBehavior: Clip.antiAlias,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Skeleton(height: context.scale(150), width: double.infinity, borderRadius: 0),
+            Padding(
+              padding: EdgeInsets.all(context.spacing),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Skeleton(height: context.font(16), width: context.scale(200)),
+                  SizedBox(height: context.scale(8)),
+                  Skeleton(height: context.font(12), width: context.scale(150)),
+                  SizedBox(height: context.scale(4)),
+                  Skeleton(height: context.font(12), width: context.scale(180)),
+                  SizedBox(height: context.scale(12)),
+                  Skeleton(height: context.scale(20), width: context.scale(80), borderRadius: context.scale(8)),
+                  SizedBox(height: context.spacing),
+                  Skeleton(height: context.scale(40), width: double.infinity, borderRadius: context.scale(12)),
+                ],
+              ),
+            ),
+          ],
         ),
       ),
     );
   }
 
-  Widget _buildRegisteredList() {
-    if (_registeredEvents.isEmpty) {
-      return _buildEmptyState("You haven't registered for any events yet");
-    }
-    return Center(
-      child: ConstrainedBox(
-        constraints: BoxConstraints(maxWidth: context.scale(800)),
-        child: ListView.builder(
-          padding: context.pagePadding,
-          itemCount: _registeredEvents.length,
-          itemBuilder: (context, index) => _buildRegisteredItem(_registeredEvents[index]),
+  Widget _buildRegisteredListSkeleton() {
+    return ListView.builder(
+      padding: context.pagePadding,
+      physics: const NeverScrollableScrollPhysics(),
+      itemCount: 5,
+      itemBuilder: (context, index) => Card(
+        margin: EdgeInsets.only(bottom: context.spacing),
+        elevation: 0,
+        color: context.theme.colorScheme.surfaceContainerLow,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(context.scale(16)),
+          side: BorderSide(color: context.theme.colorScheme.outlineVariant, width: 0.5),
+        ),
+        child: Padding(
+          padding: EdgeInsets.all(context.spacing),
+          child: Row(
+            children: [
+              Skeleton(width: context.scale(48), height: context.scale(48), borderRadius: context.scale(24)),
+              SizedBox(width: context.spacing),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Skeleton(height: context.font(16), width: context.scale(150)),
+                    SizedBox(height: context.scale(4)),
+                    Skeleton(height: context.font(12), width: context.scale(100)),
+                    SizedBox(height: context.scale(8)),
+                    Row(
+                      children: [
+                        Skeleton(height: context.scale(20), width: context.scale(60), borderRadius: context.scale(6)),
+                        SizedBox(width: context.spacing),
+                        Skeleton(height: context.scale(15), width: context.scale(80)),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );

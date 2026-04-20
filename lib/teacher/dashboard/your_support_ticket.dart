@@ -4,7 +4,8 @@ import 'package:flutter/material.dart';
 import 'package:eduphin/services/api_service.dart';
 import 'package:eduphin/teacher/dashboard/ticket_models.dart';
 import 'package:eduphin/services/responsive_helper.dart';
-import 'common_widgets.dart';
+import 'package:eduphin/services/common_widgets.dart';
+import 'package:eduphin/teacher/dashboard/common_widgets.dart' as teacher_common;
 
 class YourSupportTicketPage extends StatefulWidget {
   const YourSupportTicketPage({super.key});
@@ -173,9 +174,9 @@ class _YourSupportTicketPageState extends State<YourSupportTicketPage> {
             Text("Filters", style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold, fontSize: context.font(14))),
             SizedBox(height: context.scale(16)),
             if (context.isMobile) ...[
-              buildTextField(context, _searchController, "Search by Title...", prefixIcon: Icons.search),
+              teacher_common.buildTextField(context, _searchController, "Search by Title...", prefixIcon: Icons.search),
               SizedBox(height: context.scale(12)),
-              buildDropdown(
+              teacher_common.buildDropdown(
                 context,
                 ['low', 'medium', 'high'],
                 _filters['priority'],
@@ -183,7 +184,7 @@ class _YourSupportTicketPageState extends State<YourSupportTicketPage> {
                 hint: "All Priorities",
               ),
               SizedBox(height: context.scale(12)),
-              buildDropdown(
+              teacher_common.buildDropdown(
                 context,
                 ['open', 'in_progress', 'resolved', 'closed'],
                 _filters['status'],
@@ -191,16 +192,16 @@ class _YourSupportTicketPageState extends State<YourSupportTicketPage> {
                 hint: "All Statuses",
               ),
             ] else
-              buildResponsiveRow(context, [
-                buildTextField(context, _searchController, "Search by Title...", prefixIcon: Icons.search),
-                buildDropdown(
+              teacher_common.buildResponsiveRow(context, [
+                teacher_common.buildTextField(context, _searchController, "Search by Title...", prefixIcon: Icons.search),
+                teacher_common.buildDropdown(
                   context,
                   ['low', 'medium', 'high'],
                   _filters['priority'],
                   (val) => setState(() => _filters['priority'] = val),
                   hint: "All Priorities",
                 ),
-                buildDropdown(
+                teacher_common.buildDropdown(
                   context,
                   ['open', 'in_progress', 'resolved', 'closed'],
                   _filters['status'],

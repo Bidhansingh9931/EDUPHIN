@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../services/api_service.dart';
 import '../../services/responsive_helper.dart';
+import '../../services/common_widgets.dart';
 import 'staff_models.dart';
 
 class StaffFeeStructurePage extends StatefulWidget {
@@ -11,7 +12,7 @@ class StaffFeeStructurePage extends StatefulWidget {
 }
 
 class _StaffFeeStructurePageState extends State<StaffFeeStructurePage> {
-  late Future<List<Fee>> _feesFuture;
+  late Stream<List<Fee>> _feesStream;
 
   @override
   void initState() {
@@ -21,7 +22,7 @@ class _StaffFeeStructurePageState extends State<StaffFeeStructurePage> {
 
   void _loadFees() {
     setState(() {
-      _feesFuture = ApiService.getStaffFees();
+      _feesStream = ApiService.getStaffFeesStream();
     });
   }
 
@@ -42,66 +43,48 @@ class _StaffFeeStructurePageState extends State<StaffFeeStructurePage> {
           child: Center(
             child: ConstrainedBox(
               constraints: const BoxConstraints(maxWidth: 1200),
-              child: FutureBuilder<List<Fee>>(
-                future: _feesFuture,
+              child: StreamBuilder<List<Fee>>(
+                stream: _feesStream,
                 builder: (context, snapshot) {
-                  if (snapshot.connectionState == ConnectionState.waiting) {
-                    return Padding(
-                      padding: EdgeInsets.symmetric(vertical: context.scale(100)),
-                      child: const Center(child: CircularProgressIndicator()),
-                    );
-                  } else if (snapshot.hasError) {
-                    return Padding(
-                      padding: EdgeInsets.symmetric(vertical: context.scale(100)),
-                      child: Center(
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(Icons.error_outline, size: context.scale(48), color: theme.colorScheme.error),
-                            SizedBox(height: context.scale(16)),
-                            Text("Error: ${snapshot.error}",
-                              textAlign: TextAlign.center,
-                              style: TextStyle(color: theme.colorScheme.error)),
-                            SizedBox(height: context.scale(16)),
-                            FilledButton.tonal(onPressed: _loadFees, child: const Text("Retry")),
-                          ],
-                        ),
-                      ),
-                    );
-                  } else if (!snapshot.hasData || snapshot.data!.isEmpty) {
-                    return Padding(
-                      padding: EdgeInsets.symmetric(vertical: context.scale(100)),
-                      child: Center(
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(Icons.account_balance_wallet_outlined, size: context.scale(64), color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.5)),
-                            SizedBox(height: context.scale(16)),
-                            Text("No fee structure available",
-                              style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: context.font(16), fontWeight: FontWeight.bold)),
-                          ],
-                        ),
-                      ),
-                    );
-                  }
+                  return LoadingWrapper<List<Fee>>(
+                    snapshot: snapshot,
+                    skeleton: _buildSkeleton(context),
+                    builder: (fees) {
+                      if (fees.isEmpty) {
+                        return Padding(
+                          padding: EdgeInsets.symmetric(vertical: context.scale(100)),
+                          child: Center(
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(Icons.account_balance_wallet_outlined, size: context.scale(64), color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.5)),
+                                SizedBox(height: context.scale(16)),
+                                Text("No fee structure available",
+                                  style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: context.font(16), fontWeight: FontWeight.bold)),
+                              ],
+                            ),
+                          ),
+                        );
+                      }
 
-                  final fees = snapshot.data!;
-                  return LayoutBuilder(
-                    builder: (context, constraints) {
-                      final crossAxisCount = constraints.maxWidth > 900 ? 3 : (constraints.maxWidth > 600 ? 2 : 1);
-                      return GridView.builder(
-                        shrinkWrap: true,
-                        physics: const NeverScrollableScrollPhysics(),
-                        itemCount: fees.length,
-                        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                          crossAxisCount: crossAxisCount,
-                          crossAxisSpacing: context.spacing,
-                          mainAxisSpacing: context.spacing,
-                          mainAxisExtent: context.scale(140),
-                        ),
-                        itemBuilder: (context, index) {
-                          final fee = fees[index];
-                          return _buildFeeCard(context, fee.name, "₹${fee.amount}", fee.description ?? "");
+                      return LayoutBuilder(
+                        builder: (context, constraints) {
+                          final crossAxisCount = constraints.maxWidth > 900 ? 3 : (constraints.maxWidth > 600 ? 2 : 1);
+                          return GridView.builder(
+                            shrinkWrap: true,
+                            physics: const NeverScrollableScrollPhysics(),
+                            itemCount: fees.length,
+                            gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                              crossAxisCount: crossAxisCount,
+                              crossAxisSpacing: context.spacing,
+                              mainAxisSpacing: context.spacing,
+                              mainAxisExtent: context.scale(140),
+                            ),
+                            itemBuilder: (context, index) {
+                              final fee = fees[index];
+                              return _buildFeeCard(context, fee.name, "₹${fee.amount}", fee.description ?? "");
+                            },
+                          );
                         },
                       );
                     },
@@ -167,6 +150,49 @@ class _StaffFeeStructurePageState extends State<StaffFeeStructurePage> {
           ],
         ],
       ),
+    );
+  }
+
+  Widget _buildSkeleton(BuildContext context) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final crossAxisCount = constraints.maxWidth > 900 ? 3 : (constraints.maxWidth > 600 ? 2 : 1);
+        return GridView.builder(
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          itemCount: 6,
+          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: crossAxisCount,
+            crossAxisSpacing: context.spacing,
+            mainAxisSpacing: context.spacing,
+            mainAxisExtent: context.scale(140),
+          ),
+          itemBuilder: (context, index) => Container(
+            padding: EdgeInsets.all(context.scale(20)),
+            decoration: BoxDecoration(
+              color: context.theme.colorScheme.surfaceContainerLow,
+              borderRadius: BorderRadius.circular(context.scale(20)),
+              border: Border.all(color: context.theme.colorScheme.outlineVariant, width: 0.5),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Skeleton(width: context.scale(120), height: context.scale(18)),
+                    Skeleton(width: context.scale(60), height: context.scale(20)),
+                  ],
+                ),
+                const Spacer(),
+                Skeleton(width: double.infinity, height: context.scale(14)),
+                SizedBox(height: context.scale(4)),
+                Skeleton(width: context.scale(150), height: context.scale(14)),
+              ],
+            ),
+          ),
+        );
+      },
     );
   }
 }

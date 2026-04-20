@@ -1,6 +1,9 @@
 import 'dart:convert';
 
 import 'package:eduphin/services/api_service.dart';
+import 'package:eduphin/services/caching_service.dart';
+import 'package:eduphin/services/common_widgets.dart';
+import 'package:eduphin/services/responsive_helper.dart';
 import 'package:eduphin/manager_dashboard/manageClasses/schedule/searchSchedule/overrideSchedule/override_schedule.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
@@ -69,25 +72,83 @@ class DailyClassSchedulePage extends StatefulWidget{
 
 class _DailyClassSchedulePageState extends State<DailyClassSchedulePage>{
   bool _isLoading = true;
-  String _error = '';
-  final List<ScheduleEntry> _schedule = [];
+  Object? _error;
+  List<ScheduleEntry> _schedule = [];
+  static const String _cacheKey = 'manager_class_schedules';
 
   @override
   void initState() {
     super.initState();
+    _loadCachedData();
     _fetchSchedule();
+  }
+
+  Future<void> _loadCachedData() async {
+    final cachedData = await CacheService.getCache(_cacheKey);
+    if (cachedData != null && mounted) {
+      _processScheduleData(cachedData);
+    }
+  }
+
+  void _processScheduleData(dynamic data) {
+    // 2. Parse the date to find the weekday
+    final DateFormat inputFormat = DateFormat('dd-MM-yyyy');
+    final DateTime dateTime = inputFormat.parse(widget.date);
+    final String weekday = DateFormat('EEEE').format(dateTime);
+
+    // 3. Filter schedules by class, section, and weekday
+    final List<dynamic> allSchedulesJson = data ?? [];
+    final List<ApiSchedule> allSchedules = allSchedulesJson.map((json) => ApiSchedule.fromJson(json)).toList();
+
+    final List<ApiSchedule> filteredSchedules = allSchedules.where((schedule) {
+      return schedule.className == widget.className &&
+             schedule.sectionName == widget.section &&
+             schedule.weekday.toLowerCase() == weekday.toLowerCase();
+    }).toList();
+
+    // 4. Format the time and map to UI model
+    final DateFormat apiTimeFormat = DateFormat('HH:mm:ss');
+    final DateFormat displayTimeFormat = DateFormat('h:mm a');
+
+    final List<ScheduleEntry> fetchedSchedule = filteredSchedules.map((schedule) {
+      try {
+        final DateTime startTime = apiTimeFormat.parse(schedule.startTime);
+        final DateTime endTime = apiTimeFormat.parse(schedule.endTime);
+
+        final String formattedTime = '${displayTimeFormat.format(startTime)} - ${displayTimeFormat.format(endTime)}';
+
+        return ScheduleEntry(
+          id: schedule.id,
+          title: schedule.subjectName,
+          subtitle: schedule.teacherName,
+          time: formattedTime,
+        );
+      } catch (e) {
+        // Handle potential time parsing errors gracefully
+        return ScheduleEntry(
+          id: schedule.id,
+          title: schedule.subjectName,
+          subtitle: schedule.teacherName,
+          time: 'Invalid Time',
+        );
+      }
+    }).toList();
+
+    if (mounted) {
+      setState(() {
+        _schedule = fetchedSchedule;
+      });
+    }
   }
 
   Future<void> _fetchSchedule() async {
     if (!mounted) return;
     setState(() {
       _isLoading = true;
-      _error = '';
-      _schedule.clear();
+      _error = null;
     });
 
     try {
-      // 1. Fetch all schedules from the API
       final response = await ApiService.get('manager/class-schedules');
 
       if (!mounted) return;
@@ -98,61 +159,15 @@ class _DailyClassSchedulePageState extends State<DailyClassSchedulePage>{
           throw Exception('API returned an error: ${responseData['message']}');
         }
 
-        // 2. Parse the date to find the weekday
-        final DateFormat inputFormat = DateFormat('dd-MM-yyyy');
-        final DateTime dateTime = inputFormat.parse(widget.date);
-        final String weekday = DateFormat('EEEE').format(dateTime);
-
-        // 3. Filter schedules by class, section, and weekday
-        final List<dynamic> allSchedulesJson = responseData['data'] ?? [];
-        final List<ApiSchedule> allSchedules = allSchedulesJson.map((json) => ApiSchedule.fromJson(json)).toList();
-
-        final List<ApiSchedule> filteredSchedules = allSchedules.where((schedule) {
-          return schedule.className == widget.className &&
-                 schedule.sectionName == widget.section &&
-                 schedule.weekday.toLowerCase() == weekday.toLowerCase();
-        }).toList();
-
-        // 4. Format the time and map to UI model
-        final DateFormat apiTimeFormat = DateFormat('HH:mm:ss');
-        final DateFormat displayTimeFormat = DateFormat('h:mm a');
-
-        final List<ScheduleEntry> fetchedSchedule = filteredSchedules.map((schedule) {
-          try {
-            final DateTime startTime = apiTimeFormat.parse(schedule.startTime);
-            final DateTime endTime = apiTimeFormat.parse(schedule.endTime);
-
-            final String formattedTime = '${displayTimeFormat.format(startTime)} - ${displayTimeFormat.format(endTime)}';
-
-            return ScheduleEntry(
-              id: schedule.id,
-              title: schedule.subjectName,
-              subtitle: schedule.teacherName,
-              time: formattedTime,
-            );
-          } catch (e) {
-            // Handle potential time parsing errors gracefully
-            return ScheduleEntry(
-              id: schedule.id,
-              title: schedule.subjectName,
-              subtitle: schedule.teacherName,
-              time: 'Invalid Time',
-            );
-          }
-        }).toList();
-
-        if (mounted) {
-          setState(() {
-            _schedule.addAll(fetchedSchedule);
-          });
-        }
+        await CacheService.setCache(_cacheKey, responseData['data']);
+        _processScheduleData(responseData['data']);
       } else {
         throw Exception('Failed to load schedule. Status code: ${response.statusCode}');
       }
     } catch (e) {
       if(mounted) {
         setState(() {
-          _error = e.toString().replaceFirst('Exception: ', '');
+          _error = e;
         });
       }
     } finally {
@@ -184,76 +199,111 @@ class _DailyClassSchedulePageState extends State<DailyClassSchedulePage>{
   }
 
   Widget _buildBody() {
-    final theme = Theme.of(context);
-    if (_isLoading) {
-      return const Center(child: CircularProgressIndicator());
-    }
-
-    if (_error.isNotEmpty) {
-      return Center(
-        child: Padding(
-          padding: const EdgeInsets.all(20.0),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Text('Error: $_error', style: TextStyle(color: theme.colorScheme.error), textAlign: TextAlign.center,),
-              const SizedBox(height: 16),
-              ElevatedButton(onPressed: _fetchSchedule, child: const Text("Retry"))
-            ],
-          ),
-        ),
-      );
-    }
+    final theme = context.theme;
     
-    if (_schedule.isEmpty) {
-       return Center(child: Text("No schedule found for this day.", style: TextStyle(color: theme.colorScheme.onSurfaceVariant)));
-    }
+    return LoadingWrapper(
+      isLoading: _isLoading,
+      hasData: _schedule.isNotEmpty,
+      error: _error,
+      onRetry: _fetchSchedule,
+      skeleton: _buildSkeleton(),
+      child: RefreshIndicator(
+        onRefresh: _fetchSchedule,
+        color: theme.colorScheme.primary,
+        child: _schedule.isEmpty
+            ? Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(Icons.event_busy_outlined, size: context.scale(64), color: theme.colorScheme.outlineVariant.withValues(alpha: 0.5)),
+                    SizedBox(height: context.scale(16)),
+                    Text("No schedule found for this day.", style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: context.font(16))),
+                  ],
+                ),
+              )
+            : Center(
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 1200),
+                  child: LayoutBuilder(
+                    builder: (context, constraints) {
+                      // Use GridView for wider screens
+                      if (constraints.maxWidth > 600) {
+                        return GridView.builder(
+                          padding: context.pagePadding,
+                          itemCount: _schedule.length,
+                          gridDelegate: SliverGridDelegateWithMaxCrossAxisExtent(
+                            maxCrossAxisExtent: context.scale(400),
+                            mainAxisSpacing: context.scale(16),
+                            crossAxisSpacing: context.scale(16),
+                            childAspectRatio: 2.5,
+                          ),
+                          itemBuilder: (context, index) {
+                            final entry = _schedule[index];
+                            return ScheduleCard(
+                              scheduleId: entry.id,
+                              className: "${widget.className} - ${widget.section}",
+                              title: entry.title,
+                              subtitle: entry.subtitle,
+                              time: entry.time,
+                            );
+                          },
+                        );
+                      } else {
+                        // Use ListView for narrower screens
+                        return ListView.separated(
+                          padding: context.pagePadding,
+                          itemCount: _schedule.length,
+                          separatorBuilder: (context, index) => SizedBox(height: context.scale(16)),
+                          itemBuilder: (context, index) {
+                            final entry = _schedule[index];
+                            return ScheduleCard(
+                              scheduleId: entry.id,
+                              className: "${widget.className} - ${widget.section}",
+                              title: entry.title,
+                              subtitle: entry.subtitle,
+                              time: entry.time,
+                            );
+                          },
+                        );
+                      }
+                    },
+                  ),
+                ),
+              ),
+      ),
+    );
+  }
 
-    final screenSize = MediaQuery.of(context).size;
-
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        // Use GridView for wider screens
-        if (constraints.maxWidth > 600) {
-          return GridView.builder(
-            padding: EdgeInsets.all(screenSize.width * 0.04),
-            itemCount: _schedule.length,
-            gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
-              maxCrossAxisExtent: 400, // Max width per item
-              mainAxisSpacing: 16,
-              crossAxisSpacing: 16,
-              childAspectRatio: 2.5, // Adjust for content
+  Widget _buildSkeleton() {
+    return ListView.separated(
+      padding: context.pagePadding,
+      itemCount: 5,
+      separatorBuilder: (context, index) => SizedBox(height: context.scale(16)),
+      itemBuilder: (context, index) => Container(
+        padding: EdgeInsets.all(context.scale(16)),
+        decoration: BoxDecoration(
+          color: context.theme.cardColor,
+          borderRadius: BorderRadius.circular(context.scale(12)),
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  SkeletonBox(height: context.scale(20), width: context.scale(150)),
+                  SizedBox(height: context.scale(8)),
+                  SkeletonBox(height: context.scale(14), width: context.scale(100)),
+                  SizedBox(height: context.scale(4)),
+                  SkeletonBox(height: context.scale(14), width: context.scale(80)),
+                ],
+              ),
             ),
-            itemBuilder: (context, index) {
-              final entry = _schedule[index];
-              return ScheduleCard(
-                scheduleId: entry.id,
-                className: "${widget.className} - ${widget.section}",
-                title: entry.title,
-                subtitle: entry.subtitle,
-                time: entry.time,
-              );
-            },
-          );
-        } else {
-          // Use ListView for narrower screens
-          return ListView.separated(
-            padding: EdgeInsets.all(screenSize.width * 0.04),
-            itemCount: _schedule.length,
-            separatorBuilder: (context, index) => const SizedBox(height: 16),
-            itemBuilder: (context, index) {
-              final entry = _schedule[index];
-              return ScheduleCard(
-                scheduleId: entry.id,
-                className: "${widget.className} - ${widget.section}",
-                title: entry.title,
-                subtitle: entry.subtitle,
-                time: entry.time,
-              );
-            },
-          );
-        }
-      },
+            SkeletonBox(height: context.scale(36), width: context.scale(80), borderRadius: context.scale(10)),
+          ],
+        ),
+      ),
     );
   }
 }
@@ -339,3 +389,4 @@ class ScheduleCard extends StatelessWidget{
     );
   }
 }
+

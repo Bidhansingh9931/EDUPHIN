@@ -2,8 +2,9 @@ import 'dart:async';
 import 'dart:convert';
 
 import 'package:eduphin/services/api_service.dart';
+import 'package:eduphin/services/caching_service.dart';
 import 'package:eduphin/services/responsive_helper.dart';
-import 'package:eduphin/teacher/dashboard/common_widgets.dart';
+import 'package:eduphin/services/common_widgets.dart';
 import 'package:flutter/material.dart';
 
 class StudentRegistration {
@@ -38,6 +39,14 @@ class StudentRegistration {
       rollNo: rollNo,
     );
   }
+
+  Map<String, dynamic> toJson() => {
+    'id': registrationId,
+    'student': {
+      'name': studentName,
+      'registration_no': rollNo,
+    },
+  };
 }
 
 class Mark {
@@ -79,14 +88,14 @@ class EnterMarksPage extends StatefulWidget {
 class _EnterMarksPageState extends State<EnterMarksPage> {
   bool _isLoading = true;
   bool _isSaving = false;
-  String _error = '';
+  Object? _error;
   List<StudentRegistration> _students = [];
   final Map<int, Mark> _marks = {};
 
   @override
   void initState() {
     super.initState();
-    _fetchStudents();
+    _loadCacheAndFetch();
   }
 
   @override
@@ -97,11 +106,32 @@ class _EnterMarksPageState extends State<EnterMarksPage> {
     super.dispose();
   }
 
+  Future<void> _loadCacheAndFetch() async {
+    final cacheKey = 'manager_marks_reg_${widget.examId}_${widget.classId}_${widget.sectionId}';
+    final cachedData = await CachingService.getCache(cacheKey);
+    if (cachedData != null && mounted) {
+      final List<dynamic> jsonList = cachedData;
+      setState(() {
+        _students = jsonList.map((json) => StudentRegistration.fromJson(json)).toList();
+        _initializeMarks();
+      });
+    }
+    _fetchStudents();
+  }
+
+  void _initializeMarks() {
+    for (var student in _students) {
+      if (!_marks.containsKey(student.registrationId)) {
+        _marks[student.registrationId] = Mark();
+      }
+    }
+  }
+
   Future<void> _fetchStudents() async {
     if (!mounted) return;
     setState(() {
       _isLoading = true;
-      _error = '';
+      _error = null;
     });
 
     try {
@@ -109,13 +139,11 @@ class _EnterMarksPageState extends State<EnterMarksPage> {
           'manager/registrations/${widget.examId}/${widget.classId}/${widget.sectionId}');
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body)['data'] as List;
+        await CachingService.setCache('manager_marks_reg_${widget.examId}_${widget.classId}_${widget.sectionId}', data);
         if (mounted) {
           setState(() {
             _students = data.map((json) => StudentRegistration.fromJson(json)).toList();
-            _marks.clear();
-            for (var student in _students) {
-              _marks[student.registrationId] = Mark();
-            }
+            _initializeMarks();
             _isLoading = false;
           });
         }
@@ -126,7 +154,7 @@ class _EnterMarksPageState extends State<EnterMarksPage> {
       if (mounted) {
         setState(() {
           _isLoading = false;
-          _error = e.toString();
+          _error = e;
         });
       }
     }
@@ -208,6 +236,26 @@ class _EnterMarksPageState extends State<EnterMarksPage> {
     }
   }
 
+  Widget buildActionButton(BuildContext context, String label, VoidCallback onPressed) {
+    final theme = context.theme;
+    return ElevatedButton(
+      onPressed: onPressed,
+      style: ElevatedButton.styleFrom(
+        backgroundColor: theme.colorScheme.primary,
+        foregroundColor: theme.colorScheme.onPrimary,
+        minimumSize: Size(double.infinity, context.scale(48)),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(context.scale(12))),
+      ),
+      child: Text(
+        label,
+        style: TextStyle(
+          fontSize: context.font(14),
+          fontWeight: FontWeight.bold,
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = context.theme;
@@ -256,7 +304,7 @@ class _EnterMarksPageState extends State<EnterMarksPage> {
             ),
         ],
       ),
-      bottomNavigationBar: _isLoading || _error.isNotEmpty || _students.isEmpty
+      bottomNavigationBar: _isLoading && _students.isEmpty || _error != null || _students.isEmpty
           ? null
           : SafeArea(
               child: Padding(
@@ -273,26 +321,41 @@ class _EnterMarksPageState extends State<EnterMarksPage> {
                 ),
               ),
             ),
-      body: _isLoading
-          ? Center(child: CircularProgressIndicator(color: theme.colorScheme.primary))
-          : _error.isNotEmpty
-              ? _buildErrorState()
-              : _students.isEmpty
-                  ? _buildEmptyState()
-                  : RefreshIndicator(
-                      onRefresh: _fetchStudents,
-                      child: ListView(
-                        padding: context.pagePadding,
-                        children: [
-                          _buildHeader(),
-                          SizedBox(height: context.md),
-                          _buildMarksTable(),
-                          SizedBox(height: context.scale(100)),
-                        ],
-                      ),
-                    ),
+      body: LoadingWrapper(
+        isLoading: _isLoading,
+        hasData: _students.isNotEmpty,
+        error: _error,
+        onRetry: _fetchStudents,
+        skeleton: _buildSkeleton(),
+        child: _students.isEmpty && !_isLoading
+            ? _buildEmptyState()
+            : RefreshIndicator(
+                onRefresh: _fetchStudents,
+                child: ListView(
+                  padding: context.pagePadding,
+                  children: [
+                    _buildHeader(),
+                    SizedBox(height: context.md),
+                    _buildMarksTable(),
+                    SizedBox(height: context.scale(100)),
+                  ],
+                ),
+              ),
+      ),
     );
   }
+
+  Widget _buildSkeleton() {
+    return ListView(
+      padding: context.pagePadding,
+      children: [
+        SkeletonBox(height: context.scale(40), width: context.scale(200)),
+        SizedBox(height: context.md),
+        SkeletonBox(height: context.scale(400), borderRadius: context.scale(16)),
+      ],
+    );
+  }
+
 
   Widget _buildHeader() {
     final theme = context.theme;
@@ -455,7 +518,7 @@ class _EnterMarksPageState extends State<EnterMarksPage> {
           children: [
             Icon(Icons.error_outline, color: theme.colorScheme.error, size: context.scale(48)),
             SizedBox(height: context.spacing),
-            Text(_error, textAlign: TextAlign.center, style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.error, fontSize: context.font(14))),
+            Text(_error.toString(), textAlign: TextAlign.center, style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.error, fontSize: context.font(14))),
             SizedBox(height: context.md),
             ElevatedButton(onPressed: _fetchStudents, child: const Text("Retry")),
           ],
@@ -504,3 +567,4 @@ class _EnterMarksPageState extends State<EnterMarksPage> {
     );
   }
 }
+

@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:csv/csv.dart';
 import 'package:eduphin/manager_dashboard/account_statics/staff/add_staff.dart';
 import 'package:eduphin/services/api_service.dart';
+import 'package:eduphin/services/caching_service.dart';
 import 'package:eduphin/services/common_widgets.dart';
 import 'package:eduphin/services/responsive_helper.dart';
 import 'package:flutter/material.dart';
@@ -46,22 +47,58 @@ class _StaffListPageState extends State<StaffListPage> {
   int? _selectedRoleId = 0;
   List<Role> _roles = [];
   List<Staff> _staff = [];
+  Object? _error;
 
   @override
   void initState() {
     super.initState();
+    _loadCacheAndFetch();
+  }
+
+  Future<void> _loadCacheAndFetch() async {
+    // 1. Load cached roles
+    final cachedRolesData = await CacheService.getCache('manager_roles');
+    if (cachedRolesData != null) {
+      final List<dynamic> rolesData = cachedRolesData;
+      final List<Role> allRoles = rolesData
+          .map((role) => Role(id: role['role_id'], name: role['name']))
+          .toList();
+      final staffRoles = allRoles.where((role) => role.id != 6).toList();
+      final displayRoles = [Role(id: 0, name: "All Staff"), ...staffRoles];
+
+      if (mounted) {
+        setState(() {
+          _roles = displayRoles;
+          _selectedRoleId = 0;
+        });
+        
+        // 2. Load cached staff for 'All Staff' (roleId 0)
+        final cachedStaffData = await CacheService.getCache('staff_list_0');
+        if (cachedStaffData != null && mounted) {
+          setState(() {
+            _staff = (cachedStaffData as List).map((json) => Staff.fromJson(json)).toList();
+          });
+        }
+      }
+    }
+    // 3. Fetch fresh data
     _fetchInitialData();
   }
 
   Future<void> _fetchInitialData() async {
     if (!mounted) return;
-    setState(() => _isLoading = true);
+    setState(() {
+      _isLoading = true;
+      _error = null;
+    });
 
     try {
       final response = await ApiService.get('manager/salary/accounts');
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
         final List<dynamic> rolesData = data['roles'];
+        
+        await CacheService.setCache('manager_roles', rolesData);
 
         final List<Role> allRoles = rolesData
             .map((role) => Role(id: role['role_id'], name: role['name']))
@@ -73,7 +110,7 @@ class _StaffListPageState extends State<StaffListPage> {
         if (mounted) {
           setState(() {
             _roles = displayRoles;
-            _selectedRoleId = displayRoles.first.id;
+            _selectedRoleId = _selectedRoleId ?? displayRoles.first.id;
           });
           await _fetchStaffForRole(_selectedRoleId!);
         }
@@ -82,8 +119,10 @@ class _StaffListPageState extends State<StaffListPage> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString())));
-        setState(() => _isLoading = false);
+        setState(() {
+          _error = e;
+          _isLoading = false;
+        });
       }
     }
   }
@@ -92,8 +131,18 @@ class _StaffListPageState extends State<StaffListPage> {
     if (!mounted) return;
     setState(() {
       _isLoading = true;
-      _staff = [];
+      _error = null;
     });
+
+    // Load cache for specific role
+    if (_staff.isEmpty) {
+      final cachedStaffData = await CacheService.getCache('staff_list_$roleId');
+      if (cachedStaffData != null && mounted) {
+        setState(() {
+          _staff = (cachedStaffData as List).map((json) => Staff.fromJson(json)).toList();
+        });
+      }
+    }
 
     try {
       List<Staff> allFetchedStaff = [];
@@ -118,6 +167,14 @@ class _StaffListPageState extends State<StaffListPage> {
         }
       }
 
+      // Cache the result for this roleId
+      await CacheService.setCache('staff_list_$roleId', allFetchedStaff.map((s) => {
+        'id': s.id,
+        'name': s.name,
+        'designation': s.designation,
+        'photo': s.photo
+      }).toList());
+
       if (mounted) {
         setState(() {
           _staff = allFetchedStaff;
@@ -126,8 +183,10 @@ class _StaffListPageState extends State<StaffListPage> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString())));
-        setState(() => _isLoading = false);
+        setState(() {
+          _error = e;
+          _isLoading = false;
+        });
       }
     }
   }
@@ -187,6 +246,7 @@ class _StaffListPageState extends State<StaffListPage> {
               constraints: const BoxConstraints(maxWidth: 1200),
               child: CustomStaffListBox(
                 isLoading: _isLoading,
+                error: _error,
                 staff: _staff,
                 roles: _roles,
                 selectedRoleId: _selectedRoleId,
@@ -196,6 +256,7 @@ class _StaffListPageState extends State<StaffListPage> {
                     _fetchStaffForRole(newRoleId);
                   }
                 },
+                onRetry: _fetchInitialData,
               ),
             ),
           ),
@@ -207,18 +268,22 @@ class _StaffListPageState extends State<StaffListPage> {
 
 class CustomStaffListBox extends StatelessWidget {
   final bool isLoading;
+  final Object? error;
   final List<Staff> staff;
   final List<Role> roles;
   final int? selectedRoleId;
   final ValueChanged<int?> onRoleChanged;
+  final VoidCallback onRetry;
 
   const CustomStaffListBox({
     super.key,
     required this.isLoading,
+    this.error,
     required this.staff,
     required this.roles,
     required this.selectedRoleId,
     required this.onRoleChanged,
+    required this.onRetry,
   });
 
   @override
@@ -246,10 +311,27 @@ class CustomStaffListBox extends StatelessWidget {
               items: roles.map((role) => DropdownMenuItem(value: role.id, child: Text(role.name, style: theme.textTheme.bodyLarge?.copyWith(fontSize: context.font(16))))).toList(),
             ),
             SizedBox(height: context.scale(24)),
-            isLoading
-                ? Center(child: Padding(padding: EdgeInsets.all(context.scale(40)), child: const CircularProgressIndicator()))
-                : _buildContent(context),
+            LoadingWrapper(
+              isLoading: isLoading,
+              hasData: staff.isNotEmpty,
+              error: error,
+              onRetry: onRetry,
+              skeleton: _buildSkeleton(context),
+              child: _buildContent(context),
+            ),
           ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSkeleton(BuildContext context) {
+    return Column(
+      children: List.generate(
+        5,
+        (index) => Padding(
+          padding: EdgeInsets.only(bottom: context.scale(12)),
+          child: SkeletonBox(height: context.scale(80), borderRadius: context.scale(12)),
         ),
       ),
     );
@@ -323,4 +405,5 @@ class CustomStaffListBox extends StatelessWidget {
     );
   }
 }
+
 
