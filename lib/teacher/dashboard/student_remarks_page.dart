@@ -1,6 +1,9 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:ui';
+import 'package:eduphin/services/responsive_helper.dart';
+import 'package:eduphin/teacher/dashboard/common_widgets.dart';
+import 'package:eduphin/teacher/dashboard/teacher_cache_service.dart';
 import 'package:flutter/material.dart';
 import 'package:eduphin/services/api_service.dart';
 import 'add_student_remark_page.dart';
@@ -29,6 +32,17 @@ class StudentRemark {
       dateRange: "${json['from_date'] ?? 'N/A'} - ${json['to_date'] ?? 'N/A'}",
     );
   }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'remarks_type': type,
+      'remarks': description,
+      'remarks_date': remarkDate,
+      'from_date': dateRange.split(' - ').first,
+      'to_date': dateRange.split(' - ').last,
+    };
+  }
 }
 
 class StudentRemarksPage extends StatefulWidget {
@@ -47,21 +61,39 @@ class StudentRemarksPage extends StatefulWidget {
 
 class _StudentRemarksPageState extends State<StudentRemarksPage> {
   bool _isLoading = true;
-  final List<StudentRemark> _remarks = [];
+  List<StudentRemark> _remarks = [];
   String _error = '';
 
   @override
   void initState() {
     super.initState();
-    _fetchRemarks();
+    _loadData();
+  }
+
+  Future<void> _loadData() async {
+    final cacheKey = 'student_remarks_${widget.studentId}';
+
+    // 1. Load from cache
+    final cachedData = await TeacherCacheService.load(cacheKey);
+    if (cachedData != null && mounted) {
+      setState(() {
+        _remarks = (cachedData as List).map((r) => StudentRemark.fromJson(r)).toList();
+        _isLoading = false;
+      });
+    }
+
+    // 2. Fetch from API
+    await _fetchRemarks();
   }
 
   Future<void> _fetchRemarks() async {
     if (!mounted) return;
-    setState(() {
-      _isLoading = true;
-      _error = '';
-    });
+    if (_remarks.isEmpty) {
+      setState(() {
+        _isLoading = true;
+        _error = '';
+      });
+    }
 
     try {
       final response = await ApiService.get('teacher/student/${widget.studentId}/remarks');
@@ -75,9 +107,11 @@ class _StudentRemarksPageState extends State<StudentRemarksPage> {
 
           if (mounted) {
             setState(() {
-              _remarks.clear();
-              _remarks.addAll(fetchedRemarks);
+              _remarks = fetchedRemarks;
+              _error = '';
+              _isLoading = false;
             });
+            await TeacherCacheService.save('student_remarks_${widget.studentId}', _remarks.map((r) => r.toJson()).toList());
           }
         } else {
           throw Exception(data['message'] ?? 'Unknown API error');
@@ -88,7 +122,7 @@ class _StudentRemarksPageState extends State<StudentRemarksPage> {
           final data = jsonDecode(response.body);
           errorMessage = data['message'] ?? errorMessage;
         } catch (_) {}
-        
+
         if (response.statusCode == 404) {
           throw Exception('Student or Remarks not found (404). $errorMessage');
         }
@@ -96,7 +130,8 @@ class _StudentRemarksPageState extends State<StudentRemarksPage> {
       }
     } on Exception catch (e) {
       if (mounted) {
-        setState(() => _error = e.toString().replaceFirst('Exception: ', ''));
+        _error = e.toString().replaceFirst('Exception: ', '');
+        _isLoading = false;
       }
     } finally {
       if (mounted) {
@@ -107,7 +142,7 @@ class _StudentRemarksPageState extends State<StudentRemarksPage> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
+    final theme = context.theme;
     return Scaffold(
       appBar: AppBar(
         title: Text("Remarks: ${widget.studentName}"),
@@ -125,18 +160,32 @@ class _StudentRemarksPageState extends State<StudentRemarksPage> {
         label: const Text("Add Remark"),
         icon: const Icon(Icons.add),
       ),
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : _error.isNotEmpty
-              ? Center(child: Padding(padding: const EdgeInsets.all(16), child: Text(_error, style: TextStyle(color: theme.colorScheme.error), textAlign: TextAlign.center)))
-              : _remarks.isEmpty
-                  ? const Center(child: Text("No remarks found."))
-                  : ListView.separated(
-                      padding: const EdgeInsets.fromLTRB(16, 16, 16, 100),
-                      itemCount: _remarks.length,
-                      separatorBuilder: (context, index) => const SizedBox(height: 12),
-                      itemBuilder: (context, index) => _RemarkTile(remark: _remarks[index], onDeleted: _fetchRemarks),
-                    ),
+      body: TeacherLoadingWrapper(
+        isLoading: _isLoading,
+        hasData: _remarks.isNotEmpty,
+        skeleton: _buildSkeleton(),
+        child: _error.isNotEmpty && _remarks.isEmpty
+            ? Center(child: Padding(padding: const EdgeInsets.all(16), child: Text(_error, style: TextStyle(color: theme.colorScheme.error), textAlign: TextAlign.center)))
+            : _remarks.isEmpty
+                ? const Center(child: Text("No remarks found."))
+                : ListView.separated(
+                    padding: const EdgeInsets.fromLTRB(16, 16, 16, 100),
+                    itemCount: _remarks.length,
+                    separatorBuilder: (context, index) => const SizedBox(height: 12),
+                    itemBuilder: (context, index) => _RemarkTile(remark: _remarks[index], onDeleted: _fetchRemarks),
+                  ),
+      ),
+    );
+  }
+
+  Widget _buildSkeleton() {
+    return ListView.builder(
+      padding: const EdgeInsets.all(16),
+      itemCount: 5,
+      itemBuilder: (context, index) => Padding(
+        padding: const EdgeInsets.only(bottom: 12),
+        child: TeacherSkeleton(height: 120, borderRadius: BorderRadius.circular(12)),
+      ),
     );
   }
 }

@@ -7,6 +7,8 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
 import '../services/api_service.dart';
+import 'cache_service.dart';
+import 'super_admin_common_widgets.dart';
 
 class TestimonialsManagementScreen extends StatefulWidget {
   const TestimonialsManagementScreen({super.key});
@@ -22,12 +24,25 @@ class _TestimonialsManagementScreenState extends State<TestimonialsManagementScr
   @override
   void initState() {
     super.initState();
+    _loadInitialData();
+  }
+
+  Future<void> _loadInitialData() async {
+    final cachedData = await SuperAdminCacheService.load('testimonials');
+    if (cachedData != null && mounted) {
+      setState(() {
+        _testimonials = cachedData;
+        _isLoading = false;
+      });
+    }
     _fetchTestimonials();
   }
 
   Future<void> _fetchTestimonials() async {
     if (!mounted) return;
-    setState(() => _isLoading = true);
+    if (_testimonials.isEmpty) {
+      setState(() => _isLoading = true);
+    }
     try {
       final data = await ApiService.getSuperAdminTestimonials();
       if (mounted) {
@@ -35,6 +50,7 @@ class _TestimonialsManagementScreenState extends State<TestimonialsManagementScr
           _testimonials = data;
           _isLoading = false;
         });
+        await SuperAdminCacheService.save('testimonials', data);
       }
     } catch (e) {
       if (mounted) {
@@ -96,55 +112,65 @@ class _TestimonialsManagementScreenState extends State<TestimonialsManagementScr
           ),
         ],
       ),
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : RefreshIndicator(
-              onRefresh: _fetchTestimonials,
-              child: SingleChildScrollView(
-                padding: context.pagePadding,
-                child: Column(
-                  children: [
-                    Container(
-                      decoration: BoxDecoration(
-                        color: theme.colorScheme.surfaceContainerLow,
-                        borderRadius: BorderRadius.circular(context.scale(12)),
-                        border: Border.all(color: theme.colorScheme.outlineVariant, width: 1),
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Padding(
-                            padding: EdgeInsets.all(context.scale(20)),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
+      body: SuperAdminLoadingWrapper(
+        isLoading: _isLoading,
+        hasData: _testimonials.isNotEmpty,
+        skeleton: _buildSkeleton(context),
+        child: RefreshIndicator(
+          onRefresh: _fetchTestimonials,
+          child: SingleChildScrollView(
+            padding: context.pagePadding,
+            child: Column(
+              children: [
+                Container(
+                  decoration: BoxDecoration(
+                    color: theme.colorScheme.surfaceContainerLow,
+                    borderRadius: BorderRadius.circular(context.scale(12)),
+                    border: Border.all(color: theme.colorScheme.outlineVariant, width: 1),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Padding(
+                        padding: EdgeInsets.all(context.scale(20)),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
                               children: [
-                                Row(
-                                  children: [
-                                    Icon(Icons.format_quote_rounded,
-                                        color: theme.colorScheme.primary, size: context.scale(24)),
-                                    SizedBox(width: context.scale(12)),
-                                    Text("Testimonial Directory",
-                                        style: TextStyle(
-                                            fontWeight: FontWeight.bold,
-                                            fontSize: context.font(16))),
-                                  ],
-                                ),
-                                SizedBox(height: context.scale(4)),
-                                Text("Manage all platform testimonials and user feedback.",
+                                Icon(Icons.format_quote_rounded,
+                                    color: theme.colorScheme.primary, size: context.scale(24)),
+                                SizedBox(width: context.scale(12)),
+                                Text("Testimonial Directory",
                                     style: TextStyle(
-                                        color: theme.hintColor, fontSize: context.font(12))),
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: context.font(16))),
                               ],
                             ),
-                          ),
-                          Divider(color: theme.colorScheme.outlineVariant, height: 1),
-                          _buildTable(context),
-                        ],
+                            SizedBox(height: context.scale(4)),
+                            Text("Manage all platform testimonials and user feedback.",
+                                style: TextStyle(
+                                    color: theme.hintColor, fontSize: context.font(12))),
+                          ],
+                        ),
                       ),
-                    ),
-                  ],
+                      Divider(color: theme.colorScheme.outlineVariant, height: 1),
+                      _buildTable(context),
+                    ],
+                  ),
                 ),
-              ),
+              ],
             ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSkeleton(BuildContext context) {
+    return SingleChildScrollView(
+      padding: context.pagePadding,
+      child: SuperAdminSkeleton(height: context.scale(400)),
     );
   }
 

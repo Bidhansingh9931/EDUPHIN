@@ -1,3 +1,5 @@
+import 'package:eduphin/teacher/dashboard/teacher_cache_service.dart';
+import 'package:shimmer/shimmer.dart';
 import 'package:eduphin/services/api_service.dart';
 import 'package:eduphin/services/common_widgets.dart';
 import 'package:eduphin/services/responsive_helper.dart';
@@ -15,12 +17,47 @@ class VirtualIdPage extends StatefulWidget {
 
 class _VirtualIdPageState extends State<VirtualIdPage> {
   bool _isFlipped = false;
-  late Future<VirtualIdCardData> _idDataFuture;
+  VirtualIdCardData? _idData;
+  bool _isLoading = true;
+  String? _error;
 
   @override
   void initState() {
     super.initState();
-    _idDataFuture = ApiService.getVirtualIdCard();
+    _loadData();
+  }
+
+  Future<void> _loadData() async {
+    // 1. Load from cache
+    final cachedData = await TeacherCacheService.load('virtual_id');
+    if (cachedData != null) {
+      if (mounted) {
+        setState(() {
+          _idData = VirtualIdCardData.fromJson(cachedData);
+          _isLoading = false;
+        });
+      }
+    }
+
+    // 2. Fetch from API
+    try {
+      final data = await ApiService.getVirtualIdCard();
+      await TeacherCacheService.save('virtual_id', data.toJson());
+      if (mounted) {
+        setState(() {
+          _idData = data;
+          _isLoading = false;
+          _error = null;
+        });
+      }
+    } catch (e) {
+      if (_idData == null) {
+        setState(() {
+          _error = e.toString();
+          _isLoading = false;
+        });
+      }
+    }
   }
 
   @override
@@ -30,57 +67,82 @@ class _VirtualIdPageState extends State<VirtualIdPage> {
       appBar: AppBar(
         title: const Text("Virtual ID Card"),
       ),
-      body: FutureBuilder<VirtualIdCardData>(
-        future: _idDataFuture,
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
-          } else if (snapshot.hasError) {
-            return Center(
-              child: Padding(
-                padding: const EdgeInsets.all(24.0),
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(Icons.error_outline, size: 48, color: theme.colorScheme.error),
-                    const SizedBox(height: 16),
-                    Text("Error: ${snapshot.error}", textAlign: TextAlign.center),
-                    const SizedBox(height: 24),
-                    ElevatedButton(
-                      onPressed: () => setState(() { _idDataFuture = ApiService.getVirtualIdCard(); }),
-                      child: const Text("Retry"),
-                    )
-                  ],
-                ),
-              ),
-            );
-          } else if (!snapshot.hasData) {
-            return const Center(child: Text("No data found"));
-          }
+      body: _buildBody(theme),
+    );
+  }
 
-          final data = snapshot.data!;
-          return SingleChildScrollView(
-            padding: context.pagePadding,
-            child: Center(
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 600),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    _buildIDCard(context, data),
-                    const SizedBox(height: 32),
-                    buildResponsiveRow(context, [
-                      buildActionButton(context, "FLIP CARD", () => setState(() => _isFlipped = !_isFlipped)),
-                      const SizedBox(height: 12),
-                      buildActionButton(context, "DOWNLOAD PDF", () => PdfService.generateAndPrintIdCard(data), isPrimary: false),
-                    ]),
-                    const SizedBox(height: 40),
-                  ],
-                ),
+  Widget _buildBody(ThemeData theme) {
+    if (_isLoading && _idData == null) {
+      return _buildSkeleton();
+    }
+    if (_error != null && _idData == null) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(24.0),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(Icons.error_outline, size: 48, color: theme.colorScheme.error),
+              const SizedBox(height: 16),
+              Text("Error: $_error", textAlign: TextAlign.center),
+              const SizedBox(height: 24),
+              ElevatedButton(
+                onPressed: _loadData,
+                child: const Text("Retry"),
+              )
+            ],
+          ),
+        ),
+      );
+    }
+    if (_idData == null) {
+      return const Center(child: Text("No data found"));
+    }
+
+    final data = _idData!;
+    return SingleChildScrollView(
+      padding: context.pagePadding,
+      child: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 600),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              _buildIDCard(context, data),
+              const SizedBox(height: 32),
+              buildResponsiveRow(context, [
+                buildActionButton(context, "FLIP CARD", () => setState(() => _isFlipped = !_isFlipped)),
+                const SizedBox(height: 12),
+                buildActionButton(context, "DOWNLOAD PDF", () => PdfService.generateAndPrintIdCard(data), isPrimary: false),
+              ]),
+              const SizedBox(height: 40),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSkeleton() {
+    return Shimmer.fromColors(
+      baseColor: Colors.grey[300]!,
+      highlightColor: Colors.grey[100]!,
+      child: Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(
+              width: 300,
+              height: 480,
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(20),
               ),
             ),
-          );
-        },
+            const SizedBox(height: 32),
+            Container(height: 48, width: 200, color: Colors.white),
+          ],
+        ),
       ),
     );
   }

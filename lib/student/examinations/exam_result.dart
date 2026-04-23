@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:eduphin/services/api_service.dart';
+import 'package:eduphin/services/caching_service.dart';
+import 'package:eduphin/services/common_widgets.dart';
 import 'package:eduphin/services/responsive_helper.dart';
 import 'package:eduphin/services/pdf_service.dart';
 import 'package:intl/intl.dart';
@@ -15,35 +17,57 @@ class _ExamResultPageState extends State<ExamResultPage> {
   List<dynamic> _examResults = [];
   bool _isLoading = true;
   final Map<int, bool> _expandedExams = {};
+  static const String _cacheKey = 'student_exam_results';
 
   @override
   void initState() {
     super.initState();
+    _loadCachedData();
     _fetchResults();
   }
 
-  Future<void> _fetchResults() async {
-    setState(() => _isLoading = true);
-    try {
-      final data = await ApiService.getExamResults();
+  Future<void> _loadCachedData() async {
+    final cachedData = await CacheService.getData(_cacheKey);
+    if (cachedData != null && mounted) {
       setState(() {
-        _examResults = data;
+        _examResults = cachedData as List? ?? [];
         _isLoading = false;
-        
-        // Expand first result by default if available
-        if (_examResults.isNotEmpty && _expandedExams.isEmpty) {
+        if (_expandedExams.isEmpty && _examResults.isNotEmpty) {
           _expandedExams[_examResults[0]['id']] = true;
         }
       });
-    } catch (e) {
-      setState(() => _isLoading = false);
+    }
+  }
+
+  Future<void> _fetchResults() async {
+    if (_examResults.isEmpty) {
+      setState(() => _isLoading = true);
+    }
+    try {
+      final data = await ApiService.getExamResults();
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text("Error fetching results: $e"),
-            backgroundColor: context.theme.colorScheme.error,
-          ),
-        );
+        setState(() {
+          _examResults = data;
+          _isLoading = false;
+          
+          // Expand first result by default if available and none expanded
+          if (_examResults.isNotEmpty && _expandedExams.isEmpty) {
+            _expandedExams[_examResults[0]['id']] = true;
+          }
+        });
+        await CacheService.saveData(_cacheKey, data);
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isLoading = false);
+        if (_examResults.isEmpty) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text("Error fetching results: $e"),
+              backgroundColor: context.theme.colorScheme.error,
+            ),
+          );
+        }
       }
     }
   }
@@ -95,57 +119,56 @@ class _ExamResultPageState extends State<ExamResultPage> {
           ),
         ),
       ),
-      body: _isLoading
-          ? Center(child: CircularProgressIndicator(color: colorScheme.primary, strokeWidth: 3))
-          : _examResults.isEmpty
-              ? Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(Icons.grade_outlined, size: context.scale(64), color: colorScheme.outlineVariant),
-                      SizedBox(height: context.scale(16)),
-                      Text("No exam results found", style: TextStyle(color: colorScheme.onSurfaceVariant, fontSize: context.font(16), fontWeight: FontWeight.w500)),
-                    ],
-                  ),
-                )
-              : RefreshIndicator(
-                  onRefresh: _fetchResults,
-                  color: colorScheme.primary,
-                  backgroundColor: colorScheme.surface,
-                  child: SingleChildScrollView(
-                    physics: const BouncingScrollPhysics(parent: AlwaysScrollableScrollPhysics()),
-                    padding: context.pagePadding,
-                    child: Center(
-                      child: Container(
-                        constraints: const BoxConstraints(maxWidth: 1000),
-                        child: LayoutBuilder(builder: (context, constraints) {
-                          final isWide = constraints.maxWidth > 700;
-                          if (isWide) {
-                            return GridView.builder(
-                              shrinkWrap: true,
-                              physics: const NeverScrollableScrollPhysics(),
-                              gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                                crossAxisCount: 2,
-                                crossAxisSpacing: context.scale(20),
-                                mainAxisSpacing: context.scale(20),
-                                mainAxisExtent: context.scale(550),
-                              ),
-                              itemCount: _examResults.length,
-                              itemBuilder: (context, index) => _buildItem(index),
-                            );
-                          }
-                          return ListView.separated(
-                            shrinkWrap: true,
-                            physics: const NeverScrollableScrollPhysics(),
-                            itemCount: _examResults.length,
-                            separatorBuilder: (context, index) => SizedBox(height: context.scale(16)),
-                            itemBuilder: (context, index) => _buildItem(index),
-                          );
-                        }),
-                      ),
-                    ),
+      body: LoadingWrapper(
+        isLoading: _isLoading,
+        hasData: _examResults.isNotEmpty,
+        skeleton: const _ExamResultSkeleton(),
+        onRefresh: _fetchResults,
+        child: _examResults.isEmpty
+            ? Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(Icons.grade_outlined, size: context.scale(64), color: colorScheme.outlineVariant),
+                    SizedBox(height: context.scale(16)),
+                    Text("No exam results found", style: TextStyle(color: colorScheme.onSurfaceVariant, fontSize: context.font(16), fontWeight: FontWeight.w500)),
+                  ],
+                ),
+              )
+            : SingleChildScrollView(
+                physics: const BouncingScrollPhysics(parent: AlwaysScrollableScrollPhysics()),
+                padding: context.pagePadding,
+                child: Center(
+                  child: Container(
+                    constraints: const BoxConstraints(maxWidth: 1000),
+                    child: LayoutBuilder(builder: (context, constraints) {
+                      final isWide = constraints.maxWidth > 700;
+                      if (isWide) {
+                        return GridView.builder(
+                          shrinkWrap: true,
+                          physics: const NeverScrollableScrollPhysics(),
+                          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                            crossAxisCount: 2,
+                            crossAxisSpacing: context.scale(20),
+                            mainAxisSpacing: context.scale(20),
+                            mainAxisExtent: context.scale(550),
+                          ),
+                          itemCount: _examResults.length,
+                          itemBuilder: (context, index) => _buildItem(index),
+                        );
+                      }
+                      return ListView.separated(
+                        shrinkWrap: true,
+                        physics: const NeverScrollableScrollPhysics(),
+                        itemCount: _examResults.length,
+                        separatorBuilder: (context, index) => SizedBox(height: context.scale(16)),
+                        itemBuilder: (context, index) => _buildItem(index),
+                      );
+                    }),
                   ),
                 ),
+              ),
+      ),
     );
   }
 
@@ -386,4 +409,107 @@ class _ExamResultPageState extends State<ExamResultPage> {
     );
   }
 
+}
+
+class _ExamResultSkeleton extends StatelessWidget {
+  const _ExamResultSkeleton();
+
+  @override
+  Widget build(BuildContext context) {
+    return SingleChildScrollView(
+      padding: context.pagePadding,
+      child: Center(
+        child: Container(
+          constraints: const BoxConstraints(maxWidth: 1000),
+          child: LayoutBuilder(builder: (context, constraints) {
+            final isWide = constraints.maxWidth > 700;
+            if (isWide) {
+              return GridView.builder(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: 2,
+                  crossAxisSpacing: context.scale(20),
+                  mainAxisSpacing: context.scale(20),
+                  mainAxisExtent: context.scale(550),
+                ),
+                itemCount: 4,
+                itemBuilder: (context, index) => _buildSkeletonCard(context, index == 0),
+              );
+            }
+            return ListView.separated(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              itemCount: 4,
+              separatorBuilder: (context, index) => SizedBox(height: context.scale(16)),
+              itemBuilder: (context, index) => _buildSkeletonCard(context, index == 0),
+            );
+          }),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSkeletonCard(BuildContext context, bool expanded) {
+    final colorScheme = context.theme.colorScheme;
+    return Container(
+      decoration: BoxDecoration(
+        color: colorScheme.surfaceContainerLow,
+        borderRadius: BorderRadius.circular(context.scale(20)),
+        border: Border.all(color: colorScheme.outlineVariant),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: EdgeInsets.all(context.scale(20)),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      SkeletonBox(width: context.scale(150), height: context.scale(18), borderRadius: context.scale(4)),
+                      SizedBox(height: context.scale(8)),
+                      SkeletonBox(width: context.scale(100), height: context.scale(14), borderRadius: context.scale(4)),
+                    ],
+                  ),
+                ),
+                SkeletonBox(width: context.scale(80), height: context.scale(24), borderRadius: context.scale(4)),
+              ],
+            ),
+          ),
+          if (expanded)
+            Padding(
+              padding: EdgeInsets.fromLTRB(context.scale(20), 0, context.scale(20), context.scale(20)),
+              child: Column(
+                children: [
+                  Divider(color: colorScheme.outlineVariant, height: 1),
+                  SizedBox(height: context.scale(20)),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      SkeletonBox(width: context.scale(120), height: context.scale(16), borderRadius: context.scale(4)),
+                      SkeletonBox(width: context.scale(80), height: context.scale(24), borderRadius: context.scale(4)),
+                    ],
+                  ),
+                  SizedBox(height: context.scale(16)),
+                  Container(
+                    height: context.scale(200),
+                    decoration: BoxDecoration(
+                      color: colorScheme.surface,
+                      borderRadius: BorderRadius.circular(context.scale(16)),
+                      border: Border.all(color: colorScheme.outlineVariant),
+                    ),
+                  ),
+                  SizedBox(height: context.scale(24)),
+                  SkeletonBox(width: double.infinity, height: context.scale(50), borderRadius: context.scale(12)),
+                ],
+              ),
+            ),
+        ],
+      ),
+    );
+  }
 }

@@ -1,3 +1,5 @@
+import 'package:eduphin/services/caching_service.dart';
+import 'package:eduphin/services/common_widgets.dart';
 import 'package:eduphin/services/pdf_service.dart';
 import 'package:flutter/material.dart';
 import 'package:eduphin/services/api_service.dart';
@@ -17,30 +19,49 @@ class _AdmitCardPageState extends State<AdmitCardPage> {
   final Map<dynamic, bool> _expandedRegistrations = {};
   final Map<dynamic, dynamic> _admitCardDetails = {};
   final Map<dynamic, bool> _isLoadingDetails = {};
+  static const String _cacheKey = 'student_admit_cards';
 
   @override
   void initState() {
     super.initState();
+    _loadCachedData();
     _fetchAdmitCards();
   }
 
+  Future<void> _loadCachedData() async {
+    final cachedData = await CacheService.getData(_cacheKey);
+    if (cachedData != null && mounted) {
+      setState(() {
+        _registrations = cachedData as List? ?? [];
+        if (_registrations.isNotEmpty) {
+          _isLoading = false;
+        }
+      });
+    }
+  }
+
   Future<void> _fetchAdmitCards() async {
-    setState(() => _isLoading = true);
+    if (_registrations.isEmpty) setState(() => _isLoading = true);
     try {
       final data = await ApiService.getAdmitCards();
-      setState(() {
-        _registrations = data;
-        _isLoading = false;
-      });
-    } catch (e) {
-      setState(() => _isLoading = false);
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text("Error fetching registered exams: $e"),
-            backgroundColor: Theme.of(context).colorScheme.error,
-          ),
-        );
+        setState(() {
+          _registrations = data;
+          _isLoading = false;
+        });
+        CacheService.saveData(_cacheKey, data);
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isLoading = false);
+        if (_registrations.isEmpty) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text("Error fetching registered exams: $e"),
+              backgroundColor: Theme.of(context).colorScheme.error,
+            ),
+          );
+        }
       }
     }
   }
@@ -101,60 +122,59 @@ class _AdmitCardPageState extends State<AdmitCardPage> {
           ),
         ),
       ),
-      body: _isLoading
-          ? Center(child: CircularProgressIndicator(color: colorScheme.primary))
-          : _registrations.isEmpty
-              ? Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(Icons.badge_outlined, size: context.scale(64), color: colorScheme.outlineVariant),
-                      SizedBox(height: context.scale(16)),
-                      Text("No registered exams found",
-                          style: TextStyle(color: colorScheme.onSurfaceVariant, fontSize: context.font(16))),
-                    ],
-                  ),
-                )
-              : RefreshIndicator(
-                  onRefresh: _fetchAdmitCards,
-                  color: colorScheme.primary,
-                  backgroundColor: colorScheme.surface,
-                  child: Center(
-                    child: Container(
-                      constraints: const BoxConstraints(maxWidth: 1000),
-                      child: context.responsive(
-                        ListView.separated(
-                          padding: context.pagePadding,
-                          itemCount: _registrations.length,
-                          separatorBuilder: (context, index) => SizedBox(height: context.scale(16)),
-                          itemBuilder: (context, index) => _buildItem(index),
-                        ),
-                        tablet: GridView.builder(
-                          padding: context.pagePadding,
-                          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                            crossAxisCount: 2,
-                            crossAxisSpacing: context.scale(20),
-                            mainAxisSpacing: context.scale(20),
-                            mainAxisExtent: context.scale(550),
-                          ),
-                          itemCount: _registrations.length,
-                          itemBuilder: (context, index) => _buildItem(index),
-                        ),
-                        desktop: GridView.builder(
-                          padding: context.pagePadding,
-                          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                            crossAxisCount: 3,
-                            crossAxisSpacing: context.scale(24),
-                            mainAxisSpacing: context.scale(24),
-                            mainAxisExtent: context.scale(600),
-                          ),
-                          itemCount: _registrations.length,
-                          itemBuilder: (context, index) => _buildItem(index),
-                        ),
+      body: LoadingWrapper(
+        isLoading: _isLoading,
+        hasData: _registrations.isNotEmpty,
+        skeleton: const _AdmitCardSkeleton(),
+        onRefresh: _fetchAdmitCards,
+        child: Center(
+          child: Container(
+            constraints: const BoxConstraints(maxWidth: 1000),
+            child: _registrations.isEmpty
+                ? Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(Icons.badge_outlined, size: context.scale(64), color: colorScheme.outlineVariant),
+                        SizedBox(height: context.scale(16)),
+                        Text("No registered exams found",
+                            style: TextStyle(color: colorScheme.onSurfaceVariant, fontSize: context.font(16))),
+                      ],
+                    ),
+                  )
+                : context.responsive(
+                    ListView.separated(
+                      padding: context.pagePadding,
+                      itemCount: _registrations.length,
+                      separatorBuilder: (context, index) => SizedBox(height: context.scale(16)),
+                      itemBuilder: (context, index) => _buildItem(index),
+                    ),
+                    tablet: GridView.builder(
+                      padding: context.pagePadding,
+                      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                        crossAxisCount: 2,
+                        crossAxisSpacing: context.scale(20),
+                        mainAxisSpacing: context.scale(20),
+                        mainAxisExtent: context.scale(550),
                       ),
+                      itemCount: _registrations.length,
+                      itemBuilder: (context, index) => _buildItem(index),
+                    ),
+                    desktop: GridView.builder(
+                      padding: context.pagePadding,
+                      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                        crossAxisCount: 3,
+                        crossAxisSpacing: context.scale(24),
+                        mainAxisSpacing: context.scale(24),
+                        mainAxisExtent: context.scale(600),
+                      ),
+                      itemCount: _registrations.length,
+                      itemBuilder: (context, index) => _buildItem(index),
                     ),
                   ),
-                ),
+          ),
+        ),
+      ),
     );
   }
 
@@ -438,6 +458,49 @@ class _AdmitCardPageState extends State<AdmitCardPage> {
             style: TextStyle(color: theme.colorScheme.onSurface, fontWeight: FontWeight.w600, fontSize: context.font(13)),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _AdmitCardSkeleton extends StatelessWidget {
+  const _AdmitCardSkeleton();
+
+  @override
+  Widget build(BuildContext context) {
+    return ListView.separated(
+      padding: context.pagePadding,
+      itemCount: 4,
+      separatorBuilder: (context, index) => SizedBox(height: context.scale(16)),
+      itemBuilder: (context, index) => Container(
+        padding: EdgeInsets.all(context.scale(20)),
+        decoration: BoxDecoration(
+          color: context.theme.colorScheme.surfaceContainerLow,
+          borderRadius: BorderRadius.circular(context.scale(16)),
+          border: Border.all(color: context.theme.colorScheme.outlineVariant),
+        ),
+        child: Row(
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  SkeletonBox(width: context.scale(150), height: context.scale(16), borderRadius: context.scale(4)),
+                  SizedBox(height: context.scale(8)),
+                  SkeletonBox(width: context.scale(120), height: context.scale(12), borderRadius: context.scale(4)),
+                ],
+              ),
+            ),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                SkeletonBox(width: context.scale(80), height: context.scale(16), borderRadius: context.scale(4)),
+                SizedBox(height: context.scale(8)),
+                Icon(Icons.keyboard_arrow_down, color: context.theme.colorScheme.outlineVariant),
+              ],
+            ),
+          ],
+        ),
       ),
     );
   }

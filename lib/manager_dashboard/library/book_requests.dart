@@ -158,21 +158,21 @@ class _BookRequestsScreenState extends State<BookRequestsScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Row(
+              Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  SkeletonBox(width: 150, height: 20),
-                  SkeletonBox(width: 60, height: 20),
+                  SkeletonBox(width: context.scale(150), height: context.scale(20)),
+                  SkeletonBox(width: context.scale(60), height: context.scale(20)),
                 ],
               ),
-              const SizedBox(height: 8),
-              const SkeletonBox(width: 100, height: 14),
-              const SizedBox(height: 16),
-              const Row(
+              SizedBox(height: context.scale(8)),
+              SkeletonBox(width: context.scale(100), height: context.scale(14)),
+              SizedBox(height: context.scale(16)),
+              Row(
                 children: [
-                  SkeletonBox(width: 100, height: 30),
-                  SizedBox(width: 16),
-                  SkeletonBox(width: 100, height: 30),
+                  SkeletonBox(width: context.scale(100), height: context.scale(30)),
+                  SizedBox(width: context.scale(16)),
+                  SkeletonBox(width: context.scale(100), height: context.scale(30)),
                 ],
               ),
             ],

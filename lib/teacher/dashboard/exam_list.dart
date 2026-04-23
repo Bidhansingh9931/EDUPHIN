@@ -1,5 +1,6 @@
 import 'package:eduphin/services/responsive_helper.dart';
 import 'package:eduphin/teacher/dashboard/exam_schedule_page.dart';
+import 'package:eduphin/teacher/dashboard/teacher_cache_service.dart';
 import 'package:flutter/material.dart';
 import 'package:eduphin/services/api_service.dart';
 import 'package:eduphin/teacher/dashboard/exam_models.dart';
@@ -14,12 +15,45 @@ class ExamListPage extends StatefulWidget {
 }
 
 class _ExamListPageState extends State<ExamListPage> {
-  late Future<ExamPageData> _examsFuture;
+  ExamPageData? _examData;
+  bool _isLoading = true;
 
   @override
   void initState() {
     super.initState();
-    _examsFuture = ApiService.getTeacherExams();
+    _loadInitialData();
+  }
+
+  Future<void> _loadInitialData() async {
+    final cachedData = await TeacherCacheService.load('exams');
+    if (cachedData != null && mounted) {
+      setState(() {
+        _examData = ExamPageData.fromJson(cachedData);
+        _isLoading = false;
+      });
+    }
+    _fetchExams();
+  }
+
+  Future<void> _fetchExams() async {
+    if (!mounted) return;
+    if (_examData == null) {
+      setState(() => _isLoading = true);
+    }
+    try {
+      final data = await ApiService.getTeacherExams();
+      if (mounted) {
+        setState(() {
+          _examData = data;
+          _isLoading = false;
+        });
+        await TeacherCacheService.save('exams', data.toJson());
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
+    }
   }
 
   @override
@@ -34,25 +68,21 @@ class _ExamListPageState extends State<ExamListPage> {
         centerTitle: false,
       ),
       drawer: const AppDrawer(),
-      body: Center(
-        child: ConstrainedBox(
-          constraints: BoxConstraints(maxWidth: context.scale(1200)),
-          child: FutureBuilder<ExamPageData>(
-            future: _examsFuture,
-            builder: (context, snapshot) {
-              if (snapshot.connectionState == ConnectionState.waiting) {
-                return const Center(child: CircularProgressIndicator());
-              } else if (snapshot.hasError) {
-                return _buildErrorState(snapshot.error.toString());
-              }
-
-              final exams = snapshot.data?.exams ?? [];
-              return ListView(
+      body: TeacherLoadingWrapper(
+        isLoading: _isLoading,
+        hasData: _examData != null,
+        skeleton: _buildSkeleton(context),
+        child: RefreshIndicator(
+          onRefresh: _fetchExams,
+          child: Center(
+            child: ConstrainedBox(
+              constraints: BoxConstraints(maxWidth: context.scale(1200)),
+              child: _examData != null ? ListView(
                 padding: context.pagePadding,
                 children: [
                   _buildSectionHeader("Active Examinations", Icons.assignment_outlined),
                   SizedBox(height: context.md),
-                  if (exams.isEmpty)
+                  if (_examData!.exams.isEmpty)
                     _buildEmptyState()
                   else
                     GridView.builder(
@@ -64,15 +94,37 @@ class _ExamListPageState extends State<ExamListPage> {
                         mainAxisSpacing: context.scale(16),
                         mainAxisExtent: context.scale(230),
                       ),
-                      itemCount: exams.length,
-                      itemBuilder: (context, index) => _buildExamCard(exams[index]),
+                      itemCount: _examData!.exams.length,
+                      itemBuilder: (context, index) => _buildExamCard(_examData!.exams[index]),
                     ),
                 ],
-              );
-            },
+              ) : const Center(child: Text("No data available")),
+            ),
           ),
         ),
       ),
+    );
+  }
+
+  Widget _buildSkeleton(BuildContext context) {
+    return ListView(
+      padding: context.pagePadding,
+      children: [
+        const TeacherSkeleton(height: 25, width: 200),
+        SizedBox(height: context.md),
+        GridView.builder(
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: context.responsive(1, tablet: 2, desktop: 3),
+            crossAxisSpacing: context.scale(16),
+            mainAxisSpacing: context.scale(16),
+            mainAxisExtent: context.scale(230),
+          ),
+          itemCount: 6,
+          itemBuilder: (context, index) => TeacherSkeleton(height: context.scale(230), borderRadius: BorderRadius.circular(16)),
+        ),
+      ],
     );
   }
 
@@ -109,7 +161,7 @@ class _ExamListPageState extends State<ExamListPage> {
             Text(error, style: theme.textTheme.bodySmall?.copyWith(fontSize: context.font(12)), textAlign: TextAlign.center),
             SizedBox(height: context.scale(24)),
             ElevatedButton(
-              onPressed: () => setState(() { _examsFuture = ApiService.getTeacherExams(); }),
+              onPressed: _fetchExams,
               child: const Text("Retry"),
             )
           ],

@@ -6,6 +6,7 @@ import 'add_reviews.dart';
 import 'all_review_model.dart';
 import 'all_review_provider.dart';
 import 'moderator_dashboard.dart';
+import 'skeleton_widgets.dart';
 
 class AllReviewsPage extends StatefulWidget {
   const AllReviewsPage({super.key});
@@ -17,23 +18,34 @@ class AllReviewsPage extends StatefulWidget {
 class _AllReviewsPageState extends State<AllReviewsPage> {
   late Future<List<ReviewDetail>> _reviewsFuture;
   final AllReviewProvider _provider = AllReviewProvider();
+  List<ReviewDetail>? _cachedReviews;
 
   @override
   void initState() {
     super.initState();
-    _reviewsFuture = _provider.fetchAllReviews();
+    _loadCacheAndFetch();
+  }
+
+  Future<void> _loadCacheAndFetch() async {
+    final cached = await _provider.getCachedReviews();
+    if (mounted) {
+      setState(() {
+        _cachedReviews = cached;
+        _reviewsFuture = _provider.fetchAllReviews();
+      });
+    }
   }
 
   Future<void> _refreshReviews() async {
     setState(() {
-      _reviewsFuture = _provider.fetchAllReviews();
+      _reviewsFuture = _provider.fetchAllReviews(bypassCache: true);
     });
+    await _reviewsFuture;
   }
 
   @override
   Widget build(BuildContext context) {
     final theme = context.theme;
-    final colorScheme = theme.colorScheme;
 
     return Scaffold(
       appBar: AppBar(
@@ -56,49 +68,17 @@ class _AllReviewsPageState extends State<AllReviewsPage> {
         child: FutureBuilder<List<ReviewDetail>>(
           future: _reviewsFuture,
           builder: (context, snapshot) {
-            if (snapshot.connectionState == ConnectionState.waiting) {
-              return const Center(child: CircularProgressIndicator());
-            } else if (snapshot.hasError) {
-              return Center(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(Icons.error_outline_rounded, size: context.scale(48), color: colorScheme.error),
-                    SizedBox(height: context.spacing),
-                    Text('Error loading reviews', style: theme.textTheme.titleMedium),
-                    SizedBox(height: context.spacing),
-                    ElevatedButton(onPressed: _refreshReviews, child: const Text("Retry")),
-                  ],
-                ),
-              );
-            } else if (!snapshot.hasData || snapshot.data!.isEmpty) {
-              return _buildEmptyState(theme);
-            }
-
-            final reviews = snapshot.data!;
-
-            return SingleChildScrollView(
-              padding: context.pagePadding,
-              physics: const AlwaysScrollableScrollPhysics(),
-              child: Center(
-                child: ConstrainedBox(
-                  constraints: BoxConstraints(maxWidth: context.scale(1000)),
-                  child: GridView.builder(
-                    shrinkWrap: true,
-                    physics: const NeverScrollableScrollPhysics(),
-                    itemCount: reviews.length,
-                    gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                      crossAxisCount: context.responsive(1, tablet: 2, desktop: 2),
-                      crossAxisSpacing: context.spacing,
-                      mainAxisSpacing: context.spacing,
-                      mainAxisExtent: context.scale(220),
-                    ),
-                    itemBuilder: (context, index) {
-                      return _buildReviewCard(context, reviews[index]);
-                    },
-                  ),
-                ),
-              ),
+            return ModeratorLoadingWrapper<List<ReviewDetail>>(
+              snapshot: snapshot,
+              cachedData: _cachedReviews,
+              skeleton: const ReviewSkeleton(),
+              onRefresh: _refreshReviews,
+              builder: (reviews) {
+                if (reviews.isEmpty) {
+                  return _buildEmptyState(theme);
+                }
+                return _buildReviewList(context, reviews);
+              },
             );
           },
         ),
@@ -112,6 +92,32 @@ class _AllReviewsPageState extends State<AllReviewsPage> {
         },
         label: const Text('Write Review'),
         icon: Icon(Icons.rate_review_rounded, size: context.scale(24)),
+      ),
+    );
+  }
+
+  Widget _buildReviewList(BuildContext context, List<ReviewDetail> reviews) {
+    return SingleChildScrollView(
+      padding: context.pagePadding,
+      physics: const AlwaysScrollableScrollPhysics(),
+      child: Center(
+        child: ConstrainedBox(
+          constraints: BoxConstraints(maxWidth: context.scale(1000)),
+          child: GridView.builder(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            itemCount: reviews.length,
+            gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: context.responsive(1, tablet: 2, desktop: 2),
+              crossAxisSpacing: context.spacing,
+              mainAxisSpacing: context.spacing,
+              mainAxisExtent: context.scale(220),
+            ),
+            itemBuilder: (context, index) {
+              return _buildReviewCard(context, reviews[index]);
+            },
+          ),
+        ),
       ),
     );
   }

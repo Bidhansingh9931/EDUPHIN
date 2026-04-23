@@ -79,7 +79,7 @@ class _ClassListPageState extends State<ClassListPage> {
   }
 
   Future<void> _loadCacheAndFetch() async {
-    final cachedData = await CachingService.getCache('manager_classes');
+    final cachedData = await CacheService.getCache('manager_classes');
     if (cachedData != null && mounted) {
       final List classesData = cachedData;
       setState(() {
@@ -92,7 +92,7 @@ class _ClassListPageState extends State<ClassListPage> {
   Future<void> _fetchClasses() async {
     if (!mounted) return;
     setState(() {
-      _isLoading = true;
+      _isLoading = _classes.isEmpty;
       _error = null;
     });
 
@@ -104,7 +104,7 @@ class _ClassListPageState extends State<ClassListPage> {
 
       if (response.statusCode == 200 && responseData['status'] == true) {
         final List classesData = responseData['data'];
-        await CachingService.setCache('manager_classes', classesData);
+        await CacheService.setCache('manager_classes', classesData);
         if (mounted) {
           setState(() {
             _classes = classesData.map((c) => Class.fromJson(c)).toList();

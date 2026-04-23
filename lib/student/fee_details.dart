@@ -1,4 +1,6 @@
 import 'package:eduphin/services/api_service.dart';
+import 'package:eduphin/services/caching_service.dart';
+import 'package:eduphin/services/common_widgets.dart';
 import 'package:eduphin/student/student_fee_model.dart';
 import 'package:flutter/material.dart';
 import 'package:eduphin/services/responsive_helper.dart';
@@ -14,26 +16,48 @@ class _StudentFeePageState extends State<StudentFeePage> {
   bool isLoading = true;
   String? errorMessage;
   StudentFeeData? feeData;
+  static const String _cacheKey = 'student_fee_details';
 
   @override
   void initState() {
     super.initState();
+    _loadCachedData();
     _fetchFeeData();
   }
 
+  Future<void> _loadCachedData() async {
+    final cachedData = await CacheService.getData(_cacheKey);
+    if (cachedData != null && mounted) {
+      setState(() {
+        feeData = StudentFeeData.fromJson(cachedData as Map<String, dynamic>);
+        if (feeData != null) {
+          isLoading = false;
+        }
+      });
+    }
+  }
+
   Future<void> _fetchFeeData() async {
-    setState(() => isLoading = true);
+    if (feeData == null) setState(() => isLoading = true);
     try {
       final data = await ApiService.getStudentFees();
-      setState(() {
-        feeData = data;
-        isLoading = false;
-      });
+      if (mounted) {
+        setState(() {
+          feeData = data;
+          isLoading = false;
+          errorMessage = null;
+        });
+        CacheService.saveData(_cacheKey, data.toJson());
+      }
     } catch (e) {
-      setState(() {
-        errorMessage = e.toString();
-        isLoading = false;
-      });
+      if (mounted) {
+        setState(() {
+          isLoading = false;
+          if (feeData == null) {
+            errorMessage = e.toString();
+          }
+        });
+      }
     }
   }
 
@@ -102,82 +126,59 @@ class _StudentFeePageState extends State<StudentFeePage> {
           style: TextStyle(fontWeight: FontWeight.bold, fontSize: context.font(18)),
         ),
       ),
-      body: isLoading
-          ? Center(child: CircularProgressIndicator(color: colorScheme.primary, strokeWidth: 3))
-          : errorMessage != null
-              ? _buildErrorView()
-              : RefreshIndicator(
-                  onRefresh: _fetchFeeData,
-                  color: colorScheme.primary,
-                  backgroundColor: theme.cardColor,
-                  child: SingleChildScrollView(
-                    physics: const BouncingScrollPhysics(parent: AlwaysScrollableScrollPhysics()),
-                    padding: context.pagePadding,
-                    child: Center(
-                      child: Container(
-                        constraints: const BoxConstraints(maxWidth: 1000),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            /// STUDENT INFO
-                            _buildStudentInfoCard(),
+      body: LoadingWrapper(
+        isLoading: isLoading,
+        hasData: feeData != null,
+        error: errorMessage,
+        skeleton: const _FeeSkeleton(),
+        onRefresh: _fetchFeeData,
+        onRetry: _fetchFeeData,
+        child: SingleChildScrollView(
+          physics: const BouncingScrollPhysics(parent: AlwaysScrollableScrollPhysics()),
+          padding: context.pagePadding,
+          child: Center(
+            child: Container(
+              constraints: const BoxConstraints(maxWidth: 1000),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  /// STUDENT INFO
+                  _buildStudentInfoCard(),
 
-                            SizedBox(height: context.scale(32)),
+                  SizedBox(height: context.scale(32)),
 
-                            Text(
-                              "Fee Summary",
-                              style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800, fontSize: context.font(20)),
-                            ),
-                            SizedBox(height: context.scale(16)),
-                            _buildSummaryGrid(feeData?.summary),
-
-                            SizedBox(height: context.scale(32)),
-
-                            _buildSectionHeader("Payment History", Icons.history_rounded),
-                            SizedBox(height: context.scale(16)),
-                            _buildPaymentHistoryList(),
-
-                            SizedBox(height: context.scale(32)),
-
-                            _buildSectionHeader("Fee Structure", Icons.account_balance_wallet_outlined),
-                            SizedBox(height: context.scale(16)),
-                            _buildFeeStructureTable(),
-
-                            SizedBox(height: context.scale(32)),
-
-                            if (feeData?.fines?.isNotEmpty ?? false) ...[
-                              _buildSectionHeader("Fine Details", Icons.warning_amber_rounded),
-                              SizedBox(height: context.scale(16)),
-                              _buildFineDetailsTable(),
-                              SizedBox(height: context.scale(32)),
-                            ],
-                            SizedBox(height: context.scale(50)),
-                          ],
-                        ),
-                      ),
-                    ),
+                  Text(
+                    "Fee Summary",
+                    style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800, fontSize: context.font(20)),
                   ),
-                ),
-    );
-  }
+                  SizedBox(height: context.scale(16)),
+                  _buildSummaryGrid(feeData?.summary),
 
-  Widget _buildErrorView() {
-    final theme = context.theme;
-    return Center(
-      child: Padding(
-        padding: EdgeInsets.all(context.scale(40)),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.error_outline_rounded, color: theme.colorScheme.error, size: context.scale(60)),
-            SizedBox(height: context.scale(20)),
-            Text(errorMessage!, textAlign: TextAlign.center, style: theme.textTheme.bodyMedium?.copyWith(fontSize: context.font(14))),
-            SizedBox(height: context.scale(24)),
-            ElevatedButton(
-              onPressed: _fetchFeeData,
-              child: const Text("Retry Connection"),
-            )
-          ],
+                  SizedBox(height: context.scale(32)),
+
+                  _buildSectionHeader("Payment History", Icons.history_rounded),
+                  SizedBox(height: context.scale(16)),
+                  _buildPaymentHistoryList(),
+
+                  SizedBox(height: context.scale(32)),
+
+                  _buildSectionHeader("Fee Structure", Icons.account_balance_wallet_outlined),
+                  SizedBox(height: context.scale(16)),
+                  _buildFeeStructureTable(),
+
+                  SizedBox(height: context.scale(32)),
+
+                  if (feeData?.fines?.isNotEmpty ?? false) ...[
+                    _buildSectionHeader("Fine Details", Icons.warning_amber_rounded),
+                    SizedBox(height: context.scale(16)),
+                    _buildFineDetailsTable(),
+                    SizedBox(height: context.scale(32)),
+                  ],
+                  SizedBox(height: context.scale(50)),
+                ],
+              ),
+            ),
+          ),
         ),
       ),
     );
@@ -534,6 +535,95 @@ class _StudentFeePageState extends State<StudentFeePage> {
       child: Text(
         text,
         style: TextStyle(color: color, fontSize: context.font(10), fontWeight: FontWeight.bold),
+      ),
+    );
+  }
+}
+
+class _FeeSkeleton extends StatelessWidget {
+  const _FeeSkeleton();
+
+  @override
+  Widget build(BuildContext context) {
+    return SingleChildScrollView(
+      padding: context.pagePadding,
+      child: Center(
+        child: Container(
+          constraints: const BoxConstraints(maxWidth: 1000),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Student Info Skeleton
+              Container(
+                padding: EdgeInsets.all(context.scale(24)),
+                decoration: BoxDecoration(
+                  color: context.theme.colorScheme.surfaceContainerLow,
+                  borderRadius: BorderRadius.circular(context.scale(20)),
+                ),
+                child: Column(
+                  children: [
+                    Row(
+                      children: [
+                        SkeletonBox(width: context.scale(60), height: context.scale(60), borderRadius: context.scale(30)),
+                        SizedBox(width: context.scale(16)),
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            SkeletonBox(width: context.scale(150), height: context.scale(20), borderRadius: context.scale(4)),
+                            SizedBox(height: context.scale(8)),
+                            SkeletonBox(width: context.scale(100), height: context.scale(14), borderRadius: context.scale(4)),
+                          ],
+                        )
+                      ],
+                    ),
+                    SizedBox(height: context.scale(24)),
+                    SkeletonBox(height: context.scale(14), borderRadius: context.scale(4)),
+                    SizedBox(height: context.scale(12)),
+                    SkeletonBox(height: context.scale(14), borderRadius: context.scale(4)),
+                  ],
+                ),
+              ),
+              SizedBox(height: context.scale(32)),
+              SkeletonBox(width: context.scale(150), height: context.scale(24), borderRadius: context.scale(4)),
+              SizedBox(height: context.scale(16)),
+              // Summary Grid Skeleton
+              GridView.count(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                crossAxisCount: context.isDesktop ? 4 : 2,
+                crossAxisSpacing: context.scale(16),
+                mainAxisSpacing: context.scale(16),
+                childAspectRatio: context.isDesktop ? 1.5 : 1.3,
+                children: List.generate(4, (index) => Container(
+                  padding: EdgeInsets.all(context.scale(16)),
+                  decoration: BoxDecoration(
+                    color: context.theme.colorScheme.surfaceContainerLow,
+                    borderRadius: BorderRadius.circular(context.scale(20)),
+                  ),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      SkeletonBox(width: context.scale(24), height: context.scale(24), borderRadius: context.scale(4)),
+                      SizedBox(height: context.scale(12)),
+                      SkeletonBox(width: context.scale(60), height: context.scale(12), borderRadius: context.scale(4)),
+                      SizedBox(height: context.scale(8)),
+                      SkeletonBox(width: context.scale(80), height: context.scale(16), borderRadius: context.scale(4)),
+                    ],
+                  ),
+                )),
+              ),
+              SizedBox(height: context.scale(32)),
+              SkeletonBox(width: context.scale(150), height: context.scale(24), borderRadius: context.scale(4)),
+              SizedBox(height: context.scale(16)),
+              // List Skeleton
+              ...List.generate(3, (index) => Padding(
+                padding: EdgeInsets.only(bottom: context.scale(16)),
+                child: SkeletonBox(height: context.scale(100), borderRadius: context.scale(16)),
+              )),
+            ],
+          ),
+        ),
       ),
     );
   }

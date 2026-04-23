@@ -13,7 +13,7 @@ import 'lending_books_page.dart';
 import 'explore_events.dart';
 import 'my_registered_event.dart';
 import 'your_support_ticket.dart';
-import 'assigned_tickets_page.dart';
+import 'assigned_tickets.dart';
 import 'exam_information_page.dart';
 import 'marks_entry_page.dart';
 import 'exam_schedule_page.dart';

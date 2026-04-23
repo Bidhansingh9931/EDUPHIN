@@ -1,4 +1,5 @@
 import 'package:eduphin/services/responsive_helper.dart';
+import 'package:eduphin/teacher/dashboard/teacher_cache_service.dart';
 import 'package:flutter/material.dart';
 import 'package:eduphin/services/api_service.dart';
 import 'student_leave_model.dart';
@@ -13,9 +14,9 @@ class StudentLeaveScreen extends StatefulWidget {
 }
 
 class _StudentLeaveScreenState extends State<StudentLeaveScreen> {
-  late Future<List<StudentLeave>> _leaveFuture;
   List<StudentLeave> _allLeaves = [];
   List<StudentLeave> _filteredLeaves = [];
+  bool _isLoading = true;
 
   final TextEditingController _searchController = TextEditingController();
   final TextEditingController _dateController = TextEditingController();
@@ -24,7 +25,7 @@ class _StudentLeaveScreenState extends State<StudentLeaveScreen> {
   @override
   void initState() {
     super.initState();
-    _fetchLeaves();
+    _loadInitialData();
     _searchController.addListener(_filterLeaves);
   }
 
@@ -35,16 +36,40 @@ class _StudentLeaveScreenState extends State<StudentLeaveScreen> {
     super.dispose();
   }
 
-  void _fetchLeaves() {
-    _leaveFuture = ApiService.getStudentLeaveDetails();
-    _leaveFuture.then((leaves) {
+  Future<void> _loadInitialData() async {
+    final cachedData = await TeacherCacheService.load('student_leaves');
+    if (cachedData != null && mounted) {
+      final List<dynamic> list = cachedData;
+      setState(() {
+        _allLeaves = list.map((e) => StudentLeave.fromJson(e)).toList();
+        _filteredLeaves = _allLeaves;
+        _isLoading = false;
+      });
+      _filterLeaves();
+    }
+    _fetchLeaves();
+  }
+
+  Future<void> _fetchLeaves() async {
+    if (!mounted) return;
+    if (_allLeaves.isEmpty) {
+      setState(() => _isLoading = true);
+    }
+    try {
+      final leaves = await ApiService.getStudentLeaveDetails();
       if (mounted) {
         setState(() {
           _allLeaves = leaves;
-          _filteredLeaves = leaves;
+          _isLoading = false;
         });
+        _filterLeaves();
+        await TeacherCacheService.save('student_leaves', leaves.map((e) => e.toJson()).toList());
       }
-    });
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
+    }
   }
 
   void _filterLeaves() {
@@ -64,8 +89,7 @@ class _StudentLeaveScreenState extends State<StudentLeaveScreen> {
   }
 
   Future<void> _handleRefresh() async {
-    _fetchLeaves();
-    await _leaveFuture;
+    await _fetchLeaves();
   }
   
   void _resetFilters() {
@@ -94,29 +118,35 @@ class _StudentLeaveScreenState extends State<StudentLeaveScreen> {
               children: [
                 _buildFilterCard(),
                 Expanded(
-                  child: FutureBuilder<List<StudentLeave>>(
-                    future: _leaveFuture,
-                    builder: (context, snapshot) {
-                      if (snapshot.connectionState == ConnectionState.waiting && _allLeaves.isEmpty) {
-                        return const Center(child: CircularProgressIndicator());
-                      } else if (snapshot.hasError) {
-                        return Center(child: Text('Error: ${snapshot.error}', style: TextStyle(color: theme.colorScheme.error)));
-                      } else if (_filteredLeaves.isEmpty) {
-                        return Center(
-                          child: Text(
-                            "No leave applications found.",
-                            style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: context.font(14)),
-                          ),
-                        );
-                      }
-                      return _buildLeaveList();
-                    },
+                  child: TeacherLoadingWrapper(
+                    isLoading: _isLoading,
+                    hasData: _allLeaves.isNotEmpty,
+                    skeleton: _buildSkeleton(context),
+                    child: _filteredLeaves.isEmpty && !_isLoading
+                        ? Center(
+                            child: Text(
+                              "No leave applications found.",
+                              style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: context.font(14)),
+                            ),
+                          )
+                        : _buildLeaveList(),
                   ),
                 ),
               ],
             ),
           ),
         ),
+      ),
+    );
+  }
+
+  Widget _buildSkeleton(BuildContext context) {
+    return ListView.builder(
+      padding: context.pagePadding,
+      itemCount: 5,
+      itemBuilder: (context, index) => Padding(
+        padding: EdgeInsets.only(bottom: context.spacing),
+        child: TeacherSkeleton(height: context.scale(60), borderRadius: BorderRadius.circular(12)),
       ),
     );
   }

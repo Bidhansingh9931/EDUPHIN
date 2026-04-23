@@ -144,7 +144,7 @@ class _DailyClassSchedulePageState extends State<DailyClassSchedulePage>{
   Future<void> _fetchSchedule() async {
     if (!mounted) return;
     setState(() {
-      _isLoading = true;
+      _isLoading = _schedule.isEmpty;
       _error = null;
     });
 

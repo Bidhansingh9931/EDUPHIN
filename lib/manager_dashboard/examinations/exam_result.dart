@@ -16,7 +16,7 @@ class Exam {
 
   factory Exam.fromJson(Map<String, dynamic> json) {
     return Exam(
-      id: json['id'] ?? 0,
+      id: int.tryParse(json['id']?.toString() ?? '') ?? 0,
       name: json['name']?.toString() ?? 'Unnamed Exam',
     );
   }
@@ -58,11 +58,11 @@ class ExamPaper {
 
   factory ExamPaper.fromJson(Map<String, dynamic> json) {
     return ExamPaper(
-      id: json['id'] ?? 0,
-      examId: json['exam_id'] ?? 0,
-      classId: json['class_id'] ?? 0,
-      sectionId: json['section_id'] ?? 0,
-      subjectId: json['subject_id'] ?? 0,
+      id: int.tryParse(json['id']?.toString() ?? '') ?? 0,
+      examId: int.tryParse(json['exam_id']?.toString() ?? '') ?? 0,
+      classId: int.tryParse(json['class_id']?.toString() ?? '') ?? 0,
+      sectionId: int.tryParse(json['section_id']?.toString() ?? '') ?? 0,
+      subjectId: int.tryParse(json['subject_id']?.toString() ?? '') ?? 0,
       className: json['class']?['name']?.toString() ?? 'N/A',
       sectionName: json['section']?['name']?.toString() ?? 'N/A',
       subjectName: json['subject']?['name']?.toString() ?? 'N/A',
@@ -132,6 +132,7 @@ class _ExamResultPageState extends State<ExamResultPage> {
       final List<dynamic> jsonList = cachedData;
       setState(() {
         _examData = jsonList.map((json) => ExamWithPapers.fromJson(json)).toList();
+        _isLoading = _examData.isEmpty;
       });
     }
     _fetchExamData();
@@ -284,8 +285,10 @@ class _ExamResultPageState extends State<ExamResultPage> {
       itemBuilder: (context, index) => Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          SkeletonBox(height: context.scale(40), width: context.scale(200)),
-          SizedBox(height: context.md),
+          Padding(
+            padding: EdgeInsets.symmetric(vertical: context.md),
+            child: SkeletonBox(height: context.scale(40), width: context.scale(200)),
+          ),
           GridView.builder(
             shrinkWrap: true,
             physics: const NeverScrollableScrollPhysics(),

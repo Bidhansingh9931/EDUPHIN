@@ -1,4 +1,6 @@
 import 'dart:io';
+import 'package:eduphin/moderator_dashboard/skeleton_widgets.dart';
+import 'package:eduphin/moderator_dashboard/cache_helper.dart';
 import 'package:eduphin/services/common_widgets.dart';
 import 'package:eduphin/services/responsive_helper.dart';
 import 'package:flutter/foundation.dart';
@@ -20,9 +22,9 @@ class EmployeeDetailsPage extends StatefulWidget {
 
 class _EmployeeDetailsPageState extends State<EmployeeDetailsPage> {
   final EmployeeDetailsProvider _provider = EmployeeDetailsProvider();
-  bool _isLoading = true;
+  late Future<EmployeeDetails?> _detailsFuture;
+  EmployeeDetails? _cachedDetails;
   bool _isSaving = false;
-  late EmployeeDetails _employeeDetails;
 
   File? _profileImage;
   Uint8List? _webImage;
@@ -60,7 +62,63 @@ class _EmployeeDetailsPageState extends State<EmployeeDetailsPage> {
   @override
   void initState() {
     super.initState();
-    _fetchData();
+    _loadInitialData();
+  }
+
+  Future<void> _loadInitialData() async {
+    _cachedDetails = await _provider.getCachedEmployeeDetails(widget.employeeId);
+    if (_cachedDetails != null) {
+      _populateControllers(_cachedDetails!);
+    }
+    _fetchDetails();
+  }
+
+  void _fetchDetails({bool bypassCache = false}) {
+    debugPrint('DEBUG: Fetching details for employeeId: ${widget.employeeId}');
+    setState(() {
+      _detailsFuture = _provider.fetchEmployeeDetails(widget.employeeId, bypassCache: bypassCache);
+      _detailsFuture.then((data) {
+        if (mounted && data != null) {
+          debugPrint('DEBUG: Received data for: ${data.fullName} (ID: ${data.id})');
+          _populateControllers(data);
+        }
+      });
+    });
+  }
+
+  void _populateControllers(EmployeeDetails data) {
+    _fullNameController.text = data.fullName ?? '';
+    _emailController.text = data.email ?? '';
+    _roleController.text = data.role ?? '';
+    _genderController.text = data.gender ?? '';
+    _dateOfBirthController.text = data.dateOfBirth ?? '';
+    _relationshipStatusController.text = data.relationshipStatus ?? '';
+    _phoneNumberController.text = data.phoneNumber ?? '';
+    _alternateNumberController.text = data.alternateNumber ?? '';
+    _addressController.text = data.address ?? '';
+    _cityController.text = data.city ?? '';
+    _stateController.text = data.state ?? '';
+    _pinCodeController.text = data.pinCode ?? '';
+    _positionController.text = data.position ?? '';
+    _employmentTypeController.text = data.employmentType ?? '';
+    _joiningDateController.text = data.joiningDate ?? '';
+    _experienceController.text = data.experience ?? '';
+    _statusController.text = data.status ?? '';
+    _referenceController.text = data.reference ?? '';
+    _qualificationController.text = data.qualification ?? '';
+    _matriculationMarksController.text = data.matriculationMarks ?? '';
+    _intermediateMarksController.text = data.intermediateMarks ?? '';
+    _bankAccountNumberController.text = data.bankAccountNumber ?? '';
+    _ifscCodeController.text = data.ifscCode ?? '';
+    _bankNameController.text = data.bankName ?? '';
+    _branchController.text = data.branch ?? '';
+    _emergencyContactNameController.text = data.emergencyContactName ?? '';
+    _emergencyContactNumberController.text = data.emergencyContactNumber ?? '';
+  }
+
+  Future<void> _refreshDetails() async {
+    _fetchDetails(bypassCache: true);
+    await _detailsFuture;
   }
 
   @override
@@ -96,55 +154,6 @@ class _EmployeeDetailsPageState extends State<EmployeeDetailsPage> {
     super.dispose();
   }
 
-  Future<void> _fetchData() async {
-    try {
-      final data = await _provider.fetchEmployeeDetails(widget.employeeId);
-      _employeeDetails = data ?? EmployeeDetails(); // If data is null, create an empty EmployeeDetails object
-
-      // Populate controllers with fetched data
-      _fullNameController.text = _employeeDetails.fullName ?? '';
-      _emailController.text = _employeeDetails.email ?? '';
-      _roleController.text = _employeeDetails.role ?? '';
-      _genderController.text = _employeeDetails.gender ?? '';
-      _dateOfBirthController.text = _employeeDetails.dateOfBirth ?? '';
-      _relationshipStatusController.text = _employeeDetails.relationshipStatus ?? '';
-      _phoneNumberController.text = _employeeDetails.phoneNumber ?? '';
-      _alternateNumberController.text = _employeeDetails.alternateNumber ?? '';
-      _addressController.text = _employeeDetails.address ?? '';
-      _cityController.text = _employeeDetails.city ?? '';
-      _stateController.text = _employeeDetails.state ?? '';
-      _pinCodeController.text = _employeeDetails.pinCode ?? '';
-      _positionController.text = _employeeDetails.position ?? '';
-      _employmentTypeController.text = _employeeDetails.employmentType ?? '';
-      _joiningDateController.text = _employeeDetails.joiningDate ?? '';
-      _experienceController.text = _employeeDetails.experience ?? '';
-      _statusController.text = _employeeDetails.status ?? '';
-      _referenceController.text = _employeeDetails.reference ?? '';
-      _qualificationController.text = _employeeDetails.qualification ?? '';
-      _matriculationMarksController.text = _employeeDetails.matriculationMarks ?? '';
-      _intermediateMarksController.text = _employeeDetails.intermediateMarks ?? '';
-      _bankAccountNumberController.text = _employeeDetails.bankAccountNumber ?? '';
-      _ifscCodeController.text = _employeeDetails.ifscCode ?? '';
-      _bankNameController.text = _employeeDetails.bankName ?? '';
-      _branchController.text = _employeeDetails.branch ?? '';
-      _emergencyContactNameController.text = _employeeDetails.emergencyContactName ?? '';
-      _emergencyContactNumberController.text = _employeeDetails.emergencyContactNumber ?? '';
-
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text("Failed to load employee details: $e")),
-        );
-      }
-    } finally {
-      if (mounted) {
-        setState(() {
-          _isLoading = false;
-        });
-      }
-    }
-  }
-
   Future<void> _pickImage() async {
     final ImagePicker picker = ImagePicker();
     final XFile? image = await picker.pickImage(source: ImageSource.gallery);
@@ -164,13 +173,16 @@ class _EmployeeDetailsPageState extends State<EmployeeDetailsPage> {
   }
 
   Future<void> _saveChanges() async {
+    final details = await _detailsFuture;
+    if (details == null) return;
+
     setState(() {
       _isSaving = true;
     });
 
     // Update the model object with data from controllers
     final updatedDetails = EmployeeDetails(
-      id: _employeeDetails.id,
+      id: details.id,
       fullName: _fullNameController.text,
       email: _emailController.text,
       role: _roleController.text,
@@ -198,7 +210,7 @@ class _EmployeeDetailsPageState extends State<EmployeeDetailsPage> {
       branch: _branchController.text,
       emergencyContactName: _emergencyContactNameController.text,
       emergencyContactNumber: _emergencyContactNumberController.text,
-      photo: _employeeDetails.photo,
+      photo: details.photo,
       profileImage: _profileImage,
       webImage: _webImage,
       imageName: _imageName,
@@ -206,6 +218,13 @@ class _EmployeeDetailsPageState extends State<EmployeeDetailsPage> {
 
     try {
       await _provider.saveEmployeeDetails(updatedDetails);
+
+      // Clear the employee list cache to ensure the list view reflects changes
+      final details = await _detailsFuture;
+      if (details != null && details.instituteId != null) {
+        await CacheHelper.clear('employees_list_${details.instituteId}');
+      }
+
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
@@ -213,6 +232,7 @@ class _EmployeeDetailsPageState extends State<EmployeeDetailsPage> {
             backgroundColor: Colors.green,
           ),
         );
+        _fetchDetails(bypassCache: true);
       }
     } catch (e) {
       if (mounted) {
@@ -260,155 +280,179 @@ class _EmployeeDetailsPageState extends State<EmployeeDetailsPage> {
         elevation: 0,
         scrolledUnderElevation: 0,
         backgroundColor: context.theme.colorScheme.surface,
+        actions: [
+          IconButton(
+            onPressed: _refreshDetails,
+            icon: const Icon(Icons.refresh_rounded),
+          ),
+        ],
       ),
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : SingleChildScrollView(
-              padding: context.pagePadding.copyWith(bottom: context.scale(80)),
-              child: Center(
-                child: ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 1000),
-                  child: Column(
-                    children: [
-                      Padding(
-                        padding: EdgeInsets.only(bottom: context.lg),
-                        child: ProfileAvatar(
-                          imageUrl: _employeeDetails.photo,
-                          radius: context.scale(50),
-                          localImage: _profileImage,
-                          webImage: _webImage,
-                          onCameraTap: _pickImage,
-                        ),
-                      ),
-                      _buildSection(
-                        context: context,
-                        title: 'Personal Details',
+      body: FutureBuilder<EmployeeDetails?>(
+        future: _detailsFuture,
+        builder: (context, snapshot) {
+          return ModeratorLoadingWrapper<EmployeeDetails?>(
+            snapshot: snapshot,
+            cachedData: _cachedDetails,
+            skeleton: const DetailSkeleton(),
+            onRefresh: _refreshDetails,
+            builder: (details) {
+              if (details == null) {
+                return const Center(child: Text("Employee details not found"));
+              }
+              return RefreshIndicator(
+                onRefresh: _refreshDetails,
+                child: SingleChildScrollView(
+                  padding: context.pagePadding.copyWith(bottom: context.scale(80)),
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  child: Center(
+                    child: ConstrainedBox(
+                      constraints: const BoxConstraints(maxWidth: 1000),
+                      child: Column(
                         children: [
-                          _buildTextField(context: context, controller: _fullNameController, label: 'Full Name'),
-                          _buildTextField(context: context, controller: _emailController, label: 'Email'),
-                          _buildDropdownField(
-                            context: context,
-                            controller: _roleController,
-                            label: 'Role',
-                            items: ['Institute Manager', 'Counselors', 'Teacher', 'Student', 'Librarian', 'Accountant', 'Staff'],
+                          Padding(
+                            padding: EdgeInsets.only(bottom: context.lg),
+                            child: ProfileAvatar(
+                              imageUrl: details.photo,
+                              radius: context.scale(50),
+                              localImage: _profileImage,
+                              webImage: _webImage,
+                              onCameraTap: _pickImage,
+                            ),
                           ),
-                          _buildDropdownField(
+                          _buildSection(
                             context: context,
-                            controller: _genderController,
-                            label: 'Gender',
-                            items: ['Male', 'Female', 'Other'],
+                            title: 'Personal Details',
+                            children: [
+                              _buildTextField(context: context, controller: _fullNameController, label: 'Full Name'),
+                              _buildTextField(context: context, controller: _emailController, label: 'Email'),
+                              _buildDropdownField(
+                                context: context,
+                                controller: _roleController,
+                                label: 'Role',
+                                items: ['Institute Manager', 'Counselors', 'Teacher', 'Student', 'Librarian', 'Accountant', 'Staff'],
+                              ),
+                              _buildDropdownField(
+                                context: context,
+                                controller: _genderController,
+                                label: 'Gender',
+                                items: ['Male', 'Female', 'Other'],
+                              ),
+                              _buildTextField(
+                                context: context,
+                                controller: _dateOfBirthController,
+                                label: 'Date of Birth',
+                                readOnly: true,
+                                onTap: () => _selectDate(context, _dateOfBirthController),
+                              ),
+                              _buildDropdownField(
+                                context: context,
+                                controller: _relationshipStatusController,
+                                label: 'Relationship Status',
+                                items: ['Single', 'Married', 'Divorced', 'Widowed'],
+                              ),
+                            ],
                           ),
-                          _buildTextField(
+                          _buildSection(
                             context: context,
-                            controller: _dateOfBirthController,
-                            label: 'Date of Birth',
-                            readOnly: true,
-                            onTap: () => _selectDate(context, _dateOfBirthController),
+                            title: 'Contact Information',
+                            children: [
+                              _buildTextField(context: context, controller: _phoneNumberController, label: 'Phone Number'),
+                              _buildTextField(context: context, controller: _alternateNumberController, label: 'Alternate Number'),
+                              _buildTextField(context: context, controller: _addressController, label: 'Address'),
+                              _buildTextField(context: context, controller: _cityController, label: 'City'),
+                              _buildTextField(context: context, controller: _stateController, label: 'State'),
+                              _buildTextField(context: context, controller: _pinCodeController, label: 'Pincode'),
+                            ],
                           ),
-                          _buildDropdownField(
+                          _buildSection(
                             context: context,
-                            controller: _relationshipStatusController,
-                            label: 'Relationship Status',
-                            items: ['Single', 'Married', 'Divorced', 'Widowed'],
+                            title: 'Employment Details',
+                            children: [
+                              _buildTextField(context: context, controller: _positionController, label: 'Position'),
+                              _buildDropdownField(
+                                context: context,
+                                controller: _employmentTypeController,
+                                label: 'Employment Type',
+                                items: ['Full-time', 'Part-time', 'Contract', 'Internship'],
+                              ),
+                              _buildTextField(
+                                context: context,
+                                controller: _joiningDateController,
+                                label: 'Joining Date',
+                                readOnly: true,
+                                onTap: () => _selectDate(context, _joiningDateController),
+                              ),
+                              _buildTextField(context: context, controller: _experienceController, label: 'Experience (Years)'),
+                              _buildDropdownField(
+                                context: context,
+                                controller: _statusController,
+                                label: 'Status',
+                                items: ['live', 'expired'],
+                              ),
+                              _buildTextField(context: context, controller: _referenceController, label: 'Reference'),
+                            ],
+                          ),
+                          _buildSection(
+                            context: context,
+                            title: 'Educational Qualification',
+                            children: [
+                              _buildTextField(context: context, controller: _qualificationController, label: 'Qualification'),
+                              _buildTextField(context: context, controller: _matriculationMarksController, label: 'Matriculation Marks'),
+                              _buildTextField(context: context, controller: _intermediateMarksController, label: 'Intermediate Marks'),
+                            ],
+                          ),
+                          _buildSection(
+                            context: context,
+                            title: 'Bank Details',
+                            children: [
+                              _buildTextField(context: context, controller: _bankAccountNumberController, label: 'Bank Account Number'),
+                              _buildTextField(context: context, controller: _ifscCodeController, label: 'IFSC Code'),
+                              _buildTextField(context: context, controller: _bankNameController, label: 'Bank Name'),
+                              _buildTextField(context: context, controller: _branchController, label: 'Branch'),
+                            ],
+                          ),
+                          _buildSection(
+                            context: context,
+                            title: 'Emergency Contact',
+                            children: [
+                              _buildTextField(context: context, controller: _emergencyContactNameController, label: 'Emergency Contact Name'),
+                              _buildTextField(context: context, controller: _emergencyContactNumberController, label: 'Emergency Contact Number'),
+                            ],
+                          ),
+                          SizedBox(height: context.lg),
+                          SizedBox(
+                            width: double.infinity,
+                            height: context.scale(56),
+                            child: ElevatedButton(
+                              onPressed: _isSaving ? null : _saveChanges,
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: context.theme.colorScheme.primary,
+                                foregroundColor: context.theme.colorScheme.onPrimary,
+                                elevation: 0,
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(context.scale(12))),
+                              ),
+                              child: _isSaving
+                                  ? SizedBox(
+                                      height: context.scale(24),
+                                      width: context.scale(24),
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                        valueColor: AlwaysStoppedAnimation<Color>(context.theme.colorScheme.onPrimary),
+                                      ),
+                                    )
+                                  : Text('Save Changes', style: TextStyle(fontSize: context.font(16), fontWeight: FontWeight.bold)),
+                            ),
                           ),
                         ],
                       ),
-                      _buildSection(
-                        context: context,
-                        title: 'Contact Information',
-                        children: [
-                          _buildTextField(context: context, controller: _phoneNumberController, label: 'Phone Number'),
-                          _buildTextField(context: context, controller: _alternateNumberController, label: 'Alternate Number'),
-                          _buildTextField(context: context, controller: _addressController, label: 'Address'),
-                          _buildTextField(context: context, controller: _cityController, label: 'City'),
-                          _buildTextField(context: context, controller: _stateController, label: 'State'),
-                          _buildTextField(context: context, controller: _pinCodeController, label: 'Pincode'),
-                        ],
-                      ),
-                      _buildSection(
-                        context: context,
-                        title: 'Employment Details',
-                        children: [
-                          _buildTextField(context: context, controller: _positionController, label: 'Position'),
-                          _buildDropdownField(
-                            context: context,
-                            controller: _employmentTypeController,
-                            label: 'Employment Type',
-                            items: ['Full-time', 'Part-time', 'Contract', 'Internship'],
-                          ),
-                          _buildTextField(
-                            context: context,
-                            controller: _joiningDateController,
-                            label: 'Joining Date',
-                            readOnly: true,
-                            onTap: () => _selectDate(context, _joiningDateController),
-                          ),
-                          _buildTextField(context: context, controller: _experienceController, label: 'Experience (Years)'),
-                          _buildDropdownField(
-                            context: context,
-                            controller: _statusController,
-                            label: 'Status',
-                            items: ['live', 'expired'],
-                          ),
-                          _buildTextField(context: context, controller: _referenceController, label: 'Reference'),
-                        ],
-                      ),
-                      _buildSection(
-                        context: context,
-                        title: 'Educational Qualification',
-                        children: [
-                          _buildTextField(context: context, controller: _qualificationController, label: 'Qualification'),
-                          _buildTextField(context: context, controller: _matriculationMarksController, label: 'Matriculation Marks'),
-                          _buildTextField(context: context, controller: _intermediateMarksController, label: 'Intermediate Marks'),
-                        ],
-                      ),
-                      _buildSection(
-                        context: context,
-                        title: 'Bank Details',
-                        children: [
-                          _buildTextField(context: context, controller: _bankAccountNumberController, label: 'Bank Account Number'),
-                          _buildTextField(context: context, controller: _ifscCodeController, label: 'IFSC Code'),
-                          _buildTextField(context: context, controller: _bankNameController, label: 'Bank Name'),
-                          _buildTextField(context: context, controller: _branchController, label: 'Branch'),
-                        ],
-                      ),
-                      _buildSection(
-                        context: context,
-                        title: 'Emergency Contact',
-                        children: [
-                          _buildTextField(context: context, controller: _emergencyContactNameController, label: 'Emergency Contact Name'),
-                          _buildTextField(context: context, controller: _emergencyContactNumberController, label: 'Emergency Contact Number'),
-                        ],
-                      ),
-                      SizedBox(height: context.lg),
-                      SizedBox(
-                        width: double.infinity,
-                        height: context.scale(56),
-                        child: ElevatedButton(
-                          onPressed: _isSaving ? null : _saveChanges,
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: context.theme.colorScheme.primary,
-                            foregroundColor: context.theme.colorScheme.onPrimary,
-                            elevation: 0,
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(context.scale(12))),
-                          ),
-                          child: _isSaving
-                              ? SizedBox(
-                                  height: context.scale(24),
-                                  width: context.scale(24),
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2,
-                                    valueColor: AlwaysStoppedAnimation<Color>(context.theme.colorScheme.onPrimary),
-                                  ),
-                                )
-                              : Text('Save Changes', style: TextStyle(fontSize: context.font(16), fontWeight: FontWeight.bold)),
-                        ),
-                      ),
-                    ],
+                    ),
                   ),
                 ),
-              ),
-            ),
+              );
+            },
+          );
+        },
+      ),
     );
   }
 
@@ -468,7 +512,7 @@ class _EmployeeDetailsPageState extends State<EmployeeDetailsPage> {
           Text(label, style: TextStyle(color: context.theme.colorScheme.onSurfaceVariant, fontSize: context.font(12), fontWeight: FontWeight.w500)),
           SizedBox(height: context.xs),
           DropdownButtonFormField<String>(
-            initialValue: items.contains(controller.text) ? controller.text : null,
+            value: items.contains(controller.text) ? controller.text : null,
             items: items.map((String item) {
               return DropdownMenuItem<String>(
                 value: item,

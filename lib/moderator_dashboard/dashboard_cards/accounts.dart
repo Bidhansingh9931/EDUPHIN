@@ -1,7 +1,9 @@
 import 'dart:async';
 import 'dart:convert';
+import 'package:eduphin/moderator_dashboard/cache_helper.dart';
 import 'package:eduphin/moderator_dashboard/dashboard_cards/add_account.dart';
 import 'package:eduphin/moderator_dashboard/dashboard_cards/active_institutes/manage/employ_details.dart';
+import 'package:eduphin/moderator_dashboard/skeleton_widgets.dart';
 import 'package:eduphin/services/api_service.dart';
 import 'package:eduphin/services/common_widgets.dart';
 import 'package:eduphin/services/responsive_helper.dart';
@@ -33,13 +35,20 @@ class Account {
 
 // 2. Data Provider to fetch account data from the API
 class AccountProvider {
-  Future<List<Account>> fetchAccounts(String instituteId) async {
+  static const String _cacheKeyPrefix = 'accounts_list_';
+
+  Future<List<Account>> fetchAccounts(String instituteId, {bool bypassCache = false}) async {
     try {
+      if (!bypassCache) {
+        final cached = await getCachedAccounts(instituteId);
+        if (cached != null) return cached;
+      }
       final response = await ApiService.get('moderator/institutes/$instituteId/accounts');
-      
+
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
         if (data['success'] == true && data['accounts'] != null) {
+          await CacheHelper.save(_cacheKeyPrefix + instituteId, data);
           final List<dynamic> accountsJson = data['accounts'];
           return accountsJson.map((json) => Account.fromJson(json)).toList();
         } else {
@@ -51,6 +60,15 @@ class AccountProvider {
     } catch (e) {
       throw Exception('Failed to fetch accounts: $e');
     }
+  }
+
+  Future<List<Account>?> getCachedAccounts(String instituteId) async {
+    final cached = await CacheHelper.load(_cacheKeyPrefix + instituteId);
+    if (cached != null && cached['accounts'] != null) {
+      final List<dynamic> accountsJson = cached['accounts'];
+      return accountsJson.map((json) => Account.fromJson(json)).toList();
+    }
+    return null;
   }
 }
 
@@ -66,6 +84,7 @@ class AccountsPage extends StatefulWidget {
 class _AccountsPageState extends State<AccountsPage> {
   final AccountProvider _provider = AccountProvider();
   late Future<List<Account>> _accountsFuture;
+  List<Account>? _cachedAccounts;
   List<Account> _allAccounts = [];
   List<Account> _filteredAccounts = [];
   final TextEditingController _searchController = TextEditingController();
@@ -73,25 +92,36 @@ class _AccountsPageState extends State<AccountsPage> {
   @override
   void initState() {
     super.initState();
-    _fetchAccounts();
+    _loadInitialData();
     _searchController.addListener(_filterAccounts);
   }
 
-  void _fetchAccounts() {
-    _accountsFuture = _provider.fetchAccounts(widget.instituteId);
-    _accountsFuture.then((accounts) {
-      if (mounted) {
-        setState(() {
-          _allAccounts = accounts;
-          _filteredAccounts = accounts;
-        });
-      }
-    }).catchError((error) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error fetching accounts: $error')),
-        );
-      }
+  Future<void> _loadInitialData() async {
+    _cachedAccounts = await _provider.getCachedAccounts(widget.instituteId);
+    if (_cachedAccounts != null) {
+      _allAccounts = _cachedAccounts!;
+      _filteredAccounts = _cachedAccounts!;
+    }
+    _fetchAccounts();
+  }
+
+  void _fetchAccounts({bool bypassCache = false}) {
+    setState(() {
+      _accountsFuture = _provider.fetchAccounts(widget.instituteId, bypassCache: bypassCache);
+      _accountsFuture.then((accounts) {
+        if (mounted) {
+          setState(() {
+            _allAccounts = accounts;
+            _filteredAccounts = accounts;
+          });
+        }
+      }).catchError((error) {
+        if (mounted && _allAccounts.isEmpty) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Error fetching accounts: $error')),
+          );
+        }
+      });
     });
   }
 
@@ -113,7 +143,7 @@ class _AccountsPageState extends State<AccountsPage> {
   }
 
   void _refreshAccounts() {
-    _fetchAccounts();
+    _fetchAccounts(bypassCache: true);
   }
 
   Future<String?> _selectRoleDialog() async {
@@ -201,43 +231,21 @@ class _AccountsPageState extends State<AccountsPage> {
           ),
         ),
       ),
-      body: FutureBuilder<List<Account>>(
-        future: _accountsFuture,
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting && _allAccounts.isEmpty) {
-            return Center(child: CircularProgressIndicator(color: theme.colorScheme.primary));
-          }
-          if (snapshot.hasError && _allAccounts.isEmpty) {
-            return Center(
-              child: Padding(
-                padding: context.pagePadding,
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(Icons.error_outline_rounded, size: context.scale(48), color: colorScheme.error),
-                    SizedBox(height: context.md),
-                    Text('Failed to load accounts', style: theme.textTheme.titleMedium?.copyWith(fontSize: context.font(18), color: theme.colorScheme.onSurface)),
-                    SizedBox(height: context.lg),
-                    ElevatedButton(
-                      onPressed: _refreshAccounts,
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: theme.colorScheme.primary,
-                        foregroundColor: theme.colorScheme.onPrimary,
-                        padding: EdgeInsets.symmetric(horizontal: context.lg, vertical: context.md),
-                      ),
-                      child: Text("Retry", style: TextStyle(fontSize: context.font(16))),
-                    ),
-                  ],
-                ),
-              ),
-            );
-          }
-          if (_allAccounts.isEmpty) {
+      body: ModeratorLoadingWrapper<List<Account>>(
+        snapshot: AsyncSnapshot.withData(
+          _allAccounts.isNotEmpty ? ConnectionState.done : ConnectionState.waiting,
+          _allAccounts,
+        ),
+        cachedData: _cachedAccounts,
+        skeleton: const ListSkeleton(),
+        onRefresh: _refreshAccounts,
+        builder: (allAccounts) {
+          if (allAccounts.isEmpty) {
             return _buildEmptyState(context, "No accounts found");
           }
 
           final accounts = _filteredAccounts;
-          if(accounts.isEmpty && _searchController.text.isNotEmpty) {
+          if (accounts.isEmpty && _searchController.text.isNotEmpty) {
             return _buildEmptyState(context, "No results for \"${_searchController.text}\"");
           }
 

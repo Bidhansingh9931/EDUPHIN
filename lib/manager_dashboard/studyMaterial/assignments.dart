@@ -35,16 +35,21 @@ class Assignment {
   });
 
   factory Assignment.fromJson(Map<String, dynamic> json, Map<int, String> classMap, Map<int, String> sectionMap, Map<int, String> subjectMap, Map<int, String> teacherMap) {
+    final int classId = int.tryParse(json['class_id']?.toString() ?? '') ?? 0;
+    final int sectionId = int.tryParse(json['section_id']?.toString() ?? '') ?? 0;
+    final int subjectId = int.tryParse(json['subject_id']?.toString() ?? '') ?? 0;
+    final int teacherId = int.tryParse(json['teacher_id']?.toString() ?? '') ?? 0;
+
     return Assignment(
-      id: json['id'] as int? ?? 0,
-      title: json['title'] as String? ?? 'No Title',
-      description: json['description'] as String? ?? '',
-      subject: subjectMap[json['subject_id']] ?? 'N/A',
-      className: classMap[json['class_id']] ?? 'N/A',
-      section: sectionMap[json['section_id']] ?? 'N/A',
-      uploadedBy: teacherMap[json['teacher_id']] ?? 'N/A',
-      uploadedDate: json['created_at'] != null ? DateFormat('dd MMM yyyy').format(DateTime.parse(json['created_at'])) : 'N/A',
-      dueDate: json['due_date'] != null ? DateFormat('dd MMM yyyy').format(DateTime.parse(json['due_date'])) : 'N/A',
+      id: int.tryParse(json['id']?.toString() ?? '') ?? 0,
+      title: json['title']?.toString() ?? 'No Title',
+      description: json['description']?.toString() ?? '',
+      subject: subjectMap[subjectId] ?? 'N/A',
+      className: classMap[classId] ?? 'N/A',
+      section: sectionMap[sectionId] ?? 'N/A',
+      uploadedBy: teacherMap[teacherId] ?? 'N/A',
+      uploadedDate: json['created_at'] != null ? DateFormat('dd MMM yyyy').format(DateTime.parse(json['created_at'].toString())) : 'N/A',
+      dueDate: json['due_date'] != null ? DateFormat('dd MMM yyyy').format(DateTime.parse(json['due_date'].toString())) : 'N/A',
     );
   }
 }
@@ -55,7 +60,10 @@ class ApiClass {
   ApiClass({required this.id, required this.name});
 
   factory ApiClass.fromJson(Map<String, dynamic> json) {
-    return ApiClass(id: json['id'], name: json['name']);
+    return ApiClass(
+      id: int.tryParse(json['id']?.toString() ?? '') ?? 0,
+      name: json['name']?.toString() ?? 'N/A',
+    );
   }
 }
 
@@ -65,7 +73,10 @@ class ApiSection {
   ApiSection({required this.id, required this.name});
 
   factory ApiSection.fromJson(Map<String, dynamic> json) {
-    return ApiSection(id: json['id'], name: json['section_name']);
+    return ApiSection(
+      id: int.tryParse(json['id']?.toString() ?? '') ?? 0,
+      name: json['section_name']?.toString() ?? 'N/A',
+    );
   }
 }
 
@@ -96,51 +107,57 @@ class _AssignmentsPageState extends State<AssignmentsPage> {
   Future<void> _loadCacheAndFetch() async {
     final cachedData = await CacheService.getCache('manager_assignments');
     if (cachedData != null && mounted) {
-      final responseData = cachedData;
-      _processData(responseData);
+      _processData(cachedData);
+      setState(() => isLoading = false);
     }
     _fetchData();
   }
 
   void _processData(dynamic responseData) {
-    final List<ApiClass> fetchedClasses = (responseData['classes'] as List)
+    if (responseData == null) return;
+    
+    final List<ApiClass> fetchedClasses = (responseData['classes'] as List? ?? [])
         .map((data) => ApiClass.fromJson(data))
         .toList();
-    final List<ApiSection> fetchedSections = (responseData['sections'] as List)
+    final List<ApiSection> fetchedSections = (responseData['sections'] as List? ?? [])
         .map((data) => ApiSection.fromJson(data))
         .toList();
 
     final classMap = {for (var e in fetchedClasses) e.id: e.name};
     final sectionMap = {for (var e in fetchedSections) e.id: e.name};
 
-    final schedules = responseData['schedules'] as List;
+    final schedules = responseData['schedules'] as List? ?? [];
     final Map<int, String> subjectMap = {for (var s in schedules) s['subject_id']: s['subject']?['name'] ?? 'N/A'};
     final Map<int, String> teacherMap = {for (var s in schedules) s['teacher_id']: s['teacher']?['name'] ?? 'N/A'};
 
-    final List<Assignment> fetchedAssignments = (responseData['assignments'] as List)
+    final List<Assignment> fetchedAssignments = (responseData['assignments'] as List? ?? [])
         .map((data) => Assignment.fromJson(data, classMap, sectionMap, subjectMap, teacherMap))
         .toList();
 
-    setState(() {
-      classes = fetchedClasses;
-      sections = fetchedSections;
-      allAssignments = fetchedAssignments;
-      if (classes.isNotEmpty && selectedClass == null) {
-        selectedClass = classes.first.name;
-      }
-      if (sections.isNotEmpty && selectedSection == null) {
-        selectedSection = sections.first.name;
-      }
-      _filterAssignments();
-    });
+    if (mounted) {
+      setState(() {
+        classes = fetchedClasses;
+        sections = fetchedSections;
+        allAssignments = fetchedAssignments;
+        if (classes.isNotEmpty && (selectedClass == null || !classes.any((c) => c.name == selectedClass))) {
+          selectedClass = classes.first.name;
+        }
+        if (sections.isNotEmpty && (selectedSection == null || !sections.any((s) => s.name == selectedSection))) {
+          selectedSection = sections.first.name;
+        }
+        _filterAssignments();
+      });
+    }
   }
 
   Future<void> _fetchData() async {
     if (!mounted) return;
-    setState(() {
-      isLoading = true;
-      _error = null;
-    });
+    if (allAssignments.isEmpty) {
+      setState(() {
+        isLoading = true;
+        _error = null;
+      });
+    }
 
     try {
       final response = await ApiService.get('manager/study/assignments');
@@ -156,13 +173,13 @@ class _AssignmentsPageState extends State<AssignmentsPage> {
           });
         }
       } else {
-        throw Exception('Failed to load data');
+        throw Exception('Failed to load data: ${response.statusCode}');
       }
     } catch (e) {
       if (mounted) {
         setState(() {
           _error = e;
-          isLoading = false;
+          isLoading = allAssignments.isEmpty;
         });
       }
     }
@@ -477,9 +494,11 @@ class _AssignmentCard extends StatelessWidget {
                 child: _buildInfoColumn(
                     context, "Uploaded Date", assignment.uploadedDate),
               ),
+              Expanded(
+                child: _buildInfoColumn(context, "Due Date", assignment.dueDate),
+              ),
             ],
           ),
-          _buildInfoColumn(context, "Due Date", assignment.dueDate),
           SizedBox(height: context.sm),
           SizedBox(
             width: double.infinity,

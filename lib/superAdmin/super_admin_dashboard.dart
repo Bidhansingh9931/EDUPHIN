@@ -1,6 +1,6 @@
 import 'package:eduphin/services/common_widgets.dart';
 import 'package:eduphin/services/responsive_helper.dart';
-import 'package:eduphin/teacher/dashboard/app_drawer.dart';
+
 import 'package:flutter/material.dart';
 import '../services/api_service.dart';
 import 'institute_management/institute_list.dart';
@@ -16,6 +16,8 @@ import 'privacy_policy.dart';
 import 'cancellation_policy.dart';
 import 'terms_of_service.dart';
 import 'super_admin_profile.dart';
+import 'cache_service.dart';
+import 'super_admin_common_widgets.dart';
 
 class SuperAdminDashboard extends StatefulWidget {
   const SuperAdminDashboard({super.key});
@@ -31,12 +33,25 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
   @override
   void initState() {
     super.initState();
+    _loadInitialData();
+  }
+
+  Future<void> _loadInitialData() async {
+    final cachedData = await SuperAdminCacheService.load('dashboard');
+    if (cachedData != null && mounted) {
+      setState(() {
+        _dashboardData = cachedData;
+        _isLoading = false;
+      });
+    }
     _fetchDashboard();
   }
 
   Future<void> _fetchDashboard() async {
     if (!mounted) return;
-    setState(() => _isLoading = true);
+    if (_dashboardData == null) {
+      setState(() => _isLoading = true);
+    }
     try {
       final data = await ApiService.getSuperAdminDashboard();
       if (mounted) {
@@ -44,6 +59,7 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
           _dashboardData = data;
           _isLoading = false;
         });
+        await SuperAdminCacheService.save('dashboard', data);
       }
     } catch (e) {
       if (mounted) {
@@ -109,22 +125,24 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
           SizedBox(width: context.scale(8)),
         ],
       ),
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : RefreshIndicator(
-              onRefresh: _fetchDashboard,
-              child: SingleChildScrollView(
-                padding: context.pagePadding,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    _buildProfileOverview(context),
-                    SizedBox(height: context.spacing),
-                    _buildSectionHeader(context, "⚡ Quick Actions"),
-                    _buildQuickActions(context),
-                    SizedBox(height: context.spacing),
-                    _buildStatsGrid(context, counts),
-                    SizedBox(height: context.spacing),
+      body: SuperAdminLoadingWrapper(
+        isLoading: _isLoading,
+        hasData: _dashboardData != null,
+        skeleton: _buildSkeleton(context),
+        child: RefreshIndicator(
+          onRefresh: _fetchDashboard,
+          child: SingleChildScrollView(
+            padding: context.pagePadding,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _buildProfileOverview(context),
+                SizedBox(height: context.spacing),
+                _buildSectionHeader(context, "⚡ Quick Actions"),
+                _buildQuickActions(context),
+                SizedBox(height: context.spacing),
+                _buildStatsGrid(context, counts),
+                SizedBox(height: context.spacing),
 
                     if (context.isDesktop)
                       Row(
@@ -221,6 +239,35 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
                 ),
               ),
             ),
+        ),
+    );
+  }
+
+  Widget _buildSkeleton(BuildContext context) {
+    return SingleChildScrollView(
+      padding: context.pagePadding,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SuperAdminSkeleton(height: context.scale(100)),
+          SizedBox(height: context.spacing),
+          const SuperAdminSkeleton(height: 30, width: 150),
+          SizedBox(height: context.spacing / 2),
+          SuperAdminSkeleton(height: context.scale(120)),
+          SizedBox(height: context.spacing),
+          GridView.count(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            crossAxisCount: context.isTablet ? 4 : 2,
+            mainAxisSpacing: 12,
+            crossAxisSpacing: 12,
+            childAspectRatio: 1.5,
+            children: List.generate(4, (index) => const SuperAdminSkeleton()),
+          ),
+          SizedBox(height: context.spacing),
+          SuperAdminSkeleton(height: context.scale(200)),
+        ],
+      ),
     );
   }
 
@@ -313,6 +360,11 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
   }
 
   Widget _buildStatsGrid(BuildContext context, Map counts) {
+    final roles = _dashboardData?['roles'] as List? ?? [];
+    final moderatorCount = roles
+        .where((r) => r['name'].toString().toLowerCase().contains('mod'))
+        .fold(0, (sum, r) => (sum as int) + (r['users_count'] as int? ?? 0));
+
     return GridView.count(
       crossAxisCount: context.isDesktop ? 4 : (context.isTablet ? 3 : 2),
       shrinkWrap: true,
@@ -321,10 +373,10 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
       crossAxisSpacing: context.scale(12),
       childAspectRatio: context.responsive(1.5, tablet: 1.6, desktop: 1.8),
       children: [
-        _buildStatCard(context, counts['accounts']?.toString() ?? "0", "Total Accounts", Icons.group_outlined, const ModeratorListScreen()),
+        _buildStatCard(context, moderatorCount.toString(), "Total Moderators", Icons.admin_panel_settings_outlined, const ModeratorListScreen()),
         _buildStatCard(context, counts['institutes']?.toString() ?? "0", "Active Institutes", Icons.apartment, const InstituteListScreen()),
         _buildStatCard(context, counts['students']?.toString() ?? "0", "Total Students", Icons.school_outlined, const InstituteListScreen()),
-        _buildStatCard(context, counts['classes']?.toString() ?? "0", "Classes/Sections", Icons.class_outlined, const InstituteListScreen()),
+        _buildStatCard(context, counts['accounts']?.toString() ?? "0", "Total Users", Icons.group_outlined, const InstituteListScreen()),
       ],
     );
   }
@@ -631,11 +683,13 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
             ),
             SizedBox(height: context.scale(16)),
             if (activities.isEmpty)
-              Padding(
-                padding: EdgeInsets.symmetric(vertical: context.scale(20)),
-                child: Text("No recent activity", style: TextStyle(color: theme.hintColor, fontSize: context.font(14))),
-              ),
-            ...activities.take(3).map((activity) => Column(
+              SuperAdminEmptyState(
+                title: "No recent activity",
+                subtitle: "System activities will appear here as they occur.",
+                icon: Icons.history,
+              )
+            else
+              ...activities.take(3).map((activity) => Column(
                   children: [
                     _buildActivityItem(context, activity['event'] ?? "Activity", activity['created_at'] ?? "N/A", activity['user']?['name'] ?? "User"),
                     Divider(height: context.scale(24)),

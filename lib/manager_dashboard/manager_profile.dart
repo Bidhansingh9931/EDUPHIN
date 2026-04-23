@@ -1,8 +1,10 @@
+import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:eduphin/login_logout/login.dart';
 import 'package:eduphin/services/api_service.dart';
+import 'package:eduphin/services/caching_service.dart';
 import 'package:eduphin/services/responsive_helper.dart';
 import 'package:eduphin/services/common_widgets.dart';
 import 'package:flutter/material.dart';
@@ -110,7 +112,9 @@ class ManagerProfilePage extends StatefulWidget {
 }
 
 class _ManagerProfilePageState extends State<ManagerProfilePage> {
-  late Future<ManagerProfile> _profileDataFuture;
+  ManagerProfile? _profileData;
+  bool _isLoading = true;
+  Object? _error;
   final _formKey = GlobalKey<FormState>();
 
   final _phoneController = TextEditingController();
@@ -151,44 +155,75 @@ class _ManagerProfilePageState extends State<ManagerProfilePage> {
   @override
   void initState() {
     super.initState();
-    _profileDataFuture = _fetchAndInitializeProfileData();
+    _loadCacheAndFetch();
   }
 
-  Future<ManagerProfile> _fetchAndInitializeProfileData() async {
-    final dataMap = await ApiService.getManagerProfile();
+  Future<void> _loadCacheAndFetch() async {
+    final cachedData = await CacheService.getCache('manager_profile_data');
+    if (cachedData != null && mounted) {
+      _processData(cachedData);
+    }
+    _fetchProfileData();
+  }
+
+  void _processData(Map<String, dynamic> dataMap) {
     final data = ManagerProfile.fromJson(dataMap);
+    setState(() {
+      _profileData = data;
+      _phoneController.text = data.phone;
+      _altPhoneController.text = data.altPhone;
+      _address1Controller.text = data.address1;
+      _cityController.text = data.city;
+      _districtController.text = data.district;
+      _pincodeController.text = data.pincode;
+      _dobController.text = data.dob;
+      _bankAccountController.text = data.bankAccount;
+      _ifscController.text = data.ifsc;
+      _bankNameController.text = data.bankName;
+      _employerBranchController.text = data.employerBranch;
+      _zoneController.text = data.zone;
+      _emergencyContactNameController.text = data.emergencyContactName;
+      _emergencyContactNumberController.text = data.emergencyContactNumber;
+      _userNameController.text = data.userName;
+      _emailController.text = data.email;
+      _positionController.text = data.position;
+      _employmentTypeController.text = data.employmentType;
+      _joiningDateController.text = data.joiningDate;
+      _experienceController.text = data.experience;
+      _statusController.text = data.status;
 
-    _phoneController.text = data.phone;
-    _altPhoneController.text = data.altPhone;
-    _address1Controller.text = data.address1;
-    _cityController.text = data.city;
-    _districtController.text = data.district;
-    _pincodeController.text = data.pincode;
-    _dobController.text = data.dob;
-    _bankAccountController.text = data.bankAccount;
-    _ifscController.text = data.ifsc;
-    _bankNameController.text = data.bankName;
-    _employerBranchController.text = data.employerBranch;
-    _zoneController.text = data.zone;
-    _emergencyContactNameController.text = data.emergencyContactName;
-    _emergencyContactNumberController.text = data.emergencyContactNumber;
-    _userNameController.text = data.userName;
-    _emailController.text = data.email;
-    _positionController.text = data.position;
-    _employmentTypeController.text = data.employmentType;
-    _joiningDateController.text = data.joiningDate;
-    _experienceController.text = data.experience;
-    _statusController.text = data.status;
+      if (_genderOptions.contains(data.gender)) {
+        _genderValue = data.gender;
+      }
 
-    if (_genderOptions.contains(data.gender)) {
-      _genderValue = data.gender;
+      if (_marriageStatusOptions.contains(data.marriageStatus)) {
+        _marriageStatusValue = data.marriageStatus;
+      }
+    });
+  }
+
+  Future<void> _fetchProfileData() async {
+    if (!mounted) return;
+    setState(() {
+      _isLoading = _profileData == null;
+      _error = null;
+    });
+
+    try {
+      final dataMap = await ApiService.getManagerProfile();
+      await CacheService.setCache('manager_profile_data', dataMap);
+      if (!mounted) return;
+      _processData(dataMap);
+      setState(() {
+        _isLoading = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _isLoading = _profileData == null;
+        _error = e;
+      });
     }
-
-    if (_marriageStatusOptions.contains(data.marriageStatus)) {
-      _marriageStatusValue = data.marriageStatus;
-    }
-
-    return data;
   }
 
   Future<void> _pickImage() async {
@@ -290,8 +325,8 @@ class _ManagerProfilePageState extends State<ManagerProfilePage> {
           _imageFile = null;
           _imageBytes = null;
           _fileName = null;
-          _profileDataFuture = _fetchAndInitializeProfileData();
         });
+        _fetchProfileData();
       }
     } catch (e) {
       if (mounted) {
@@ -379,164 +414,161 @@ class _ManagerProfilePageState extends State<ManagerProfilePage> {
           SizedBox(width: context.scale(8)),
         ],
       ),
-      body: FutureBuilder<ManagerProfile>(
-        future: _profileDataFuture,
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
-          } else if (snapshot.hasError) {
-            return Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(Icons.error_outline_rounded, size: context.scale(48), color: Colors.red),
-                  SizedBox(height: context.scale(16)),
-                  Text("Error: ${snapshot.error}", style: theme.textTheme.bodyMedium?.copyWith(fontSize: context.font(14))),
-                  SizedBox(height: context.scale(16)),
-                  ElevatedButton(
-                    onPressed: () => setState(() {
-                      _profileDataFuture = _fetchAndInitializeProfileData();
-                    }),
-                    child: Text("Retry", style: TextStyle(fontSize: context.font(14))),
-                  ),
-                ],
-              ),
-            );
-          } else if (snapshot.hasData) {
-            final data = snapshot.data!;
-            return SingleChildScrollView(
-              padding: context.pagePadding,
-              child: Center(
-                child: ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 900),
-                  child: Form(
-                    key: _formKey,
-                    child: Column(
-                      children: [
-                        _buildHeader(context, data),
-                        SizedBox(height: context.scale(32)),
-                        
-                        ProfileSection(
-                          title: "Personal Information", 
-                          icon: Icons.person_outline_rounded,
-                          children: [
-                            AdaptiveFieldRow(children: [
-                              ProfileDropdown(
-                                label: "Gender",
-                                value: _genderValue,
-                                items: _genderOptions,
-                                onChanged: (v) => setState(() => _genderValue = v),
-                                validator: (value) => value == null ? 'Required' : null,
-                              ),
-                              ProfileTextField(
-                                label: "Date of Birth",
-                                controller: _dobController,
-                                icon: Icons.calendar_today_rounded,
-                                readOnly: true,
-                                onTap: () => _selectDate(context),
-                                validator: (value) => value == null || value.isEmpty ? 'Required' : null,
-                              ),
-                            ]),
-                            AdaptiveFieldRow(children: [
-                              ProfileTextField(
-                                label: "Phone",
-                                controller: _phoneController,
-                                icon: Icons.phone_android_rounded,
-                                validator: (value) => value == null || value.isEmpty ? 'Required' : null,
-                              ),
-                              ProfileTextField(
-                                label: "Alternate Phone",
-                                controller: _altPhoneController,
-                                icon: Icons.phone_callback_rounded,
-                              ),
-                            ]),
-                            ProfileDropdown(
-                              label: "Marriage Status", 
-                              value: _marriageStatusValue, 
-                              items: _marriageStatusOptions, 
-                              onChanged: (v) => setState(() => _marriageStatusValue = v)
-                            ),
-                          ]
-                        ),
+      body: LoadingWrapper(
+        isLoading: _isLoading,
+        hasData: _profileData != null,
+        error: _error,
+        onRetry: _fetchProfileData,
+        skeleton: _buildSkeleton(),
+        child: _profileData == null ? const SizedBox.shrink() : _buildContent(context, _profileData!),
+      ),
+    );
+  }
 
-                        ProfileSection(
-                          title: 'Address Details', 
-                          icon: Icons.location_on_outlined, 
-                          children: [
-                            ProfileTextField(label: "Full Address", controller: _address1Controller, icon: Icons.home_outlined),
-                            AdaptiveFieldRow(children: [
-                              ProfileTextField(label: "City", controller: _cityController),
-                              ProfileTextField(label: "State/District", controller: _districtController),
-                            ]),
-                            ProfileTextField(label: "Pincode", controller: _pincodeController),
-                          ]
-                        ),
+  Widget _buildSkeleton() {
+    return SingleChildScrollView(
+      padding: context.pagePadding,
+      child: Column(
+        children: [
+          SkeletonBox(height: context.scale(200), borderRadius: context.scale(24)),
+          SizedBox(height: context.scale(32)),
+          SkeletonBox(height: context.scale(400), borderRadius: context.scale(16)),
+          SizedBox(height: context.scale(24)),
+          SkeletonBox(height: context.scale(300), borderRadius: context.scale(16)),
+        ],
+      ),
+    );
+  }
 
-                        ProfileSection(
-                          title: 'Employment Information', 
-                          icon: Icons.work_outline_rounded, 
-                          children: [
-                            AdaptiveFieldRow(children: [
-                              ProfileTextField(label: "Position", controller: _positionController, enabled: false),
-                              ProfileTextField(label: "Employment Type", controller: _employmentTypeController, enabled: false),
-                            ]),
-                            AdaptiveFieldRow(children: [
-                              ProfileTextField(label: "Joining Date", controller: _joiningDateController, enabled: false),
-                              ProfileTextField(label: "Experience", controller: _experienceController, enabled: false),
-                            ]),
-                            ProfileTextField(label: "Current Status", controller: _statusController, enabled: false),
-                          ]
-                        ),
+  Widget _buildContent(BuildContext context, ManagerProfile data) {
+    final theme = context.theme;
+    return SingleChildScrollView(
+      padding: context.pagePadding,
+      child: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 900),
+          child: Form(
+            key: _formKey,
+            child: Column(
+              children: [
+                _buildHeader(context, data),
+                SizedBox(height: context.scale(32)),
 
-                        ProfileSection(
-                          title: 'Bank Details (View Only)', 
-                          icon: Icons.account_balance_outlined, 
-                          children: [
-                            AdaptiveFieldRow(children: [
-                              ProfileTextField(label: "Account Number", controller: _bankAccountController, enabled: false),
-                              ProfileTextField(label: "IFSC Code", controller: _ifscController, enabled: false),
-                            ]),
-                            ProfileTextField(label: "Bank Name", controller: _bankNameController, enabled: false),
-                          ]
+                ProfileSection(
+                    title: "Personal Information",
+                    icon: Icons.person_outline_rounded,
+                    children: [
+                      AdaptiveFieldRow(children: [
+                        ProfileDropdown(
+                          label: "Gender",
+                          value: _genderValue,
+                          items: _genderOptions,
+                          onChanged: (v) => setState(() => _genderValue = v),
+                          validator: (value) => value == null ? 'Required' : null,
                         ),
+                        ProfileTextField(
+                          label: "Date of Birth",
+                          controller: _dobController,
+                          icon: Icons.calendar_today_rounded,
+                          readOnly: true,
+                          onTap: () => _selectDate(context),
+                          validator: (value) => value == null || value.isEmpty ? 'Required' : null,
+                        ),
+                      ]),
+                      AdaptiveFieldRow(children: [
+                        ProfileTextField(
+                          label: "Phone",
+                          controller: _phoneController,
+                          icon: Icons.phone_android_rounded,
+                          validator: (value) => value == null || value.isEmpty ? 'Required' : null,
+                        ),
+                        ProfileTextField(
+                          label: "Alternate Phone",
+                          controller: _altPhoneController,
+                          icon: Icons.phone_callback_rounded,
+                        ),
+                      ]),
+                      ProfileDropdown(
+                          label: "Marriage Status",
+                          value: _marriageStatusValue,
+                          items: _marriageStatusOptions,
+                          onChanged: (v) => setState(() => _marriageStatusValue = v)
+                      ),
+                    ]
+                ),
 
-                        ProfileSection(
-                          title: 'Update Security', 
-                          icon: Icons.lock_reset_rounded, 
-                          children: [
-                            AdaptiveFieldRow(children: [
-                              ProfileTextField(label: "New Password", controller: _newPasswordController, isPassword: true, icon: Icons.password_rounded),
-                              ProfileTextField(label: "Confirm New Password", controller: _confirmPasswordController, isPassword: true, icon: Icons.lock_outline_rounded),
-                            ]),
-                          ]
-                        ),
+                ProfileSection(
+                    title: 'Address Details',
+                    icon: Icons.location_on_outlined,
+                    children: [
+                      ProfileTextField(label: "Full Address", controller: _address1Controller, icon: Icons.home_outlined),
+                      AdaptiveFieldRow(children: [
+                        ProfileTextField(label: "City", controller: _cityController),
+                        ProfileTextField(label: "State/District", controller: _districtController),
+                      ]),
+                      ProfileTextField(label: "Pincode", controller: _pincodeController),
+                    ]
+                ),
 
-                        SizedBox(height: context.scale(40)),
-                        SizedBox(
-                          width: double.infinity,
-                          child: ElevatedButton.icon(
-                            onPressed: _isSaving ? null : () => _saveChanges(data),
-                            icon: _isSaving ? SizedBox(width: context.scale(20), height: context.scale(20), child: const CircularProgressIndicator(strokeWidth: 2, color: Colors.white)) : Icon(Icons.save_rounded, size: context.scale(20)),
-                            label: Text(_isSaving ? "Saving..." : "Save Changes", style: TextStyle(fontSize: context.font(16))),
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: theme.colorScheme.primary,
-                              foregroundColor: theme.colorScheme.onPrimary,
-                              padding: EdgeInsets.symmetric(vertical: context.scale(18)),
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(context.scale(16))),
-                            ),
-                          ),
-                        ),
-                        SizedBox(height: context.scale(60)),
-                      ],
+                ProfileSection(
+                    title: 'Employment Information',
+                    icon: Icons.work_outline_rounded,
+                    children: [
+                      AdaptiveFieldRow(children: [
+                        ProfileTextField(label: "Position", controller: _positionController, enabled: false),
+                        ProfileTextField(label: "Employment Type", controller: _employmentTypeController, enabled: false),
+                      ]),
+                      AdaptiveFieldRow(children: [
+                        ProfileTextField(label: "Joining Date", controller: _joiningDateController, enabled: false),
+                        ProfileTextField(label: "Experience", controller: _experienceController, enabled: false),
+                      ]),
+                      ProfileTextField(label: "Current Status", controller: _statusController, enabled: false),
+                    ]
+                ),
+
+                ProfileSection(
+                    title: 'Bank Details (View Only)',
+                    icon: Icons.account_balance_outlined,
+                    children: [
+                      AdaptiveFieldRow(children: [
+                        ProfileTextField(label: "Account Number", controller: _bankAccountController, enabled: false),
+                        ProfileTextField(label: "IFSC Code", controller: _ifscController, enabled: false),
+                      ]),
+                      ProfileTextField(label: "Bank Name", controller: _bankNameController, enabled: false),
+                    ]
+                ),
+
+                ProfileSection(
+                    title: 'Update Security',
+                    icon: Icons.lock_reset_rounded,
+                    children: [
+                      AdaptiveFieldRow(children: [
+                        ProfileTextField(label: "New Password", controller: _newPasswordController, isPassword: true, icon: Icons.password_rounded),
+                        ProfileTextField(label: "Confirm New Password", controller: _confirmPasswordController, isPassword: true, icon: Icons.lock_outline_rounded),
+                      ]),
+                    ]
+                ),
+
+                SizedBox(height: context.scale(40)),
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton.icon(
+                    onPressed: _isSaving ? null : () => _saveChanges(data),
+                    icon: _isSaving ? SizedBox(width: context.scale(20), height: context.scale(20), child: const CircularProgressIndicator(strokeWidth: 2, color: Colors.white)) : Icon(Icons.save_rounded, size: context.scale(20)),
+                    label: Text(_isSaving ? "Saving..." : "Save Changes", style: TextStyle(fontSize: context.font(16))),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: theme.colorScheme.primary,
+                      foregroundColor: theme.colorScheme.onPrimary,
+                      padding: EdgeInsets.symmetric(vertical: context.scale(18)),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(context.scale(16))),
                     ),
                   ),
                 ),
-              ),
-            );
-          } else {
-            return const Center(child: Text('No profile data available.'));
-          }
-        },
+                SizedBox(height: context.scale(60)),
+              ],
+            ),
+          ),
+        ),
       ),
     );
   }

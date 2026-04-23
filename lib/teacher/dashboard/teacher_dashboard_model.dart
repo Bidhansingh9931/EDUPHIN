@@ -17,6 +17,13 @@ class AssignmentPageData {
           .toList(),
     );
   }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'schedules': schedules.map((e) => e.toJson()).toList(),
+      'assignments': assignments.map((e) => e.toJson()).toList(),
+    };
+  }
 }
 
 class TeacherDashboardData {
@@ -61,6 +68,22 @@ class TeacherDashboardData {
       studyMaterials: (json['study_materials'] as List? ?? []).map((i) => StudyMaterial.fromJson(i)).toList(),
     );
   }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'user_detail': userDetail.toJson(),
+      'last_salary': lastSalary?.toJson(),
+      'events': events.map((e) => e.toJson()).toList(),
+      'active_exams': activeExams.map((e) => e.toJson()).toList(),
+      'created_tickets': createdTickets.map((e) => e.toJson()).toList(),
+      'assigned_tickets': assignedTickets.map((e) => e.toJson()).toList(),
+      'assignments': assignments.map((e) => e.toJson()).toList(),
+      'leaves': leaves.map((e) => e.toJson()).toList(),
+      'mentor_sections': mentorSections.map((e) => e.toJson()).toList(),
+      'today_schedule': todaySchedule.map((e) => e.toJson()).toList(),
+      'study_materials': studyMaterials.map((e) => e.toJson()).toList(),
+    };
+  }
 }
 
 class UserDetail {
@@ -75,7 +98,6 @@ class UserDetail {
   UserDetail({required this.id, required this.name, this.photo, this.roleName, this.employeeId, this.phone});
 
   factory UserDetail.fromJson(Map<String, dynamic> json) {
-    // Robust name detection: check top level, then inside 'user' object
     String detectedName = 'Unknown';
     if (json['name'] != null) {
       detectedName = json['name'].toString();
@@ -96,6 +118,17 @@ class UserDetail {
       phone: json['phone']?.toString() ?? 'N/A',
     );
   }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'name': name,
+      'photo': photo,
+      'role_name': roleName,
+      'employee_id': employeeId,
+      'phone': phone,
+    };
+  }
 }
 
 class Salary {
@@ -112,6 +145,14 @@ class Salary {
       paymentDate: json['payment_date'],
     );
   }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'net_salary': amount,
+      'status': status,
+      'payment_date': paymentDate,
+    };
+  }
 }
 
 class ExamType {
@@ -120,6 +161,9 @@ class ExamType {
     ExamType({required this.name, required this.status});
     factory ExamType.fromJson(Map<String, dynamic> json) {
         return ExamType(name: json['name'] ?? '', status: json['status'] ?? '');
+    }
+    Map<String, dynamic> toJson() {
+        return {'name': name, 'status': status};
     }
 }
 
@@ -159,6 +203,20 @@ class Assignment {
       status: json['status'] ?? 'Active',
     );
   }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'subject_id': subjectId,
+      'class_id': classId,
+      'section_id': sectionId,
+      'title': title,
+      'description': description,
+      'attachment': attachment,
+      'due_date': dueDate,
+      'status': status,
+    };
+  }
 }
 
 class StudentLeave {
@@ -173,6 +231,13 @@ class StudentLeave {
           student: json['student'] is Map<String, dynamic> ? json['student'] : null,
         );
     }
+    Map<String, dynamic> toJson() {
+        return {
+          'reason': reason,
+          'status': status,
+          'student': student,
+        };
+    }
 }
 
 class Section {
@@ -180,6 +245,9 @@ class Section {
     Section({required this.name});
     factory Section.fromJson(Map<String, dynamic> json) {
         return Section(name: json['name'] ?? '');
+    }
+    Map<String, dynamic> toJson() {
+        return {'name': name};
     }
 }
 
@@ -219,6 +287,19 @@ class ClassSchedule {
             sectionId: json['section_id'] ?? 0,
         );
     }
+    Map<String, dynamic> toJson() {
+        return {
+            'id': id,
+            'start_time': startTime,
+            'end_time': endTime,
+            'subject': subject,
+            'class': classModel,
+            'section': section,
+            'subject_id': subjectId,
+            'class_id': classId,
+            'section_id': sectionId,
+        };
+    }
 }
 
 class StudyMaterial {
@@ -226,6 +307,9 @@ class StudyMaterial {
     StudyMaterial({required this.title});
     factory StudyMaterial.fromJson(Map<String, dynamic> json) {
         return StudyMaterial(title: json['title'] ?? '');
+    }
+    Map<String, dynamic> toJson() {
+        return {'title': title};
     }
 }
 
@@ -251,12 +335,24 @@ class AssignmentSchedule {
   factory AssignmentSchedule.fromJson(Map<String, dynamic> json) {
     return AssignmentSchedule(
       id: json['id'] ?? 0,
-      subjectName: (json['subject'] is Map ? json['subject']['name'] : null) ?? 'N/A',
-      className: (json['class'] is Map ? json['class']['name'] : null) ?? 'N/A',
-      sectionName: (json['section'] is Map ? json['section']['name'] : null) ?? 'N/A',
+      subjectName: json['subjectName'] ?? (json['subject'] is Map ? json['subject']['name'] : null) ?? 'N/A',
+      className: json['className'] ?? (json['class'] is Map ? json['class']['name'] : null) ?? 'N/A',
+      sectionName: json['sectionName'] ?? (json['section'] is Map ? json['section']['name'] : null) ?? 'N/A',
       subjectId: json['subject_id'] ?? 0,
       classId: json['class_id'] ?? 0,
       sectionId: json['section_id'] ?? 0,
     );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'subjectName': subjectName,
+      'className': className,
+      'sectionName': sectionName,
+      'subject_id': subjectId,
+      'class_id': classId,
+      'section_id': sectionId,
+    };
   }
 }

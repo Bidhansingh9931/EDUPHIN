@@ -33,16 +33,20 @@ class StudyMaterial {
   });
 
   factory StudyMaterial.fromJson(Map<String, dynamic> json, Map<int, String> classMap, Map<int, String> sectionMap, Map<int, String> teacherMap) {
+    final int classId = int.tryParse(json['class_id']?.toString() ?? '') ?? 0;
+    final int sectionId = int.tryParse(json['section_id']?.toString() ?? '') ?? 0;
+    final int userId = int.tryParse(json['user_id']?.toString() ?? '') ?? 0;
+    
     return StudyMaterial(
-      id: json['id'] ?? 0,
-      title: json['title'] ?? 'N/A',
-      description: json['description'] ?? '',
-      classId: json['class_id'] ?? 0,
-      sectionId: json['section_id'] ?? 0,
-      className: classMap[json['class_id']] ?? 'N/A',
-      section: sectionMap[json['section_id']] ?? 'N/A',
-      uploadedBy: teacherMap[json['user_id']] ?? 'N/A',
-      date: json['created_at'] != null ? DateFormat('dd MMM yyyy').format(DateTime.parse(json['created_at'])) : 'N/A',
+      id: int.tryParse(json['id']?.toString() ?? '') ?? 0,
+      title: json['title']?.toString() ?? 'N/A',
+      description: json['description']?.toString() ?? '',
+      classId: classId,
+      sectionId: sectionId,
+      className: classMap[classId] ?? 'N/A',
+      section: sectionMap[sectionId] ?? 'N/A',
+      uploadedBy: teacherMap[userId] ?? 'N/A',
+      date: json['created_at'] != null ? DateFormat('dd MMM yyyy').format(DateTime.parse(json['created_at'].toString())) : 'N/A',
     );
   }
 }
@@ -53,7 +57,10 @@ class ApiClass {
   ApiClass({required this.id, required this.name});
 
   factory ApiClass.fromJson(Map<String, dynamic> json) {
-    return ApiClass(id: json['id'], name: json['name']);
+    return ApiClass(
+      id: int.tryParse(json['id']?.toString() ?? '') ?? 0,
+      name: json['name']?.toString() ?? 'N/A',
+    );
   }
 }
 
@@ -63,7 +70,10 @@ class ApiSection {
   ApiSection({required this.id, required this.name});
 
   factory ApiSection.fromJson(Map<String, dynamic> json) {
-    return ApiSection(id: json['id'], name: json['section_name']);
+    return ApiSection(
+      id: int.tryParse(json['id']?.toString() ?? '') ?? 0,
+      name: json['section_name']?.toString() ?? 'N/A',
+    );
   }
 }
 
@@ -88,23 +98,28 @@ class _NotesPageState extends State<NotesPage> {
   @override
   void initState() {
     super.initState();
+    _loadCacheAndFetch();
+  }
+
+  Future<void> _loadCacheAndFetch() async {
+    const cacheKey = 'manager_notes';
+    final cachedData = await CacheService.getCache(cacheKey);
+    if (cachedData != null && mounted) {
+      _processResponse(cachedData);
+      setState(() => isLoading = false);
+    }
     _fetchData();
   }
 
   Future<void> _fetchData() async {
     const cacheKey = 'manager_notes';
     
-    setState(() {
-      isLoading = true;
-      _error = null;
-    });
-
-    // Try loading from cache
-    CacheService.getCache(cacheKey).then((cachedData) {
-      if (cachedData != null && mounted && allMaterials.isEmpty) {
-        _processResponse(cachedData);
-      }
-    });
+    if (allMaterials.isEmpty) {
+      setState(() {
+        isLoading = true;
+        _error = null;
+      });
+    }
 
     try {
       final response = await ApiService.get('manager/study/notes');
@@ -121,7 +136,7 @@ class _NotesPageState extends State<NotesPage> {
     } catch (e) {
       if (mounted) {
         setState(() {
-          isLoading = false;
+          isLoading = allMaterials.isEmpty;
           _error = e;
         });
       }
@@ -247,13 +262,13 @@ class _NotesPageState extends State<NotesPage> {
       padding: context.pagePadding,
       child: Column(
         children: [
-          const SkeletonBox(height: 100),
+          SkeletonBox(height: context.scale(100), borderRadius: context.scale(20)),
           SizedBox(height: context.md),
           Expanded(
             child: ListView.separated(
               itemCount: 5,
               separatorBuilder: (context, index) => SizedBox(height: context.sm),
-              itemBuilder: (context, index) => const SkeletonBox(height: 120),
+              itemBuilder: (context, index) => SkeletonBox(height: context.scale(120), borderRadius: context.scale(18)),
             ),
           ),
         ],

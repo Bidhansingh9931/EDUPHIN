@@ -163,7 +163,7 @@ class _TicketInfoPageState extends State<TicketInfoPage> {
 
           final List<dynamic> usersList = cachedData['assignable_users'] as List? ?? [];
           _assignableUsers = usersList.whereType<Map<String, dynamic>>().map(AssignableUser.fromJson).toList();
-          _isLoading = false;
+          _isLoading = _tickets.isEmpty;
         });
       }
     }
@@ -268,6 +268,7 @@ class _TicketInfoPageState extends State<TicketInfoPage> {
   }
 
   Widget _buildSkeleton() {
+    final theme = context.theme;
     return ListView.builder(
       padding: context.pagePadding,
       itemCount: 5,
@@ -277,8 +278,9 @@ class _TicketInfoPageState extends State<TicketInfoPage> {
           child: Container(
             padding: EdgeInsets.all(context.spacing),
             decoration: BoxDecoration(
-              color: Colors.white,
+              color: theme.colorScheme.surfaceContainerLow,
               borderRadius: BorderRadius.circular(context.scale(16)),
+              border: Border.all(color: theme.colorScheme.outlineVariant),
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -286,33 +288,33 @@ class _TicketInfoPageState extends State<TicketInfoPage> {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    const SkeletonBox(height: 15, width: 60),
-                    const SkeletonBox(height: 20, width: 80),
+                    SkeletonBox(height: context.scale(15), width: context.scale(60)),
+                    SkeletonBox(height: context.scale(20), width: context.scale(80)),
                   ],
                 ),
                 SizedBox(height: context.md),
-                const SkeletonBox(height: 20, width: 200),
+                SkeletonBox(height: context.scale(20), width: context.scale(200)),
                 SizedBox(height: context.md),
                 Row(
                   children: [
-                    Expanded(child: SkeletonBox(height: 15, width: 80)),
-                    Expanded(child: SkeletonBox(height: 15, width: 80)),
+                    Expanded(child: SkeletonBox(height: context.scale(15), width: context.scale(80))),
+                    Expanded(child: SkeletonBox(height: context.scale(15), width: context.scale(80))),
                   ],
                 ),
                 SizedBox(height: context.md),
-                const SkeletonBox(height: 32, width: 32, borderRadius: 16),
+                SkeletonBox(height: context.scale(32), width: context.scale(32), borderRadius: context.scale(16)),
                 SizedBox(height: context.md),
-                const SkeletonBox(height: 15, width: 100),
+                SkeletonBox(height: context.scale(15), width: context.scale(100)),
                 SizedBox(height: context.md),
-                const Divider(),
+                Divider(color: theme.colorScheme.outlineVariant),
                 SizedBox(height: context.sm),
                 Row(
                   children: [
-                    const SkeletonBox(height: 40, width: 60),
+                    SkeletonBox(height: context.scale(40), width: context.scale(60)),
                     SizedBox(width: context.sm),
-                    const SkeletonBox(height: 40, width: 60),
+                    SkeletonBox(height: context.scale(40), width: context.scale(60)),
                     SizedBox(width: context.sm),
-                    const Expanded(child: SkeletonBox(height: 45)),
+                    Expanded(child: SkeletonBox(height: context.scale(45))),
                   ],
                 ),
               ],

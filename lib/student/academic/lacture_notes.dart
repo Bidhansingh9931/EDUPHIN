@@ -1,3 +1,5 @@
+import 'package:eduphin/services/caching_service.dart';
+import 'package:eduphin/services/common_widgets.dart';
 import 'package:eduphin/services/responsive_helper.dart';
 import 'package:flutter/material.dart';
 import 'package:eduphin/services/api_service.dart';
@@ -14,36 +16,59 @@ class _NotesPageState extends State<NotesPage> {
   List<dynamic> _notes = [];
   bool _isLoading = true;
   final Map<String, bool> _subjectOpenStates = {};
+  static const String _cacheKey = 'student_notes';
 
   @override
   void initState() {
     super.initState();
+    _loadCachedData();
     _fetchNotes();
   }
 
+  Future<void> _loadCachedData() async {
+    final cachedData = await CacheService.getData(_cacheKey);
+    if (cachedData != null && mounted) {
+      setState(() {
+        if (cachedData is List) {
+          _notes = List<dynamic>.from(cachedData);
+        } else if (cachedData is Map && (cachedData as Map).containsKey('notes')) {
+          _notes = List<dynamic>.from(cachedData['notes'] as List? ?? []);
+        }
+        if (_notes.isNotEmpty) {
+          _isLoading = false;
+        }
+      });
+    }
+  }
+
   Future<void> _fetchNotes() async {
-    setState(() => _isLoading = true);
+    if (_notes.isEmpty) setState(() => _isLoading = true);
     try {
       final data = await ApiService.getStudentNotes();
-      setState(() {
-        if (data is List) {
-          _notes = data;
-        } else if (data is Map && data.containsKey('notes')) {
-          _notes = data['notes'] as List? ?? [];
-        } else {
-          _notes = [];
-        }
-        _isLoading = false;
-      });
-    } catch (e) {
-      setState(() => _isLoading = false);
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text("Error fetching notes: $e"),
-            backgroundColor: Theme.of(context).colorScheme.error,
-          ),
-        );
+        setState(() {
+          if (data is List) {
+            _notes = data;
+          } else if (data is Map && data.containsKey('notes')) {
+            _notes = data['notes'] as List? ?? [];
+          } else {
+            _notes = [];
+          }
+          _isLoading = false;
+        });
+        CacheService.saveData(_cacheKey, data);
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isLoading = false);
+        if (_notes.isEmpty) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text("Error fetching notes: $e"),
+              backgroundColor: Theme.of(context).colorScheme.error,
+            ),
+          );
+        }
       }
     }
   }
@@ -66,21 +91,21 @@ class _NotesPageState extends State<NotesPage> {
       appBar: AppBar(
         title: Text("Lecture Notes", style: TextStyle(fontWeight: FontWeight.bold, fontSize: context.font(20))),
       ),
-      body: _isLoading
-          ? Center(child: CircularProgressIndicator(color: colorScheme.primary))
-          : groupedNotes.isEmpty
-              ? Center(child: Text("No notes available", style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: context.font(16))))
-              : RefreshIndicator(
-                  onRefresh: _fetchNotes,
-                  color: colorScheme.primary,
-                  child: Center(
-                    child: ConstrainedBox(
-                      constraints: const BoxConstraints(maxWidth: 1000),
-                      child: ListView.separated(
-                        padding: context.pagePadding,
-                        itemCount: groupedNotes.length,
-                        separatorBuilder: (context, index) => SizedBox(height: context.md),
-                        itemBuilder: (context, index) {
+      body: LoadingWrapper(
+        isLoading: _isLoading,
+        hasData: _notes.isNotEmpty,
+        skeleton: const _NotesSkeleton(),
+        onRefresh: _fetchNotes,
+        child: groupedNotes.isEmpty
+            ? Center(child: Text("No notes available", style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: context.font(16))))
+            : Center(
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 1000),
+                  child: ListView.separated(
+                    padding: context.pagePadding,
+                    itemCount: groupedNotes.length,
+                    separatorBuilder: (context, index) => SizedBox(height: context.md),
+                    itemBuilder: (context, index) {
                           final subjectName = groupedNotes.keys.elementAt(index);
                           final subjectNotes = groupedNotes[subjectName]!;
                           final bool isOpen = _subjectOpenStates[subjectName] ?? false;
@@ -143,7 +168,7 @@ class _NotesPageState extends State<NotesPage> {
                       ),
                     ),
                   ),
-                ),
+      ),
     );
   }
 
@@ -211,7 +236,6 @@ class _NotesPageState extends State<NotesPage> {
               overflow: TextOverflow.ellipsis,
             ),
           ],
-          const Spacer(),
           SizedBox(height: context.md),
           SizedBox(
             width: double.infinity,
@@ -230,6 +254,99 @@ class _NotesPageState extends State<NotesPage> {
               ),
             ),
           )
+        ],
+      ),
+    );
+  }
+}
+
+class _NotesSkeleton extends StatelessWidget {
+  const _NotesSkeleton();
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = context.theme;
+    return ListView.separated(
+      padding: context.pagePadding,
+      itemCount: 5,
+      separatorBuilder: (context, index) => SizedBox(height: context.md),
+      itemBuilder: (context, index) => Container(
+        decoration: BoxDecoration(
+          color: theme.colorScheme.surfaceContainerLow,
+          borderRadius: BorderRadius.circular(context.md),
+          border: Border.all(color: theme.colorScheme.outlineVariant.withValues(alpha: 0.5)),
+        ),
+        child: Column(
+          children: [
+            ListTile(
+              title: SkeletonBox(width: context.scale(150), height: context.scale(16)),
+              trailing: Icon(Icons.expand_more, color: theme.colorScheme.outlineVariant, size: context.scale(24)),
+            ),
+            if (index == 0) // Show first one expanded in skeleton
+              Padding(
+                padding: EdgeInsets.only(bottom: context.sm, left: context.sm, right: context.sm),
+                child: LayoutBuilder(
+                  builder: (context, constraints) {
+                    final crossAxisCount = constraints.maxWidth > 600 ? 2 : 1;
+                    if (crossAxisCount > 1) {
+                      return GridView.builder(
+                        shrinkWrap: true,
+                        physics: const NeverScrollableScrollPhysics(),
+                        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                          crossAxisCount: crossAxisCount,
+                          crossAxisSpacing: context.sm,
+                          mainAxisSpacing: context.sm,
+                          childAspectRatio: 2.2,
+                        ),
+                        itemCount: 2,
+                        itemBuilder: (context, idx) => const _NoteCardSkeleton(),
+                      );
+                    }
+                    return const _NoteCardSkeleton();
+                  },
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _NoteCardSkeleton extends StatelessWidget {
+  const _NoteCardSkeleton();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: EdgeInsets.symmetric(horizontal: context.md, vertical: context.xs),
+      padding: EdgeInsets.all(context.md),
+      decoration: BoxDecoration(
+        color: context.theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
+        borderRadius: BorderRadius.circular(context.md),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    SkeletonBox(width: context.scale(120), height: context.scale(14)),
+                    SizedBox(height: context.md),
+                    SkeletonBox(width: context.scale(100), height: context.scale(10)),
+                  ],
+                ),
+              ),
+              SkeletonBox(width: context.scale(24), height: context.scale(24)),
+            ],
+          ),
+          SizedBox(height: context.md),
+          SkeletonBox(width: context.scale(80), height: context.scale(10)),
+          SizedBox(height: context.md),
+          SkeletonBox(height: context.scale(40)),
         ],
       ),
     );

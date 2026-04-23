@@ -1,4 +1,6 @@
 import 'dart:io';
+import 'dart:convert';
+import 'package:flutter/foundation.dart';
 import 'package:eduphin/services/responsive_helper.dart';
 import 'package:flutter/material.dart';
 import 'package:eduphin/services/api_service.dart';
@@ -6,6 +8,7 @@ import 'package:eduphin/teacher/dashboard/ticket_details_models.dart';
 import 'package:eduphin/teacher/dashboard/ticket_models.dart';
 import 'package:file_picker/file_picker.dart';
 import 'common_widgets.dart';
+import 'teacher_cache_service.dart';
 
 class TicketDetailsPage extends StatefulWidget {
   final int ticketId;
@@ -16,34 +19,52 @@ class TicketDetailsPage extends StatefulWidget {
 }
 
 class _TicketDetailsPageState extends State<TicketDetailsPage> {
-  late Future<TicketDetails> _detailsFuture;
+  TicketDetails? _cachedDetails;
+  bool _isLoading = true;
   final TextEditingController _replyController = TextEditingController();
-  File? _selectedFile;
   bool _isSending = false;
 
   @override
   void initState() {
     super.initState();
-    _loadDetails();
+    _loadInitialData();
   }
 
-  void _loadDetails() {
-    setState(() {
-      _detailsFuture = ApiService.getTicketDetails(widget.ticketId);
-    });
+  Future<void> _loadInitialData() async {
+    final cachedData = await TeacherCacheService.load('ticket_details_${widget.ticketId}');
+    if (cachedData != null && mounted) {
+      setState(() {
+        _cachedDetails = TicketDetails.fromJson(cachedData);
+        _isLoading = false;
+      });
+    }
+    _fetchDetails();
+  }
+
+  Future<void> _fetchDetails() async {
+    if (_cachedDetails == null) {
+      setState(() => _isLoading = true);
+    }
+    try {
+      final data = await ApiService.getTicketDetails(widget.ticketId);
+      if (mounted) {
+        setState(() {
+          _cachedDetails = data;
+          _isLoading = false;
+        });
+        await TeacherCacheService.save('ticket_details_${widget.ticketId}', data.toJson());
+      }
+    } catch (e) {
+      debugPrint("Error fetching ticket details: $e");
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
   }
 
   @override
   void dispose() {
     _replyController.dispose();
     super.dispose();
-  }
-
-  Future<void> _pickFile() async {
-    final result = await FilePicker.platform.pickFiles();
-    if (result != null) {
-      setState(() => _selectedFile = File(result.files.single.path!));
-    }
   }
 
   Future<void> _sendReply() async {
@@ -53,12 +74,10 @@ class _TicketDetailsPageState extends State<TicketDetailsPage> {
     try {
       await ApiService.addTicketReply(
         widget.ticketId, 
-        _replyController.text, 
-        attachment: _selectedFile
+        _replyController.text,
       );
       _replyController.clear();
-      setState(() => _selectedFile = null);
-      _loadDetails();
+      _fetchDetails();
     } catch (e) {
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Error: $e")));
     } finally {
@@ -72,57 +91,136 @@ class _TicketDetailsPageState extends State<TicketDetailsPage> {
       appBar: AppBar(
         title: Text("Ticket Details", style: TextStyle(fontWeight: FontWeight.bold, fontSize: context.font(20))),
       ),
-      body: FutureBuilder<TicketDetails>(
-        future: _detailsFuture,
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
-          } else if (snapshot.hasError) {
-            return Center(child: Padding(
-              padding: EdgeInsets.all(context.scale(24.0)),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(Icons.error_outline, size: context.scale(48), color: context.theme.colorScheme.error),
-                  SizedBox(height: context.scale(16)),
-                  Text("Error loading ticket details", style: TextStyle(fontWeight: FontWeight.bold, fontSize: context.font(16))),
-                  Text("${snapshot.error}", textAlign: TextAlign.center, style: TextStyle(fontSize: context.font(12))),
-                  SizedBox(height: context.scale(24)),
-                  ElevatedButton(onPressed: _loadDetails, child: const Text("Retry")),
-                ],
-              ),
-            ));
-          } else if (!snapshot.hasData) {
-            return const Center(child: Text("No details found"));
-          }
-
-          final data = snapshot.data!;
-          final ticket = data.ticket;
-
-          return Center(
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 1000),
-              child: Column(
-                children: [
-                  _buildHeader(ticket),
-                  Expanded(
-                    child: data.replies.isEmpty 
-                      ? _buildEmptyConversation() 
-                      : ListView.builder(
-                          padding: EdgeInsets.all(context.scale(16)),
-                          itemCount: data.replies.length,
-                          itemBuilder: (context, index) => _buildReplyBubble(data.replies[index]),
-                        ),
+      body: TeacherLoadingWrapper(
+        isLoading: _isLoading,
+        hasData: _cachedDetails != null,
+        skeleton: _buildSkeleton(context),
+        child: _cachedDetails == null
+            ? const Center(child: Text("No details found"))
+            : Center(
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 1000),
+                  child: Column(
+                    children: [
+                      _buildHeader(_cachedDetails!.ticket),
+                      Expanded(
+                        child: _cachedDetails!.replies.isEmpty 
+                          ? _buildEmptyConversation() 
+                          : ListView.builder(
+                              padding: EdgeInsets.all(context.scale(16)),
+                              itemCount: _cachedDetails!.replies.length,
+                              itemBuilder: (context, index) => _buildReplyBubble(_cachedDetails!.replies[index]),
+                            ),
+                      ),
+                      _buildReplySection(_cachedDetails!.ticket.status),
+                    ],
                   ),
-                  _buildReplySection(ticket.status),
-                ],
+                ),
               ),
-            ),
-          );
-        },
       ),
     );
   }
+
+  Widget _buildSkeleton(BuildContext context) {
+    return Center(
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 1000),
+        child: Column(
+          children: [
+            // Header Skeleton
+            Container(
+              width: double.infinity,
+              padding: EdgeInsets.all(context.spacing),
+              decoration: BoxDecoration(
+                color: context.theme.colorScheme.surface,
+                border: Border(bottom: BorderSide(color: context.theme.colorScheme.outlineVariant.withValues(alpha: 0.5), width: 0.5)),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Row(
+                    children: [
+                      TeacherSkeleton(width: 80, height: 24),
+                      SizedBox(width: 8),
+                      TeacherSkeleton(width: 80, height: 24),
+                    ],
+                  ),
+                  SizedBox(height: context.scale(16)),
+                  const TeacherSkeleton(height: 24, width: 300),
+                  SizedBox(height: context.scale(8)),
+                  const TeacherSkeleton(height: 16, width: double.infinity),
+                  const SizedBox(height: 4),
+                  const TeacherSkeleton(height: 16, width: 250),
+                ],
+              ),
+            ),
+            // Replies Skeleton
+            Expanded(
+              child: ListView.builder(
+                padding: EdgeInsets.all(context.scale(16)),
+                itemCount: 5,
+                itemBuilder: (context, index) {
+                  final isMe = index % 2 == 0;
+                  return Align(
+                    alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
+                    child: Container(
+                      margin: EdgeInsets.only(
+                        bottom: context.scale(16),
+                        left: isMe ? context.scale(64) : 0,
+                        right: isMe ? 0 : context.scale(64),
+                      ),
+                      padding: EdgeInsets.all(context.scale(16)),
+                      decoration: BoxDecoration(
+                        color: isMe 
+                            ? context.theme.colorScheme.primaryContainer.withValues(alpha: 0.1) 
+                            : context.theme.colorScheme.surfaceContainerLow,
+                        borderRadius: BorderRadius.only(
+                          topLeft: Radius.circular(context.scale(20)),
+                          topRight: Radius.circular(context.scale(20)),
+                          bottomLeft: Radius.circular(isMe ? context.scale(20) : 0),
+                          bottomRight: Radius.circular(isMe ? 0 : context.scale(20)),
+                        ),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          if (!isMe) ...[
+                            const TeacherSkeleton(height: 12, width: 80),
+                            SizedBox(height: context.scale(4)),
+                          ],
+                          TeacherSkeleton(height: 14, width: isMe ? 150 : 200),
+                          const SizedBox(height: 4),
+                          TeacherSkeleton(height: 14, width: isMe ? 100 : 150),
+                          SizedBox(height: context.scale(8)),
+                          const TeacherSkeleton(height: 10, width: 60),
+                        ],
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ),
+            // Input Section Skeleton
+            Container(
+              padding: EdgeInsets.all(context.spacing),
+              decoration: BoxDecoration(
+                color: context.theme.colorScheme.surface,
+                border: Border(top: BorderSide(color: context.theme.colorScheme.outlineVariant.withValues(alpha: 0.5), width: 0.5)),
+              ),
+              child: Column(
+                children: [
+                  const TeacherSkeleton(height: 48),
+                  SizedBox(height: context.scale(16)),
+                  const TeacherSkeleton(height: 52),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
 
   Widget _buildHeader(SupportTicket ticket) {
     final theme = context.theme;
@@ -354,32 +452,6 @@ class _TicketDetailsPageState extends State<TicketDetailsPage> {
                 ),
                 style: TextStyle(fontSize: context.font(14), color: theme.colorScheme.onSurface),
                 maxLines: null,
-              ),
-            ),
-            SizedBox(height: context.scale(12)),
-            InkWell(
-              onTap: _pickFile,
-              borderRadius: BorderRadius.circular(context.scale(12)),
-              child: Container(
-                padding: EdgeInsets.all(context.scale(12)),
-                decoration: BoxDecoration(
-                  border: Border.all(color: theme.colorScheme.outlineVariant.withValues(alpha: 0.5), width: 0.5),
-                  borderRadius: BorderRadius.circular(context.scale(12)),
-                  color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.1),
-                ),
-                child: Row(
-                  children: [
-                    Icon(Icons.add_circle_outline, size: context.scale(20), color: theme.colorScheme.primary),
-                    SizedBox(width: context.scale(12)),
-                    Expanded(
-                      child: Text(
-                        _selectedFile == null ? "Attach file" : _selectedFile!.path.split('/').last,
-                        style: TextStyle(fontSize: context.font(13), color: _selectedFile != null ? theme.colorScheme.onSurface : theme.colorScheme.onSurfaceVariant),
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                  ],
-                ),
               ),
             ),
             SizedBox(height: context.scale(16)),

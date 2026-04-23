@@ -107,7 +107,7 @@ class _EmployeesSalaryPageState extends State<EmployeesSalaryPage> {
   Future<void> _fetchEmployees() async {
     if (!mounted) return;
     setState(() {
-      _isLoading = true;
+      _isLoading = _allEmployees.isEmpty;
       _error = null;
     });
 
@@ -147,7 +147,7 @@ class _EmployeesSalaryPageState extends State<EmployeesSalaryPage> {
       if (!mounted) return;
       setState(() {
         _error = e;
-        _isLoading = false;
+        _isLoading = _allEmployees.isEmpty;
       });
     }
   }

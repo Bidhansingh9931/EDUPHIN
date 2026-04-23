@@ -14,7 +14,7 @@ class StudentFeeDetailPage extends StatefulWidget {
 }
 
 class _StudentFeeDetailPageState extends State<StudentFeeDetailPage> {
-  late Stream<List<dynamic>> _studentsStream;
+  late Stream<Map<String, dynamic>> _studentsStream;
   Stream<Map<String, dynamic>>? _studentDetailsStream;
   
   List<dynamic> _classes = [];
@@ -66,14 +66,20 @@ class _StudentFeeDetailPageState extends State<StudentFeeDetailPage> {
               )
             : null,
       ),
-      body: StreamBuilder<List<dynamic>>(
+      body: StreamBuilder<Map<String, dynamic>>(
         stream: _studentsStream,
         builder: (context, studentsSnapshot) {
-          return LoadingWrapper<List<dynamic>>(
+          if (studentsSnapshot.hasData) {
+            final data = studentsSnapshot.data!;
+            _classes = data['classes'] ?? [];
+            _sections = data['sections'] ?? [];
+          }
+          return LoadingWrapper<Map<String, dynamic>>(
             snapshot: studentsSnapshot,
             onRetry: _fetchStudents,
             skeleton: _buildSkeleton(context),
-            builder: (students) {
+            builder: (data) {
+              final students = data['students'] ?? (data is List ? data : []);
               return SingleChildScrollView(
                 padding: context.pagePadding,
                 child: Center(
@@ -226,7 +232,7 @@ class _StudentFeeDetailPageState extends State<StudentFeeDetailPage> {
 
   Widget _buildDropdownField(BuildContext context, List<dynamic> items, dynamic value, String hint, Function(dynamic) onChanged, {bool isSection = false}) {
     return DropdownButtonFormField<dynamic>(
-      initialValue: value,
+      value: value,
       isExpanded: true,
       hint: Text(hint, style: TextStyle(fontSize: context.font(13))),
       items: [
@@ -569,7 +575,7 @@ class _StudentFeeDetailPageState extends State<StudentFeeDetailPage> {
                   TextField(controller: amountController, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: "Amount (₹)")),
                   SizedBox(height: context.spacing),
                   DropdownButtonFormField<String>(
-                    initialValue: selectedMode,
+                    value: selectedMode,
                     items: ['Cash', 'UPI', 'Bank Transfer', 'Cheque'].map((m) => DropdownMenuItem(value: m, child: Text(m))).toList(),
                     onChanged: (v) => selectedMode = v!,
                     decoration: const InputDecoration(labelText: "Mode"),

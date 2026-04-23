@@ -2,6 +2,9 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:ui';
 
+import 'package:eduphin/services/caching_service.dart';
+import 'package:eduphin/services/common_widgets.dart';
+import 'package:eduphin/services/responsive_helper.dart';
 import 'package:flutter/material.dart';
 
 import 'package:eduphin/services/api_service.dart';
@@ -49,20 +52,31 @@ class RemarksPage extends StatefulWidget {
 
 class _RemarksPageState extends State<RemarksPage> {
   bool _isLoading = true;
-  final List<Remark> _remarks = [];
-  String _error = '';
+  List<Remark> _remarks = [];
+  Object? _error;
 
   @override
   void initState() {
     super.initState();
+    _loadCacheAndFetch();
+  }
+
+  Future<void> _loadCacheAndFetch() async {
+    final cacheKey = 'student_remarks_${widget.studentId}';
+    final cachedData = await CacheService.getCache(cacheKey);
+    if (cachedData != null && mounted) {
+      setState(() {
+        _remarks = (cachedData as List).map((remarkJson) => Remark.fromJson(remarkJson)).toList();
+      });
+    }
     _fetchRemarks();
   }
 
   Future<void> _fetchRemarks() async {
     if (!mounted) return;
     setState(() {
-      _isLoading = true;
-      _error = '';
+      _isLoading = _remarks.isEmpty;
+      _error = null;
     });
 
     try {
@@ -81,34 +95,25 @@ class _RemarksPageState extends State<RemarksPage> {
               .map((remarkJson) => Remark.fromJson(remarkJson))
               .toList();
 
+          final cacheKey = 'student_remarks_${widget.studentId}';
+          await CacheService.setCache(cacheKey, data['remarks']);
+
           if (mounted) {
             setState(() {
-              _remarks.clear();
-              _remarks.addAll(fetchedRemarks);
+              _remarks = fetchedRemarks;
+              _isLoading = false;
             });
           }
         } else {
-          throw Exception(
-              'API response format is incorrect or status is false.');
+          throw Exception(data['message'] ?? 'Failed to load remarks');
         }
       } else {
-        throw Exception('Failed to load remarks: ${response.statusCode}');
+        throw Exception('Failed to load remarks. Status: ${response.statusCode}');
       }
-    } on TimeoutException {
+    } catch (e) {
       if (mounted) {
         setState(() {
-          _error = "The connection timed out. Please try again.";
-        });
-      }
-    } on Exception catch (e) {
-      if (mounted) {
-        setState(() {
-          _error = e.toString().replaceFirst('Exception: ', '');
-        });
-      }
-    } finally {
-      if (mounted) {
-        setState(() {
+          _error = e;
           _isLoading = false;
         });
       }
@@ -117,7 +122,7 @@ class _RemarksPageState extends State<RemarksPage> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
+    final theme = context.theme;
     return Scaffold(
       backgroundColor: theme.scaffoldBackgroundColor,
       floatingActionButton: FloatingActionButton.extended(
@@ -125,8 +130,7 @@ class _RemarksPageState extends State<RemarksPage> {
           final result = await Navigator.push(
             context,
             MaterialPageRoute(
-              builder: (context) =>
-                  AddNewRemarksPage(studentId: widget.studentId),
+              builder: (context) => AddNewRemarksPage(studentId: widget.studentId),
             ),
           );
           if (result == true) {
@@ -135,79 +139,88 @@ class _RemarksPageState extends State<RemarksPage> {
         },
         label: const Text("Add New Remark"),
         icon: const Icon(Icons.add),
+        backgroundColor: theme.colorScheme.primary,
+        foregroundColor: theme.colorScheme.onPrimary,
       ),
       floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
       appBar: AppBar(
-        title: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Flexible(
-              child: Text(
-                "Remarks for ${widget.studentName}",
-                overflow: TextOverflow.ellipsis,
-              ),
-            ),
-            IconButton(
-              onPressed: () {},
-              icon: const Icon(Icons.more_vert_sharp),
-            ),
-          ],
-        ),
+        title: Text("Remarks for ${widget.studentName}"),
+        actions: [
+          IconButton(
+            onPressed: _fetchRemarks,
+            icon: const Icon(Icons.refresh_rounded),
+            tooltip: "Refresh",
+          ),
+          SizedBox(width: context.xs),
+        ],
       ),
-      body: _buildBody(),
+      body: LoadingWrapper(
+        isLoading: _isLoading,
+        hasData: _remarks.isNotEmpty,
+        error: _error,
+        onRetry: _fetchRemarks,
+        skeleton: _buildSkeleton(),
+        child: _remarks.isEmpty ? _buildEmptyState(theme) : _buildContent(),
+      ),
     );
   }
 
-  Widget _buildBody() {
-    final theme = Theme.of(context);
-    if (_isLoading) {
-      return const Center(child: CircularProgressIndicator());
-    }
-    if (_error.isNotEmpty) {
-      return Center(
-        child: Padding(
-          padding: const EdgeInsets.all(16.0),
-          child: Text(
-            _error,
-            textAlign: TextAlign.center,
-            style: TextStyle(color: theme.colorScheme.error),
-          ),
-        ),
-      );
-    }
-    if (_remarks.isEmpty) {
-      return const Center(child: Text("No remarks found for this student."));
-    }
+  Widget _buildSkeleton() {
+    return ListView.separated(
+      padding: context.pagePadding,
+      itemCount: 5,
+      separatorBuilder: (context, index) => SizedBox(height: context.md),
+      itemBuilder: (context, index) => SkeletonBox(
+        height: context.scale(150),
+        borderRadius: BorderRadius.circular(12),
+      ),
+    );
+  }
 
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        if (constraints.maxWidth > 600) {
-          return GridView.builder(
-            padding: const EdgeInsets.fromLTRB(16, 16, 16, 80),
-            itemCount: _remarks.length,
-            gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
-              maxCrossAxisExtent: 450,
-              crossAxisSpacing: 16,
-              mainAxisSpacing: 16,
-              childAspectRatio: 1.8,
-            ),
-            itemBuilder: (context, index) {
-              final remark = _remarks[index];
-              return RemarkCard(remark: remark, onUpdate: _fetchRemarks);
-            },
-          );
-        } else {
-          return ListView.separated(
-            padding: const EdgeInsets.fromLTRB(16, 16, 16, 120),
-            itemCount: _remarks.length,
-            separatorBuilder: (context, index) => const SizedBox(height: 16),
-            itemBuilder: (context, index) {
-              final remark = _remarks[index];
-              return RemarkCard(remark: remark, onUpdate: _fetchRemarks);
-            },
-          );
-        }
-      },
+  Widget _buildEmptyState(ThemeData theme) {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(Icons.notes_outlined, size: context.scale(64), color: theme.colorScheme.outlineVariant),
+          SizedBox(height: context.md),
+          Text("No remarks found for this student.", style: theme.textTheme.bodyLarge),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildContent() {
+    return RefreshIndicator(
+      onRefresh: _fetchRemarks,
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          if (constraints.maxWidth > 600) {
+            return GridView.builder(
+              padding: context.pagePadding.copyWith(bottom: 100),
+              itemCount: _remarks.length,
+              gridDelegate: SliverGridDelegateWithMaxCrossAxisExtent(
+                maxCrossAxisExtent: 450,
+                crossAxisSpacing: context.md,
+                mainAxisSpacing: context.md,
+                childAspectRatio: 1.8,
+              ),
+              itemBuilder: (context, index) {
+                return RemarkCard(remark: _remarks[index], onUpdate: _fetchRemarks);
+              },
+            );
+          } else {
+            return ListView.separated(
+              padding: context.pagePadding.copyWith(bottom: 120),
+              itemCount: _remarks.length,
+              separatorBuilder: (context, index) => SizedBox(height: context.md),
+              itemBuilder: (context, index) {
+                return RemarkCard(remark: _remarks[index], onUpdate: _fetchRemarks);
+              },
+            );
+          }
+        },
+      ),
     );
   }
 }

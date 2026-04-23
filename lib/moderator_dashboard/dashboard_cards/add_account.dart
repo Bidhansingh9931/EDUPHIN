@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:io';
+import 'package:eduphin/moderator_dashboard/cache_helper.dart';
 import 'package:eduphin/services/api_service.dart';
 import 'package:eduphin/services/responsive_helper.dart';
 import 'package:flutter/material.dart';
@@ -91,6 +92,9 @@ class _AddAccountPageState extends State<AddAccountPage> {
       final responseBody = await response.stream.bytesToString();
 
       if (response.statusCode == 201 || response.statusCode == 200) {
+        // Clear accounts list cache for this institute
+        await CacheHelper.clear('accounts_list_${widget.instituteId}');
+
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Account created successfully')),

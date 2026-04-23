@@ -14,9 +14,6 @@ import 'library.dart';
 import 'lending_books.dart';
 import 'virtual_id_card.dart';
 import 'staff_profile.dart';
-import 'employee_list.dart';
-import 'fee_structure.dart';
-import 'student_fee_detail.dart';
 
 class StaffDashboard extends StatefulWidget {
   const StaffDashboard({super.key});
@@ -178,7 +175,6 @@ class _StaffDashboardState extends State<StaffDashboard> {
                       SizedBox(width: itemWidth, child: _buildSupportTicketCard(context)),
                       SizedBox(width: itemWidth, child: _buildLibraryCard(context)),
                       SizedBox(width: itemWidth, child: _buildExaminationsCard(context)),
-                      SizedBox(width: itemWidth, child: _buildFeeManagementCard(context)),
                       SizedBox(width: itemWidth, child: _buildSalaryDetailCard(context)),
                       SizedBox(width: itemWidth, child: _buildEventManagementCard(context)),
                     ],
@@ -330,14 +326,6 @@ class _StaffDashboardState extends State<StaffDashboard> {
       children: [
         Expanded(
           child: QuickActionItem(
-            label: "Employee List",
-            icon: Icons.people_alt_rounded,
-            onTap: () => Navigator.push(context, MaterialPageRoute(builder: (context) => const EmployeeListPage())),
-          ),
-        ),
-        SizedBox(width: context.spacing),
-        Expanded(
-          child: QuickActionItem(
             label: "My Profile",
             icon: Icons.person_outline_rounded,
             onTap: () => Navigator.push(context, MaterialPageRoute(builder: (context) => const StaffProfilePage())).then((_) => _refreshData()),
@@ -455,18 +443,6 @@ class _StaffDashboardState extends State<StaffDashboard> {
       icon: Icons.assignment_rounded,
       items: [
         {"title": "Examination Info", "page": const StaffExaminationsPage()},
-      ],
-    );
-  }
-
-  Widget _buildFeeManagementCard(BuildContext context) {
-    return _buildSectionCard(
-      context,
-      title: "Fee Management",
-      icon: Icons.account_balance_wallet_rounded,
-      items: [
-        {"title": "Fee Structure", "page": const StaffFeeStructurePage()},
-        {"title": "Student Fee Details", "page": const StaffStudentFeeDetailPage()},
       ],
     );
   }

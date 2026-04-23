@@ -1,3 +1,5 @@
+import 'package:eduphin/services/caching_service.dart';
+import 'package:eduphin/services/common_widgets.dart';
 import 'package:eduphin/services/responsive_helper.dart';
 import 'package:flutter/material.dart';
 import 'package:eduphin/services/api_service.dart';
@@ -15,15 +17,29 @@ class _RegisteredEventsPageState extends State<RegisteredEventsPage> {
   String _typeValue = "All";
   List<dynamic> _registeredEvents = [];
   bool _isLoading = true;
+  static const String _cacheKey = 'student_registered_events';
 
   @override
   void initState() {
     super.initState();
+    _loadCachedData();
     _fetchRegisteredEvents();
   }
 
+  Future<void> _loadCachedData() async {
+    final cachedData = await CacheService.getData(_cacheKey);
+    if (cachedData != null && mounted) {
+      setState(() {
+        _registeredEvents = List<dynamic>.from(cachedData as List? ?? []);
+        _isLoading = false;
+      });
+    }
+  }
+
   Future<void> _fetchRegisteredEvents() async {
-    setState(() => _isLoading = true);
+    if (_registeredEvents.isEmpty) {
+      setState(() => _isLoading = true);
+    }
     try {
       String? apiStatus;
       if (_statusValue == "Active") apiStatus = "upcoming";
@@ -38,18 +54,20 @@ class _RegisteredEventsPageState extends State<RegisteredEventsPage> {
         status: apiStatus,
         type: apiType,
       );
-      setState(() {
-        _registeredEvents = data;
-        _isLoading = false;
-      });
-    } catch (e) {
-      setState(() => _isLoading = false);
       if (mounted) {
-        final theme = context.theme;
+        setState(() {
+          _registeredEvents = data;
+          _isLoading = false;
+        });
+        await CacheService.saveData(_cacheKey, data);
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isLoading = false);
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text("Error fetching registered events: $e"),
-            backgroundColor: theme.colorScheme.error,
+            backgroundColor: context.theme.colorScheme.error,
           ),
         );
       }
@@ -152,10 +170,11 @@ class _RegisteredEventsPageState extends State<RegisteredEventsPage> {
       appBar: AppBar(
         title: const Text("My Registered Events"),
       ),
-      body: RefreshIndicator(
+      body: LoadingWrapper(
+        isLoading: _isLoading,
+        hasData: _registeredEvents.isNotEmpty,
+        skeleton: const _RegisteredEventsSkeleton(),
         onRefresh: _fetchRegisteredEvents,
-        color: theme.colorScheme.primary,
-        backgroundColor: theme.cardColor,
         child: SingleChildScrollView(
           physics: const AlwaysScrollableScrollPhysics(),
           padding: context.pagePadding,
@@ -181,9 +200,7 @@ class _RegisteredEventsPageState extends State<RegisteredEventsPage> {
                     ],
                   ),
                   SizedBox(height: context.lg),
-                  _isLoading
-                      ? Center(child: Padding(padding: EdgeInsets.all(context.scale(40)), child: CircularProgressIndicator(color: theme.colorScheme.primary)))
-                      : _registeredEvents.isEmpty
+                  _registeredEvents.isEmpty
                           ? _buildEmptyState()
                           : GridView.builder(
                               shrinkWrap: true,
@@ -509,6 +526,133 @@ class _RegisteredEventsPageState extends State<RegisteredEventsPage> {
             Text("Events you join will appear here", style: theme.textTheme.bodySmall?.copyWith(color: colorScheme.onSurfaceVariant.withValues(alpha: 0.5), fontSize: context.font(12))),
           ],
         ),
+      ),
+    );
+  }
+}
+
+class _RegisteredEventsSkeleton extends StatelessWidget {
+  const _RegisteredEventsSkeleton();
+
+  @override
+  Widget build(BuildContext context) {
+    return SingleChildScrollView(
+      padding: context.pagePadding,
+      child: Center(
+        child: Container(
+          constraints: const BoxConstraints(maxWidth: 1100),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _buildFilterSkeleton(context),
+              SizedBox(height: context.xl),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  SkeletonBox(width: context.scale(150), height: context.scale(24)),
+                  SkeletonBox(width: context.scale(100), height: context.scale(20)),
+                ],
+              ),
+              SizedBox(height: context.lg),
+              GridView.builder(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: context.responsive(1, tablet: 2, desktop: 3),
+                  crossAxisSpacing: context.md,
+                  mainAxisSpacing: context.md,
+                  mainAxisExtent: context.scale(360),
+                ),
+                itemCount: 6,
+                itemBuilder: (context, index) => _buildCardSkeleton(context),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildFilterSkeleton(BuildContext context) {
+    return Card(
+      elevation: 0,
+      color: context.theme.colorScheme.surfaceContainerLow,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(context.scale(16)),
+        side: BorderSide(color: context.theme.colorScheme.outlineVariant.withValues(alpha: 0.5)),
+      ),
+      child: Padding(
+        padding: EdgeInsets.all(context.scale(24)),
+        child: Column(
+          children: [
+            Row(
+              children: [
+                SkeletonBox(width: context.scale(24), height: context.scale(24), borderRadius: context.scale(4)),
+                SizedBox(width: context.scale(12)),
+                SkeletonBox(width: context.scale(120), height: context.scale(20), borderRadius: context.scale(4)),
+              ],
+            ),
+            SizedBox(height: context.scale(24)),
+            Row(
+              children: [
+                Expanded(child: SkeletonBox(height: context.scale(40), borderRadius: context.scale(12))),
+                SizedBox(width: context.scale(20)),
+                Expanded(child: SkeletonBox(height: context.scale(40), borderRadius: context.scale(12))),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildCardSkeleton(BuildContext context) {
+    return Card(
+      elevation: 0,
+      clipBehavior: Clip.antiAlias,
+      color: context.theme.colorScheme.surfaceContainerLow,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(context.scale(16)),
+        side: BorderSide(color: context.theme.colorScheme.outlineVariant.withValues(alpha: 0.5)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: EdgeInsets.all(context.scale(16)),
+            child: Row(
+              children: [
+                SkeletonBox(width: context.scale(64), height: context.scale(64), borderRadius: context.scale(12)),
+                SizedBox(width: context.scale(16)),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      SkeletonBox(width: double.infinity, height: context.scale(16), borderRadius: context.scale(4)),
+                      SizedBox(height: context.scale(6)),
+                      SkeletonBox(width: context.scale(100), height: context.scale(12), borderRadius: context.scale(4)),
+                      SizedBox(height: context.scale(10)),
+                      SkeletonBox(width: context.scale(60), height: context.scale(20), borderRadius: context.scale(4)),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Divider(color: context.theme.colorScheme.outlineVariant.withValues(alpha: 0.5), height: 1),
+          Padding(
+            padding: EdgeInsets.all(context.scale(16)),
+            child: Column(
+              children: [
+                Row(children: [SkeletonBox(width: context.scale(14), height: context.scale(14), borderRadius: context.scale(4)), SizedBox(width: 8), SkeletonBox(width: context.scale(200), height: context.scale(12), borderRadius: context.scale(4))]),
+                SizedBox(height: context.scale(12)),
+                Row(children: [SkeletonBox(width: context.scale(14), height: context.scale(14), borderRadius: context.scale(4)), SizedBox(width: 8), SkeletonBox(width: context.scale(150), height: context.scale(12), borderRadius: context.scale(4))]),
+                SizedBox(height: context.scale(24)),
+                SkeletonBox(width: double.infinity, height: context.scale(48), borderRadius: context.scale(12)),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }

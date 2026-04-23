@@ -3,6 +3,8 @@ import 'package:eduphin/services/theme_service.dart';
 import 'package:eduphin/services/common_widgets.dart';
 import 'package:flutter/material.dart';
 import '../../services/api_service.dart';
+import '../cache_service.dart';
+import '../super_admin_common_widgets.dart';
 import 'add_moderators.dart';
 
 class ModeratorListScreen extends StatefulWidget {
@@ -19,12 +21,25 @@ class _ModeratorListScreenState extends State<ModeratorListScreen> {
   @override
   void initState() {
     super.initState();
+    _loadInitialData();
+  }
+
+  Future<void> _loadInitialData() async {
+    final cachedData = await SuperAdminCacheService.load('moderator_list');
+    if (cachedData != null && mounted) {
+      setState(() {
+        _moderators = cachedData;
+        _isLoading = false;
+      });
+    }
     _fetchModerators();
   }
 
   Future<void> _fetchModerators() async {
     if (!mounted) return;
-    setState(() => _isLoading = true);
+    if (_moderators.isEmpty) {
+      setState(() => _isLoading = true);
+    }
     try {
       final data = await ApiService.getModerates();
       if (mounted) {
@@ -32,6 +47,7 @@ class _ModeratorListScreenState extends State<ModeratorListScreen> {
           _moderators = data;
           _isLoading = false;
         });
+        await SuperAdminCacheService.save('moderator_list', data);
       }
     } catch (e) {
       if (mounted) {
@@ -83,51 +99,66 @@ class _ModeratorListScreenState extends State<ModeratorListScreen> {
           ),
         ],
       ),
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : RefreshIndicator(
-              onRefresh: _fetchModerators,
-              child: SingleChildScrollView(
-                padding: context.pagePadding,
-                child: Center(
-                  child: ConstrainedBox(
-                    constraints: const BoxConstraints(maxWidth: 1000),
-                    child: Column(
-                      children: [
-                        Card(
-                          elevation: 0,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(context.scale(12)),
-                            side: BorderSide(color: theme.dividerColor.withValues(alpha: 0.1)),
-                          ),
-                          child: Padding(
-                            padding: EdgeInsets.all(context.spacing),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
+      body: SuperAdminLoadingWrapper(
+        isLoading: _isLoading,
+        hasData: _moderators.isNotEmpty,
+        skeleton: _buildSkeleton(context),
+        child: RefreshIndicator(
+          onRefresh: _fetchModerators,
+          child: SingleChildScrollView(
+            padding: context.pagePadding,
+            child: Center(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 1000),
+                child: Column(
+                  children: [
+                    Card(
+                      elevation: 0,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(context.scale(12)),
+                        side: BorderSide(color: theme.dividerColor.withValues(alpha: 0.1)),
+                      ),
+                      child: Padding(
+                        padding: EdgeInsets.all(context.spacing),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
                               children: [
-                                Row(
-                                  children: [
-                                    Icon(Icons.list, color: theme.colorScheme.primary, size: context.scale(20)),
-                                    SizedBox(width: context.scale(8)),
-                                    Text("Moderator Directory",
-                                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: context.font(16))),
-                                  ],
-                                ),
-                                SizedBox(height: context.scale(4)),
-                                Text("View and manage all registered moderators.",
-                                    style: TextStyle(color: theme.hintColor, fontSize: context.font(12))),
-                                SizedBox(height: context.spacing),
-                                _buildTable(context),
+                                Icon(Icons.list, color: theme.colorScheme.primary, size: context.scale(20)),
+                                SizedBox(width: context.scale(8)),
+                                Text("Moderator Directory",
+                                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: context.font(16))),
                               ],
                             ),
-                          ),
+                            SizedBox(height: context.scale(4)),
+                            Text("View and manage all registered moderators.",
+                                style: TextStyle(color: theme.hintColor, fontSize: context.font(12))),
+                            SizedBox(height: context.spacing),
+                            _buildTable(context),
+                          ],
                         ),
-                      ],
+                      ),
                     ),
-                  ),
+                  ],
                 ),
               ),
             ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSkeleton(BuildContext context) {
+    return SingleChildScrollView(
+      padding: context.pagePadding,
+      child: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 1000),
+          child: SuperAdminSkeleton(height: context.scale(400)),
+        ),
+      ),
     );
   }
 

@@ -75,7 +75,7 @@ class _SubjectListPageState extends State<SubjectListPage> {
   Future<void> _fetchSubjects() async {
     if (!mounted) return;
     setState(() {
-      _isLoading = true;
+      _isLoading = _subjects.isEmpty;
       _error = null;
     });
 

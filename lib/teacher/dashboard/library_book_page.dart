@@ -1,3 +1,5 @@
+import 'dart:convert';
+import 'package:eduphin/teacher/dashboard/teacher_cache_service.dart';
 import 'package:flutter/material.dart';
 import 'package:eduphin/services/api_service.dart';
 import 'package:eduphin/services/responsive_helper.dart';
@@ -20,7 +22,9 @@ class _LibraryBookPageState extends State<LibraryBookPage> {
   final TextEditingController _authorController = TextEditingController();
   final TextEditingController _isbnController = TextEditingController();
   
-  late Future<BookPagination> _booksFuture;
+  bool _isLoading = true;
+  BookPagination? _data;
+  String? _error;
   int _currentPage = 1;
 
   @override
@@ -29,7 +33,7 @@ class _LibraryBookPageState extends State<LibraryBookPage> {
     _loadBooks();
   }
 
-  void _loadBooks() {
+  Future<void> _loadBooks() async {
     final queryParams = <String, String>{
       if (_titleController.text.isNotEmpty) 'title': _titleController.text,
       if (_authorController.text.isNotEmpty) 'author': _authorController.text,
@@ -39,7 +43,40 @@ class _LibraryBookPageState extends State<LibraryBookPage> {
       if (_filters['format'] != null && _filters['format'] != 'All') 'format': _filters['format']!,
       if (_filters['year'] != null && _filters['year'] != 'All') 'publication_year': _filters['year']!,
     };
-    _booksFuture = ApiService.getLibraryBooks(queryParams, _currentPage);
+
+    final cacheKey = 'library_books_${_currentPage}_${jsonEncode(queryParams)}';
+    
+    // 1. Load from cache
+    final cachedData = await TeacherCacheService.load(cacheKey);
+    if (cachedData != null) {
+      if (mounted) {
+        setState(() {
+          _data = BookPagination.fromJson(cachedData);
+          _isLoading = false;
+        });
+      }
+    }
+
+    // 2. Fetch from API
+    try {
+      final freshData = await ApiService.getLibraryBooks(queryParams, _currentPage);
+      await TeacherCacheService.save(cacheKey, freshData.toJson());
+      
+      if (mounted) {
+        setState(() {
+          _data = freshData;
+          _isLoading = false;
+          _error = null;
+        });
+      }
+    } catch (e) {
+      if (_data == null && mounted) {
+        setState(() {
+          _error = e.toString();
+          _isLoading = false;
+        });
+      }
+    }
   }
 
   @override
@@ -56,34 +93,37 @@ class _LibraryBookPageState extends State<LibraryBookPage> {
       appBar: AppBar(
         title: const Text("Library Books"),
       ),
-      body: FutureBuilder<BookPagination>(
-        future: _booksFuture,
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting && !snapshot.hasData) {
-            return const Center(child: CircularProgressIndicator());
-          }
+      body: _buildBody(),
+    );
+  }
 
-          final filters = snapshot.hasData ? snapshot.data!.filters : null;
-          final books = snapshot.hasData ? snapshot.data!.books : <Book>[];
+  Widget _buildBody() {
+    final theme = context.theme;
 
-          return SingleChildScrollView(
-            child: Center(
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 1200),
-                child: Column(
-                  children: [
-                    _buildFilterSection(filters),
-                    if (snapshot.hasError)
-                      Center(child: Padding(padding: EdgeInsets.all(context.spacing), child: Text("Error: ${snapshot.error}", style: TextStyle(color: context.theme.colorScheme.error))))
-                    else
-                      _buildBooksTable(books, snapshot.data),
-                    SizedBox(height: context.spacing * 2),
-                  ],
-                ),
-              ),
+    if (_error != null && _data == null) {
+      return Center(child: Text('Error: $_error', style: TextStyle(color: theme.colorScheme.error)));
+    }
+
+    final filters = _data?.filters;
+    final books = _data?.books ?? <Book>[];
+
+    return TeacherLoadingWrapper(
+      isLoading: _isLoading,
+      hasData: _data != null,
+      skeleton: _buildSkeletonLoader(context),
+      child: SingleChildScrollView(
+        child: Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 1200),
+            child: Column(
+              children: [
+                _buildFilterSection(filters),
+                _buildBooksTable(books, _data),
+                SizedBox(height: context.spacing * 2),
+              ],
             ),
-          );
-        },
+          ),
+        ),
       ),
     );
   }
@@ -142,14 +182,18 @@ class _LibraryBookPageState extends State<LibraryBookPage> {
               child: buildActionButton(
                 context,
                 "RESET",
-                () => setState(() {
+                () {
                   _titleController.clear();
                   _authorController.clear();
                   _isbnController.clear();
                   _filters.updateAll((k, v) => null);
-                  _currentPage = 1;
+                  setState(() {
+                    _currentPage = 1;
+                    _isLoading = true;
+                    _data = null;
+                  });
                   _loadBooks();
-                }),
+                },
                 isPrimary: false,
               ),
             ),
@@ -159,10 +203,14 @@ class _LibraryBookPageState extends State<LibraryBookPage> {
               child: buildActionButton(
                 context,
                 "SEARCH",
-                () => setState(() {
-                  _currentPage = 1;
+                () {
+                  setState(() {
+                    _currentPage = 1;
+                    _isLoading = true;
+                    _data = null;
+                  });
                   _loadBooks();
-                }),
+                },
               ),
             ),
           ],
@@ -290,8 +338,10 @@ class _LibraryBookPageState extends State<LibraryBookPage> {
                 ? () {
                     setState(() {
                       _currentPage--;
-                      _loadBooks();
+                      _isLoading = true;
+                      _data = null;
                     });
+                    _loadBooks();
                   }
                 : null,
             icon: Icon(Icons.chevron_left, size: context.scale(24), color: colorScheme.primary),
@@ -305,8 +355,10 @@ class _LibraryBookPageState extends State<LibraryBookPage> {
                 ? () {
                     setState(() {
                       _currentPage++;
-                      _loadBooks();
+                      _isLoading = true;
+                      _data = null;
                     });
+                    _loadBooks();
                   }
                 : null,
             icon: Icon(Icons.chevron_right, size: context.scale(24), color: colorScheme.primary),
@@ -316,5 +368,26 @@ class _LibraryBookPageState extends State<LibraryBookPage> {
     );
   }
 
-
+  Widget _buildSkeletonLoader(BuildContext context) {
+    return SingleChildScrollView(
+      child: Column(
+        children: [
+          Padding(
+            padding: context.pagePadding,
+            child: TeacherSkeleton(
+              height: context.scale(300),
+              borderRadius: BorderRadius.circular(context.scale(16)),
+            ),
+          ),
+          Padding(
+            padding: context.pagePadding,
+            child: TeacherSkeleton(
+              height: context.scale(400),
+              borderRadius: BorderRadius.circular(context.scale(16)),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 }

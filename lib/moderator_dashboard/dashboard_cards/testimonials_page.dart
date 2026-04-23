@@ -1,10 +1,10 @@
 import 'dart:convert';
+import 'package:eduphin/moderator_dashboard/cache_helper.dart';
+import 'package:eduphin/moderator_dashboard/skeleton_widgets.dart';
 import 'package:eduphin/services/api_service.dart';
 import 'package:eduphin/services/responsive_helper.dart';
 import 'package:eduphin/services/common_widgets.dart';
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
 
 import 'add_edit_testimonial_page.dart';
@@ -55,38 +55,50 @@ class Testimonial {
 
 // Provider to interact with the testimonial API.
 class TestimonialProvider {
-  Future<List<Testimonial>> fetchTestimonials() async {
+  static const String _cacheKey = 'moderator_testimonials_list';
+
+  Future<List<Testimonial>> fetchTestimonials({bool bypassCache = false}) async {
+    if (!bypassCache) {
+      final cached = await CacheHelper.load(_cacheKey);
+      if (cached != null && cached is List) {
+        return cached.map((e) => Testimonial.fromJson(e)).toList();
+      }
+    }
     final response = await ApiService.get('moderator/testimonials');
 
     if (response.statusCode == 200) {
       final body = jsonDecode(response.body);
 
-      // CORRECTED: More robust JSON parsing to handle multiple possible structures.
       List<dynamic> testimonialsData;
-
       if (body is List) {
         testimonialsData = body;
       } else if (body is Map<String, dynamic> && body['data'] is List) {
         testimonialsData = body['data'];
       } else {
-        // This will catch cases where 'data' is not a list or the structure is unexpected.
-        throw Exception(
-            'Failed to parse testimonials: Unexpected JSON structure.');
+        throw Exception('Failed to parse testimonials: Unexpected JSON structure.');
       }
 
-      return testimonialsData
-          .map((json) => Testimonial.fromJson(json as Map<String, dynamic>))
-          .toList();
+      await CacheHelper.save(_cacheKey, testimonialsData);
+      return testimonialsData.map((json) => Testimonial.fromJson(json as Map<String, dynamic>)).toList();
     } else {
-      throw Exception(
-          'Failed to load testimonials. Status code: ${response.statusCode}');
+      throw Exception('Failed to load testimonials. Status code: ${response.statusCode}');
     }
+  }
+
+  Future<List<Testimonial>?> getCachedTestimonials() async {
+    final cached = await CacheHelper.load(_cacheKey);
+    if (cached != null && cached is List) {
+      return cached.map((e) => Testimonial.fromJson(e)).toList();
+    }
+    return null;
   }
 
   Future<void> deleteTestimonial(int id) async {
     final response = await ApiService.delete('moderator/testimonials/$id');
 
-    if (response.statusCode != 200) {
+    if (response.statusCode == 200) {
+      await CacheHelper.clear(_cacheKey);
+    } else {
       throw Exception('Failed to delete testimonial.');
     }
   }
@@ -103,16 +115,22 @@ class TestimonialsPage extends StatefulWidget {
 class _TestimonialsPageState extends State<TestimonialsPage> {
   final TestimonialProvider _provider = TestimonialProvider();
   late Future<List<Testimonial>> _testimonialsFuture;
+  List<Testimonial>? _cachedTestimonials;
 
   @override
   void initState() {
     super.initState();
+    _loadInitialData();
+  }
+
+  Future<void> _loadInitialData() async {
+    _cachedTestimonials = await _provider.getCachedTestimonials();
     _fetchData();
   }
 
-  void _fetchData() {
+  void _fetchData({bool bypassCache = false}) {
     setState(() {
-      _testimonialsFuture = _provider.fetchTestimonials();
+      _testimonialsFuture = _provider.fetchTestimonials(bypassCache: bypassCache);
     });
   }
 
@@ -127,7 +145,7 @@ class _TestimonialsPageState extends State<TestimonialsPage> {
     );
 
     if (result == true) {
-      _fetchData();
+      _fetchData(bypassCache: true);
     }
   }
 
@@ -143,7 +161,7 @@ class _TestimonialsPageState extends State<TestimonialsPage> {
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(context.sm)),
           ),
         );
-        _fetchData(); // Refresh the list
+        _fetchData(bypassCache: true); // Refresh the list
       }
     } catch (e) {
       if (mounted) {
@@ -213,58 +231,49 @@ class _TestimonialsPageState extends State<TestimonialsPage> {
       body: FutureBuilder<List<Testimonial>>(
         future: _testimonialsFuture,
         builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return Center(child: CircularProgressIndicator(color: theme.colorScheme.primary));
-          }
-          if (snapshot.hasError) {
-            return Center(
-              child: Padding(
-                padding: context.pagePadding,
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(Icons.error_outline_rounded, size: context.scale(48), color: theme.colorScheme.error),
-                    SizedBox(height: context.md),
-                    Text('Error: ${snapshot.error}', textAlign: TextAlign.center, style: TextStyle(color: theme.colorScheme.onSurface, fontSize: context.font(14))),
-                    SizedBox(height: context.lg),
-                    ElevatedButton(
-                      onPressed: _fetchData,
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: theme.colorScheme.primary,
-                        foregroundColor: theme.colorScheme.onPrimary,
-                      ),
-                      child: Text("Retry", style: TextStyle(fontSize: context.font(16))),
-                    ),
-                  ],
+          return ModeratorLoadingWrapper<List<Testimonial>>(
+            snapshot: snapshot,
+            cachedData: _cachedTestimonials,
+            skeleton: const TestimonialSkeleton(),
+            onRefresh: () async => _fetchData(bypassCache: true),
+            builder: (testimonials) {
+              if (testimonials.isEmpty) {
+                return Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.reviews_outlined,
+                          size: context.scale(64),
+                          color: theme.colorScheme.onSurfaceVariant
+                              .withValues(alpha: 0.3)),
+                      SizedBox(height: context.md),
+                      Text('No testimonials found.',
+                          style: TextStyle(
+                              color: theme.colorScheme.onSurfaceVariant,
+                              fontSize: context.font(16),
+                              fontWeight: FontWeight.bold)),
+                    ],
+                  ),
+                );
+              }
+
+              return RefreshIndicator(
+                onRefresh: () async => _fetchData(bypassCache: true),
+                color: theme.colorScheme.primary,
+                child: ListView.builder(
+                  padding: context.pagePadding,
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  itemCount: testimonials.length,
+                  itemBuilder: (context, index) {
+                    return TestimonialCard(
+                      testimonial: testimonials[index],
+                      onDelete: () =>
+                          _showDeleteConfirmation(testimonials[index].id),
+                      onEdit: () =>
+                          _navigateAndRefresh(testimonial: testimonials[index]),
+                    );
+                  },
                 ),
-              ),
-            );
-          }
-          if (!snapshot.hasData || snapshot.data!.isEmpty) {
-            return Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(Icons.reviews_outlined, size: context.scale(64), color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.3)),
-                  SizedBox(height: context.md),
-                  Text('No testimonials found.', style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: context.font(16), fontWeight: FontWeight.bold)),
-                ],
-              ),
-            );
-          }
-
-          final testimonials = snapshot.data!;
-
-          return ListView.builder(
-            padding: context.pagePadding,
-            itemCount: testimonials.length,
-            itemBuilder: (context, index) {
-              return TestimonialCard(
-                testimonial: testimonials[index],
-                onDelete: () =>
-                    _showDeleteConfirmation(testimonials[index].id),
-                onEdit: () =>
-                    _navigateAndRefresh(testimonial: testimonials[index]),
               );
             },
           );
@@ -288,7 +297,6 @@ class TestimonialCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = context.theme;
-    final colorScheme = theme.colorScheme;
     final imageUrl = ApiService.getStorageUrl(testimonial.image);
 
     return Card(

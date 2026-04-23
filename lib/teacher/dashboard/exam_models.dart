@@ -11,6 +11,12 @@ class ExamPageData {
           .toList(),
     );
   }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'exams': exams.map((e) => e.toJson()).toList(),
+    };
+  }
 }
 
 class TeacherExam {
@@ -43,6 +49,18 @@ class TeacherExam {
       description: json['description'],
     );
   }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'name': name,
+      'code': code,
+      'type': type,
+      'start_date': startDate,
+      'end_date': endDate,
+      'description': description,
+    };
+  }
 }
 
 class ExamScheduleData {
@@ -58,6 +76,13 @@ class ExamScheduleData {
           .map((s) => ExamSchedule.fromJson(s as Map<String, dynamic>))
           .toList(),
     );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'exam': exam.toJson(),
+      'schedules': schedules.map((e) => e.toJson()).toList(),
+    };
   }
 }
 
@@ -94,6 +119,19 @@ class ExamSchedule {
       sectionName: json['section']?['name'] ?? 'N/A',
     );
   }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'date': date,
+      'start_time': startTime,
+      'end_time': endTime,
+      'room_no': roomNo,
+      'subject': {'name': subjectName},
+      'class': {'name': className},
+      'section': {'name': sectionName},
+    };
+  }
 }
 
 class ExamPaper {
@@ -122,6 +160,17 @@ class ExamPaper {
       sectionName: json['section']?['name'] ?? 'N/A',
       date: json['date'] ?? 'N/A',
     );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'exam': {'name': examName},
+      'subject': {'name': subjectName},
+      'class': {'name': className},
+      'section': {'name': sectionName},
+      'date': date,
+    };
   }
 }
 
@@ -161,5 +210,24 @@ class ExamStudentRegistration {
       gradeName: result?['grade_name'],
       remarks: result?['remarks'],
     );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'student': {
+        'id': studentId,
+        'roll_no': rollNo,
+        'user': {'name': studentName},
+      },
+      'exam_result': [
+        {
+          'marks_obtained': marksObtained,
+          'max_marks': maxMarks,
+          'grade_name': gradeName,
+          'remarks': remarks,
+        }
+      ],
+    };
   }
 }

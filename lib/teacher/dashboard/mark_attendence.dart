@@ -1,5 +1,7 @@
 import 'package:eduphin/services/responsive_helper.dart';
 import 'package:eduphin/teacher/dashboard/attendance_model.dart';
+import 'package:eduphin/teacher/dashboard/common_widgets.dart';
+import 'package:eduphin/teacher/dashboard/teacher_cache_service.dart';
 import 'package:flutter/material.dart';
 import 'package:eduphin/services/api_service.dart';
 import 'package:eduphin/teacher/dashboard/teacher_dashboard_model.dart';
@@ -14,43 +16,77 @@ class MarkAttendancePage extends StatefulWidget {
 }
 
 class _MarkAttendancePageState extends State<MarkAttendancePage> {
-  Future<void>? _attendanceDataFuture;
   List<StudentForAttendance> _students = [];
   Map<int, AttendanceRecord> _attendanceRecords = {};
   final String _date = DateFormat('yyyy-MM-dd').format(DateTime.now());
+  bool _isLoading = true;
   String? _error;
 
   @override
   void initState() {
     super.initState();
-    _attendanceDataFuture = _fetchAttendanceData();
+    _fetchAttendanceData();
   }
 
   Future<void> _fetchAttendanceData() async {
+    setState(() {
+      _isLoading = true;
+      _error = null;
+    });
+
+    final cacheKey = 'attendance_${widget.schedule.id}_$_date';
+
     try {
-      final data = await ApiService.getAttendanceData(widget.schedule.id, _date);
-      if (mounted && data['status'] == true) {
+      // Load from cache first
+      final cachedData = await TeacherCacheService.load(cacheKey);
+      if (cachedData != null) {
+        _processAttendanceData(cachedData);
         setState(() {
-          _students = (data['students'] as List)
-              .map((s) => StudentForAttendance.fromJson(s))
-              .toList();
-          final existing = data['existingAttendance'] as Map<String, dynamic>;
-          _attendanceRecords = {
-            for (var student in _students)
-              student.id: existing.containsKey(student.id.toString())
-                  ? AttendanceRecord.fromJson(existing[student.id.toString()]!)
-                  : AttendanceRecord(status: 'Present'),
-          };
-          _error = null;
+          _isLoading = false;
         });
+      }
+
+      // Fetch fresh data
+      final freshData = await ApiService.getAttendanceData(widget.schedule.id, _date);
+      if (freshData['status'] == true) {
+        await TeacherCacheService.save(cacheKey, freshData);
+        if (mounted) {
+          setState(() {
+            _processAttendanceData(freshData);
+            _isLoading = false;
+          });
+        }
       }
     } catch (e) {
       if (mounted) {
-        setState(() {
-          _error = "Failed to load attendance: $e";
-        });
+        if (_students.isEmpty) {
+          setState(() {
+            _error = "Failed to load attendance: $e";
+            _isLoading = false;
+          });
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text("Failed to update attendance data: $e")),
+          );
+          setState(() {
+            _isLoading = false;
+          });
+        }
       }
     }
+  }
+
+  void _processAttendanceData(Map<String, dynamic> data) {
+    _students = (data['students'] as List)
+        .map((s) => StudentForAttendance.fromJson(s))
+        .toList();
+    final existing = data['existingAttendance'] as Map<String, dynamic>;
+    _attendanceRecords = {
+      for (var student in _students)
+        student.id: existing.containsKey(student.id.toString())
+            ? AttendanceRecord.fromJson(existing[student.id.toString()]!)
+            : AttendanceRecord(status: 'Present'),
+    };
   }
 
   @override
@@ -67,67 +103,66 @@ class _MarkAttendancePageState extends State<MarkAttendancePage> {
           child: Column(
             children: [
               Expanded(
-                child: FutureBuilder(
-                  future: _attendanceDataFuture,
-                  builder: (context, snapshot) {
-                    if (snapshot.connectionState == ConnectionState.waiting && _students.isEmpty) {
-                      return const Center(child: CircularProgressIndicator());
-                    } else if (_error != null) {
-                      return Center(
-                        child: Padding(
-                          padding: EdgeInsets.all(context.spacing * 1.5),
-                          child: Text(_error!, textAlign: TextAlign.center, style: TextStyle(color: theme.colorScheme.error, fontSize: context.font(14))),
-                        ),
-                      );
-                    } else {
-                      return context.responsive(
-                        ListView.builder(
-                          padding: context.pagePadding,
-                          itemCount: _students.length + 1,
-                          itemBuilder: (context, index) {
-                            if (index == 0) return _buildHeaderCard(context);
-                            return _buildStudentCard(index - 1);
-                          },
-                        ),
-                        tablet: ListView(
-                          padding: context.pagePadding,
-                          children: [
-                            _buildHeaderCard(context),
-                            GridView.builder(
-                              shrinkWrap: true,
-                              physics: const NeverScrollableScrollPhysics(),
-                              gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                                crossAxisCount: 2,
-                                crossAxisSpacing: context.spacing,
-                                mainAxisSpacing: context.spacing,
-                                childAspectRatio: 1.5,
-                              ),
-                              itemCount: _students.length,
-                              itemBuilder: (context, index) => _buildStudentCard(index),
+                child: TeacherLoadingWrapper(
+                  isLoading: _isLoading,
+                  hasData: _students.isNotEmpty,
+                  skeleton: _buildSkeleton(),
+                  child: _error != null
+                      ? Center(
+                          child: Padding(
+                            padding: EdgeInsets.all(context.spacing * 1.5),
+                            child: Text(_error!, textAlign: TextAlign.center, style: TextStyle(color: theme.colorScheme.error, fontSize: context.font(14))),
+                          ),
+                        )
+                      : RefreshIndicator(
+                          onRefresh: _fetchAttendanceData,
+                          child: context.responsive(
+                            ListView.builder(
+                              padding: context.pagePadding,
+                              itemCount: _students.length + 1,
+                              itemBuilder: (context, index) {
+                                if (index == 0) return _buildHeaderCard(context);
+                                return _buildStudentCard(index - 1);
+                              },
                             ),
-                          ],
-                        ),
-                        desktop: ListView(
-                          padding: context.pagePadding,
-                          children: [
-                            _buildHeaderCard(context),
-                            GridView.builder(
-                              shrinkWrap: true,
-                              physics: const NeverScrollableScrollPhysics(),
-                              gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                                crossAxisCount: 3,
-                                crossAxisSpacing: context.spacing,
-                                mainAxisSpacing: context.spacing,
-                                childAspectRatio: 1.6,
-                              ),
-                              itemCount: _students.length,
-                              itemBuilder: (context, index) => _buildStudentCard(index),
+                            tablet: ListView(
+                              padding: context.pagePadding,
+                              children: [
+                                _buildHeaderCard(context),
+                                GridView.builder(
+                                  shrinkWrap: true,
+                                  physics: const NeverScrollableScrollPhysics(),
+                                  gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                                    crossAxisCount: 2,
+                                    crossAxisSpacing: context.spacing,
+                                    mainAxisSpacing: context.spacing,
+                                    childAspectRatio: 1.5,
+                                  ),
+                                  itemCount: _students.length,
+                                  itemBuilder: (context, index) => _buildStudentCard(index),
+                                ),
+                              ],
                             ),
-                          ],
+                            desktop: ListView(
+                              padding: context.pagePadding,
+                              children: [
+                                _buildHeaderCard(context),
+                                GridView.builder(
+                                  shrinkWrap: true,
+                                  physics: const NeverScrollableScrollPhysics(),
+                                  gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                                    crossAxisCount: 3,
+                                    crossAxisSpacing: context.spacing,
+                                    mainAxisSpacing: context.spacing,
+                                    childAspectRatio: 1.6,
+                                  ),
+                                  itemCount: _students.length,
+                                  itemBuilder: (context, index) => _buildStudentCard(index),
+                                ),
+                              ],
+                            ),
+                          ),
                         ),
-                      );
-                    }
-                  },
                 ),
               ),
               Container(
@@ -158,6 +193,25 @@ class _MarkAttendancePageState extends State<MarkAttendancePage> {
           ),
         ),
       ),
+    );
+  }
+
+  Widget _buildSkeleton() {
+    return ListView.builder(
+      padding: context.pagePadding,
+      itemCount: 6,
+      itemBuilder: (context, index) {
+        if (index == 0) {
+          return Padding(
+            padding: EdgeInsets.only(bottom: context.spacing * 1.5),
+            child: TeacherSkeleton(height: context.scale(100), borderRadius: BorderRadius.circular(context.scale(16))),
+          );
+        }
+        return Padding(
+          padding: EdgeInsets.only(bottom: context.spacing),
+          child: TeacherSkeleton(height: context.scale(150), borderRadius: BorderRadius.circular(context.scale(16))),
+        );
+      },
     );
   }
 

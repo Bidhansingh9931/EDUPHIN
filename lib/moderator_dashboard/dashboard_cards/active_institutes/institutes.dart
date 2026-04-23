@@ -1,4 +1,6 @@
 import 'dart:async';
+import 'package:eduphin/moderator_dashboard/cache_helper.dart';
+import 'package:eduphin/moderator_dashboard/skeleton_widgets.dart';
 import 'package:eduphin/services/api_service.dart';
 import 'package:eduphin/moderator_dashboard/dashboard_cards/active_institutes/add_institute.dart';
 import 'package:eduphin/moderator_dashboard/dashboard_cards/active_institutes/view_institute_page.dart';
@@ -11,8 +13,24 @@ import 'manage/manage_institute.dart';
 
 // 1. Data Provider to fetch institute data
 class InstituteProvider {
-  Future<List<Institute>> fetchInstitutes() async {
-    return ApiService.getInstitutes();
+  static const String _cacheKey = 'institutes_list';
+
+  Future<List<Institute>> fetchInstitutes({bool bypassCache = false}) async {
+    if (!bypassCache) {
+      final cached = await getCachedInstitutes();
+      if (cached != null) return cached;
+    }
+    final data = await ApiService.getInstitutes();
+    await CacheHelper.save(_cacheKey, data.map((e) => e.toJson()).toList());
+    return data;
+  }
+
+  Future<List<Institute>?> getCachedInstitutes() async {
+    final cached = await CacheHelper.load(_cacheKey);
+    if (cached != null) {
+      return (cached as List).map((e) => Institute.fromJson(e)).toList();
+    }
+    return null;
   }
 }
 
@@ -28,42 +46,34 @@ class _InstitutesPageState extends State<InstitutesPage> {
   List<Institute> _allInstitutes = [];
   List<Institute> _filteredInstitutes = [];
   final _searchController = TextEditingController();
-  bool _isLoading = true;
-  String? _error;
+  late Future<List<Institute>> _institutesFuture;
+  List<Institute>? _cachedInstitutes;
 
   @override
   void initState() {
     super.initState();
-    _fetchData();
+    _loadInitialData();
     _searchController.addListener(_filterInstitutes);
   }
 
-  Future<void> _fetchData() async {
-    if (!mounted) return;
-    setState(() {
-      _isLoading = true;
-      _error = null;
-    });
-    try {
-      final data = await _provider.fetchInstitutes();
-      if (mounted) {
-        setState(() {
-          _allInstitutes = data;
-          _filteredInstitutes = data;
-          _isLoading = false;
-        });
-      }
-    } catch (e) {
-      if (mounted) {
-        setState(() {
-          _isLoading = false;
-          _error = e.toString();
-        });
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to load institutes: $e')),
-        );
-      }
+  Future<void> _loadInitialData() async {
+    _cachedInstitutes = await _provider.getCachedInstitutes();
+    if (_cachedInstitutes != null) {
+      _allInstitutes = _cachedInstitutes!;
+      _filteredInstitutes = _cachedInstitutes!;
     }
+    if (mounted) {
+      setState(() {
+        _institutesFuture = _provider.fetchInstitutes();
+      });
+    }
+  }
+
+  Future<void> _fetchData({bool bypassCache = false}) async {
+    setState(() {
+      _institutesFuture = _provider.fetchInstitutes(bypassCache: bypassCache);
+    });
+    await _institutesFuture;
   }
 
   @override
@@ -106,14 +116,14 @@ class _InstitutesPageState extends State<InstitutesPage> {
         title: Text("Active Institutes", style: TextStyle(fontSize: context.font(20))),
         actions: [
           IconButton(
-            onPressed: _fetchData,
+            onPressed: () => _fetchData(bypassCache: true),
             icon: Icon(Icons.refresh_rounded, size: context.scale(24)),
           ),
           SizedBox(width: context.md),
         ],
       ),
       body: RefreshIndicator(
-        onRefresh: _fetchData,
+        onRefresh: () => _fetchData(bypassCache: true),
         child: Column(
           children: [
             Padding(
@@ -162,35 +172,48 @@ class _InstitutesPageState extends State<InstitutesPage> {
             ),
             SizedBox(height: context.md),
             Expanded(
-              child: _isLoading
-                  ? const Center(child: CircularProgressIndicator())
-                  : _error != null
-                      ? _buildErrorState(context)
-                      : _filteredInstitutes.isEmpty
-                          ? _buildEmptyState(context)
-                          : SingleChildScrollView(
-                              padding: context.pagePadding,
-                              physics: const AlwaysScrollableScrollPhysics(),
-                              child: Center(
-                                child: ConstrainedBox(
-                                  constraints: BoxConstraints(maxWidth: context.scale(1200)),
-                                  child: GridView.builder(
-                                    shrinkWrap: true,
-                                    physics: const NeverScrollableScrollPhysics(),
-                                    itemCount: _filteredInstitutes.length,
-                                    gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                                      crossAxisCount: context.responsive(1, tablet: 2, desktop: 3),
-                                      crossAxisSpacing: context.md,
-                                      mainAxisSpacing: context.md,
-                                      mainAxisExtent: context.scale(210),
-                                    ),
-                                    itemBuilder: (context, index) {
-                                      return InstituteCard(data: _filteredInstitutes[index]);
-                                    },
-                                  ),
-                                ),
+              child: FutureBuilder<List<Institute>>(
+                future: _institutesFuture,
+                builder: (context, snapshot) {
+                  return ModeratorLoadingWrapper<List<Institute>>(
+                    snapshot: snapshot,
+                    cachedData: _cachedInstitutes,
+                    skeleton: const InstituteSkeleton(),
+                    onRefresh: () => _fetchData(bypassCache: true),
+                    builder: (institutes) {
+                      _allInstitutes = institutes;
+                      _filterInstitutesNoState();
+
+                      if (_filteredInstitutes.isEmpty) {
+                        return _buildEmptyState(context);
+                      }
+                      return SingleChildScrollView(
+                        padding: context.pagePadding,
+                        physics: const AlwaysScrollableScrollPhysics(),
+                        child: Center(
+                          child: ConstrainedBox(
+                            constraints: BoxConstraints(maxWidth: context.scale(1200)),
+                            child: GridView.builder(
+                              shrinkWrap: true,
+                              physics: const NeverScrollableScrollPhysics(),
+                              itemCount: _filteredInstitutes.length,
+                              gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                                crossAxisCount: context.responsive(1, tablet: 2, desktop: 3),
+                                crossAxisSpacing: context.md,
+                                mainAxisSpacing: context.md,
+                                mainAxisExtent: context.scale(210),
                               ),
+                              itemBuilder: (context, index) {
+                                return InstituteCard(data: _filteredInstitutes[index]);
+                              },
                             ),
+                          ),
+                        ),
+                      );
+                    },
+                  );
+                },
+              ),
             ),
           ],
         ),
@@ -198,33 +221,13 @@ class _InstitutesPageState extends State<InstitutesPage> {
     );
   }
 
-  Widget _buildErrorState(BuildContext context) {
-    final theme = context.theme;
-    final colorScheme = theme.colorScheme;
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(Icons.cloud_off_rounded, size: context.scale(64), color: colorScheme.error.withValues(alpha: 0.5)),
-          SizedBox(height: context.md),
-          Text("Connection Error", style: theme.textTheme.titleMedium?.copyWith(fontSize: context.font(18), color: colorScheme.error)),
-          Padding(
-            padding: EdgeInsets.symmetric(horizontal: context.lg),
-            child: Text(_error ?? "Unknown error", style: TextStyle(color: colorScheme.onSurfaceVariant, fontSize: context.font(14)), textAlign: TextAlign.center),
-          ),
-          SizedBox(height: context.scale(24)),
-          ElevatedButton.icon(
-            onPressed: _fetchData,
-            icon: const Icon(Icons.refresh_rounded),
-            label: Text("Retry", style: TextStyle(fontSize: context.font(16))),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: colorScheme.primary,
-              foregroundColor: colorScheme.onPrimary,
-            ),
-          ),
-        ],
-      ),
-    );
+  void _filterInstitutesNoState() {
+    final query = _searchController.text.toLowerCase();
+    _filteredInstitutes = _allInstitutes.where((institute) {
+      final nameLower = institute.name.toLowerCase();
+      final codeLower = institute.code.toLowerCase();
+      return nameLower.contains(query) || codeLower.contains(query);
+    }).toList();
   }
 
   Widget _buildEmptyState(BuildContext context) {

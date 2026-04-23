@@ -2,6 +2,8 @@ import 'package:eduphin/services/responsive_helper.dart';
 import 'package:eduphin/services/theme_service.dart';
 import 'package:flutter/material.dart';
 import '../services/api_service.dart';
+import 'cache_service.dart';
+import 'super_admin_common_widgets.dart';
 
 class CustomerContactScreen extends StatefulWidget {
   const CustomerContactScreen({super.key});
@@ -17,12 +19,25 @@ class _CustomerContactScreenState extends State<CustomerContactScreen> {
   @override
   void initState() {
     super.initState();
+    _loadInitialData();
+  }
+
+  Future<void> _loadInitialData() async {
+    final cachedData = await SuperAdminCacheService.loadList('customer_contacts');
+    if (cachedData != null && mounted) {
+      setState(() {
+        _contacts = cachedData;
+        _isLoading = false;
+      });
+    }
     _fetchContacts();
   }
 
   Future<void> _fetchContacts() async {
     if (!mounted) return;
-    setState(() => _isLoading = true);
+    if (_contacts.isEmpty) {
+      setState(() => _isLoading = true);
+    }
     try {
       final data = await ApiService.getSuperAdminContacts();
       if (mounted) {
@@ -30,6 +45,7 @@ class _CustomerContactScreenState extends State<CustomerContactScreen> {
           _contacts = data;
           _isLoading = false;
         });
+        await SuperAdminCacheService.saveList('customer_contacts', data);
       }
     } catch (e) {
       debugPrint("Error fetching contacts: $e");
@@ -47,9 +63,11 @@ class _CustomerContactScreenState extends State<CustomerContactScreen> {
       appBar: AppBar(
         title: Text("Customer Messages", style: TextStyle(fontSize: context.font(20), fontWeight: FontWeight.bold)),
       ),
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : RefreshIndicator(
+      body: SuperAdminLoadingWrapper(
+        isLoading: _isLoading,
+        hasData: _contacts.isNotEmpty,
+        skeleton: _buildSkeleton(context),
+        child: RefreshIndicator(
               onRefresh: _fetchContacts,
               child: SingleChildScrollView(
                 padding: context.pagePadding,
@@ -92,6 +110,64 @@ class _CustomerContactScreenState extends State<CustomerContactScreen> {
                 ),
               ),
             ),
+      ),
+    );
+  }
+
+  Widget _buildSkeleton(BuildContext context) {
+    return SingleChildScrollView(
+      padding: context.pagePadding,
+      child: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 1000),
+          child: Column(
+            children: [
+              Card(
+                elevation: 0,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(context.scale(12)),
+                  side: BorderSide(color: Colors.grey.withValues(alpha: 0.1)),
+                ),
+                child: Padding(
+                  padding: EdgeInsets.all(context.spacing),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Row(
+                        children: [
+                          SuperAdminSkeleton(height: 20, width: 20),
+                          SizedBox(width: 8),
+                          SuperAdminSkeleton(height: 16, width: 150),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      const SuperAdminSkeleton(height: 12, width: 300),
+                      SizedBox(height: context.spacing),
+                      ListView.separated(
+                        shrinkWrap: true,
+                        physics: const NeverScrollableScrollPhysics(),
+                        itemCount: 8,
+                        separatorBuilder: (_, __) => const Divider(),
+                        itemBuilder: (_, __) => const Row(
+                          children: [
+                            SuperAdminSkeleton(height: 40, width: 30),
+                            SizedBox(width: 12),
+                            Expanded(child: SuperAdminSkeleton(height: 40)),
+                            SizedBox(width: 12),
+                            Expanded(child: SuperAdminSkeleton(height: 40)),
+                            SizedBox(width: 12),
+                            Expanded(child: SuperAdminSkeleton(height: 40)),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 

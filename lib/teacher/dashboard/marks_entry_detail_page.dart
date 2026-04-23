@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:eduphin/services/api_service.dart';
 import 'package:eduphin/services/responsive_helper.dart';
 import 'package:eduphin/teacher/dashboard/exam_models.dart';
+import 'package:eduphin/teacher/dashboard/teacher_cache_service.dart';
+import 'common_widgets.dart';
 
 class MarksEntryDetailPage extends StatefulWidget {
   final ExamPaper paper;
@@ -13,7 +15,9 @@ class MarksEntryDetailPage extends StatefulWidget {
 }
 
 class _MarksEntryDetailPageState extends State<MarksEntryDetailPage> {
-  late Future<Map<String, dynamic>> _studentsFuture;
+  List<ExamStudentRegistration>? _students;
+  bool _isLoading = true;
+  String? _error;
   final Map<int, TextEditingController> _marksControllers = {};
   final Map<int, TextEditingController> _maxMarksControllers = {};
   final Map<int, TextEditingController> _gradeControllers = {};
@@ -23,7 +27,46 @@ class _MarksEntryDetailPageState extends State<MarksEntryDetailPage> {
   @override
   void initState() {
     super.initState();
-    _studentsFuture = ApiService.getExamStudents(widget.paper.id);
+    _loadData();
+  }
+
+  Future<void> _loadData() async {
+    final cacheKey = 'exam_students_${widget.paper.id}';
+    
+    // 1. Load from cache
+    final cachedData = await TeacherCacheService.load(cacheKey);
+    if (cachedData != null && mounted) {
+      setState(() {
+        _students = (cachedData['students'] as List)
+            .map((s) => ExamStudentRegistration.fromJson(s))
+            .toList();
+        _isLoading = false;
+      });
+    }
+
+    // 2. Fetch from API
+    try {
+      final data = await ApiService.getExamStudents(widget.paper.id);
+      final students = data['students'] as List<ExamStudentRegistration>;
+      if (mounted) {
+        setState(() {
+          _students = students;
+          _isLoading = false;
+          _error = null;
+        });
+        // 3. Save to cache
+        await TeacherCacheService.save(cacheKey, {
+          'students': students.map((s) => s.toJson()).toList(),
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _error = e.toString();
+          _isLoading = false;
+        });
+      }
+    }
   }
 
   @override
@@ -49,23 +92,29 @@ class _MarksEntryDetailPageState extends State<MarksEntryDetailPage> {
       appBar: AppBar(
         title: Text('Enter Marks: ${widget.paper.subjectName}'),
       ),
-      body: FutureBuilder<Map<String, dynamic>>(
-        future: _studentsFuture,
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
-          } else if (snapshot.hasError) {
-            return Center(child: Padding(
-              padding: context.pagePadding,
-              child: Text('Error: ${snapshot.error}', style: TextStyle(fontSize: context.font(14))),
-            ));
-          } else if (!snapshot.hasData || (snapshot.data!['students'] as List).isEmpty) {
-            return Center(child: Text('No students found for this class/section.', style: TextStyle(fontSize: context.font(14))));
-          } else {
-            final students = snapshot.data!['students'] as List<ExamStudentRegistration>;
-            return _buildMarksEntryForm(students);
-          }
-        },
+      body: TeacherLoadingWrapper(
+        isLoading: _isLoading,
+        hasData: _students != null,
+        skeleton: _buildSkeleton(),
+        child: RefreshIndicator(
+          onRefresh: _loadData,
+          child: _error != null && _students == null
+              ? Center(child: Text('Error: $_error'))
+              : (_students == null || _students!.isEmpty)
+                  ? Center(child: Text('No students found for this class/section.'))
+                  : _buildMarksEntryForm(_students!),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSkeleton() {
+    return ListView.builder(
+      padding: context.pagePadding,
+      itemCount: 10,
+      itemBuilder: (context, index) => Padding(
+        padding: EdgeInsets.symmetric(vertical: 8),
+        child: TeacherSkeleton(height: 50),
       ),
     );
   }

@@ -10,6 +10,7 @@ import 'package:flutter/material.dart';
 import 'all_review.dart';
 import 'dashboard_data_provider.dart';
 import 'dashboard_models.dart';
+import 'skeleton_widgets.dart';
 
 class ModeratorDashboardPage extends StatefulWidget {
   const ModeratorDashboardPage({super.key});
@@ -24,23 +25,34 @@ class _ModeratorDashboardPageState extends State<ModeratorDashboardPage> {
 
   late Future<DashboardData> _dashboardDataFuture;
   final DashboardDataProvider _dataProvider = DashboardDataProvider();
+  DashboardData? _cachedData;
 
   @override
   void initState() {
     super.initState();
-    _dashboardDataFuture = _dataProvider.fetchDashboardData();
+    _loadCacheAndFetch();
+  }
+
+  Future<void> _loadCacheAndFetch() async {
+    final cached = await _dataProvider.getCachedData();
+    if (mounted) {
+      setState(() {
+        _cachedData = cached;
+        _dashboardDataFuture = _dataProvider.fetchDashboardData();
+      });
+    }
   }
 
   Future<void> _refreshData() async {
     setState(() {
-      _dashboardDataFuture = _dataProvider.fetchDashboardData();
+      _dashboardDataFuture = _dataProvider.fetchDashboardData(bypassCache: true);
     });
+    await _dashboardDataFuture;
   }
 
   @override
   Widget build(BuildContext context) {
     final theme = context.theme;
-    final colorScheme = theme.colorScheme;
 
     return Scaffold(
       appBar: AppBar(
@@ -74,35 +86,13 @@ class _ModeratorDashboardPageState extends State<ModeratorDashboardPage> {
         child: FutureBuilder<DashboardData>(
           future: _dashboardDataFuture,
           builder: (context, snapshot) {
-            if (snapshot.connectionState == ConnectionState.waiting) {
-              return const Center(child: CircularProgressIndicator());
-            } else if (snapshot.hasError) {
-              return Center(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Text(
-                      'Error: An error occurred: ${snapshot.error}',
-                      textAlign: TextAlign.center,
-                      style: theme.textTheme.bodyMedium?.copyWith(color: colorScheme.error),
-                    ),
-                    SizedBox(height: context.spacing),
-                    ElevatedButton(
-                      onPressed: _refreshData,
-                      child: const Text('Retry'),
-                    ),
-                  ],
-                ),
-              );
-            } else if (snapshot.hasData) {
-              return _buildDashboardBody(snapshot.data!);
-            } else {
-              return const Center(
-                child: Text(
-                  'No data available.',
-                ),
-              );
-            }
+            return ModeratorLoadingWrapper<DashboardData>(
+              snapshot: snapshot,
+              cachedData: _cachedData,
+              skeleton: const DashboardSkeleton(),
+              onRefresh: _refreshData,
+              builder: (data) => _buildDashboardBody(data),
+            );
           },
         ),
       ),

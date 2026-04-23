@@ -60,10 +60,12 @@ class _LibrarianListPageState extends State<LibrarianListPage> {
 
   Future<void> _fetchLibrarians() async {
     if (!mounted) return;
-    setState(() {
-      _isLoading = _librarians.isEmpty;
-      _error = null;
-    });
+    if (_librarians.isEmpty) {
+      setState(() {
+        _isLoading = true;
+        _error = null;
+      });
+    }
 
     try {
       final response = await ApiService.get('manager/users/6');
@@ -162,6 +164,7 @@ class _LibrarianListPageState extends State<LibrarianListPage> {
   }
 
   Widget _buildSkeleton(BuildContext context) {
+    final theme = context.theme;
     return SingleChildScrollView(
       padding: context.pagePadding,
       child: Center(
@@ -169,7 +172,7 @@ class _LibrarianListPageState extends State<LibrarianListPage> {
           constraints: const BoxConstraints(maxWidth: 1200),
           child: Card(
             elevation: 0,
-            color: Colors.white,
+            color: theme.cardColor,
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(context.scale(12))),
             child: Padding(
               padding: EdgeInsets.all(context.spacing),
@@ -191,12 +194,16 @@ class _LibrarianListPageState extends State<LibrarianListPage> {
                     itemBuilder: (context, index) => Container(
                       padding: EdgeInsets.all(context.scale(12)),
                       decoration: BoxDecoration(
-                        color: Colors.white,
+                        color: theme.colorScheme.surfaceContainerLow,
                         borderRadius: BorderRadius.circular(context.scale(12)),
                       ),
                       child: Row(
                         children: [
-                          CircleAvatar(radius: context.scale(24), backgroundColor: Colors.white),
+                          SkeletonBox(
+                            width: context.scale(48),
+                            height: context.scale(48),
+                            borderRadius: context.scale(24),
+                          ),
                           SizedBox(width: context.scale(16)),
                           const Expanded(
                             child: Column(

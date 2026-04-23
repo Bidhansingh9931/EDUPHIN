@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:eduphin/services/api_service.dart';
 import 'package:eduphin/services/responsive_helper.dart';
+import 'package:eduphin/services/caching_service.dart';
+import 'package:eduphin/services/common_widgets.dart';
 
 class LibraryBooksPage extends StatefulWidget {
   const LibraryBooksPage({super.key});
@@ -39,35 +41,71 @@ class _LibraryBooksPageState extends State<LibraryBooksPage> {
   @override
   void initState() {
     super.initState();
+    _loadCachedData();
     _fetchBooks();
   }
 
+  Future<void> _loadCachedData() async {
+    final cachedData = await CacheService.getData('student_library_books');
+    if (cachedData != null && mounted) {
+      final Map<String, dynamic> data = Map<String, dynamic>.from(cachedData as Map? ?? {});
+      setState(() {
+        _books = List<dynamic>.from(data['books'] ?? []);
+        if (_categories.length == 1 && data['filters'] != null) {
+          final filters = Map<String, dynamic>.from(data['filters']);
+          _categories.addAll(List<String>.from(filters['categories'] ?? []));
+          _languages.addAll(List<String>.from(filters['languages'] ?? []));
+          _formats.addAll(List<String>.from(filters['formats'] ?? []));
+          _years.addAll(List<String>.from(filters['years']?.map((e) => e.toString()) ?? []));
+        }
+        _isLoading = false;
+      });
+    }
+  }
+
   Future<void> _fetchBooks() async {
-    setState(() {
-      _isLoading = true;
-      _errorMessage = null;
-    });
+    if (_books.isEmpty) {
+      setState(() {
+        _isLoading = true;
+      });
+    }
+    _errorMessage = null;
 
     try {
       final response = await ApiService.getStudentLibraryBooks(_filters, 1);
-      setState(() {
-        _books = response['data']['books']['data'] ?? [];
-        
-        // Update filter options if they are empty (only once)
-        if (_categories.length == 1) {
-          _categories.addAll(List<String>.from(response['data']['filters']['categories'] ?? []));
-          _languages.addAll(List<String>.from(response['data']['filters']['languages'] ?? []));
-          _formats.addAll(List<String>.from(response['data']['filters']['formats'] ?? []));
-          _years.addAll(List<String>.from(response['data']['filters']['years']?.map((e) => e.toString()) ?? []));
-        }
-        
-        _isLoading = false;
-      });
+      final data = response['data'];
+      if (mounted) {
+        setState(() {
+          _books = data['books']['data'] ?? [];
+          
+          // Update filter options if they are empty (only once)
+          if (_categories.length == 1) {
+            _categories.addAll(List<String>.from(data['filters']['categories'] ?? []));
+            _languages.addAll(List<String>.from(data['filters']['languages'] ?? []));
+            _formats.addAll(List<String>.from(data['filters']['formats'] ?? []));
+            _years.addAll(List<String>.from(data['filters']['years']?.map((e) => e.toString()) ?? []));
+          }
+          
+          _isLoading = false;
+        });
+        await CacheService.saveData('student_library_books', {
+          'books': _books,
+          'filters': data['filters'],
+        });
+      }
     } catch (e) {
-      setState(() {
-        _isLoading = false;
-        _errorMessage = e.toString();
-      });
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+          if (_books.isEmpty) {
+            _errorMessage = e.toString();
+          } else {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text("Failed to refresh: ${e.toString()}")),
+            );
+          }
+        });
+      }
     }
   }
 
@@ -200,63 +238,66 @@ class _LibraryBooksPageState extends State<LibraryBooksPage> {
                 SizedBox(height: context.scale(24)),
 
                 /// RESULTS TABLE
-                Card(
-                  elevation: 0,
-                  color: colorScheme.surfaceContainerLow,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(context.scale(16)),
-                    side: BorderSide(color: colorScheme.outlineVariant.withValues(alpha: 0.5)),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      Padding(
-                        padding: EdgeInsets.all(context.scale(20.0)),
-                        child: Text(
-                          "Available Books",
-                          style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold, fontSize: context.font(18)),
+                LoadingWrapper(
+                  isLoading: _isLoading,
+                  hasData: _books.isNotEmpty,
+                  error: _errorMessage,
+                  skeleton: const _BooksSkeleton(),
+                  onRetry: _fetchBooks,
+                  child: Card(
+                    elevation: 0,
+                    color: colorScheme.surfaceContainerLow,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(context.scale(16)),
+                      side: BorderSide(color: colorScheme.outlineVariant.withValues(alpha: 0.5)),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        Padding(
+                          padding: EdgeInsets.all(context.scale(20.0)),
+                          child: Text(
+                            "Available Books",
+                            style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold, fontSize: context.font(18)),
+                          ),
                         ),
-                      ),
-                      if (_isLoading)
-                        Center(child: Padding(padding: EdgeInsets.all(context.scale(40.0)), child: CircularProgressIndicator(color: colorScheme.primary)))
-                      else if (_errorMessage != null)
-                        Center(child: Padding(padding: EdgeInsets.all(context.scale(40.0)), child: Text(_errorMessage!, style: TextStyle(color: colorScheme.error, fontSize: context.font(14)))))
-                      else if (_books.isEmpty)
-                        Center(child: Padding(padding: EdgeInsets.all(context.scale(40.0)), child: Text("No books found", style: TextStyle(fontSize: context.font(14), color: colorScheme.onSurfaceVariant))))
-                      else
-                        SingleChildScrollView(
-                          scrollDirection: Axis.horizontal,
-                          child: ConstrainedBox(
-                            constraints: BoxConstraints(minWidth: context.screenWidth - context.scale(64)),
-                            child: Theme(
-                              data: theme.copyWith(dividerColor: colorScheme.outlineVariant.withValues(alpha: 0.5)),
-                              child: DataTable(
-                                headingRowColor: WidgetStateProperty.all(colorScheme.surfaceContainerHighest.withValues(alpha: 0.3)),
-                                columnSpacing: context.responsive(24.0, tablet: 48.0, desktop: 64.0),
-                                columns: [
-                                  DataColumn(label: Text("#", style: TextStyle(fontWeight: FontWeight.bold, fontSize: context.font(14)))),
-                                  DataColumn(label: Text("TITLE", style: TextStyle(fontWeight: FontWeight.bold, fontSize: context.font(14)))),
-                                  DataColumn(label: Text("AUTHOR", style: TextStyle(fontWeight: FontWeight.bold, fontSize: context.font(14)))),
-                                  DataColumn(label: Text("ISBN", style: TextStyle(fontWeight: FontWeight.bold, fontSize: context.font(14)))),
-                                  DataColumn(label: Text("COPIES", style: TextStyle(fontWeight: FontWeight.bold, fontSize: context.font(14)))),
-                                ],
-                                rows: _books.asMap().entries.map((entry) {
-                                  int index = entry.key;
-                                  var book = entry.value;
-                                  return DataRow(cells: [
-                                    DataCell(Text((index + 1).toString(), style: TextStyle(fontSize: context.font(14), color: colorScheme.onSurface))),
-                                    DataCell(Text(book['title'] ?? 'N/A', style: TextStyle(fontSize: context.font(14), color: colorScheme.onSurface))),
-                                    DataCell(Text(book['author'] ?? 'N/A', style: TextStyle(fontSize: context.font(14), color: colorScheme.onSurface))),
-                                    DataCell(Text(book['isbn'] ?? 'N/A', style: TextStyle(fontSize: context.font(14), color: colorScheme.onSurface))),
-                                    DataCell(Text(book['available_copies']?.toString() ?? '0', style: TextStyle(fontSize: context.font(14), color: colorScheme.onSurface))),
-                                  ]);
-                                }).toList(),
+                        if (_books.isEmpty)
+                          Center(child: Padding(padding: EdgeInsets.all(context.scale(40.0)), child: Text("No books found", style: TextStyle(fontSize: context.font(14), color: colorScheme.onSurfaceVariant))))
+                        else
+                          SingleChildScrollView(
+                            scrollDirection: Axis.horizontal,
+                            child: ConstrainedBox(
+                              constraints: BoxConstraints(minWidth: context.screenWidth - context.scale(64)),
+                              child: Theme(
+                                data: theme.copyWith(dividerColor: colorScheme.outlineVariant.withValues(alpha: 0.5)),
+                                child: DataTable(
+                                  headingRowColor: WidgetStateProperty.all(colorScheme.surfaceContainerHighest.withValues(alpha: 0.3)),
+                                  columnSpacing: context.responsive(24.0, tablet: 48.0, desktop: 64.0),
+                                  columns: [
+                                    DataColumn(label: Text("#", style: TextStyle(fontWeight: FontWeight.bold, fontSize: context.font(14)))),
+                                    DataColumn(label: Text("TITLE", style: TextStyle(fontWeight: FontWeight.bold, fontSize: context.font(14)))),
+                                    DataColumn(label: Text("AUTHOR", style: TextStyle(fontWeight: FontWeight.bold, fontSize: context.font(14)))),
+                                    DataColumn(label: Text("ISBN", style: TextStyle(fontWeight: FontWeight.bold, fontSize: context.font(14)))),
+                                    DataColumn(label: Text("COPIES", style: TextStyle(fontWeight: FontWeight.bold, fontSize: context.font(14)))),
+                                  ],
+                                  rows: _books.asMap().entries.map((entry) {
+                                    int index = entry.key;
+                                    var book = entry.value;
+                                    return DataRow(cells: [
+                                      DataCell(Text((index + 1).toString(), style: TextStyle(fontSize: context.font(14), color: colorScheme.onSurface))),
+                                      DataCell(Text(book['title'] ?? 'N/A', style: TextStyle(fontSize: context.font(14), color: colorScheme.onSurface))),
+                                      DataCell(Text(book['author'] ?? 'N/A', style: TextStyle(fontSize: context.font(14), color: colorScheme.onSurface))),
+                                      DataCell(Text(book['isbn'] ?? 'N/A', style: TextStyle(fontSize: context.font(14), color: colorScheme.onSurface))),
+                                      DataCell(Text(book['available_copies']?.toString() ?? '0', style: TextStyle(fontSize: context.font(14), color: colorScheme.onSurface))),
+                                    ]);
+                                  }).toList(),
+                                ),
                               ),
                             ),
                           ),
-                        ),
-                      SizedBox(height: context.scale(12)),
-                    ],
+                        SizedBox(height: context.scale(12)),
+                      ],
+                    ),
                   ),
                 ),
               ],
@@ -343,6 +384,44 @@ class _LibraryBooksPageState extends State<LibraryBooksPage> {
           borderSide: BorderSide(color: colorScheme.primary),
           borderRadius: BorderRadius.circular(context.scale(12)),
         ),
+      ),
+    );
+  }
+}
+
+class _BooksSkeleton extends StatelessWidget {
+  const _BooksSkeleton();
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      elevation: 0,
+      color: context.theme.colorScheme.surfaceContainerLow,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(context.scale(16)),
+        side: BorderSide(color: context.theme.colorScheme.outlineVariant.withValues(alpha: 0.5)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: EdgeInsets.all(context.scale(20)),
+            child: SkeletonBox(width: context.scale(120), height: context.scale(20), borderRadius: context.scale(4)),
+          ),
+          ...List.generate(5, (index) => Padding(
+            padding: EdgeInsets.symmetric(horizontal: context.scale(20), vertical: context.scale(12)),
+            child: Row(
+              children: [
+                SkeletonBox(width: context.scale(30), height: context.scale(16), borderRadius: context.scale(4)),
+                SizedBox(width: context.scale(16)),
+                Expanded(child: SkeletonBox(height: context.scale(16), borderRadius: context.scale(4))),
+                SizedBox(width: context.scale(16)),
+                SkeletonBox(width: context.scale(60), height: context.scale(16), borderRadius: context.scale(4)),
+              ],
+            ),
+          )),
+          SizedBox(height: context.scale(12)),
+        ],
       ),
     );
   }

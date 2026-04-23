@@ -3,6 +3,8 @@ import 'package:eduphin/services/api_service.dart';
 import 'package:eduphin/services/responsive_helper.dart';
 import 'package:eduphin/services/common_widgets.dart';
 import 'package:eduphin/teacher/dashboard/teacher_profile_model.dart';
+import 'package:eduphin/teacher/dashboard/teacher_cache_service.dart';
+import 'package:shimmer/shimmer.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -15,8 +17,9 @@ class ProfilePage extends StatefulWidget {
 }
 
 class _ProfilePageState extends State<ProfilePage> {
-  late Future<TeacherProfile> _profileFuture;
   TeacherProfile? _profile;
+  bool _isLoading = true;
+  String? _error;
 
   final _nameController = TextEditingController();
   final _emailController = TextEditingController();
@@ -47,30 +50,57 @@ class _ProfilePageState extends State<ProfilePage> {
     _loadProfile();
   }
 
-  void _loadProfile() {
-    _profileFuture = ApiService.getTeacherProfile();
-    _profileFuture.then((profile) {
+  Future<void> _loadProfile() async {
+    // 1. Load from cache
+    final cachedData = await TeacherCacheService.load('profile');
+    if (cachedData != null) {
+      if (mounted) {
+        setState(() {
+          _profile = TeacherProfile.fromJson(cachedData);
+          _syncControllers(_profile!);
+          _isLoading = false;
+        });
+      }
+    }
+
+    // 2. Fetch from API
+    try {
+      final profile = await ApiService.getTeacherProfile();
+      await TeacherCacheService.save('profile', profile.toJson());
       if (mounted) {
         setState(() {
           _profile = profile;
-          _nameController.text = profile.name;
-          _emailController.text = profile.email;
-          _genderController.text = profile.gender ?? '';
-          _dobController.text = profile.dateOfBirth ?? '';
-          _phoneController.text = profile.phone ?? '';
-          _altPhoneController.text = profile.alternatePhone ?? '';
-          _relationshipStatusController.text = profile.relationshipStatus ?? '';
-          _addressController.text = profile.address ?? '';
-          _cityController.text = profile.city ?? '';
-          _stateController.text = profile.state ?? '';
-          _pincodeController.text = profile.pincode ?? '';
-          _accountNumberController.text = profile.bankAccountNumber ?? '';
-          _ifscController.text = profile.ifscCode ?? '';
-          _bankNameController.text = profile.bankName ?? '';
-          _branchController.text = profile.branch ?? '';
+          _syncControllers(_profile!);
+          _isLoading = false;
+          _error = null;
         });
       }
-    });
+    } catch (e) {
+      if (_profile == null) {
+        setState(() {
+          _error = e.toString();
+          _isLoading = false;
+        });
+      }
+    }
+  }
+
+  void _syncControllers(TeacherProfile profile) {
+    _nameController.text = profile.name;
+    _emailController.text = profile.email;
+    _genderController.text = profile.gender ?? '';
+    _dobController.text = profile.dateOfBirth ?? '';
+    _phoneController.text = profile.phone ?? '';
+    _altPhoneController.text = profile.alternatePhone ?? '';
+    _relationshipStatusController.text = profile.relationshipStatus ?? '';
+    _addressController.text = profile.address ?? '';
+    _cityController.text = profile.city ?? '';
+    _stateController.text = profile.state ?? '';
+    _pincodeController.text = profile.pincode ?? '';
+    _accountNumberController.text = profile.bankAccountNumber ?? '';
+    _ifscController.text = profile.ifscCode ?? '';
+    _bankNameController.text = profile.bankName ?? '';
+    _branchController.text = profile.branch ?? '';
   }
 
   Future<void> _pickPhoto() async {
@@ -174,216 +204,262 @@ class _ProfilePageState extends State<ProfilePage> {
           ),
         ),
       ),
-      body: FutureBuilder<TeacherProfile>(
-        future: _profileFuture,
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
-          } else if (snapshot.hasError) {
-            return Center(child: Text('Error: ${snapshot.error}', style: TextStyle(fontSize: context.font(14))));
-          } else if (snapshot.hasData) {
-            final profile = snapshot.data!;
-            return SingleChildScrollView(
-              padding: context.pagePadding,
-              child: Center(
-                child: ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 1000),
-                  child: Column(
-                    children: [
-                      _buildHeader(profile),
-                      SizedBox(height: context.xl),
-                      AdaptiveFieldRow(children: [
-                        ProfileSection(
-                          title: "Personal Information",
-                          icon: Icons.person_outline,
-                          status: "Editable",
-                          children: [
-                            AdaptiveFieldRow(children: [
-                              ProfileDropdown(
-                                label: "Gender",
-                                value: _genderController.text.isEmpty ? null : _genderController.text,
-                                items: const ['Male', 'Female', 'Other'],
-                                onChanged: (v) => setState(() => _genderController.text = v!),
-                                icon: Icons.wc_outlined,
-                              ),
-                              ProfileTextField(
-                                label: "Date of Birth",
-                                controller: _dobController,
-                                readOnly: true,
-                                icon: Icons.calendar_today_rounded,
-                                onTap: () async {
-                                  DateTime? picked = await showDatePicker(
-                                    context: context,
-                                    initialDate: DateTime.tryParse(_dobController.text) ?? DateTime.now(),
-                                    firstDate: DateTime(1900),
-                                    lastDate: DateTime(2101),
-                                  );
-                                  if (picked != null) {
-                                    setState(() => _dobController.text = "${picked.year}-${picked.month.toString().padLeft(2, '0')}-${picked.day.toString().padLeft(2, '0')}");
-                                  }
-                                },
-                              ),
-                            ]),
-                            AdaptiveFieldRow(children: [
-                              ProfileTextField(
-                                label: "Phone",
-                                controller: _phoneController,
-                                icon: Icons.phone_android,
-                                keyboardType: TextInputType.phone,
-                              ),
-                              ProfileTextField(
-                                label: "Alternate Phone",
-                                controller: _altPhoneController,
-                                icon: Icons.phone,
-                                keyboardType: TextInputType.phone,
-                              ),
-                            ]),
-                            AdaptiveFieldRow(children: [
-                              ProfileTextField(
-                                label: "Relationship Status",
-                                controller: _relationshipStatusController,
-                                icon: Icons.favorite_outline,
-                              ),
-                            ]),
-                          ],
-                        ),
-                        ProfileSection(
-                          title: "Address Information",
-                          icon: Icons.home_outlined,
-                          status: "Update",
-                          children: [
-                            ProfileTextField(
-                              label: "Address",
-                              controller: _addressController,
-                              icon: Icons.map_outlined,
-                              maxLines: 2,
-                            ),
-                            AdaptiveFieldRow(children: [
-                              ProfileTextField(label: "City", controller: _cityController),
-                              ProfileTextField(label: "State", controller: _stateController),
-                            ]),
-                            ProfileTextField(
-                              label: "Pincode",
-                              controller: _pincodeController,
-                              icon: Icons.pin_drop_outlined,
-                              keyboardType: TextInputType.number,
-                            ),
-                          ],
-                        ),
-                      ]),
-                      AdaptiveFieldRow(children: [
-                        ProfileSection(
-                          title: "Banking Information",
-                          icon: Icons.account_balance_outlined,
-                          status: "Editable",
-                          children: [
-                            ProfileTextField(
-                              label: "Bank Account Number",
-                              controller: _accountNumberController,
-                              icon: Icons.numbers,
-                              keyboardType: TextInputType.number,
-                            ),
-                            AdaptiveFieldRow(children: [
-                              ProfileTextField(
-                                label: "IFSC Code",
-                                controller: _ifscController,
-                                icon: Icons.code,
-                              ),
-                              ProfileTextField(
-                                label: "Bank Name",
-                                controller: _bankNameController,
-                                icon: Icons.account_balance,
-                              ),
-                            ]),
-                            ProfileTextField(
-                              label: "Branch Name",
-                              controller: _branchController,
-                              icon: Icons.location_on_outlined,
-                            ),
-                          ],
-                        ),
-                        ProfileSection(
-                          title: "Security Settings",
-                          icon: Icons.security_outlined,
-                          status: "Editable",
-                          children: [
-                            AdaptiveFieldRow(children: [
-                              ProfileTextField(
-                                label: "New Password",
-                                controller: _passwordController,
-                                isPassword: true,
-                                icon: Icons.lock_outline,
-                              ),
-                              ProfileTextField(
-                                label: "Confirm Password",
-                                controller: _confirmPasswordController,
-                                isPassword: true,
-                                icon: Icons.lock_outline,
-                              ),
-                            ]),
-                          ],
-                        ),
-                      ]),
-                      ProfileSection(
-                        title: "Employment Details",
-                        icon: Icons.work_outline,
-                        status: "Read only",
-                        isReadOnly: true,
-                        children: [
-                          AdaptiveFieldRow(children: [
-                            ProfileBadge(
-                              label: "POSITION",
-                              value: profile.position ?? "N/A",
-                              icon: Icons.badge_outlined,
-                            ),
-                            ProfileBadge(
-                              label: "EMPLOYMENT TYPE",
-                              value: profile.employmentType ?? "N/A",
-                              icon: Icons.timer_outlined,
-                            ),
-                          ]),
-                          AdaptiveFieldRow(children: [
-                            ProfileBadge(
-                              label: "JOINING DATE",
-                              value: profile.joiningDate ?? "N/A",
-                              icon: Icons.calendar_today_outlined,
-                            ),
-                            ProfileBadge(
-                              label: "EXPERIENCE",
-                              value: profile.experience ?? "N/A",
-                              icon: Icons.history_outlined,
-                            ),
-                          ]),
-                          ProfileBadge(
-                            label: "STATUS",
-                            value: profile.status?.toUpperCase() ?? "LIVE",
-                            icon: Icons.check_circle_outline,
-                          ),
-                        ],
+      body: _buildBody(),
+    );
+  }
+
+  Widget _buildBody() {
+    if (_isLoading && _profile == null) {
+      return _buildSkeleton();
+    }
+    if (_error != null && _profile == null) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Text('Error: $_error', style: TextStyle(fontSize: context.font(14))),
+            ElevatedButton(onPressed: _loadProfile, child: const Text("Retry")),
+          ],
+        ),
+      );
+    }
+    if (_profile == null) {
+      return Center(child: Text('No data', style: TextStyle(fontSize: context.font(14))));
+    }
+
+    final profile = _profile!;
+    return SingleChildScrollView(
+      padding: context.pagePadding,
+      child: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 1000),
+          child: Column(
+            children: [
+              _buildHeader(profile),
+              SizedBox(height: context.xl),
+              AdaptiveFieldRow(children: [
+                ProfileSection(
+                  title: "Personal Information",
+                  icon: Icons.person_outline,
+                  status: "Editable",
+                  children: [
+                    AdaptiveFieldRow(children: [
+                      ProfileDropdown(
+                        label: "Gender",
+                        value: _genderController.text.isEmpty ? null : _genderController.text,
+                        items: const ['Male', 'Female', 'Other'],
+                        onChanged: (v) => setState(() => _genderController.text = v!),
+                        icon: Icons.wc_outlined,
                       ),
-                      SizedBox(height: context.xl),
-                      SizedBox(
-                        width: double.infinity,
-                        child: ElevatedButton(
-                          onPressed: _isSaving ? null : _saveChanges,
-                          style: ElevatedButton.styleFrom(
-                            padding: EdgeInsets.symmetric(vertical: context.scale(16)),
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(context.scale(12))),
-                          ),
-                          child: _isSaving
-                              ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2))
-                              : Text("SAVE CHANGES", style: TextStyle(fontWeight: FontWeight.bold, fontSize: context.font(14))),
-                        ),
+                      ProfileTextField(
+                        label: "Date of Birth",
+                        controller: _dobController,
+                        readOnly: true,
+                        icon: Icons.calendar_today_rounded,
+                        onTap: () async {
+                          DateTime? picked = await showDatePicker(
+                            context: context,
+                            initialDate: DateTime.tryParse(_dobController.text) ?? DateTime.now(),
+                            firstDate: DateTime(1900),
+                            lastDate: DateTime(2101),
+                          );
+                          if (picked != null) {
+                            setState(() => _dobController.text =
+                                "${picked.year}-${picked.month.toString().padLeft(2, '0')}-${picked.day.toString().padLeft(2, '0')}");
+                          }
+                        },
                       ),
-                      SizedBox(height: context.xl * 2),
-                    ],
+                    ]),
+                    AdaptiveFieldRow(children: [
+                      ProfileTextField(
+                        label: "Phone",
+                        controller: _phoneController,
+                        icon: Icons.phone_android,
+                        keyboardType: TextInputType.phone,
+                      ),
+                      ProfileTextField(
+                        label: "Alternate Phone",
+                        controller: _altPhoneController,
+                        icon: Icons.phone,
+                        keyboardType: TextInputType.phone,
+                      ),
+                    ]),
+                    AdaptiveFieldRow(children: [
+                      ProfileTextField(
+                        label: "Relationship Status",
+                        controller: _relationshipStatusController,
+                        icon: Icons.favorite_outline,
+                      ),
+                    ]),
+                  ],
+                ),
+                ProfileSection(
+                  title: "Address Information",
+                  icon: Icons.home_outlined,
+                  status: "Update",
+                  children: [
+                    ProfileTextField(
+                      label: "Address",
+                      controller: _addressController,
+                      icon: Icons.map_outlined,
+                      maxLines: 2,
+                    ),
+                    AdaptiveFieldRow(children: [
+                      ProfileTextField(label: "City", controller: _cityController),
+                      ProfileTextField(label: "State", controller: _stateController),
+                    ]),
+                    ProfileTextField(
+                      label: "Pincode",
+                      controller: _pincodeController,
+                      icon: Icons.pin_drop_outlined,
+                      keyboardType: TextInputType.number,
+                    ),
+                  ],
+                ),
+              ]),
+              AdaptiveFieldRow(children: [
+                ProfileSection(
+                  title: "Banking Information",
+                  icon: Icons.account_balance_outlined,
+                  status: "Editable",
+                  children: [
+                    ProfileTextField(
+                      label: "Bank Account Number",
+                      controller: _accountNumberController,
+                      icon: Icons.numbers,
+                      keyboardType: TextInputType.number,
+                    ),
+                    AdaptiveFieldRow(children: [
+                      ProfileTextField(
+                        label: "IFSC Code",
+                        controller: _ifscController,
+                        icon: Icons.code,
+                      ),
+                      ProfileTextField(
+                        label: "Bank Name",
+                        controller: _bankNameController,
+                        icon: Icons.account_balance,
+                      ),
+                    ]),
+                    ProfileTextField(
+                      label: "Branch Name",
+                      controller: _branchController,
+                      icon: Icons.location_on_outlined,
+                    ),
+                  ],
+                ),
+                ProfileSection(
+                  title: "Security Settings",
+                  icon: Icons.security_outlined,
+                  status: "Editable",
+                  children: [
+                    AdaptiveFieldRow(children: [
+                      ProfileTextField(
+                        label: "New Password",
+                        controller: _passwordController,
+                        isPassword: true,
+                        icon: Icons.lock_outline,
+                      ),
+                      ProfileTextField(
+                        label: "Confirm Password",
+                        controller: _confirmPasswordController,
+                        isPassword: true,
+                        icon: Icons.lock_outline,
+                      ),
+                    ]),
+                  ],
+                ),
+              ]),
+              ProfileSection(
+                title: "Employment Details",
+                icon: Icons.work_outline,
+                status: "Read only",
+                isReadOnly: true,
+                children: [
+                  AdaptiveFieldRow(children: [
+                    ProfileBadge(
+                      label: "POSITION",
+                      value: profile.position ?? "N/A",
+                      icon: Icons.badge_outlined,
+                    ),
+                    ProfileBadge(
+                      label: "EMPLOYMENT TYPE",
+                      value: profile.employmentType ?? "N/A",
+                      icon: Icons.timer_outlined,
+                    ),
+                  ]),
+                  AdaptiveFieldRow(children: [
+                    ProfileBadge(
+                      label: "JOINING DATE",
+                      value: profile.joiningDate ?? "N/A",
+                      icon: Icons.calendar_today_outlined,
+                    ),
+                    ProfileBadge(
+                      label: "EXPERIENCE",
+                      value: profile.experience ?? "N/A",
+                      icon: Icons.history_outlined,
+                    ),
+                  ]),
+                  ProfileBadge(
+                    label: "STATUS",
+                    value: profile.status?.toUpperCase() ?? "LIVE",
+                    icon: Icons.check_circle_outline,
                   ),
+                ],
+              ),
+              SizedBox(height: context.xl),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  onPressed: _isSaving ? null : _saveChanges,
+                  style: ElevatedButton.styleFrom(
+                    padding: EdgeInsets.symmetric(vertical: context.scale(16)),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(context.scale(12))),
+                  ),
+                  child: _isSaving
+                      ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2))
+                      : Text("SAVE CHANGES", style: TextStyle(fontWeight: FontWeight.bold, fontSize: context.font(14))),
                 ),
               ),
-            );
-          }
-          return Center(child: Text('No data', style: TextStyle(fontSize: context.font(14))));
-        },
+              SizedBox(height: context.xl * 2),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSkeleton() {
+    return Shimmer.fromColors(
+      baseColor: Colors.grey[300]!,
+      highlightColor: Colors.grey[100]!,
+      child: SingleChildScrollView(
+        padding: context.pagePadding,
+        child: Column(
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                CircleAvatar(radius: context.scale(60), backgroundColor: Colors.white),
+                SizedBox(width: context.xl),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Container(height: 24, width: 200, color: Colors.white),
+                    SizedBox(height: 8),
+                    Container(height: 16, width: 150, color: Colors.white),
+                  ],
+                )
+              ],
+            ),
+            SizedBox(height: 40),
+            for (int i = 0; i < 3; i++)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 20),
+                child: Container(height: 150, width: double.infinity, color: Colors.white),
+              ),
+          ],
+        ),
       ),
     );
   }

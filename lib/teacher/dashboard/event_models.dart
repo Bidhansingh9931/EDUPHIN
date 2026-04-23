@@ -24,4 +24,14 @@ class RegisteredEvent {
       event: Event.fromJson(json['event'] ?? {}),
     );
   }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'event_id': eventId,
+      'user_id': userId,
+      'status': status,
+      'event': event.toJson(),
+    };
+  }
 }

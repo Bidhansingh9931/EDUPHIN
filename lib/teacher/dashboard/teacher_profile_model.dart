@@ -106,6 +106,40 @@ class TeacherProfile {
     );
   }
 
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'name': name,
+      'email': email,
+      'photo': photoUrl,
+      'gender': gender,
+      'date_of_birth': dateOfBirth,
+      'address': address,
+      'city': city,
+      'state': state,
+      'pincode': pincode,
+      'phone': phone,
+      'alternate_phone': alternatePhone,
+      'bank_account_number': bankAccountNumber,
+      'ifsc_code': ifscCode,
+      'bank_name': bankName,
+      'bank_branch': branch,
+      'designation': position,
+      'employment_type': employmentType,
+      'date_of_joining': joiningDate,
+      'work_experience': experience,
+      'marital_status': relationshipStatus,
+      'qualification': qualification,
+      'x_marks': xMarks,
+      'xii_marks': xiiMarks,
+      'aadhaar_number': aadhaarNumber,
+      'status': status,
+      'employee_id': employeeId,
+      'emergency_contact_name': emergencyContactName,
+      'emergency_contact_phone': emergencyContactPhone,
+    };
+  }
+
   Map<String, String> toApiData() {
     final map = <String, String>{};
     if (name.isNotEmpty) map['name'] = name;
@@ -205,5 +239,28 @@ class VirtualIdCardData {
       issueDate: json['issue_date']?.toString(),
       libraryId: userDetail['library_id']?.toString(),
     );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'name': name,
+      'email': email,
+      'photo': photoUrl,
+      'institute_name': instituteName,
+      'institute_logo': instituteLogo,
+      'institute_address': instituteAddress,
+      'institute_phone': institutePhone,
+      'institute_website': instituteWebsite,
+      'employee_id': employeeId,
+      'position': position,
+      'employment_type': employmentType,
+      'joining_date': joiningDate,
+      'phone': phone,
+      'full_address': fullAddress,
+      'emergency_contact_name': emergencyContactName,
+      'emergency_contact_phone': emergencyContactPhone,
+      'issue_date': issueDate,
+      'library_id': libraryId,
+    };
   }
 }

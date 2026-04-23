@@ -1,4 +1,5 @@
 import 'package:eduphin/services/responsive_helper.dart';
+import 'package:eduphin/teacher/dashboard/teacher_cache_service.dart';
 import 'package:flutter/material.dart';
 import 'package:eduphin/services/api_service.dart';
 import 'package:eduphin/manager_dashboard/events/event_model.dart';
@@ -13,13 +14,50 @@ class ExploreEventsPage extends StatefulWidget {
 
 class _ExploreEventsPageState extends State<ExploreEventsPage> {
   final Map<String, String?> _filters = {'status': 'all', 'type': 'all', 'search': ''};
-  final TextEditingController _searchController = TextEditingController();
-  Key _listKey = UniqueKey();
+  List<Event>? _events;
+  bool _isLoading = true;
 
   @override
-  void dispose() {
-    _searchController.dispose();
-    super.dispose();
+  void initState() {
+    super.initState();
+    _loadInitialData();
+  }
+
+  Future<void> _loadInitialData() async {
+    final cachedData = await TeacherCacheService.load('explore_events');
+    if (cachedData != null && mounted) {
+      setState(() {
+        _events = (cachedData as List).map((e) => Event.fromJson(e)).toList();
+        _isLoading = false;
+      });
+    }
+    _fetchEvents();
+  }
+
+  Future<void> _fetchEvents() async {
+    if (!mounted) return;
+    if (_events == null) {
+      setState(() => _isLoading = true);
+    }
+    try {
+      final events = await ApiService.getEvents(
+        status: _filters['status'] == 'all' ? null : _filters['status'],
+        type: _filters['type'] == 'all' ? null : _filters['type'],
+      );
+      if (mounted) {
+        setState(() {
+          _events = events;
+          _isLoading = false;
+        });
+        if (_filters['status'] == 'all' && _filters['type'] == 'all') {
+          await TeacherCacheService.save('explore_events', events.map((e) => e.toJson()).toList());
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
+    }
   }
 
   @override
@@ -28,44 +66,52 @@ class _ExploreEventsPageState extends State<ExploreEventsPage> {
       appBar: AppBar(
         title: const Text("Explore Events"),
       ),
-      body: SingleChildScrollView(
-        child: Center(
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 1000),
-            child: Column(
-              children: [
-                _buildFilterSection(),
-                FutureBuilder<List<Event>>(
-                  key: _listKey,
-                  future: ApiService.getEvents(
-                    status: _filters['status'] == 'all' ? null : _filters['status'],
-                    type: _filters['type'] == 'all' ? null : _filters['type'],
-                  ),
-                  builder: (context, snapshot) {
-                    if (snapshot.connectionState == ConnectionState.waiting) {
-                      return Padding(
-                        padding: EdgeInsets.all(context.spacing * 2),
-                        child: const Center(child: CircularProgressIndicator()),
-                      );
-                    } else if (snapshot.hasError) {
-                      return Padding(
-                        padding: EdgeInsets.all(context.spacing * 2),
-                        child: Center(child: Text('Error: ${snapshot.error}', style: TextStyle(color: context.theme.colorScheme.error))),
-                      );
-                    } else if (!snapshot.hasData || snapshot.data!.isEmpty) {
-                      return Padding(
-                        padding: EdgeInsets.all(context.spacing * 2),
-                        child: Center(child: Text("No events found.", style: TextStyle(fontSize: context.font(14), color: context.theme.colorScheme.onSurfaceVariant))),
-                      );
-                    }
-
-                    final events = snapshot.data!;
-                    return _buildEventsTable(events);
-                  },
+      body: TeacherLoadingWrapper(
+        isLoading: _isLoading,
+        hasData: _events != null,
+        skeleton: _buildSkeleton(context),
+        child: RefreshIndicator(
+          onRefresh: _fetchEvents,
+          child: SingleChildScrollView(
+            physics: const AlwaysScrollableScrollPhysics(),
+            child: Center(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 1000),
+                child: Column(
+                  children: [
+                    _buildFilterSection(),
+                    if (_events != null)
+                      _events!.isEmpty 
+                        ? Padding(
+                            padding: EdgeInsets.all(context.spacing * 2),
+                            child: Center(child: Text("No events found.", style: TextStyle(fontSize: context.font(14), color: context.theme.colorScheme.onSurfaceVariant))),
+                          )
+                        : _buildEventsTable(_events!)
+                    else
+                      const SizedBox.shrink(),
+                    SizedBox(height: context.spacing * 2),
+                  ],
                 ),
-                SizedBox(height: context.spacing * 2),
-              ],
+              ),
             ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSkeleton(BuildContext context) {
+    return SingleChildScrollView(
+      padding: context.pagePadding,
+      child: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 1000),
+          child: Column(
+            children: [
+              TeacherSkeleton(height: context.scale(200), borderRadius: BorderRadius.circular(20)),
+              SizedBox(height: context.spacing),
+              TeacherSkeleton(height: context.scale(400), borderRadius: BorderRadius.circular(20)),
+            ],
           ),
         ),
       ),
@@ -129,16 +175,18 @@ class _ExploreEventsPageState extends State<ExploreEventsPage> {
               child: buildActionButton(
                 context, 
                 "RESET", 
-                () => setState(() {
-                  _filters['status'] = 'all';
-                  _filters['type'] = 'all';
-                  _listKey = UniqueKey();
-                }),
+                () {
+                  setState(() {
+                    _filters['status'] = 'all';
+                    _filters['type'] = 'all';
+                  });
+                  _fetchEvents();
+                },
                 isPrimary: false
               ),
             ),
             SizedBox(width: context.scale(12)),
-            Expanded(child: buildActionButton(context, "APPLY", () => setState(() => _listKey = UniqueKey()))),
+            Expanded(child: buildActionButton(context, "APPLY", _fetchEvents)),
           ],
         ),
       ],

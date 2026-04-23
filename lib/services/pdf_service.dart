@@ -6,8 +6,11 @@ import 'package:printing/printing.dart';
 import '../counselor/counselor_models.dart' as counselor;
 import '../staff/staff_dashboard/staff_models.dart' as staff;
 import '../student/student_virtual_id_model.dart';
-import '../accountant/dashboard/accountant_dashboard_model.dart';
+import '../accountant/dashboard/accountant_dashboard_model.dart' as accountant_model;
 import '../teacher/dashboard/teacher_profile_model.dart';
+import '../teacher/dashboard/teacher_dashboard_model.dart' as teacher_model;
+import '../librarian/librarian_models.dart' as librarian_model;
+import '../teacher/dashboard/salary_models.dart' as teacher_salary;
 import 'api_service.dart';
 import 'package:http/http.dart' as http;
 
@@ -88,7 +91,7 @@ class PdfService {
       ].where((s) => s != null && s!.isNotEmpty).join(', ');
       emergency = "Guardian: ${data.student?.guardianFirstName ?? "N/A"} (${data.student?.guardianMobile ?? "N/A"})";
       website = data.instituteWebsite;
-    } else if (data is AccountantVirtualIdCardData) {
+    } else if (data is accountant_model.AccountantVirtualIdCardData) {
       photoUrl = data.photoUrl;
       logoUrl = data.instituteLogo;
       name = data.name;
@@ -380,8 +383,23 @@ class PdfService {
     String? status;
     String? paymentDate;
 
-    if (salary is Salary) {
-      month = salary.month;
+    if (salary is teacher_model.Salary) {
+      month = null; // teacher_model.Salary doesn't have month/year fields
+      amount = salary.amount.toString();
+      status = salary.status;
+      paymentDate = salary.paymentDate;
+    } else if (salary is teacher_salary.SalaryRecord) {
+      month = salary.paymentDate != null ? "Date: ${salary.paymentDate}" : null;
+      amount = salary.netSalary;
+      status = salary.status;
+      paymentDate = salary.paymentDate;
+    } else if (salary is accountant_model.Salary) {
+      month = "${salary.month ?? ''} ${salary.year ?? ''}".trim();
+      amount = salary.amount;
+      status = salary.status;
+      paymentDate = salary.paymentDate;
+    } else if (salary is librarian_model.Salary) {
+      month = null; // librarian_model.Salary doesn't have month/year fields
       amount = salary.amount;
       status = salary.status;
       paymentDate = salary.paymentDate;

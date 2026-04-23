@@ -210,32 +210,32 @@ class _AvailableBooksScreenState extends State<AvailableBooksScreen> {
             children: [
               Row(
                 children: [
-                  const SkeletonBox(width: 30, height: 20),
-                  const SizedBox(width: 12),
-                  const Expanded(child: SkeletonBox(height: 20)),
+                  SkeletonBox(width: context.scale(30), height: context.scale(20)),
+                  SizedBox(width: context.scale(12)),
+                  Expanded(child: SkeletonBox(height: context.scale(20))),
                 ],
               ),
-              const SizedBox(height: 16),
+              SizedBox(height: context.scale(16)),
               Row(
                 children: [
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const SkeletonBox(height: 12, width: 60),
-                        const SizedBox(height: 4),
-                        const SkeletonBox(height: 16),
+                        SkeletonBox(height: context.scale(12), width: context.scale(60)),
+                        SizedBox(height: context.scale(4)),
+                        SkeletonBox(height: context.scale(16)),
                       ],
                     ),
                   ),
-                  const SizedBox(width: 16),
+                  SizedBox(width: context.scale(16)),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const SkeletonBox(height: 12, width: 60),
-                        const SizedBox(height: 4),
-                        const SkeletonBox(height: 16),
+                        SkeletonBox(height: context.scale(12), width: context.scale(60)),
+                        SizedBox(height: context.scale(4)),
+                        SkeletonBox(height: context.scale(16)),
                       ],
                     ),
                   ),

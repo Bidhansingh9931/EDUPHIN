@@ -8,6 +8,8 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 
+import 'package:eduphin/services/caching_service.dart';
+
 class StudentProfilePage extends StatefulWidget {
   const StudentProfilePage({super.key});
 
@@ -30,15 +32,19 @@ class _StudentProfilePageState extends State<StudentProfilePage> {
   @override
   void initState() {
     super.initState();
+    _loadCachedData();
     _fetchProfileData();
   }
 
-  @override
-  void dispose() {
-    for (var controller in _controllers.values) {
-      controller.dispose();
+  Future<void> _loadCachedData() async {
+    final cached = await CacheService.getData('student_profile');
+    if (cached != null && mounted) {
+      setState(() {
+        profileData = StudentProfileData.fromJson(cached as Map<String, dynamic>);
+        _initializeControllers(profileData!);
+        if (isLoading) isLoading = false;
+      });
     }
-    super.dispose();
   }
 
   Future<void> _fetchProfileData() async {
@@ -49,17 +55,20 @@ class _StudentProfilePageState extends State<StudentProfilePage> {
           profileData = data;
           _initializeControllers(data);
           isLoading = false;
+          errorMessage = null;
         });
+        await CacheService.saveData('student_profile', data.toJson());
       }
     } catch (e) {
       if (mounted) {
         setState(() {
-          errorMessage = e.toString();
+          errorMessage = profileData == null ? e.toString() : null;
           isLoading = false;
         });
       }
     }
   }
+
 
   void _initializeControllers(StudentProfileData data) {
     final s = data.student;
@@ -168,94 +177,66 @@ class _StudentProfilePageState extends State<StudentProfilePage> {
 
   @override
   Widget build(BuildContext context) {
-    if (isLoading) {
-      return const Scaffold(
-        body: Center(child: CircularProgressIndicator()),
-      );
-    }
-
-    if (errorMessage != null) {
-      return Scaffold(
-        body: Center(
-          child: Padding(
-            padding: EdgeInsets.all(context.xl),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(Icons.error_outline_rounded, size: context.scale(60), color: context.theme.colorScheme.error),
-                SizedBox(height: context.md),
-                Text(errorMessage!, textAlign: TextAlign.center, style: TextStyle(fontSize: context.font(14))),
-                SizedBox(height: context.lg),
-                ElevatedButton(
-                  onPressed: () {
-                    setState(() {
-                      isLoading = true;
-                      errorMessage = null;
-                    });
-                    _fetchProfileData();
-                  },
-                  child: const Text("Retry Connection"),
-                )
-              ],
-            ),
-          ),
-        ),
-      );
-    }
-
-    final student = profileData?.student;
-
     return Scaffold(
       appBar: AppBar(
         title: Text("Student Profile", style: TextStyle(fontWeight: FontWeight.bold, fontSize: context.font(20))),
       ),
-      body: SingleChildScrollView(
-        padding: context.pagePadding,
-        child: Center(
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 1000),
-            child: Column(
-              children: [
-                _buildHeader(student),
-                SizedBox(height: context.xl),
-                
-                // TABS
-                Container(
-                  margin: EdgeInsets.only(bottom: context.lg),
-                  decoration: BoxDecoration(
-                    color: context.theme.colorScheme.surfaceContainerLow,
-                    borderRadius: BorderRadius.circular(context.scale(12)),
-                    border: Border.all(color: context.theme.colorScheme.outlineVariant.withValues(alpha: 0.5)),
-                  ),
-                  child: Row(
-                    children: [
-                      _tabButton("PERSONAL", 0),
-                      _tabButton("ADDRESS", 1),
-                      _tabButton("FAMILY", 2),
-                      _tabButton("HEALTH", 3),
-                      _tabButton("SECURITY", 4),
-                    ],
-                  ),
-                ),
-
-                _buildTabContent(),
-                
-                SizedBox(height: context.xl),
-                SizedBox(
-                  width: double.infinity,
-                  child: OutlinedButton.icon(
-                    onPressed: _handleLogout,
-                    icon: Icon(Icons.logout_rounded, color: context.theme.colorScheme.error, size: context.scale(20)),
-                    label: Text("LOGOUT", style: TextStyle(color: context.theme.colorScheme.error, fontWeight: FontWeight.w800, fontSize: context.font(14))),
-                    style: OutlinedButton.styleFrom(
-                      side: BorderSide(color: context.theme.colorScheme.error),
-                      padding: EdgeInsets.symmetric(vertical: context.scale(16)),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(context.scale(12))),
+      body: LoadingWrapper(
+        isLoading: isLoading,
+        hasData: profileData != null,
+        error: errorMessage,
+        onRetry: _fetchProfileData,
+        skeleton: const _ProfileSkeleton(),
+        child: SingleChildScrollView(
+          padding: context.pagePadding,
+          child: Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 1000),
+              child: Column(
+                children: [
+                  if (profileData != null) ...[
+                    _buildHeader(profileData!.student),
+                    SizedBox(height: context.xl),
+                    
+                    // TABS
+                    Container(
+                      margin: EdgeInsets.only(bottom: context.lg),
+                      decoration: BoxDecoration(
+                        color: context.theme.colorScheme.surfaceContainerLow,
+                        borderRadius: BorderRadius.circular(context.scale(12)),
+                        border: Border.all(color: context.theme.colorScheme.outlineVariant.withValues(alpha: 0.5)),
+                      ),
+                      child: Row(
+                        children: [
+                          _tabButton("PERSONAL", 0),
+                          _tabButton("ADDRESS", 1),
+                          _tabButton("FAMILY", 2),
+                          _tabButton("HEALTH", 3),
+                          _tabButton("SECURITY", 4),
+                        ],
+                      ),
                     ),
-                  ),
-                ),
-                SizedBox(height: context.xl * 2),
-              ],
+
+                    _buildTabContent(),
+                    
+                    SizedBox(height: context.xl),
+                    SizedBox(
+                      width: double.infinity,
+                      child: OutlinedButton.icon(
+                        onPressed: _handleLogout,
+                        icon: Icon(Icons.logout_rounded, color: context.theme.colorScheme.error, size: context.scale(20)),
+                        label: Text("LOGOUT", style: TextStyle(color: context.theme.colorScheme.error, fontWeight: FontWeight.w800, fontSize: context.font(14))),
+                        style: OutlinedButton.styleFrom(
+                          side: BorderSide(color: context.theme.colorScheme.error),
+                          padding: EdgeInsets.symmetric(vertical: context.scale(16)),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(context.scale(12))),
+                        ),
+                      ),
+                    ),
+                    SizedBox(height: context.xl * 2),
+                  ],
+                ],
+              ),
             ),
           ),
         ),
@@ -552,5 +533,46 @@ class _StudentProfilePageState extends State<StudentProfilePage> {
         Navigator.pushReplacementNamed(context, '/login');
       }
     }
+  }
+}
+
+class _ProfileSkeleton extends StatelessWidget {
+  const _ProfileSkeleton();
+
+  @override
+  Widget build(BuildContext context) {
+    return SingleChildScrollView(
+      physics: const NeverScrollableScrollPhysics(),
+      child: Padding(
+        padding: context.pagePadding,
+        child: Column(
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                SkeletonBox(width: context.scale(120), height: context.scale(120), borderRadius: context.scale(60)),
+                if (!context.isMobile) ...[
+                  SizedBox(width: context.xl),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      SkeletonBox(width: context.scale(200), height: 30),
+                      SizedBox(height: context.sm),
+                      SkeletonBox(width: context.scale(150), height: 20),
+                    ],
+                  )
+                ]
+              ],
+            ),
+            SizedBox(height: context.xl),
+            SkeletonBox(height: context.scale(50), borderRadius: context.scale(12)),
+            SizedBox(height: context.xl),
+            SkeletonBox(height: context.scale(200), borderRadius: context.scale(12)),
+            SizedBox(height: context.xl),
+            SkeletonBox(height: context.scale(300), borderRadius: context.scale(12)),
+          ],
+        ),
+      ),
+    );
   }
 }

@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 
 import 'notification_model.dart';
 import 'notification_provider.dart';
+import 'skeleton_widgets.dart';
 
 class NotificationPage extends StatefulWidget {
   const NotificationPage({super.key});
@@ -14,23 +15,34 @@ class NotificationPage extends StatefulWidget {
 class _NotificationPageState extends State<NotificationPage> {
   late Future<List<Message>> _messagesFuture;
   final NotificationProvider _provider = NotificationProvider();
+  List<Message>? _cachedMessages;
 
   @override
   void initState() {
     super.initState();
-    _messagesFuture = _provider.fetchMessages();
+    _loadCacheAndFetch();
+  }
+
+  Future<void> _loadCacheAndFetch() async {
+    final cached = await _provider.getCachedMessages();
+    if (mounted) {
+      setState(() {
+        _cachedMessages = cached;
+        _messagesFuture = _provider.fetchMessages();
+      });
+    }
   }
 
   Future<void> _refreshMessages() async {
     setState(() {
-      _messagesFuture = _provider.fetchMessages();
+      _messagesFuture = _provider.fetchMessages(bypassCache: true);
     });
+    await _messagesFuture;
   }
 
   @override
   Widget build(BuildContext context) {
     final theme = context.theme;
-    final colorScheme = theme.colorScheme;
 
     return Scaffold(
       appBar: AppBar(
@@ -48,36 +60,24 @@ class _NotificationPageState extends State<NotificationPage> {
         child: FutureBuilder<List<Message>>(
           future: _messagesFuture,
           builder: (context, snapshot) {
-            if (snapshot.connectionState == ConnectionState.waiting) {
-              return const Center(child: CircularProgressIndicator());
-            } else if (snapshot.hasError) {
-              return Center(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(Icons.error_outline_rounded, size: context.scale(48), color: colorScheme.error),
-                    SizedBox(height: context.scale(16)),
-                    Text('Failed to load messages', style: theme.textTheme.titleMedium),
-                    SizedBox(height: context.scale(24)),
-                    ElevatedButton(onPressed: _refreshMessages, child: const Text("Retry")),
-                  ],
-                ),
-              );
-            } else if (snapshot.hasData) {
-              final messageList = snapshot.data!;
-              if (messageList.isEmpty) {
-                return _buildEmptyState(theme);
-              }
-              return ListView.builder(
-                padding: context.pagePadding,
-                itemCount: messageList.length,
-                itemBuilder: (context, index) {
-                  return MessageCard(messageList[index]);
-                },
-              );
-            } else {
-              return const Center(child: Text('No messages found.'));
-            }
+            return ModeratorLoadingWrapper<List<Message>>(
+              snapshot: snapshot,
+              cachedData: _cachedMessages,
+              skeleton: const NotificationSkeleton(),
+              onRefresh: _refreshMessages,
+              builder: (messages) {
+                if (messages.isEmpty) {
+                  return _buildEmptyState(theme);
+                }
+                return ListView.builder(
+                  padding: context.pagePadding,
+                  itemCount: messages.length,
+                  itemBuilder: (context, index) {
+                    return MessageCard(messages[index]);
+                  },
+                );
+              },
+            );
           },
         ),
       ),

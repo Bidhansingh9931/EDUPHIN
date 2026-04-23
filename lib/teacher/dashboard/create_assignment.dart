@@ -70,7 +70,17 @@ class _CreateAssignmentPageState extends State<CreateAssignmentPage> {
     setState(() => _isSubmitting = true);
     try {
       final dateParts = _dateController.text.split('-');
+      // Convert DD-MM-YYYY to YYYY-MM-DD
       final formattedDate = "${dateParts[2]}-${dateParts[1]}-${dateParts[0]}";
+
+      // Backend validation: due_date must be AFTER today.
+      final selectedDate = DateTime.parse(formattedDate);
+      final today = DateTime.now();
+      final todayAtMidnight = DateTime(today.year, today.month, today.day);
+      
+      if (!selectedDate.isAfter(todayAtMidnight)) {
+        throw "Due date must be at least tomorrow.";
+      }
 
       if (kIsWeb) {
         await ApiService.createAssignmentFromBytes(

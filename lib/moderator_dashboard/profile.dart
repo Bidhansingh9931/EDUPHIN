@@ -9,6 +9,7 @@ import 'package:image_picker/image_picker.dart';
 
 import 'profile_model.dart';
 import 'profile_provider.dart';
+import 'skeleton_widgets.dart';
 
 class ModeratorProfilePage extends StatefulWidget {
   const ModeratorProfilePage({super.key});
@@ -34,6 +35,7 @@ class _ModeratorProfilePageState extends State<ModeratorProfilePage> {
   String? _genderValue;
   String? _relationshipStatusValue;
   bool _isSaving = false;
+  ProfileData? _cachedData;
 
   File? _imageFile;
   Uint8List? _webImage;
@@ -64,8 +66,21 @@ class _ModeratorProfilePageState extends State<ModeratorProfilePage> {
   @override
   void initState() {
     super.initState();
-    _profileDataFuture = _profileProvider.fetchProfileData();
-    _profileDataFuture.then(_initializeControllers);
+    _loadCacheAndFetch();
+  }
+
+  Future<void> _loadCacheAndFetch() async {
+    final cached = await _profileProvider.getCachedProfileData();
+    if (mounted) {
+      setState(() {
+        _cachedData = cached;
+        if (cached != null) _initializeControllers(cached);
+        _profileDataFuture = _profileProvider.fetchProfileData();
+      });
+      _profileDataFuture.then((data) {
+        if (mounted) _initializeControllers(data);
+      });
+    }
   }
 
   void _initializeControllers(ProfileData data) {
@@ -75,6 +90,8 @@ class _ModeratorProfilePageState extends State<ModeratorProfilePage> {
     _cityController.text = data.city;
     _pincodeController.text = data.pincode;
     _stateController.text = data.state;
+    _newPasswordController.clear();
+    _confirmPasswordController.clear();
     setState(() {
       _genderValue = data.gender;
       _relationshipStatusValue = data.relationshipStatus;
@@ -102,15 +119,15 @@ class _ModeratorProfilePageState extends State<ModeratorProfilePage> {
         "city": _cityController.text,
         "state": _stateController.text,
         "pincode": _pincodeController.text,
-        "date_of_birth": data.dateOfBirth ?? '',
+        "date_of_birth": data.dateOfBirth,
         "bank_account_number": data.bankAccountNumber ?? '',
         "bank_name": data.bankName ?? '',
         "ifsc_code": data.ifscCode ?? '',
         "branch_name": data.branchName ?? '',
         "emergency_contact_name": data.emergencyContactName ?? '',
         "emergency_contact_number": data.emergencyContactNumber ?? '',
-        "qualification": data.qualification ?? '',
-        "aadhar_number": data.aadharNumber ?? '',
+        "qualification": data.qualification,
+        "aadhar_number": data.aadharNumber,
         "x_marks": data.xMarks.toString(),
         "xii_marks": data.xiiMarks.toString(),
         "position": data.position,
@@ -118,19 +135,26 @@ class _ModeratorProfilePageState extends State<ModeratorProfilePage> {
         "salary": data.salary ?? '',
         "joining_date": data.joiningDate ?? '',
         "experience": data.experience?.toString() ?? '',
-        "status": data.status ?? '',
+        "status": data.status,
         "reference": data.reference ?? '',
         if (_newPasswordController.text.isNotEmpty) "password": _newPasswordController.text,
       };
 
       await _profileProvider.saveProfileData(updatedData, photo: _imageFile, webImage: _webImage, fileName: _fileName);
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Changes saved successfully!"), backgroundColor: Colors.green));
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          content: Text("Changes saved successfully!"),
+          backgroundColor: Colors.green,
+        ));
         setState(() {
           _imageFile = null;
           _webImage = null;
           _fileName = null;
-          _profileDataFuture = _profileProvider.fetchProfileData();
+          // Refresh the future and re-initialize controllers with server data
+          _profileDataFuture = _profileProvider.fetchProfileData(bypassCache: true);
+          _profileDataFuture.then((newData) {
+            if (mounted) _initializeControllers(newData);
+          });
         });
       }
     } catch (e) {
@@ -178,15 +202,27 @@ class _ModeratorProfilePageState extends State<ModeratorProfilePage> {
     super.dispose();
   }
 
+  Future<void> _refreshProfile() async {
+    setState(() {
+      _profileDataFuture = _profileProvider.fetchProfileData(bypassCache: true);
+      _profileDataFuture.then((data) {
+        if (mounted) _initializeControllers(data);
+      });
+    });
+    await _profileDataFuture;
+  }
+
   @override
   Widget build(BuildContext context) {
-    final theme = context.theme;
-    final colorScheme = theme.colorScheme;
-
     return Scaffold(
       appBar: AppBar(
         title: Text("Moderator Profile", style: TextStyle(fontSize: context.font(20))),
         actions: [
+          IconButton(
+            onPressed: _refreshProfile,
+            icon: const Icon(Icons.refresh_rounded),
+            tooltip: 'Refresh Profile',
+          ),
           IconButton(onPressed: _logout, icon: const Icon(Icons.logout_rounded, color: Colors.redAccent)),
           SizedBox(width: context.scale(8)),
         ],
@@ -194,97 +230,102 @@ class _ModeratorProfilePageState extends State<ModeratorProfilePage> {
       body: FutureBuilder<ProfileData>(
         future: _profileDataFuture,
         builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
-          } else if (snapshot.hasError) {
-            return Center(child: Text('Error: ${snapshot.error}', style: TextStyle(color: colorScheme.error)));
-          } else if (snapshot.hasData) {
-            final data = snapshot.data!;
-            final imageUrl = ApiService.getStorageUrl(data.photo);
+          return ModeratorLoadingWrapper<ProfileData>(
+            snapshot: snapshot,
+            cachedData: _cachedData,
+            skeleton: const ProfileSkeleton(),
+            onRefresh: _refreshProfile,
+            builder: (data) => RefreshIndicator(
+              onRefresh: _refreshProfile,
+              child: _buildProfileBody(context, data),
+            ),
+          );
+        },
+      ),
+    );
+  }
 
-            return SingleChildScrollView(
-              padding: context.pagePadding,
-              child: Center(
-                child: ConstrainedBox(
-                  constraints: BoxConstraints(maxWidth: context.scale(900)),
-                  child: Form(
-                    key: _formKey,
-                    child: Column(
-                      children: [
-                        _buildHeader(context, data, imageUrl),
-                        SizedBox(height: context.scale(32)),
+  Widget _buildProfileBody(BuildContext context, ProfileData data) {
+    final imageUrl = ApiService.getStorageUrl(data.photo);
+    return SingleChildScrollView(
+      padding: context.pagePadding,
+      physics: const AlwaysScrollableScrollPhysics(),
+      child: Center(
+        child: ConstrainedBox(
+          constraints: BoxConstraints(maxWidth: context.scale(900)),
+          child: Form(
+            key: _formKey,
+            child: Column(
+              children: [
+                _buildHeader(context, data, imageUrl),
+                SizedBox(height: context.scale(32)),
 
-                        ProfileSection(title: "Personal Details", icon: Icons.person_outline_rounded, children: [
-                          AdaptiveFieldRow(children: [
-                            ProfileDropdown(
-                              label: "Gender",
-                              value: _genderValue,
-                              items: const ["Male", "Female", "Other"],
-                              onChanged: (v) => setState(() => _genderValue = v),
-                            ),
-                            ProfileTextField(label: "Date of Birth", controller: TextEditingController(text: data.dateOfBirth), icon: Icons.calendar_today_rounded, enabled: false),
-                          ]),
-                          AdaptiveFieldRow(children: [
-                            ProfileTextField(label: "Phone Number", controller: _phoneController, icon: Icons.phone_android_rounded),
-                            ProfileTextField(label: "Alternate Phone", controller: _altPhoneController),
-                          ]),
-                          ProfileDropdown(label: "Relationship Status", value: _relationshipStatusValue, items: const ["Single", "Married", "Divorced", "Widowed"], onChanged: (v) => setState(() => _relationshipStatusValue = v)),
-                        ]),
-
-                        ProfileSection(title: "Address Info", icon: Icons.location_on_outlined, children: [
-                          ProfileTextField(label: "Full Address", controller: _addressController, icon: Icons.home_outlined),
-                          AdaptiveFieldRow(children: [
-                            ProfileTextField(label: "City", controller: _cityController),
-                            ProfileTextField(label: "State", controller: _stateController),
-                          ]),
-                          ProfileTextField(label: "Pincode", controller: _pincodeController),
-                        ]),
-
-                        ProfileSection(title: "Banking & Finance", icon: Icons.account_balance_outlined, children: [
-                          AdaptiveFieldRow(children: [
-                            ProfileTextField(label: "Account No.", controller: TextEditingController(text: data.bankAccountNumber ?? 'N/A'), enabled: false),
-                            ProfileTextField(label: "IFSC Code", controller: TextEditingController(text: data.ifscCode ?? 'N/A'), enabled: false),
-                          ]),
-                          ProfileTextField(label: "Bank Name", controller: TextEditingController(text: data.bankName ?? 'N/A'), enabled: false),
-                        ]),
-
-                        ProfileSection(title: "Security", icon: Icons.lock_reset_rounded, children: [
-                          AdaptiveFieldRow(children: [
-                            ProfileTextField(label: "New Password", controller: _newPasswordController, isPassword: true, icon: Icons.password_rounded),
-                            ProfileTextField(label: "Confirm Password", controller: _confirmPasswordController, isPassword: true, icon: Icons.lock_outline_rounded),
-                          ]),
-                        ]),
-
-                        ProfileSection(title: "Work Info", icon: Icons.work_outline_rounded, children: [
-                          AdaptiveFieldRow(children: [
-                            ProfileTextField(label: "Position", controller: TextEditingController(text: data.position), enabled: false),
-                            ProfileTextField(label: "Employment Type", controller: TextEditingController(text: data.employmentType), enabled: false),
-                          ]),
-                          AdaptiveFieldRow(children: [
-                            ProfileTextField(label: "Joining Date", controller: TextEditingController(text: data.joiningDate ?? 'N/A'), enabled: false),
-                            ProfileTextField(label: "Status", controller: TextEditingController(text: data.status), enabled: false),
-                          ]),
-                        ]),
-
-                        SizedBox(height: context.scale(40)),
-                        SizedBox(
-                          width: double.infinity,
-                          child: ElevatedButton(
-                            onPressed: _isSaving ? null : _saveChanges,
-                            style: ElevatedButton.styleFrom(padding: EdgeInsets.symmetric(vertical: context.scale(18)), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(context.scale(16)))),
-                            child: _isSaving ? const CircularProgressIndicator(color: Colors.white) : const Text("UPDATE PROFILE"),
-                          ),
-                        ),
-                        SizedBox(height: context.scale(60)),
-                      ],
+                ProfileSection(title: "Personal Details", icon: Icons.person_outline_rounded, children: [
+                  AdaptiveFieldRow(children: [
+                    ProfileDropdown(
+                      label: "Gender",
+                      value: _genderValue,
+                      items: const ["Male", "Female", "Other"],
+                      onChanged: (v) => setState(() => _genderValue = v),
                     ),
+                    ProfileTextField(label: "Date of Birth", controller: TextEditingController(text: data.dateOfBirth), icon: Icons.calendar_today_rounded, enabled: false),
+                  ]),
+                  AdaptiveFieldRow(children: [
+                    ProfileTextField(label: "Phone Number", controller: _phoneController, icon: Icons.phone_android_rounded),
+                    ProfileTextField(label: "Alternate Phone", controller: _altPhoneController),
+                  ]),
+                  ProfileDropdown(label: "Relationship Status", value: _relationshipStatusValue, items: const ["Single", "Married", "Divorced", "Widowed"], onChanged: (v) => setState(() => _relationshipStatusValue = v)),
+                ]),
+
+                ProfileSection(title: "Address Info", icon: Icons.location_on_outlined, children: [
+                  ProfileTextField(label: "Full Address", controller: _addressController, icon: Icons.home_outlined),
+                  AdaptiveFieldRow(children: [
+                    ProfileTextField(label: "City", controller: _cityController),
+                    ProfileTextField(label: "State", controller: _stateController),
+                  ]),
+                  ProfileTextField(label: "Pincode", controller: _pincodeController),
+                ]),
+
+                ProfileSection(title: "Banking & Finance", icon: Icons.account_balance_outlined, children: [
+                  AdaptiveFieldRow(children: [
+                    ProfileTextField(label: "Account No.", controller: TextEditingController(text: data.bankAccountNumber ?? 'N/A'), enabled: false),
+                    ProfileTextField(label: "IFSC Code", controller: TextEditingController(text: data.ifscCode ?? 'N/A'), enabled: false),
+                  ]),
+                  ProfileTextField(label: "Bank Name", controller: TextEditingController(text: data.bankName ?? 'N/A'), enabled: false),
+                ]),
+
+                ProfileSection(title: "Security", icon: Icons.lock_reset_rounded, children: [
+                  AdaptiveFieldRow(children: [
+                    ProfileTextField(label: "New Password", controller: _newPasswordController, isPassword: true, icon: Icons.password_rounded),
+                    ProfileTextField(label: "Confirm Password", controller: _confirmPasswordController, isPassword: true, icon: Icons.lock_outline_rounded),
+                  ]),
+                ]),
+
+                ProfileSection(title: "Work Info", icon: Icons.work_outline_rounded, children: [
+                  AdaptiveFieldRow(children: [
+                    ProfileTextField(label: "Position", controller: TextEditingController(text: data.position), enabled: false),
+                    ProfileTextField(label: "Employment Type", controller: TextEditingController(text: data.employmentType), enabled: false),
+                  ]),
+                  AdaptiveFieldRow(children: [
+                    ProfileTextField(label: "Joining Date", controller: TextEditingController(text: data.joiningDate ?? 'N/A'), enabled: false),
+                    ProfileTextField(label: "Status", controller: TextEditingController(text: data.status), enabled: false),
+                  ]),
+                ]),
+
+                SizedBox(height: context.scale(40)),
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    onPressed: _isSaving ? null : _saveChanges,
+                    style: ElevatedButton.styleFrom(padding: EdgeInsets.symmetric(vertical: context.scale(18)), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(context.scale(16)))),
+                    child: _isSaving ? const CircularProgressIndicator(color: Colors.white) : const Text("UPDATE PROFILE"),
                   ),
                 ),
-              ),
-            );
-          }
-          return const Center(child: CircularProgressIndicator());
-        },
+                SizedBox(height: context.scale(60)),
+              ],
+            ),
+          ),
+        ),
       ),
     );
   }
@@ -335,19 +376,22 @@ class _ModeratorProfilePageState extends State<ModeratorProfilePage> {
                     color: theme.colorScheme.onSurfaceVariant,
                   ),
                 ),
-                SizedBox(height: context.scale(12)),
-                Chip(
-                  label: Text(
-                    data.position.toUpperCase(),
-                    style: TextStyle(
-                      fontSize: context.font(12),
-                      fontWeight: FontWeight.bold,
+                if (data.position.isNotEmpty)
+                  Padding(
+                    padding: EdgeInsets.only(top: context.scale(12)),
+                    child: Chip(
+                      label: Text(
+                        data.position.toUpperCase(),
+                        style: TextStyle(
+                          fontSize: context.font(12),
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      backgroundColor: theme.colorScheme.secondaryContainer,
+                      labelStyle: TextStyle(color: theme.colorScheme.onSecondaryContainer),
+                      side: BorderSide.none,
                     ),
                   ),
-                  backgroundColor: theme.colorScheme.secondaryContainer,
-                  labelStyle: TextStyle(color: theme.colorScheme.onSecondaryContainer),
-                  side: BorderSide.none,
-                ),
               ],
             ),
           ),

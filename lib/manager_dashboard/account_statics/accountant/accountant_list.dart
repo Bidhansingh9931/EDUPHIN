@@ -33,10 +33,10 @@ class Accountant {
 
   factory Accountant.fromJson(Map<String, dynamic> json) {
     return Accountant(
-      id: json['id'] ?? 0,
-      name: json['name'] ?? 'N/A',
-      designation: json['designation'] ?? 'Accountant', // API doesn't provide a specific designation
-      photo: json['photo'] ?? json['profile_image'],
+      id: int.tryParse(json['id']?.toString() ?? '') ?? 0,
+      name: json['name']?.toString() ?? 'N/A',
+      designation: json['designation']?.toString() ?? 'Accountant', // API doesn't provide a specific designation
+      photo: (json['photo'] ?? json['profile_image'])?.toString(),
     );
   }
 }
@@ -74,10 +74,12 @@ class _AccountantListPageState extends State<AccountantListPage> {
           .toList();
       final accountantRoles = allRoles.where((role) => role.name.toLowerCase().contains('accountant')).toList();
 
-      setState(() {
-        _roles = accountantRoles;
-        if (_roles.isNotEmpty) _selectedRoleId = _roles.first.id;
-      });
+      if (mounted) {
+        setState(() {
+          _roles = accountantRoles;
+          if (_roles.isNotEmpty) _selectedRoleId = _roles.first.id;
+        });
+      }
 
       if (_selectedRoleId != null) {
         final accountantCache = await CacheService.getCache('accountants_$_selectedRoleId');
@@ -93,10 +95,12 @@ class _AccountantListPageState extends State<AccountantListPage> {
 
   Future<void> _fetchInitialData() async {
     if (!mounted) return;
-    setState(() {
-      _isLoading = _roles.isEmpty;
-      _error = null;
-    });
+    if (_roles.isEmpty) {
+      setState(() {
+        _isLoading = true;
+        _error = null;
+      });
+    }
 
     try {
       final response = await ApiService.get('manager/salary/accounts');
@@ -140,10 +144,12 @@ class _AccountantListPageState extends State<AccountantListPage> {
 
   Future<void> _fetchAccountantsForRole(int roleId) async {
     if (!mounted) return;
-    setState(() {
-      _isLoading = _accountants.isEmpty;
-      _error = null;
-    });
+    if (_accountants.isEmpty) {
+      setState(() {
+        _isLoading = true;
+        _error = null;
+      });
+    }
 
     try {
       final response = await ApiService.get('manager/users/$roleId');
@@ -273,6 +279,7 @@ class _AccountantListPageState extends State<AccountantListPage> {
   }
 
   Widget _buildSkeleton(BuildContext context) {
+    final theme = context.theme;
     return SingleChildScrollView(
       padding: context.pagePadding,
       child: Center(
@@ -280,7 +287,7 @@ class _AccountantListPageState extends State<AccountantListPage> {
           constraints: const BoxConstraints(maxWidth: 1200),
           child: Card(
             elevation: 0,
-            color: Colors.white,
+            color: theme.cardColor,
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(context.scale(12))),
             child: Padding(
               padding: EdgeInsets.all(context.spacing),
@@ -301,12 +308,16 @@ class _AccountantListPageState extends State<AccountantListPage> {
                     itemBuilder: (context, index) => Container(
                       padding: EdgeInsets.all(context.scale(12)),
                       decoration: BoxDecoration(
-                        color: Colors.white,
+                        color: theme.colorScheme.surfaceContainerLow,
                         borderRadius: BorderRadius.circular(context.scale(12)),
                       ),
                       child: Row(
                         children: [
-                          CircleAvatar(radius: context.scale(24), backgroundColor: Colors.white),
+                          SkeletonBox(
+                            width: context.scale(48),
+                            height: context.scale(48),
+                            borderRadius: context.scale(24),
+                          ),
                           SizedBox(width: context.scale(16)),
                           const Expanded(
                             child: Column(

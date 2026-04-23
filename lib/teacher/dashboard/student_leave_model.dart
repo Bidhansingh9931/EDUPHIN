@@ -40,4 +40,20 @@ class StudentLeave {
       appliedAt: json['applied_at'] ?? '',
     );
   }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'student_name': studentName,
+      'class_name': className,
+      'section_name': sectionName,
+      'roll_no': rollNo,
+      'leave_type': leaveType,
+      'from_date': fromDate,
+      'to_date': toDate,
+      'reason': reason,
+      'status': status,
+      'applied_at': appliedAt,
+    };
+  }
 }

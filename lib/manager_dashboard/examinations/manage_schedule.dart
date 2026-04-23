@@ -40,18 +40,18 @@ class ExamPaper {
 
   factory ExamPaper.fromJson(Map<String, dynamic> json) {
     return ExamPaper(
-      id: json['id'],
-      examId: json['exam_id'],
-      classId: json['class_id'],
-      sectionId: json['section_id'],
-      subjectId: json['subject_id'],
-      className: json['class']?['name'] ?? 'N/A',
-      sectionName: json['section']?['name'] ?? 'N/A',
-      subjectName: json['subject']?['name'] ?? 'N/A',
-      venue: json['venue'] ?? '-',
-      date: json['paper_date'],
-      startTime: json['start_time'],
-      endTime: json['end_time'],
+      id: int.tryParse(json['id']?.toString() ?? '') ?? 0,
+      examId: int.tryParse(json['exam_id']?.toString() ?? '') ?? 0,
+      classId: int.tryParse(json['class_id']?.toString() ?? '') ?? 0,
+      sectionId: int.tryParse(json['section_id']?.toString() ?? '') ?? 0,
+      subjectId: int.tryParse(json['subject_id']?.toString() ?? '') ?? 0,
+      className: json['class']?['name']?.toString() ?? 'N/A',
+      sectionName: json['section']?['name']?.toString() ?? 'N/A',
+      subjectName: json['subject']?['name']?.toString() ?? 'N/A',
+      venue: json['venue']?.toString() ?? '-',
+      date: json['paper_date']?.toString(),
+      startTime: json['start_time']?.toString(),
+      endTime: json['end_time']?.toString(),
     );
   }
 }
@@ -83,7 +83,7 @@ class _ManageSchedulePageState extends State<ManageSchedulePage> {
 
   Future<void> _loadCacheAndFetch() async {
     final cacheKey = 'manager_exam_schedule_${widget.examId}';
-    final cachedData = await CachingService.getCache(cacheKey);
+    final cachedData = await CacheService.getCache(cacheKey);
     if (cachedData != null && mounted) {
       final List<dynamic> paperJson = cachedData;
       setState(() {
@@ -96,7 +96,7 @@ class _ManageSchedulePageState extends State<ManageSchedulePage> {
   Future<void> _fetchSchedule() async {
     if (!mounted) return;
     setState(() {
-      _isLoading = true;
+      _isLoading = _papers.isEmpty;
       _error = null;
     });
 
@@ -105,7 +105,7 @@ class _ManageSchedulePageState extends State<ManageSchedulePage> {
       if (response.statusCode == 200) {
         final body = json.decode(response.body);
         final List<dynamic> paperJson = body['data'] ?? [];
-        await CachingService.setCache('manager_exam_schedule_${widget.examId}', paperJson);
+        await CacheService.setCache('manager_exam_schedule_${widget.examId}', paperJson);
         if (mounted) {
           setState(() {
             _papers = paperJson.map((json) => ExamPaper.fromJson(json)).toList();

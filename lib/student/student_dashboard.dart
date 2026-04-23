@@ -26,6 +26,8 @@ import 'package:eduphin/student/library_resources/borrowed_books.dart';
 import 'package:eduphin/student/event_management/registed_event.dart';
 import 'package:eduphin/services/common_widgets.dart';
 
+import 'package:eduphin/services/caching_service.dart';
+
 class StudentDashboard extends StatefulWidget {
   const StudentDashboard({super.key});
 
@@ -41,22 +43,70 @@ class _StudentDashboardState extends State<StudentDashboard> {
   @override
   void initState() {
     super.initState();
+    _loadCachedData();
     _fetchDashboardData();
+  }
+
+  Future<void> _loadCachedData() async {
+    final cached = await CacheService.getData('student_dashboard');
+    if (cached != null && mounted) {
+      setState(() {
+        dashboardData = StudentDashboardData.fromJson(cached as Map<String, dynamic>);
+        if (isLoading) isLoading = false;
+      });
+    }
   }
 
   Future<void> _fetchDashboardData() async {
     try {
       final data = await ApiService.getStudentDashboard();
-      setState(() {
-        dashboardData = data;
-        isLoading = false;
-        errorMessage = null;
-      });
+      if (mounted) {
+        setState(() {
+          dashboardData = data;
+          isLoading = false;
+          errorMessage = null;
+        });
+        await CacheService.saveData('student_dashboard', data.toJson());
+      }
     } catch (e) {
-      setState(() {
-        errorMessage = e.toString().replaceFirst('Exception: ', '');
-        isLoading = false;
-      });
+      if (mounted) {
+        setState(() {
+          errorMessage = dashboardData == null ? e.toString().replaceFirst('Exception: ', '') : null;
+          isLoading = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _handleLogout(BuildContext context) async {
+    final theme = Theme.of(context);
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text("Logout"),
+        content: const Text("Are you sure you want to logout?"),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: Text("Cancel", style: TextStyle(color: theme.colorScheme.onSurfaceVariant)),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: Text("Logout", style: TextStyle(color: theme.colorScheme.error, fontWeight: FontWeight.bold)),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm == true) {
+      await ApiService.logout();
+      if (mounted) {
+        Navigator.pushAndRemoveUntil(
+          context,
+          MaterialPageRoute(builder: (_) => const LoginPage()),
+          (route) => false,
+        );
+      }
     }
   }
 
@@ -64,37 +114,6 @@ class _StudentDashboardState extends State<StudentDashboard> {
   Widget build(BuildContext context) {
     final theme = context.theme;
     final colorScheme = theme.colorScheme;
-
-    if (isLoading) {
-      return Scaffold(
-        body: Center(child: CircularProgressIndicator(color: colorScheme.primary, strokeWidth: 3)),
-      );
-    }
-
-    if (errorMessage != null) {
-      return Scaffold(
-        body: Center(
-          child: Padding(
-            padding: context.pagePadding,
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(Icons.error_outline_rounded, color: colorScheme.error, size: context.scale(64)),
-                SizedBox(height: context.scale(20)),
-                Text("Dashboard Unavailable", style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold, fontSize: context.font(20))),
-                SizedBox(height: context.scale(8)),
-                Text(errorMessage!, style: theme.textTheme.bodyMedium?.copyWith(color: theme.hintColor, fontSize: context.font(14)), textAlign: TextAlign.center),
-                SizedBox(height: context.scale(32)),
-                ElevatedButton(
-                  onPressed: _fetchDashboardData,
-                  child: const Text("Retry Connection"),
-                )
-              ],
-            ),
-          ),
-        ),
-      );
-    }
 
     return Scaffold(
       appBar: AppBar(
@@ -105,140 +124,153 @@ class _StudentDashboardState extends State<StudentDashboard> {
             icon: const Icon(Icons.notifications_none_rounded),
             onPressed: () {},
           ),
+          IconButton(
+            icon: const Icon(Icons.logout_rounded),
+            onPressed: () => _handleLogout(context),
+          ),
         ],
       ),
       drawer: const AppDrawer(),
-      body: RefreshIndicator(
-        onRefresh: _fetchDashboardData,
-        color: colorScheme.primary,
-        child: SingleChildScrollView(
-          physics: const BouncingScrollPhysics(),
-          child: Center(
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 1100),
-              child: Padding(
-                padding: context.pagePadding,
-                child: Column(
-                  children: [
-                    _buildHeader(context),
-                    SizedBox(height: context.xl),
+      body: LoadingWrapper(
+        isLoading: isLoading,
+        hasData: dashboardData != null,
+        error: errorMessage,
+        onRetry: _fetchDashboardData,
+        skeleton: const _DashboardSkeleton(),
+        child: RefreshIndicator(
+          onRefresh: _fetchDashboardData,
+          color: colorScheme.primary,
+          child: SingleChildScrollView(
+            physics: const BouncingScrollPhysics(),
+            child: Center(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 1100),
+                child: Padding(
+                  padding: context.pagePadding,
+                  child: Column(
+                    children: [
+                      if (dashboardData != null) ...[
+                        _buildHeader(context),
+                        SizedBox(height: context.xl),
 
-                    // Metrics Grid for responsiveness
-                    LayoutBuilder(
-                      builder: (context, constraints) {
-                        final crossAxisCount = context.isDesktop ? 4 : (context.isTablet ? 2 : 1);
-                        final childAspectRatio = context.isDesktop ? 1.4 : (context.isTablet ? 2.2 : 2.5);
+                        // Metrics Grid for responsiveness
+                        LayoutBuilder(
+                          builder: (context, constraints) {
+                            final crossAxisCount = context.isDesktop ? 4 : (context.isTablet ? 2 : 1);
+                            final childAspectRatio = context.isDesktop ? 1.4 : (context.isTablet ? 2.2 : 2.5);
 
-                        if (crossAxisCount > 1) {
-                          return GridView(
-                            shrinkWrap: true,
-                            physics: const NeverScrollableScrollPhysics(),
-                            gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                              crossAxisCount: crossAxisCount,
-                              crossAxisSpacing: context.md,
-                              mainAxisSpacing: context.md,
-                              childAspectRatio: childAspectRatio,
+                            if (crossAxisCount > 1) {
+                              return GridView(
+                                shrinkWrap: true,
+                                physics: const NeverScrollableScrollPhysics(),
+                                gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                                  crossAxisCount: crossAxisCount,
+                                  crossAxisSpacing: context.md,
+                                  mainAxisSpacing: context.md,
+                                  childAspectRatio: childAspectRatio,
+                                ),
+                                children: [
+                                  _buildAttendanceCard(),
+                                  _buildSupportCard(),
+                                  _buildStudyCard(),
+                                  _buildFeeStatusCard(),
+                                ],
+                              );
+                            } else {
+                              return Column(
+                                children: [
+                                  _buildAttendanceCard(),
+                                  SizedBox(height: context.md),
+                                  _buildSupportCard(),
+                                  SizedBox(height: context.md),
+                                  _buildStudyCard(),
+                                  SizedBox(height: context.md),
+                                  _buildFeeStatusCard(),
+                                ],
+                              );
+                            }
+                          },
+                        ),
+
+                        SizedBox(height: context.xl),
+                        _buildSectionHeader(Icons.bolt, "Quick Actions"),
+                        GridView(
+                          shrinkWrap: true,
+                          physics: const NeverScrollableScrollPhysics(),
+                          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                            crossAxisCount: context.responsive(2, tablet: 4, desktop: 6),
+                            crossAxisSpacing: context.md,
+                            mainAxisSpacing: context.md,
+                            childAspectRatio: 1.1,
+                          ),
+                          children: [
+                            QuickActionItem(
+                              label: "ATTENDANCE",
+                              icon: Icons.calendar_today_rounded,
+                              onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const AttendanceReportPage())),
+                              color: colorScheme.primary,
                             ),
-                            children: [
-                              _buildAttendanceCard(),
-                              _buildSupportCard(),
-                              _buildStudyCard(),
-                              _buildFeeStatusCard(),
-                            ],
-                          );
-                        } else {
-                          return Column(
-                            children: [
-                              _buildAttendanceCard(),
-                              SizedBox(height: context.md),
-                              _buildSupportCard(),
-                              SizedBox(height: context.md),
-                              _buildStudyCard(),
-                              SizedBox(height: context.md),
-                              _buildFeeStatusCard(),
-                            ],
-                          );
-                        }
-                      },
-                    ),
+                            QuickActionItem(
+                              label: "TIMETABLE",
+                              icon: Icons.schedule_rounded,
+                              onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const TimetablePage())),
+                              color: colorScheme.secondary,
+                            ),
+                            QuickActionItem(
+                              label: "ADMIT CARD",
+                              icon: Icons.vignette_outlined,
+                              onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const AdmitCardPage())),
+                              color: colorScheme.tertiary,
+                            ),
+                            QuickActionItem(
+                              label: "EXAM RESULT",
+                              icon: Icons.assignment_turned_in_rounded,
+                              onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ExamResultPage())),
+                              color: colorScheme.error,
+                            ),
+                            QuickActionItem(
+                              label: "FEES",
+                              icon: Icons.account_balance_wallet_outlined,
+                              onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const StudentFeePage())),
+                              color: colorScheme.primary,
+                            ),
+                            QuickActionItem(
+                              label: "RESOURCES",
+                              icon: Icons.library_books_outlined,
+                              onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const LibraryBooksPage())),
+                              color: colorScheme.secondary,
+                            ),
+                          ],
+                        ),
 
-                    SizedBox(height: context.xl),
-                    _buildSectionHeader(Icons.bolt, "Quick Actions"),
-                    GridView(
-                      shrinkWrap: true,
-                      physics: const NeverScrollableScrollPhysics(),
-                      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                        crossAxisCount: context.responsive(2, tablet: 4, desktop: 6),
-                        crossAxisSpacing: context.md,
-                        mainAxisSpacing: context.md,
-                        childAspectRatio: 1.1,
-                      ),
-                      children: [
-                        QuickActionItem(
-                          label: "ATTENDANCE",
-                          icon: Icons.calendar_today_rounded,
-                          onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const AttendanceReportPage())),
-                          color: colorScheme.primary,
-                        ),
-                        QuickActionItem(
-                          label: "TIMETABLE",
-                          icon: Icons.schedule_rounded,
-                          onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const TimetablePage())),
-                          color: colorScheme.secondary,
-                        ),
-                        QuickActionItem(
-                          label: "ADMIT CARD",
-                          icon: Icons.vignette_outlined,
-                          onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const AdmitCardPage())),
-                          color: colorScheme.tertiary,
-                        ),
-                        QuickActionItem(
-                          label: "EXAM RESULT",
-                          icon: Icons.assignment_turned_in_rounded,
-                          onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ExamResultPage())),
-                          color: colorScheme.error,
-                        ),
-                        QuickActionItem(
-                          label: "FEES",
-                          icon: Icons.account_balance_wallet_outlined,
-                          onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const StudentFeePage())),
-                          color: colorScheme.primary,
-                        ),
-                        QuickActionItem(
-                          label: "RESOURCES",
-                          icon: Icons.library_books_outlined,
-                          onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const LibraryBooksPage())),
-                          color: colorScheme.secondary,
-                        ),
+                        SizedBox(height: context.xl),
+                        _buildSectionHeader(Icons.calendar_today_outlined, "Upcoming Events", onTap: () {
+                          Navigator.push(context, MaterialPageRoute(builder: (_) => const ManageEventsPage()));
+                        }),
+                        _buildUpcomingEvents(),
+
+                        SizedBox(height: context.xl),
+                        _buildSectionHeader(Icons.assignment_outlined, "Available Exams", onTap: () {
+                          Navigator.push(context, MaterialPageRoute(builder: (_) => const ExamRegistrationPage()));
+                        }),
+                        _buildAvailableExams(),
+
+                        SizedBox(height: context.xl),
+                        _buildSectionHeader(Icons.book_outlined, "Study Materials", onTap: () {
+                          Navigator.push(context, MaterialPageRoute(builder: (_) => const NotesPage()));
+                        }),
+                        _buildStudyMaterials(),
+
+                        SizedBox(height: context.xl),
+                        _buildSectionHeader(Icons.list_alt_outlined, "Assignments", onTap: () {
+                          Navigator.push(context, MaterialPageRoute(builder: (_) => const AssignmentsPage()));
+                        }),
+                        _buildAssignments(),
+
+                        SizedBox(height: context.xl * 2),
                       ],
-                    ),
-
-                    SizedBox(height: context.xl),
-                    _buildSectionHeader(Icons.calendar_today_outlined, "Upcoming Events", onTap: () {
-                      Navigator.push(context, MaterialPageRoute(builder: (_) => const ManageEventsPage()));
-                    }),
-                    _buildUpcomingEvents(),
-
-                    SizedBox(height: context.xl),
-                    _buildSectionHeader(Icons.assignment_outlined, "Available Exams", onTap: () {
-                      Navigator.push(context, MaterialPageRoute(builder: (_) => const ExamRegistrationPage()));
-                    }),
-                    _buildAvailableExams(),
-
-                    SizedBox(height: context.xl),
-                    _buildSectionHeader(Icons.book_outlined, "Study Materials", onTap: () {
-                      Navigator.push(context, MaterialPageRoute(builder: (_) => const NotesPage()));
-                    }),
-                    _buildStudyMaterials(),
-
-                    SizedBox(height: context.xl),
-                    _buildSectionHeader(Icons.list_alt_outlined, "Assignments", onTap: () {
-                      Navigator.push(context, MaterialPageRoute(builder: (_) => const AssignmentsPage()));
-                    }),
-                    _buildAssignments(),
-
-                    SizedBox(height: context.xl * 2),
-                  ],
+                    ],
+                  ),
                 ),
               ),
             ),
@@ -247,6 +279,7 @@ class _StudentDashboardState extends State<StudentDashboard> {
       ),
     );
   }
+
 
   Widget _buildHeader(BuildContext context) {
     final theme = context.theme;
@@ -925,6 +958,75 @@ class _StudentDashboardState extends State<StudentDashboard> {
           SizedBox(height: context.md),
           Text(msg, style: TextStyle(color: colorScheme.onSurfaceVariant, fontSize: context.font(14), fontWeight: FontWeight.w500)),
         ],
+      ),
+    );
+  }
+}
+
+class _DashboardSkeleton extends StatelessWidget {
+  const _DashboardSkeleton();
+
+  @override
+  Widget build(BuildContext context) {
+    return SingleChildScrollView(
+      physics: const NeverScrollableScrollPhysics(),
+      child: Padding(
+        padding: context.pagePadding,
+        child: Column(
+          children: [
+            SkeletonBox(height: context.scale(120), borderRadius: BorderRadius.circular(context.xl)),
+            SizedBox(height: context.xl),
+            LayoutBuilder(
+              builder: (context, constraints) {
+                final crossAxisCount = context.isDesktop ? 4 : (context.isTablet ? 2 : 1);
+                if (crossAxisCount > 1) {
+                  return GridView.builder(
+                    shrinkWrap: true,
+                    physics: const NeverScrollableScrollPhysics(),
+                    gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                      crossAxisCount: crossAxisCount,
+                      crossAxisSpacing: context.md,
+                      mainAxisSpacing: context.md,
+                      childAspectRatio: context.isDesktop ? 1.4 : 2.2,
+                    ),
+                    itemCount: 4,
+                    itemBuilder: (context, index) => SkeletonBox(height: context.scale(100), borderRadius: context.scale(12)),
+                  );
+                }
+                return Column(
+                  children: List.generate(4, (index) => Padding(
+                    padding: EdgeInsets.only(bottom: context.md),
+                    child: SkeletonBox(height: context.scale(100), borderRadius: context.scale(12)),
+                  )),
+                );
+              },
+            ),
+            SizedBox(height: context.xl),
+            SkeletonBox(height: context.scale(25), width: context.scale(150), borderRadius: context.scale(4)),
+            SizedBox(height: context.md),
+            GridView.builder(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: context.responsive(2, tablet: 4, desktop: 6),
+                crossAxisSpacing: context.md,
+                mainAxisSpacing: context.md,
+                childAspectRatio: 1.1,
+              ),
+              itemCount: 6,
+              itemBuilder: (context, index) => SkeletonBox(borderRadius: context.scale(20)),
+            ),
+            SizedBox(height: context.xl),
+            SkeletonBox(height: context.scale(25), width: context.scale(180), borderRadius: context.scale(4)),
+            SizedBox(height: context.md),
+            Column(
+              children: List.generate(2, (index) => Padding(
+                padding: EdgeInsets.only(bottom: context.sm),
+                child: SkeletonBox(height: context.scale(70), borderRadius: context.scale(12)),
+              )),
+            ),
+          ],
+        ),
       ),
     );
   }

@@ -3,6 +3,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:eduphin/services/responsive_helper.dart';
 import 'package:eduphin/services/common_widgets.dart';
 import '../../services/api_service.dart';
+import 'package:eduphin/services/pdf_service.dart';
 import 'package:eduphin/staff/staff_dashboard/staff_models.dart' as staff_model;
 import 'staff_models.dart';
 
@@ -298,6 +299,21 @@ class _StaffSalaryDetailPageState extends State<StaffSalaryDetailPage> {
                           _buildDetailRow(context, "Amount in Words", detail.amountInWords),
                           _buildDetailRow(context, "Basic Salary", "₹ ${detail.salary.basicSalary ?? 'N/A'}"),
                           _buildDetailRow(context, "Period", "${detail.salary.month} / ${detail.salary.year}"),
+                          SizedBox(height: context.scale(20)),
+                          SizedBox(
+                            width: double.infinity,
+                            height: context.scale(45),
+                            child: OutlinedButton.icon(
+                              onPressed: () => PdfService.generateSalaryPdf(detail.salary, detail.amountInWords),
+                              icon: const Icon(Icons.download_rounded, size: 20),
+                              label: const Text("DOWNLOAD PDF"),
+                              style: OutlinedButton.styleFrom(
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(context.scale(12))),
+                                side: BorderSide(color: colorScheme.primary),
+                                foregroundColor: colorScheme.primary,
+                              ),
+                            ),
+                          ),
                         ],
                       );
                     },

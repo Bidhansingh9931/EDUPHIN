@@ -24,7 +24,7 @@ class StudentRegistration {
 
     String? name = user['name']?.toString() ?? student['name']?.toString();
     if (name == null || name.isEmpty) {
-      name = "${student['first_name'] ?? ''} ${student['last_name'] ?? ''}".trim();
+      name = "${student['first_name']?.toString() ?? ''} ${student['last_name']?.toString() ?? ''}".trim();
     }
     if (name.isEmpty) name = 'N/A';
 
@@ -34,7 +34,7 @@ class StudentRegistration {
         'N/A';
 
     return StudentRegistration(
-      registrationId: json['id'] ?? 0,
+      registrationId: int.tryParse(json['id']?.toString() ?? '') ?? 0,
       studentName: name,
       rollNo: rollNo,
     );

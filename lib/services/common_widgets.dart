@@ -12,7 +12,7 @@ import 'package:shimmer/shimmer.dart';
 class SkeletonBox extends StatelessWidget {
   final double? width;
   final double? height;
-  final double? borderRadius;
+  final dynamic borderRadius;
 
   const SkeletonBox({super.key, this.width, this.height, this.borderRadius});
 
@@ -27,7 +27,9 @@ class SkeletonBox extends StatelessWidget {
         height: height ?? context.scale(20),
         decoration: BoxDecoration(
           color: theme.colorScheme.surfaceContainerHighest,
-          borderRadius: BorderRadius.circular(borderRadius ?? context.scale(8)),
+          borderRadius: borderRadius is BorderRadius
+              ? borderRadius
+              : BorderRadius.circular((borderRadius as num?)?.toDouble() ?? context.scale(8)),
         ),
       ),
     );
@@ -314,6 +316,8 @@ class ProfileTextField extends StatelessWidget {
   final TextInputType? keyboardType;
   final int maxLines;
 
+  final String? errorText;
+
   const ProfileTextField({
     super.key,
     required this.label,
@@ -326,6 +330,7 @@ class ProfileTextField extends StatelessWidget {
     this.readOnly = false,
     this.keyboardType,
     this.maxLines = 1,
+    this.errorText,
   });
 
   @override
@@ -346,6 +351,7 @@ class ProfileTextField extends StatelessWidget {
         decoration: InputDecoration(
           labelText: label,
           prefixIcon: icon != null ? Icon(icon, size: context.scale(20)) : null,
+          errorText: errorText,
           filled: !enabled || readOnly,
           fillColor: (!enabled || readOnly)
               ? theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.3)
@@ -363,6 +369,7 @@ class ProfileDropdown extends StatelessWidget {
   final ValueChanged<String?> onChanged;
   final IconData? icon;
   final String? Function(String?)? validator;
+  final String? errorText;
 
   const ProfileDropdown({
     super.key,
@@ -372,6 +379,7 @@ class ProfileDropdown extends StatelessWidget {
     required this.onChanged,
     this.icon,
     this.validator,
+    this.errorText,
   });
 
   @override
@@ -379,7 +387,7 @@ class ProfileDropdown extends StatelessWidget {
     return Padding(
       padding: EdgeInsets.only(bottom: context.scale(16)),
       child: DropdownButtonFormField<String>(
-        initialValue: value,
+        value: value,
         items: items
             .map((i) => DropdownMenuItem(value: i, child: Text(i)))
             .toList(),
@@ -388,6 +396,7 @@ class ProfileDropdown extends StatelessWidget {
         decoration: InputDecoration(
           labelText: label,
           prefixIcon: icon != null ? Icon(icon, size: context.scale(20)) : null,
+          errorText: errorText,
         ),
       ),
     );

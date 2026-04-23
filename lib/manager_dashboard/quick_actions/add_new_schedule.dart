@@ -185,7 +185,7 @@ class _AddNewSchedulePageState extends State<AddNewSchedulePage> {
       if (mounted) {
         setState(() {
           _error = e;
-          _isLoading = false;
+          _isLoading = _formData == null;
         });
       }
     }

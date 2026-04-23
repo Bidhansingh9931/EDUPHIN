@@ -1,6 +1,8 @@
 import 'package:eduphin/teacher/dashboard/app_drawer.dart';
 import 'package:eduphin/teacher/dashboard/profile.dart';
+import 'package:eduphin/login_logout/login.dart';
 import 'package:eduphin/teacher/dashboard/salary_bank_details.dart';
+import 'package:eduphin/teacher/dashboard/teacher_cache_service.dart';
 import 'package:eduphin/teacher/dashboard/virtual_id_page.dart';
 import 'package:eduphin/teacher/dashboard/your_support_ticket.dart';
 import 'package:eduphin/teacher/dashboard/create_new_support_ticket.dart';
@@ -15,6 +17,7 @@ import 'library_book_page.dart';
 import 'lending_books_page.dart';
 import 'my_registered_event.dart';
 import 'package:eduphin/services/common_widgets.dart';
+import 'package:eduphin/teacher/dashboard/common_widgets.dart';
 
 class TeacherDashboardPage extends StatefulWidget {
   const TeacherDashboardPage({super.key});
@@ -24,12 +27,46 @@ class TeacherDashboardPage extends StatefulWidget {
 }
 
 class _TeacherDashboardPageState extends State<TeacherDashboardPage> {
-  late Future<TeacherDashboardData> _dashboardDataFuture;
+  TeacherDashboardData? _dashboardData;
+  bool _isLoading = true;
 
   @override
   void initState() {
     super.initState();
-    _dashboardDataFuture = ApiService.getTeacherDashboard();
+    _loadInitialData();
+  }
+
+  Future<void> _loadInitialData() async {
+    final cachedData = await TeacherCacheService.load('dashboard');
+    if (cachedData != null && mounted) {
+      setState(() {
+        _dashboardData = TeacherDashboardData.fromJson(cachedData);
+        _isLoading = false;
+      });
+    }
+    _fetchDashboard();
+  }
+
+  Future<void> _fetchDashboard() async {
+    if (!mounted) return;
+    if (_dashboardData == null) {
+      setState(() => _isLoading = true);
+    }
+    try {
+      final data = await ApiService.getTeacherDashboard();
+      if (mounted) {
+        setState(() {
+          _dashboardData = data;
+          _isLoading = false;
+        });
+        await TeacherCacheService.save('dashboard', data.toJson());
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isLoading = false);
+        // Error handling if needed
+      }
+    }
   }
 
   @override
@@ -64,40 +101,97 @@ class _TeacherDashboardPageState extends State<TeacherDashboardPage> {
           ],
         ),
         actions: [
-          FutureBuilder<TeacherDashboardData>(
-            future: _dashboardDataFuture,
-            builder: (context, snapshot) {
-              return IconButton(
-                onPressed: () => Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (_) => const ProfilePage()),
-                ).then((_) {
-                  setState(() {
-                    _dashboardDataFuture = ApiService.getTeacherDashboard();
-                  });
-                }),
-                icon: ProfileAvatar(
-                  imageUrl: ApiService.getStorageUrl(snapshot.data?.userDetail.photo),
-                  radius: context.scale(16),
+          IconButton(
+            onPressed: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const ProfilePage()),
+            ).then((_) => _fetchDashboard()),
+            icon: ProfileAvatar(
+              imageUrl: ApiService.getStorageUrl(_dashboardData?.userDetail.photo),
+              radius: context.scale(16),
+            ),
+          ),
+          IconButton(
+            onPressed: () async {
+              final confirm = await showDialog<bool>(
+                context: context,
+                builder: (context) => AlertDialog(
+                  title: const Text("Logout"),
+                  content: const Text("Are you sure you want to logout?"),
+                  actions: [
+                    TextButton(
+                      onPressed: () => Navigator.pop(context, false),
+                      child: const Text("Cancel"),
+                    ),
+                    TextButton(
+                      onPressed: () => Navigator.pop(context, true),
+                      child: const Text("Logout"),
+                    ),
+                  ],
                 ),
               );
+
+              if (confirm == true) {
+                if (context.mounted) {
+                  // Show loading dialog
+                  showDialog(
+                    context: context,
+                    barrierDismissible: false,
+                    builder: (context) => const Center(child: CircularProgressIndicator()),
+                  );
+                }
+                
+                await ApiService.logout();
+                
+                if (context.mounted) {
+                  Navigator.of(context).pop(); // Dismiss loading
+                  Navigator.pushAndRemoveUntil(
+                    context,
+                    MaterialPageRoute(builder: (_) => const LoginPage()),
+                    (route) => false,
+                  );
+                }
+              }
             },
+            icon: Icon(Icons.logout, color: colorScheme.error, size: context.scale(22)),
           ),
           SizedBox(width: context.scale(8)),
         ],
       ),
-      body: FutureBuilder<TeacherDashboardData>(
-        future: _dashboardDataFuture,
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
-          } else if (snapshot.hasError) {
-            return _buildErrorWidget(snapshot.error.toString());
-          } else if (snapshot.hasData) {
-            return _buildDashboardContent(context, snapshot.data!);
-          }
-          return const Center(child: Text("No data available"));
-        },
+      body: TeacherLoadingWrapper(
+        isLoading: _isLoading,
+        hasData: _dashboardData != null,
+        skeleton: _buildSkeleton(context),
+        child: _dashboardData != null 
+          ? _buildDashboardContent(context, _dashboardData!)
+          : const Center(child: Text("No data available")),
+      ),
+    );
+  }
+
+  Widget _buildSkeleton(BuildContext context) {
+    return SingleChildScrollView(
+      padding: context.pagePadding,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          TeacherSkeleton(height: context.scale(250), borderRadius: BorderRadius.circular(20)),
+          SizedBox(height: context.scale(24)),
+          const TeacherSkeleton(height: 20, width: 150),
+          SizedBox(height: context.scale(12)),
+          Row(
+            children: List.generate(3, (index) => Expanded(
+              child: Padding(
+                padding: EdgeInsets.only(right: index < 2 ? 12 : 0),
+                child: TeacherSkeleton(height: context.scale(100), borderRadius: BorderRadius.circular(12)),
+              ),
+            )),
+          ),
+          SizedBox(height: context.scale(24)),
+          const TeacherSkeleton(height: 20, width: 150),
+          SizedBox(height: context.scale(12)),
+          TeacherSkeleton(height: context.scale(150), borderRadius: BorderRadius.circular(20)),
+        ],
       ),
     );
   }
@@ -129,9 +223,7 @@ class _TeacherDashboardPageState extends State<TeacherDashboardPage> {
             ),
             SizedBox(height: context.scale(24)),
             FilledButton(
-              onPressed: () => setState(() {
-                _dashboardDataFuture = ApiService.getTeacherDashboard();
-              }),
+              onPressed: _fetchDashboard,
               style: FilledButton.styleFrom(
                 backgroundColor: colorScheme.primary,
                 foregroundColor: colorScheme.onPrimary,
@@ -146,11 +238,7 @@ class _TeacherDashboardPageState extends State<TeacherDashboardPage> {
 
   Widget _buildDashboardContent(BuildContext context, TeacherDashboardData data) {
     return RefreshIndicator(
-      onRefresh: () async {
-        setState(() {
-          _dashboardDataFuture = ApiService.getTeacherDashboard();
-        });
-      },
+      onRefresh: _fetchDashboard,
       child: SingleChildScrollView(
         padding: context.pagePadding,
         physics: const AlwaysScrollableScrollPhysics(),

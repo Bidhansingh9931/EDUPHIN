@@ -1,4 +1,7 @@
+import 'package:eduphin/services/api_service.dart';
 import 'package:eduphin/services/responsive_helper.dart';
+import 'package:eduphin/teacher/dashboard/event_models.dart';
+import 'package:eduphin/teacher/dashboard/teacher_cache_service.dart';
 import 'package:flutter/material.dart';
 import 'common_widgets.dart';
 
@@ -10,8 +13,49 @@ class MyRegisteredEventPage extends StatefulWidget {
 }
 
 class _MyRegisteredEventPageState extends State<MyRegisteredEventPage> {
+  List<RegisteredEvent>? _events;
+  bool _isLoading = true;
+  String? _error;
   final Map<String, String?> _filters = {'status': 'All', 'type': 'All'};
   Key _listKey = UniqueKey();
+
+  @override
+  void initState() {
+    super.initState();
+    _loadData();
+  }
+
+  Future<void> _loadData() async {
+    // 1. Load from cache
+    final cachedData = await TeacherCacheService.load('registered_events');
+    if (cachedData != null && mounted) {
+      setState(() {
+        _events = (cachedData as List).map((e) => RegisteredEvent.fromJson(e)).toList();
+        _isLoading = false;
+      });
+    }
+
+    // 2. Fetch from API
+    try {
+      final events = await ApiService.getRegisteredEvents();
+      if (mounted) {
+        setState(() {
+          _events = events;
+          _isLoading = false;
+          _error = null;
+        });
+        // 3. Save to cache
+        await TeacherCacheService.save('registered_events', events.map((e) => e.toJson()).toList());
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _error = e.toString();
+          _isLoading = false;
+        });
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -25,16 +69,30 @@ class _MyRegisteredEventPageState extends State<MyRegisteredEventPage> {
           ],
         ),
       ),
-      body: SingleChildScrollView(
-        child: Center(
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 1000),
-            child: Column(
-              children: [
-                _buildFilterSection(),
-                _buildEventsTable(),
-                SizedBox(height: context.scale(32)),
-              ],
+      body: TeacherLoadingWrapper(
+        isLoading: _isLoading,
+        hasData: _events != null,
+        skeleton: _buildSkeleton(),
+        child: RefreshIndicator(
+          onRefresh: _loadData,
+          child: SingleChildScrollView(
+            physics: const AlwaysScrollableScrollPhysics(),
+            child: Center(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 1000),
+                child: Column(
+                  children: [
+                    _buildFilterSection(),
+                    _error != null && _events == null
+                        ? Center(child: Padding(
+                            padding: EdgeInsets.all(context.scale(20)),
+                            child: Text(_error!),
+                          ))
+                        : _buildEventsTable(),
+                    SizedBox(height: context.scale(32)),
+                  ],
+                ),
+              ),
             ),
           ),
         ),
@@ -102,6 +160,12 @@ class _MyRegisteredEventPageState extends State<MyRegisteredEventPage> {
 
   Widget _buildEventsTable() {
     final theme = context.theme;
+    final filteredEvents = _events?.where((e) {
+      bool statusMatch = _filters['status'] == 'All' || e.status == _filters['status'];
+      // Type filtering logic if available in event model
+      return statusMatch;
+    }).toList() ?? [];
+
     return Card(
       key: _listKey,
       elevation: 0,
@@ -112,14 +176,41 @@ class _MyRegisteredEventPageState extends State<MyRegisteredEventPage> {
         side: BorderSide(color: theme.colorScheme.outlineVariant.withValues(alpha: 0.5)),
       ),
       clipBehavior: Clip.antiAlias,
+      child: filteredEvents.isEmpty
+          ? Padding(
+              padding: EdgeInsets.all(context.scale(32)),
+              child: Text("No registered events found"),
+            )
+          : Column(
+              children: [
+                _buildTableHeader(),
+                ...filteredEvents.asMap().entries.expand((entry) {
+                  int idx = entry.key;
+                  RegisteredEvent e = entry.value;
+                  return [
+                    Divider(height: 1, color: theme.colorScheme.outlineVariant.withValues(alpha: 0.5)),
+                    _buildEventRow(idx + 1, e.event.title, e.event.description),
+                    _buildEventDetailsSubRow(
+                      "${e.event.eventDate.toLocal().toString().split(' ')[0]}\n${e.event.startTime} - ${e.event.endTime}",
+                      e.event.venue,
+                      e.event.isTicketed ? "Paid" : "Free Event",
+                      "N/A", // Registration on date if available
+                    ),
+                  ];
+                }),
+              ],
+            ),
+    );
+  }
+
+  Widget _buildSkeleton() {
+    return SingleChildScrollView(
+      padding: EdgeInsets.all(context.scale(16)),
       child: Column(
-        children: [
-          _buildTableHeader(),
-          Divider(height: 1, color: theme.colorScheme.outlineVariant.withValues(alpha: 0.5)),
-          _buildEventRow(1, "Campus Cultural Fest 2025", "A vibrant celebration showcasing the diverse culture of our institution."),
-          Divider(height: 1, color: theme.colorScheme.outlineVariant.withValues(alpha: 0.5)),
-          _buildEventDetailsSubRow("03 Jan 2026\n09:00 AM - 04:00 PM", "Seminar Hall", "Free Event", "09 Oct 2025\n12:16 PM"),
-        ],
+        children: List.generate(3, (index) => Padding(
+          padding: EdgeInsets.only(bottom: context.scale(16)),
+          child: TeacherSkeleton(height: context.scale(150), borderRadius: BorderRadius.circular(context.scale(16))),
+        )),
       ),
     );
   }

@@ -1,3 +1,5 @@
+import 'package:eduphin/services/caching_service.dart';
+import 'package:eduphin/services/common_widgets.dart';
 import 'package:eduphin/services/responsive_helper.dart';
 import 'package:flutter/material.dart';
 import 'package:eduphin/services/api_service.dart';
@@ -15,15 +17,29 @@ class _ManageEventsPageState extends State<ManageEventsPage> {
   String? _type;
   List<dynamic> _events = [];
   bool _isLoading = true;
+  static const String _cacheKey = 'student_all_events';
 
   @override
   void initState() {
     super.initState();
+    _loadCachedData();
     _fetchEvents();
   }
 
+  Future<void> _loadCachedData() async {
+    final cachedData = await CacheService.getData(_cacheKey);
+    if (cachedData != null && mounted) {
+      setState(() {
+        _events = List<dynamic>.from(cachedData as List? ?? []);
+        _isLoading = false;
+      });
+    }
+  }
+
   Future<void> _fetchEvents() async {
-    setState(() => _isLoading = true);
+    if (_events.isEmpty) {
+      setState(() => _isLoading = true);
+    }
     try {
       String? apiStatus;
       if (_status == "Upcoming") apiStatus = "upcoming";
@@ -37,18 +53,20 @@ class _ManageEventsPageState extends State<ManageEventsPage> {
         status: apiStatus,
         type: apiType,
       );
-      setState(() {
-        _events = data;
-        _isLoading = false;
-      });
-    } catch (e) {
-      setState(() => _isLoading = false);
       if (mounted) {
-        final theme = context.theme;
+        setState(() {
+          _events = data;
+          _isLoading = false;
+        });
+        await CacheService.saveData(_cacheKey, data);
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isLoading = false);
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text("Error fetching events: $e"),
-            backgroundColor: theme.colorScheme.error,
+            backgroundColor: context.theme.colorScheme.error,
           ),
         );
       }
@@ -160,9 +178,11 @@ class _ManageEventsPageState extends State<ManageEventsPage> {
       appBar: AppBar(
         title: const Text("Explore Events"),
       ),
-      body: RefreshIndicator(
+      body: LoadingWrapper(
+        isLoading: _isLoading,
+        hasData: _events.isNotEmpty,
+        skeleton: const _EventsSkeleton(),
         onRefresh: _fetchEvents,
-        color: theme.colorScheme.primary,
         child: SingleChildScrollView(
           physics: const AlwaysScrollableScrollPhysics(),
           padding: context.pagePadding,
@@ -188,22 +208,21 @@ class _ManageEventsPageState extends State<ManageEventsPage> {
                     ],
                   ),
                   const SizedBox(height: 24),
-                  _isLoading 
-                      ? Center(child: Padding(padding: EdgeInsets.all(context.scale(40)), child: CircularProgressIndicator(color: theme.colorScheme.primary)))
-                      : _events.isEmpty 
-                          ? _buildEmptyState()
-                          : GridView.builder(
-                              shrinkWrap: true,
-                              physics: const NeverScrollableScrollPhysics(),
-                              gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                                crossAxisCount: context.responsive(1, tablet: 2, desktop: 3),
-                                crossAxisSpacing: context.scale(20),
-                                mainAxisSpacing: context.scale(20),
-                                mainAxisExtent: context.scale(480),
-                              ),
-                              itemCount: _events.length,
-                              itemBuilder: (context, index) => _buildEventCard(_events[index]),
-                            ),
+                  if (_events.isEmpty) 
+                    _buildEmptyState()
+                  else 
+                    GridView.builder(
+                      shrinkWrap: true,
+                      physics: const NeverScrollableScrollPhysics(),
+                      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                        crossAxisCount: context.responsive(1, tablet: 2, desktop: 3),
+                        crossAxisSpacing: context.scale(20),
+                        mainAxisSpacing: context.scale(20),
+                        mainAxisExtent: context.scale(480),
+                      ),
+                      itemCount: _events.length,
+                      itemBuilder: (context, index) => _buildEventCard(_events[index]),
+                    ),
                   const SizedBox(height: 40),
                 ],
               ),
@@ -480,6 +499,123 @@ class _ManageEventsPageState extends State<ManageEventsPage> {
             Text("Try adjusting your filters", style: theme.textTheme.bodySmall?.copyWith(color: colorScheme.onSurfaceVariant.withValues(alpha: 0.5), fontSize: context.font(12))),
           ],
         ),
+      ),
+    );
+  }
+}
+
+class _EventsSkeleton extends StatelessWidget {
+  const _EventsSkeleton();
+
+  @override
+  Widget build(BuildContext context) {
+    return SingleChildScrollView(
+      padding: context.pagePadding,
+      child: Center(
+        child: Container(
+          constraints: const BoxConstraints(maxWidth: 1200),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _buildFilterSkeleton(context),
+              const SizedBox(height: 32),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  SkeletonBox(width: context.scale(150), height: context.scale(24)),
+                  SkeletonBox(width: context.scale(80), height: context.scale(20)),
+                ],
+              ),
+              const SizedBox(height: 24),
+              GridView.builder(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: context.responsive(1, tablet: 2, desktop: 3),
+                  crossAxisSpacing: context.scale(20),
+                  mainAxisSpacing: context.scale(20),
+                  mainAxisExtent: context.scale(480),
+                ),
+                itemCount: 6,
+                itemBuilder: (context, index) => _buildCardSkeleton(context),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildFilterSkeleton(BuildContext context) {
+    return Card(
+      elevation: 0,
+      color: context.theme.colorScheme.surfaceContainerLow,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(context.scale(16)),
+        side: BorderSide(color: context.theme.colorScheme.outlineVariant.withValues(alpha: 0.5)),
+      ),
+      child: Padding(
+        padding: EdgeInsets.all(context.scale(24)),
+        child: Column(
+          children: [
+            Row(
+              children: [
+                SkeletonBox(width: context.scale(24), height: context.scale(24), borderRadius: context.scale(4)),
+                SizedBox(width: context.scale(12)),
+                SkeletonBox(width: context.scale(120), height: context.scale(20), borderRadius: context.scale(4)),
+              ],
+            ),
+            SizedBox(height: context.scale(24)),
+            Row(
+              children: [
+                Expanded(child: SkeletonBox(height: context.scale(40), borderRadius: context.scale(12))),
+                SizedBox(width: context.scale(20)),
+                Expanded(child: SkeletonBox(height: context.scale(40), borderRadius: context.scale(12))),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildCardSkeleton(BuildContext context) {
+    return Card(
+      elevation: 0,
+      clipBehavior: Clip.antiAlias,
+      color: context.theme.colorScheme.surfaceContainerLow,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(context.scale(16)),
+        side: BorderSide(color: context.theme.colorScheme.outlineVariant.withValues(alpha: 0.5)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SkeletonBox(width: double.infinity, height: context.scale(180)),
+          Padding(
+            padding: EdgeInsets.all(context.scale(20)),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                SkeletonBox(width: double.infinity, height: context.scale(24), borderRadius: context.scale(4)),
+                SizedBox(height: context.scale(16)),
+                SkeletonBox(width: context.scale(120), height: context.scale(12), borderRadius: context.scale(4)),
+                SizedBox(height: context.scale(8)),
+                SkeletonBox(width: context.scale(100), height: context.scale(12), borderRadius: context.scale(4)),
+                SizedBox(height: context.scale(8)),
+                SkeletonBox(width: context.scale(140), height: context.scale(12), borderRadius: context.scale(4)),
+                SizedBox(height: context.scale(20)),
+                SkeletonBox(width: double.infinity, height: context.scale(12), borderRadius: context.scale(4)),
+                SizedBox(height: context.scale(4)),
+                SkeletonBox(width: double.infinity, height: context.scale(12), borderRadius: context.scale(4)),
+                SizedBox(height: context.scale(4)),
+                SkeletonBox(width: context.scale(150), height: context.scale(12), borderRadius: context.scale(4)),
+                SizedBox(height: context.scale(24)),
+                SkeletonBox(width: double.infinity, height: context.scale(48), borderRadius: context.scale(12)),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }

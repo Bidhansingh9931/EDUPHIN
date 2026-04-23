@@ -31,10 +31,10 @@ class Teacher {
 
   factory Teacher.fromJson(Map<String, dynamic> json) {
     return Teacher(
-      id: json['id'] ?? 0,
-      name: json['name'] ?? 'N/A',
-      designation: json['designation'] ?? 'Teacher',
-      photo: json['photo'] ?? json['profile_image'],
+      id: int.tryParse(json['id']?.toString() ?? '') ?? 0,
+      name: json['name']?.toString() ?? 'N/A',
+      designation: json['designation']?.toString() ?? 'Teacher',
+      photo: json['photo']?.toString() ?? json['profile_image']?.toString(),
     );
   }
 }
@@ -129,7 +129,7 @@ class _TeacherListPageState extends State<TeacherListPage> {
       if (mounted) {
         setState(() {
           _error = e;
-          _isLoading = false;
+          _isLoading = _roles.isEmpty;
         });
       }
     }
@@ -148,8 +148,7 @@ class _TeacherListPageState extends State<TeacherListPage> {
         final data = jsonDecode(response.body);
         final List<dynamic> teachersData = data['data'];
         await CacheService.setCache('teachers_$roleId', teachersData);
-
-        if(mounted){
+        if (mounted) {
           setState(() {
             _teachers = teachersData.map((json) => Teacher.fromJson(json)).toList();
             _isLoading = false;
@@ -162,7 +161,7 @@ class _TeacherListPageState extends State<TeacherListPage> {
       if (mounted) {
         setState(() {
           _error = e;
-          _isLoading = false;
+          _isLoading = _teachers.isEmpty;
         });
       }
     }

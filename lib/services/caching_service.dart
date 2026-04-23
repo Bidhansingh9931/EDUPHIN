@@ -36,6 +36,8 @@ class CacheService {
       }
     }
   }
+
+  static Future<void> clearAll() => clearCache();
 }
 
 class CachingService extends CacheService {

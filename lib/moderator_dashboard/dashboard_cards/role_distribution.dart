@@ -1,4 +1,6 @@
 import 'dart:convert';
+import 'package:eduphin/moderator_dashboard/cache_helper.dart';
+import 'package:eduphin/moderator_dashboard/skeleton_widgets.dart';
 import 'package:eduphin/services/api_service.dart';
 import 'package:eduphin/services/responsive_helper.dart';
 import 'package:flutter/material.dart';
@@ -19,11 +21,29 @@ class UserRole {
     required this.percent,
     required this.color,
   });
+
+  Map<String, dynamic> toJson() => {
+    'icon': icon.codePoint,
+    'title': title,
+    'count': count,
+    'percent': percent,
+    'color': color.toARGB32(),
+  };
+
+  factory UserRole.fromJson(Map<String, dynamic> json) => UserRole(
+    icon: IconData(json['icon'], fontFamily: 'MaterialIcons'),
+    title: json['title'],
+    count: json['count'],
+    percent: (json['percent'] as num).toDouble(),
+    color: Color(json['color']),
+  );
 }
 
 // 2. Data Provider
 class RoleDistributionProvider {
-  Future<List<UserRole>> fetchUserRoles() async {
+  static const String _cacheKey = 'role_distribution';
+
+  Future<List<UserRole>> fetchUserRoles({bool bypassCache = false}) async {
     final response = await ApiService.get('moderator/dashboard');
 
     if (response.statusCode == 200) {
@@ -35,7 +55,7 @@ class RoleDistributionProvider {
 
         final totalUsers = rolesData.fold<int>(0, (sum, role) => sum + ((role['users_count'] as num?)?.toInt() ?? 0));
 
-        return rolesData.map((role) {
+        final roles = rolesData.map((role) {
           final roleName = role['name'] as String? ?? 'Unnamed Role';
           final count = (role['users_count'] as num?)?.toInt() ?? 0;
           return UserRole(
@@ -46,10 +66,21 @@ class RoleDistributionProvider {
             color: _getColorForRole(roleName),
           );
         }).toList();
+
+        await CacheHelper.save(_cacheKey, roles.map((e) => e.toJson()).toList());
+        return roles;
       }
       throw Exception('Failed to load data from API.');
     }
     throw Exception('Failed to load user roles.');
+  }
+
+  Future<List<UserRole>?> getCachedUserRoles() async {
+    final cached = await CacheHelper.load(_cacheKey);
+    if (cached != null) {
+      return (cached as List).map((e) => UserRole.fromJson(e)).toList();
+    }
+    return null;
   }
 
   IconData _getIconForRole(String roleName) {
@@ -87,23 +118,32 @@ class RoleDistributionPage extends StatefulWidget {
 class _RoleDistributionPageState extends State<RoleDistributionPage> {
   final RoleDistributionProvider _provider = RoleDistributionProvider();
   late Future<List<UserRole>> _userRolesFuture;
+  List<UserRole>? _cachedUserRoles;
 
   @override
   void initState() {
     super.initState();
-    _userRolesFuture = _provider.fetchUserRoles();
+    _loadInitialData();
+  }
+
+  Future<void> _loadInitialData() async {
+    _cachedUserRoles = await _provider.getCachedUserRoles();
+    if (mounted) {
+      setState(() {
+        _userRolesFuture = _provider.fetchUserRoles();
+      });
+    }
   }
 
   void _refreshData() {
     setState(() {
-      _userRolesFuture = _provider.fetchUserRoles();
+      _userRolesFuture = _provider.fetchUserRoles(bypassCache: true);
     });
   }
 
   @override
   Widget build(BuildContext context) {
     final theme = context.theme;
-    final colorScheme = theme.colorScheme;
 
     return Scaffold(
       backgroundColor: theme.scaffoldBackgroundColor,
@@ -117,76 +157,59 @@ class _RoleDistributionPageState extends State<RoleDistributionPage> {
       body: FutureBuilder<List<UserRole>>(
         future: _userRolesFuture,
         builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return Center(child: CircularProgressIndicator(color: theme.colorScheme.primary));
-          }
-          if (snapshot.hasError) {
-            return Center(
-              child: Padding(
-                padding: context.pagePadding,
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(Icons.error_outline_rounded, size: context.scale(48), color: colorScheme.error),
-                    SizedBox(height: context.md),
-                    Text('Failed to load distribution', style: theme.textTheme.titleMedium?.copyWith(fontSize: context.font(18), color: theme.colorScheme.onSurface)),
-                    SizedBox(height: context.lg),
-                    ElevatedButton(
-                      onPressed: _refreshData,
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: theme.colorScheme.primary,
-                        foregroundColor: theme.colorScheme.onPrimary,
-                      ),
-                      child: Text("Retry", style: TextStyle(fontSize: context.font(16))),
-                    ),
-                  ],
-                ),
-              ),
-            );
-          }
-          if (!snapshot.hasData || snapshot.data!.isEmpty) {
-            return Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(Icons.groups_outlined, size: context.scale(64), color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.3)),
-                  SizedBox(height: context.md),
-                  Text('No data found.', style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: context.font(16), fontWeight: FontWeight.bold)),
-                ],
-              ),
-            );
-          }
+          return ModeratorLoadingWrapper<List<UserRole>>(
+            snapshot: snapshot,
+            cachedData: _cachedUserRoles,
+            skeleton: const RoleDistributionSkeleton(),
+            onRefresh: _refreshData,
+            builder: (userRoles) {
+              if (userRoles.isEmpty) {
+                return Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.groups_outlined, size: context.scale(64), color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.3)),
+                      SizedBox(height: context.md),
+                      Text('No data found.', style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: context.font(16), fontWeight: FontWeight.bold)),
+                    ],
+                  ),
+                );
+              }
 
-          final userRoles = snapshot.data!;
-          final totalUsers = userRoles.fold<int>(0, (sum, role) => sum + role.count);
+              final totalUsers = userRoles.fold<int>(0, (sum, role) => sum + role.count);
 
-          return SingleChildScrollView(
-            padding: context.pagePadding,
-            physics: const AlwaysScrollableScrollPhysics(),
-            child: Center(
-              child: ConstrainedBox(
-                constraints: BoxConstraints(maxWidth: context.scale(1000)),
-                child: Column(
-                  children: [
-                    _buildTotalUsersCard(context, totalUsers),
-                    SizedBox(height: context.lg),
-                    GridView.builder(
-                      shrinkWrap: true,
-                      physics: const NeverScrollableScrollPhysics(),
-                      itemCount: userRoles.length,
-                      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                        crossAxisCount: context.responsive(1, tablet: 2, desktop: 3),
-                        crossAxisSpacing: context.md,
-                        mainAxisSpacing: context.md,
-                        mainAxisExtent: context.scale(140),
+              return RefreshIndicator(
+                onRefresh: () async => _refreshData(),
+                child: SingleChildScrollView(
+                  padding: context.pagePadding,
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  child: Center(
+                    child: ConstrainedBox(
+                      constraints: BoxConstraints(maxWidth: context.scale(1000)),
+                      child: Column(
+                        children: [
+                          _buildTotalUsersCard(context, totalUsers),
+                          SizedBox(height: context.lg),
+                          GridView.builder(
+                            shrinkWrap: true,
+                            physics: const NeverScrollableScrollPhysics(),
+                            itemCount: userRoles.length,
+                            gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                              crossAxisCount: context.responsive(1, tablet: 2, desktop: 3),
+                              crossAxisSpacing: context.md,
+                              mainAxisSpacing: context.md,
+                              mainAxisExtent: context.scale(140),
+                            ),
+                            itemBuilder: (context, index) => _buildRoleCard(context, userRoles[index]),
+                          ),
+                          SizedBox(height: context.lg),
+                        ],
                       ),
-                      itemBuilder: (context, index) => _buildRoleCard(context, userRoles[index]),
                     ),
-                    SizedBox(height: context.lg),
-                  ],
+                  ),
                 ),
-              ),
-            ),
+              );
+            },
           );
         },
       ),

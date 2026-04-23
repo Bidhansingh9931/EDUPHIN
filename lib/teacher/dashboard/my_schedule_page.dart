@@ -1,4 +1,6 @@
 import 'package:eduphin/services/responsive_helper.dart';
+import 'package:eduphin/teacher/dashboard/common_widgets.dart';
+import 'package:eduphin/teacher/dashboard/teacher_cache_service.dart';
 import 'package:flutter/material.dart';
 import 'package:eduphin/services/api_service.dart';
 import 'package:intl/intl.dart';
@@ -12,19 +14,63 @@ class MySchedulePage extends StatefulWidget {
 }
 
 class _MySchedulePageState extends State<MySchedulePage> {
-  late Future<List<TeacherScheduleItem>> _scheduleFuture;
+  List<TeacherScheduleItem>? _schedules;
+  bool _isLoading = true;
+  String? _error;
   DateTime _selectedDate = DateTime.now();
 
   @override
   void initState() {
     super.initState();
-    _loadSchedule();
+    _fetchSchedule();
   }
 
-  void _loadSchedule() {
+  Future<void> _fetchSchedule() async {
     setState(() {
-      _scheduleFuture = ApiService.getMySchedule(DateFormat('yyyy-MM-dd').format(_selectedDate));
+      _isLoading = true;
+      _error = null;
     });
+
+    final dateStr = DateFormat('yyyy-MM-dd').format(_selectedDate);
+    final cacheKey = 'schedule_$dateStr';
+
+    try {
+      // Load from cache first
+      final cachedData = await TeacherCacheService.load(cacheKey);
+      if (cachedData != null && cachedData is List) {
+        setState(() {
+          _schedules = cachedData.map((e) => TeacherScheduleItem.fromJson(e)).toList();
+          _isLoading = false;
+        });
+      }
+
+      // Fetch fresh data
+      final freshData = await ApiService.getMySchedule(dateStr);
+      await TeacherCacheService.save(cacheKey, freshData.map((e) => e.toJson()).toList());
+
+      if (mounted) {
+        setState(() {
+          _schedules = freshData;
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        if (_schedules == null) {
+          setState(() {
+            _error = e.toString();
+            _isLoading = false;
+          });
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text("Failed to update schedule: $e")),
+          );
+          setState(() {
+            _isLoading = false;
+          });
+        }
+      }
+    }
   }
 
   Future<void> _selectDate(BuildContext context) async {
@@ -37,8 +83,9 @@ class _MySchedulePageState extends State<MySchedulePage> {
     if (picked != null && picked != _selectedDate) {
       setState(() {
         _selectedDate = picked;
-        _loadSchedule();
+        _schedules = null; // Clear current data to show skeleton for new date
       });
+      _fetchSchedule();
     }
   }
 
@@ -56,50 +103,62 @@ class _MySchedulePageState extends State<MySchedulePage> {
           ),
         ],
       ),
-      body: Center(
-        child: ConstrainedBox(
-          constraints: BoxConstraints(maxWidth: context.scale(800)),
-          child: Column(
-            children: [
-              Container(
-                width: double.infinity,
-                padding: EdgeInsets.all(context.spacing),
-                color: theme.colorScheme.primaryContainer.withValues(alpha: 0.2),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(Icons.today, size: context.scale(18), color: theme.colorScheme.primary),
-                    SizedBox(width: context.scale(8)),
-                    Text(
-                      DateFormat('EEEE, d MMM yyyy').format(_selectedDate),
-                      style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold, fontSize: context.font(14), color: theme.colorScheme.onPrimaryContainer),
-                    ),
-                  ],
+      body: RefreshIndicator(
+        onRefresh: _fetchSchedule,
+        child: Center(
+          child: ConstrainedBox(
+            constraints: BoxConstraints(maxWidth: context.scale(800)),
+            child: Column(
+              children: [
+                Container(
+                  width: double.infinity,
+                  padding: EdgeInsets.all(context.spacing),
+                  color: theme.colorScheme.primaryContainer.withValues(alpha: 0.2),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.today, size: context.scale(18), color: theme.colorScheme.primary),
+                      SizedBox(width: context.scale(8)),
+                      Text(
+                        DateFormat('EEEE, d MMM yyyy').format(_selectedDate),
+                        style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold, fontSize: context.font(14), color: theme.colorScheme.onPrimaryContainer),
+                      ),
+                    ],
+                  ),
                 ),
-              ),
-              Expanded(
-                child: FutureBuilder<List<TeacherScheduleItem>>(
-                  future: _scheduleFuture,
-                  builder: (context, snapshot) {
-                    if (snapshot.connectionState == ConnectionState.waiting) {
-                      return const Center(child: CircularProgressIndicator());
-                    } else if (snapshot.hasError) {
-                      return Center(child: Text('Error: ${snapshot.error}', style: TextStyle(fontSize: context.font(14))));
-                    } else if (!snapshot.hasData || snapshot.data!.isEmpty) {
-                      return _buildEmptyState();
-                    }
-    
-                    final schedules = snapshot.data!;
-                    return ListView.builder(
-                      padding: context.pagePadding,
-                      itemCount: schedules.length,
-                      itemBuilder: (context, index) => _buildScheduleCard(schedules[index]),
-                    );
-                  },
+                Expanded(
+                  child: TeacherLoadingWrapper(
+                    isLoading: _isLoading,
+                    hasData: _schedules != null,
+                    skeleton: _buildSkeleton(),
+                    child: _error != null
+                        ? Center(child: Text('Error: $_error', style: TextStyle(fontSize: context.font(14))))
+                        : (_schedules == null || _schedules!.isEmpty)
+                            ? _buildEmptyState()
+                            : ListView.builder(
+                                padding: context.pagePadding,
+                                itemCount: _schedules!.length,
+                                itemBuilder: (context, index) => _buildScheduleCard(_schedules![index]),
+                              ),
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSkeleton() {
+    return ListView.builder(
+      padding: context.pagePadding,
+      itemCount: 5,
+      itemBuilder: (context, index) => Padding(
+        padding: EdgeInsets.only(bottom: context.spacing),
+        child: TeacherSkeleton(
+          height: context.scale(80),
+          borderRadius: BorderRadius.circular(context.scale(12)),
         ),
       ),
     );

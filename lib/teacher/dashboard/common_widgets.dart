@@ -2,6 +2,62 @@ import 'package:eduphin/services/responsive_helper.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:shimmer/shimmer.dart';
+
+class TeacherSkeleton extends StatelessWidget {
+  final double? width;
+  final double? height;
+  final BorderRadius? borderRadius;
+
+  const TeacherSkeleton({
+    super.key,
+    this.width,
+    this.height,
+    this.borderRadius,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+
+    return Shimmer.fromColors(
+      baseColor: isDark ? Colors.grey[800]! : Colors.grey[300]!,
+      highlightColor: isDark ? Colors.grey[700]! : Colors.grey[100]!,
+      child: Container(
+        width: width ?? double.infinity,
+        height: height ?? 20,
+        decoration: BoxDecoration(
+          color: isDark ? Colors.grey[800] : Colors.grey[300],
+          borderRadius: borderRadius ?? BorderRadius.circular(8),
+        ),
+      ),
+    );
+  }
+}
+
+class TeacherLoadingWrapper extends StatelessWidget {
+  final bool isLoading;
+  final bool hasData;
+  final Widget skeleton;
+  final Widget child;
+
+  const TeacherLoadingWrapper({
+    super.key,
+    required this.isLoading,
+    required this.hasData,
+    required this.skeleton,
+    required this.child,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    if (isLoading && !hasData) {
+      return skeleton;
+    }
+    return child;
+  }
+}
 
 Widget buildLabel(BuildContext context, String text) {
   final theme = context.theme;

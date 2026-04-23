@@ -1,5 +1,7 @@
 import 'dart:convert';
 import 'package:eduphin/services/api_service.dart';
+import 'package:eduphin/services/caching_service.dart';
+import 'package:eduphin/services/common_widgets.dart';
 import 'package:eduphin/services/responsive_helper.dart';
 import 'package:eduphin/teacher/dashboard/common_widgets.dart';
 import 'package:flutter/material.dart';
@@ -44,63 +46,69 @@ class _ClassScheduleSearchPageState extends State<ClassScheduleSearchPage> {
   String? _selectedSection;
   List<String> _classList = [];
   List<String> _sectionList = [];
-  String _error = '';
+  Object? _error;
 
   @override
   void initState() {
     super.initState();
+    _loadCacheAndFetch();
+  }
+
+  Future<void> _loadCacheAndFetch() async {
+    final cachedData = await CacheService.getCache('manager_class_schedules_meta');
+    if (cachedData != null && mounted) {
+      _processData(cachedData);
+    }
     _fetchDropdownData();
   }
 
-  @override
-  void dispose() {
-    _selectDateController.dispose();
-    super.dispose();
+  void _processData(dynamic data) {
+    final List<dynamic> classData = data['classes'] ?? [];
+
+    final List<String> fetchedClasses = classData
+        .map((json) => ApiClass.fromJson(json).name)
+        .whereType<String>()
+        .toList();
+
+    setState(() {
+      _classList = fetchedClasses;
+      _sectionList = ['A', 'B', 'C', 'D'];
+      if (_selectedClass == null && fetchedClasses.isNotEmpty) {
+        _selectedClass = fetchedClasses.first;
+      }
+    });
   }
 
   Future<void> _fetchDropdownData() async {
     if (!mounted) return;
     setState(() {
-      _isLoading = true;
-      _error = '';
+      _isLoading = _classList.isEmpty;
+      _error = null;
     });
 
     try {
       final response = await ApiService.get('manager/class-schedules/meta');
-      
-      if (!mounted) return;
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
         if (data['status'] == true) {
-          final List<dynamic> classData = data['classes'] ?? [];
-
-          final List<String> fetchedClasses = classData
-              .map((json) => ApiClass.fromJson(json).name)
-              .whereType<String>()
-              .toList();
-
-          setState(() {
-            _classList = fetchedClasses;
-            _sectionList = ['A', 'B', 'C', 'D'];
-            _selectedClass = fetchedClasses.isNotEmpty ? fetchedClasses.first : null;
-            _selectedSection = null;
-          });
+          await CacheService.setCache('manager_class_schedules_meta', data);
+          if (mounted) {
+            _processData(data);
+            setState(() {
+              _isLoading = false;
+            });
+          }
         } else {
-          throw Exception('API returned an error: ${data['message'] ?? 'Unknown error'}');
+          throw Exception(data['message'] ?? 'Failed to load metadata');
         }
       } else {
-        throw Exception('Failed to load data. Status code: ${response.statusCode}');
+        throw Exception('Failed to load data. Status: ${response.statusCode}');
       }
     } catch (e) {
       if (mounted) {
         setState(() {
-          _error = e.toString().replaceFirst("Exception: ", "");
-        });
-      }
-    } finally {
-      if (mounted) {
-        setState(() {
+          _error = e;
           _isLoading = false;
         });
       }
@@ -154,51 +162,49 @@ class _ClassScheduleSearchPageState extends State<ClassScheduleSearchPage> {
         ),
         centerTitle: false,
       ),
-        bottomNavigationBar: _isLoading || _error.isNotEmpty
-            ? null
-            : SafeArea(
-                child: Container(
-                  padding: EdgeInsets.fromLTRB(context.spacing, context.scale(8), context.spacing, context.scale(16)),
-                  decoration: BoxDecoration(
-                    color: theme.colorScheme.surface,
-                    border: Border(top: BorderSide(color: theme.colorScheme.outlineVariant.withValues(alpha: 0.5))),
-                  ),
-                  child: ConstrainedBox(
-                    constraints: const BoxConstraints(maxWidth: 600),
-                    child: buildActionButton(context, "SEARCH SCHEDULE", _searchSchedule),
-                  ),
+      bottomNavigationBar: _isLoading || _error != null
+          ? null
+          : SafeArea(
+              child: Container(
+                padding: EdgeInsets.fromLTRB(context.spacing, context.scale(8), context.spacing, context.scale(16)),
+                decoration: BoxDecoration(
+                  color: theme.colorScheme.surface,
+                  border: Border(top: BorderSide(color: theme.colorScheme.outlineVariant.withValues(alpha: 0.5))),
+                ),
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 600),
+                  child: buildActionButton(context, "SEARCH SCHEDULE", _searchSchedule),
                 ),
               ),
-      body: _buildBody(theme),
+            ),
+      body: LoadingWrapper(
+        isLoading: _isLoading,
+        hasData: _classList.isNotEmpty,
+        error: _error,
+        onRetry: _fetchDropdownData,
+        skeleton: _buildSkeleton(),
+        child: _buildBody(theme),
+      ),
+    );
+  }
+
+  Widget _buildSkeleton() {
+    return Padding(
+      padding: context.pagePadding,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SkeletonBox(height: context.scale(30), width: context.scale(200)),
+          SizedBox(height: context.scale(8)),
+          SkeletonBox(height: context.scale(15), width: context.scale(300)),
+          SizedBox(height: context.scale(24)),
+          SkeletonBox(height: context.scale(250), borderRadius: context.scale(16)),
+        ],
+      ),
     );
   }
 
   Widget _buildBody(ThemeData theme) {
-    if (_isLoading) {
-      return Center(child: CircularProgressIndicator(color: theme.colorScheme.primary));
-    }
-
-    if (_error.isNotEmpty) {
-      return Center(
-        child: Padding(
-          padding: EdgeInsets.all(context.spacing),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(Icons.error_outline_rounded, size: context.scale(48), color: theme.colorScheme.error),
-              SizedBox(height: context.scale(16)),
-              Text('Error: $_error', style: TextStyle(color: theme.colorScheme.error, fontSize: context.font(14)), textAlign: TextAlign.center),
-              SizedBox(height: context.scale(24)),
-              SizedBox(
-                width: context.scale(120),
-                child: buildActionButton(context, "RETRY", _fetchDropdownData),
-              )
-            ],
-          ),
-        ),
-      );
-    }
-
     return SingleChildScrollView(
       padding: context.pagePadding,
       child: Center(

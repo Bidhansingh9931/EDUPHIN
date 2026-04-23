@@ -1,5 +1,6 @@
 import 'package:eduphin/services/responsive_helper.dart';
 import 'package:eduphin/teacher/dashboard/marks_entry_detail_page.dart';
+import 'package:eduphin/teacher/dashboard/teacher_cache_service.dart';
 import 'package:flutter/material.dart';
 import 'package:eduphin/services/api_service.dart';
 import 'package:eduphin/teacher/dashboard/exam_models.dart';
@@ -13,14 +14,48 @@ class MarksEntryPage extends StatefulWidget {
 }
 
 class _MarksEntryPageState extends State<MarksEntryPage> {
-  late Future<List<ExamPaper>> _papersFuture;
+  List<ExamPaper>? _papers;
+  bool _isLoading = true;
+  String? _error;
   final Map<String, String?> _filters = {'class': 'All Classes'};
   Key _listKey = UniqueKey();
 
   @override
   void initState() {
     super.initState();
-    _papersFuture = ApiService.getExamPapers();
+    _loadData();
+  }
+
+  Future<void> _loadData() async {
+    // 1. Load from cache
+    final cachedData = await TeacherCacheService.load('exam_papers');
+    if (cachedData != null && mounted) {
+      setState(() {
+        _papers = (cachedData as List).map((p) => ExamPaper.fromJson(p)).toList();
+        _isLoading = false;
+      });
+    }
+
+    // 2. Fetch from API
+    try {
+      final papers = await ApiService.getExamPapers();
+      if (mounted) {
+        setState(() {
+          _papers = papers;
+          _isLoading = false;
+          _error = null;
+        });
+        // 3. Save to cache
+        await TeacherCacheService.save('exam_papers', papers.map((p) => p.toJson()).toList());
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _error = e.toString();
+          _isLoading = false;
+        });
+      }
+    }
   }
 
   @override
@@ -38,7 +73,17 @@ class _MarksEntryPageState extends State<MarksEntryPage> {
             children: [
               _buildFilterSection(),
               Expanded(
-                child: _buildStudentsTable(),
+                child: TeacherLoadingWrapper(
+                  isLoading: _isLoading,
+                  hasData: _papers != null,
+                  skeleton: _buildSkeleton(),
+                  child: RefreshIndicator(
+                    onRefresh: _loadData,
+                    child: _error != null && _papers == null
+                        ? Center(child: Text(_error!))
+                        : _buildStudentsTable(),
+                  ),
+                ),
               ),
             ],
           ),
@@ -65,6 +110,11 @@ class _MarksEntryPageState extends State<MarksEntryPage> {
 
   Widget _buildStudentsTable() {
     final theme = context.theme;
+    final filteredPapers = _papers?.where((p) {
+      if (_filters['class'] == 'All Classes') return true;
+      return p.className == _filters['class'];
+    }).toList() ?? [];
+
     return Card(
       elevation: 0,
       margin: EdgeInsets.all(context.spacing),
@@ -87,7 +137,7 @@ class _MarksEntryPageState extends State<MarksEntryPage> {
               children: [
                 Icon(Icons.list_alt, size: context.scale(20), color: theme.colorScheme.primary),
                 SizedBox(width: context.scale(8)),
-                Text("Student List", style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold, fontSize: context.font(16), color: theme.colorScheme.onSurface)),
+                Text("Exam Papers", style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold, fontSize: context.font(16), color: theme.colorScheme.onSurface)),
               ],
             ),
           ),
@@ -104,25 +154,46 @@ class _MarksEntryPageState extends State<MarksEntryPage> {
                   ],
                 ),
               ),
-              buildTextField(context, TextEditingController(), "Search Students...", prefixIcon: Icons.search),
+              buildTextField(context, TextEditingController(), "Search Papers...", prefixIcon: Icons.search),
             ]),
           ),
           Divider(height: 1, color: theme.colorScheme.outlineVariant.withValues(alpha: 0.5), thickness: 0.5),
           Expanded(
-            child: SingleChildScrollView(
-              child: Column(
-                children: [
-                  _buildTableHeader(),
-                  Divider(height: 1, color: theme.colorScheme.outlineVariant.withValues(alpha: 0.5), thickness: 0.5),
-                  _buildStudentRow(1, "Aarav Mehta", "101"),
-                  Divider(height: 1, color: theme.colorScheme.outlineVariant.withValues(alpha: 0.3), thickness: 0.5),
-                  _buildStudentRow(2, "Nisha Rao", "102"),
-                  Divider(height: 1, color: theme.colorScheme.outlineVariant.withValues(alpha: 0.3), thickness: 0.5),
-                ],
-              ),
-            ),
+            child: filteredPapers.isEmpty 
+              ? Center(child: Text("No exam papers found", style: TextStyle(fontSize: context.font(14))))
+              : ListView.separated(
+                  itemCount: filteredPapers.length,
+                  separatorBuilder: (context, index) => Divider(height: 1, color: theme.colorScheme.outlineVariant.withValues(alpha: 0.3), thickness: 0.5),
+                  itemBuilder: (context, index) {
+                    final paper = filteredPapers[index];
+                    return _buildPaperRow(index + 1, paper);
+                  },
+                ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildSkeleton() {
+    return Card(
+      margin: EdgeInsets.all(context.spacing),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(context.scale(20))),
+      child: ListView.builder(
+        itemCount: 5,
+        padding: EdgeInsets.all(context.spacing),
+        itemBuilder: (context, index) => Padding(
+          padding: EdgeInsets.symmetric(vertical: context.scale(12)),
+          child: Row(
+            children: [
+              TeacherSkeleton(width: context.scale(30), height: context.scale(20)),
+              SizedBox(width: context.spacing),
+              Expanded(child: TeacherSkeleton(height: context.scale(20))),
+              SizedBox(width: context.spacing),
+              TeacherSkeleton(width: context.scale(60), height: context.scale(20)),
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -134,26 +205,39 @@ class _MarksEntryPageState extends State<MarksEntryPage> {
       child: Row(
         children: [
           SizedBox(width: context.scale(40), child: Text("#", style: TextStyle(fontWeight: FontWeight.bold, fontSize: context.font(13), color: theme.colorScheme.onSurfaceVariant))),
-          Expanded(child: Text("NAME", style: TextStyle(fontWeight: FontWeight.bold, fontSize: context.font(13), color: theme.colorScheme.onSurfaceVariant))),
-          Expanded(child: Text("ROLL NO.", style: TextStyle(fontWeight: FontWeight.bold, fontSize: context.font(13), color: theme.colorScheme.onSurfaceVariant))),
+          Expanded(child: Text("SUBJECT", style: TextStyle(fontWeight: FontWeight.bold, fontSize: context.font(13), color: theme.colorScheme.onSurfaceVariant))),
+          Expanded(child: Text("CLASS", style: TextStyle(fontWeight: FontWeight.bold, fontSize: context.font(13), color: theme.colorScheme.onSurfaceVariant))),
         ],
       ),
     );
   }
 
-  Widget _buildStudentRow(int id, String name, String roll) {
+  Widget _buildPaperRow(int index, ExamPaper paper) {
     final theme = context.theme;
     return InkWell(
       onTap: () {
-        // Navigate to details or open marks entry
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => MarksEntryDetailPage(paper: paper),
+          ),
+        );
       },
       child: Padding(
         padding: EdgeInsets.symmetric(horizontal: context.spacing, vertical: context.scale(16)),
         child: Row(
           children: [
-            SizedBox(width: context.scale(40), child: Text("$id", style: TextStyle(fontSize: context.font(13)))),
-            Expanded(child: Text(name, style: TextStyle(fontWeight: FontWeight.bold, fontSize: context.font(14), color: theme.colorScheme.onSurface))),
-            Expanded(child: Text(roll, style: TextStyle(fontSize: context.font(13), color: theme.colorScheme.onSurfaceVariant))),
+            SizedBox(width: context.scale(40), child: Text("$index", style: TextStyle(fontSize: context.font(13)))),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(paper.subjectName, style: TextStyle(fontWeight: FontWeight.bold, fontSize: context.font(14), color: theme.colorScheme.onSurface)),
+                  Text(paper.examName, style: TextStyle(fontSize: context.font(12), color: theme.colorScheme.onSurfaceVariant)),
+                ],
+              ),
+            ),
+            Expanded(child: Text("${paper.className} - ${paper.sectionName}", style: TextStyle(fontSize: context.font(13), color: theme.colorScheme.onSurfaceVariant))),
           ],
         ),
       ),

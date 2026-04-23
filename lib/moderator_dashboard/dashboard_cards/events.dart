@@ -1,4 +1,6 @@
 import 'dart:async';
+import 'package:eduphin/moderator_dashboard/cache_helper.dart';
+import 'package:eduphin/moderator_dashboard/skeleton_widgets.dart';
 import 'package:eduphin/services/api_service.dart';
 import 'package:eduphin/services/responsive_helper.dart';
 import 'package:flutter/material.dart';
@@ -48,9 +50,30 @@ class Event {
 
 // 2. Data Provider to fetch event data
 class EventProvider {
-  Future<List<Event>> fetchEvents() async {
-    final data = await ApiService.getModeratorEvents();
-    return data.map((e) => Event.fromJson(e)).toList();
+  static const String _cacheKey = 'moderator_events_list';
+
+  Future<List<Event>> fetchEvents({bool bypassCache = false}) async {
+    try {
+      if (!bypassCache) {
+        final cached = await getCachedEvents();
+        if (cached != null) return cached;
+      }
+      final data = await ApiService.getModeratorEvents();
+      await CacheHelper.save(_cacheKey, data);
+      return data.map((e) => Event.fromJson(e)).toList();
+    } catch (e) {
+      debugPrint("Error fetching events: $e");
+      // Return empty list instead of throwing to allow "Coming Soon" state
+      return [];
+    }
+  }
+
+  Future<List<Event>?> getCachedEvents() async {
+    final cached = await CacheHelper.load(_cacheKey);
+    if (cached != null && cached is List) {
+      return cached.map((e) => Event.fromJson(e)).toList();
+    }
+    return null;
   }
 }
 
@@ -65,16 +88,22 @@ class EventsPage extends StatefulWidget {
 class _EventsPageState extends State<EventsPage> {
   final EventProvider _provider = EventProvider();
   late Future<List<Event>> _eventsFuture;
+  List<Event>? _cachedEvents;
 
   @override
   void initState() {
     super.initState();
-    _eventsFuture = _provider.fetchEvents();
+    _loadInitialData();
   }
 
-  Future<void> _refreshEvents() async {
+  Future<void> _loadInitialData() async {
+    _cachedEvents = await _provider.getCachedEvents();
+    _refreshEvents();
+  }
+
+  Future<void> _refreshEvents({bool bypassCache = false}) async {
     setState(() {
-      _eventsFuture = _provider.fetchEvents();
+      _eventsFuture = _provider.fetchEvents(bypassCache: bypassCache);
     });
   }
 
@@ -95,49 +124,53 @@ class _EventsPageState extends State<EventsPage> {
           SizedBox(width: context.md),
         ],
       ),
-      body: RefreshIndicator(
-        onRefresh: _refreshEvents,
-        color: theme.colorScheme.primary,
-        child: FutureBuilder<List<Event>>(
-          future: _eventsFuture,
-          builder: (context, snapshot) {
-            if (snapshot.connectionState == ConnectionState.waiting) {
-              return Center(child: CircularProgressIndicator(color: theme.colorScheme.primary));
-            }
-            if (snapshot.hasError) {
-              return _buildComingSoon(context);
-            }
-            if (!snapshot.hasData || snapshot.data!.isEmpty) {
-              return _buildEmptyState(context);
-            }
+      body: FutureBuilder<List<Event>>(
+        future: _eventsFuture,
+        builder: (context, snapshot) {
+          return ModeratorLoadingWrapper<List<Event>>(
+            snapshot: snapshot,
+            cachedData: _cachedEvents,
+            skeleton: const ListSkeleton(),
+            onRefresh: () => _refreshEvents(bypassCache: true),
+            builder: (events) {
+              if (snapshot.hasError && (_cachedEvents == null || _cachedEvents!.isEmpty)) {
+                return _buildComingSoon(context);
+              }
 
-            final events = snapshot.data!;
+              if (events.isEmpty) {
+                return _buildEmptyState(context);
+              }
 
-            return SingleChildScrollView(
-              padding: context.pagePadding,
-              physics: const AlwaysScrollableScrollPhysics(),
-              child: Center(
-                child: ConstrainedBox(
-                  constraints: BoxConstraints(maxWidth: context.scale(1200)),
-                  child: GridView.builder(
-                    shrinkWrap: true,
-                    physics: const NeverScrollableScrollPhysics(),
-                    itemCount: events.length,
-                    gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                      crossAxisCount: context.responsive(1, tablet: 2, desktop: 3),
-                      crossAxisSpacing: context.md,
-                      mainAxisSpacing: context.md,
-                      mainAxisExtent: context.scale(260),
+              return RefreshIndicator(
+                onRefresh: () => _refreshEvents(bypassCache: true),
+                color: theme.colorScheme.primary,
+                child: SingleChildScrollView(
+                  padding: context.pagePadding,
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  child: Center(
+                    child: ConstrainedBox(
+                      constraints: BoxConstraints(maxWidth: context.scale(1200)),
+                      child: GridView.builder(
+                        shrinkWrap: true,
+                        physics: const NeverScrollableScrollPhysics(),
+                        itemCount: events.length,
+                        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                          crossAxisCount: context.responsive(1, tablet: 2, desktop: 3),
+                          crossAxisSpacing: context.md,
+                          mainAxisSpacing: context.md,
+                          mainAxisExtent: context.scale(260),
+                        ),
+                        itemBuilder: (context, index) {
+                          return EventCard(event: events[index]);
+                        },
+                      ),
                     ),
-                    itemBuilder: (context, index) {
-                      return EventCard(event: events[index]);
-                    },
                   ),
                 ),
-              ),
-            );
-          },
-        ),
+              );
+            },
+          );
+        },
       ),
     );
   }

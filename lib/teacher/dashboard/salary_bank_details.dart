@@ -1,9 +1,12 @@
+import 'package:eduphin/teacher/dashboard/common_widgets.dart';
+import 'package:eduphin/teacher/dashboard/teacher_cache_service.dart';
 import 'package:flutter/material.dart';
 import 'package:eduphin/services/api_service.dart';
 import 'package:eduphin/teacher/dashboard/salary_models.dart';
 import 'package:eduphin/staff/staff_dashboard/staff_models.dart' as staff_model;
 import 'package:intl/intl.dart';
 import 'package:eduphin/services/responsive_helper.dart';
+import 'package:eduphin/services/pdf_service.dart';
 
 class SalaryBankDetailsPage extends StatefulWidget {
   const SalaryBankDetailsPage({super.key});
@@ -13,12 +16,60 @@ class SalaryBankDetailsPage extends StatefulWidget {
 }
 
 class _SalaryBankDetailsPageState extends State<SalaryBankDetailsPage> {
-  late Future<SalaryPageData> _salaryDataFuture;
+  SalaryPageData? _salaryData;
+  bool _isLoading = true;
+  String? _error;
 
   @override
   void initState() {
     super.initState();
-    _salaryDataFuture = ApiService.getSalaryDetails();
+    _fetchData();
+  }
+
+  Future<void> _fetchData() async {
+    setState(() {
+      _isLoading = true;
+      _error = null;
+    });
+
+    try {
+      // Load from cache first
+      final cachedData = await TeacherCacheService.load('salary_details');
+      if (cachedData != null) {
+        setState(() {
+          _salaryData = SalaryPageData.fromJson(cachedData);
+          _isLoading = false;
+        });
+      }
+
+      // Fetch fresh data
+      final freshData = await ApiService.getSalaryDetails();
+      await TeacherCacheService.save('salary_details', freshData.toJson());
+
+      if (mounted) {
+        setState(() {
+          _salaryData = freshData;
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        if (_salaryData == null) {
+          setState(() {
+            _error = e.toString();
+            _isLoading = false;
+          });
+        } else {
+          // If we have cached data, just show a snackbar for the background fetch error
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text("Failed to update salary details: $e")),
+          );
+          setState(() {
+            _isLoading = false;
+          });
+        }
+      }
+    }
   }
 
   @override
@@ -32,83 +83,154 @@ class _SalaryBankDetailsPageState extends State<SalaryBankDetailsPage> {
         title: const Text("Salary & Bank Details"),
         centerTitle: true,
       ),
-      body: FutureBuilder<SalaryPageData>(
-        future: _salaryDataFuture,
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
-          } else if (snapshot.hasError) {
-            return Center(
-              child: Padding(
-                padding: EdgeInsets.all(context.spacing),
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(Icons.error_outline, size: context.scale(48), color: colorScheme.error),
-                    SizedBox(height: context.spacing),
-                    Text(
-                      "Error: ${snapshot.error}",
-                      textAlign: TextAlign.center,
-                      style: TextStyle(fontSize: context.font(14), color: colorScheme.onSurface),
-                    ),
-                    SizedBox(height: context.spacing * 1.5),
-                    FilledButton(
-                      onPressed: () => setState(() {
-                        _salaryDataFuture = ApiService.getSalaryDetails();
-                      }),
-                      child: const Text("Retry"),
-                    )
-                  ],
+      body: TeacherLoadingWrapper(
+        isLoading: _isLoading,
+        hasData: _salaryData != null,
+        skeleton: _buildSkeleton(),
+        child: _error != null
+            ? Center(
+                child: Padding(
+                  padding: EdgeInsets.all(context.spacing),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.error_outline, size: context.scale(48), color: colorScheme.error),
+                      SizedBox(height: context.spacing),
+                      Text(
+                        "Error: $_error",
+                        textAlign: TextAlign.center,
+                        style: TextStyle(fontSize: context.font(14), color: colorScheme.onSurface),
+                      ),
+                      SizedBox(height: context.spacing * 1.5),
+                      FilledButton(
+                        onPressed: _fetchData,
+                        child: const Text("Retry"),
+                      )
+                    ],
+                  ),
                 ),
-              ),
-            );
-          } else if (!snapshot.hasData) {
-            return Center(
-              child: Text(
-                "No salary data found",
-                style: TextStyle(fontSize: context.font(14), color: colorScheme.outline),
-              ),
-            );
-          }
+              )
+            : _salaryData == null
+                ? Center(
+                    child: Text(
+                      "No salary data found",
+                      style: TextStyle(fontSize: context.font(14), color: colorScheme.outline),
+                    ),
+                  )
+                : RefreshIndicator(
+                    onRefresh: _fetchData,
+                    child: SingleChildScrollView(
+                      padding: context.pagePadding,
+                      physics: const AlwaysScrollableScrollPhysics(),
+                      child: Center(
+                        child: ConstrainedBox(
+                          constraints: const BoxConstraints(maxWidth: 800),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              _buildBankDetailsCard(_salaryData!, _salaryData!.account),
+                              SizedBox(height: context.spacing * 2),
+                              Padding(
+                                padding: EdgeInsets.symmetric(horizontal: context.scale(4)),
+                                child: Row(
+                                  children: [
+                                    Icon(Icons.history, color: colorScheme.primary, size: context.scale(20)),
+                                    SizedBox(width: context.scale(12)),
+                                    Text(
+                                      "Past Salary Records",
+                                      style: TextStyle(
+                                        fontSize: context.font(18),
+                                        fontWeight: FontWeight.bold,
+                                        color: colorScheme.onSurface,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              SizedBox(height: context.spacing),
+                              _buildPastRecordsTable(_salaryData!.salaries),
+                              SizedBox(height: context.spacing * 2),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+      ),
+    );
+  }
 
-          final data = snapshot.data!;
-          return SingleChildScrollView(
-            padding: context.pagePadding,
-            physics: const AlwaysScrollableScrollPhysics(),
-            child: Center(
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 800),
+  Widget _buildSkeleton() {
+    return SingleChildScrollView(
+      padding: context.pagePadding,
+      child: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 800),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Card(
+                elevation: 0,
+                color: context.theme.colorScheme.surfaceContainerLow,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(context.scale(20)),
+                  side: BorderSide(color: context.theme.colorScheme.outlineVariant.withValues(alpha: 0.5), width: 0.5),
+                ),
                 child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    _buildBankDetailsCard(data, data.account),
-                    SizedBox(height: context.spacing * 2),
-                    Padding(
-                      padding: EdgeInsets.symmetric(horizontal: context.scale(4)),
+                    Container(
+                      padding: EdgeInsets.all(context.scale(16)),
+                      decoration: BoxDecoration(
+                        color: context.theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
+                        borderRadius: BorderRadius.vertical(top: Radius.circular(context.scale(20))),
+                      ),
                       child: Row(
                         children: [
-                          Icon(Icons.history, color: colorScheme.primary, size: context.scale(20)),
+                          TeacherSkeleton(width: context.scale(20), height: context.scale(20)),
                           SizedBox(width: context.scale(12)),
-                          Text(
-                            "Past Salary Records",
-                            style: TextStyle(
-                              fontSize: context.font(18),
-                              fontWeight: FontWeight.bold,
-                              color: colorScheme.onSurface,
-                            ),
-                          ),
+                          TeacherSkeleton(width: context.scale(100), height: context.font(16)),
                         ],
                       ),
                     ),
-                    SizedBox(height: context.spacing),
-                    _buildPastRecordsTable(data.salaries),
-                    SizedBox(height: context.spacing * 2),
+                    Padding(
+                      padding: EdgeInsets.all(context.scale(20)),
+                      child: Column(
+                        children: List.generate(
+                          6,
+                          (index) => Padding(
+                            padding: EdgeInsets.symmetric(vertical: context.scale(12)),
+                            child: Row(
+                              children: [
+                                TeacherSkeleton(width: context.scale(32), height: context.scale(32), borderRadius: BorderRadius.circular(16)),
+                                SizedBox(width: context.scale(12)),
+                                TeacherSkeleton(width: context.scale(100), height: context.font(14)),
+                                const Spacer(),
+                                TeacherSkeleton(width: context.scale(80), height: context.font(14)),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
                   ],
                 ),
               ),
-            ),
-          );
-        },
+              SizedBox(height: context.spacing * 2),
+              Padding(
+                padding: EdgeInsets.symmetric(horizontal: context.scale(4)),
+                child: Row(
+                  children: [
+                    TeacherSkeleton(width: context.scale(20), height: context.scale(20)),
+                    SizedBox(width: context.scale(12)),
+                    TeacherSkeleton(width: context.scale(150), height: context.font(18)),
+                  ],
+                ),
+              ),
+              SizedBox(height: context.spacing),
+              TeacherSkeleton(height: context.scale(200), borderRadius: BorderRadius.circular(context.scale(20))),
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -190,7 +312,7 @@ class _SalaryBankDetailsPageState extends State<SalaryBankDetailsPage> {
     final theme = context.theme;
     final colorScheme = theme.colorScheme;
     try {
-      final data = await ApiService.getStaffSalarySlip(salaryId.toString());
+      final data = await ApiService.getTeacherSalarySlip(salaryId.toString());
       final detail = staff_model.SalaryDetailData.fromJson(data);
       if (!mounted) return;
 
@@ -244,16 +366,31 @@ class _SalaryBankDetailsPageState extends State<SalaryBankDetailsPage> {
                   _buildModalDetailItem(context, "Basic Salary", "₹ ${detail.salary.basicSalary ?? 'N/A'}"),
                   _buildModalDetailItem(context, "Month / Year", "${detail.salary.month} / ${detail.salary.year}"),
                   SizedBox(height: context.spacing * 2),
-                  SizedBox(
-                    width: double.infinity,
-                    child: FilledButton(
-                      onPressed: () => Navigator.pop(context),
-                      style: FilledButton.styleFrom(
-                        padding: EdgeInsets.symmetric(vertical: context.scale(16)),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(context.scale(12))),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          onPressed: () => PdfService.generateSalaryPdf(detail.salary, detail.amountInWords),
+                          icon: const Icon(Icons.download),
+                          label: const Text("DOWNLOAD PDF"),
+                          style: OutlinedButton.styleFrom(
+                            padding: EdgeInsets.symmetric(vertical: context.scale(16)),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(context.scale(12))),
+                          ),
+                        ),
                       ),
-                      child: Text("CLOSE", style: TextStyle(fontSize: context.font(14), fontWeight: FontWeight.bold)),
-                    ),
+                      SizedBox(width: context.spacing),
+                      Expanded(
+                        child: FilledButton(
+                          onPressed: () => Navigator.pop(context),
+                          style: FilledButton.styleFrom(
+                            padding: EdgeInsets.symmetric(vertical: context.scale(16)),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(context.scale(12))),
+                          ),
+                          child: Text("CLOSE", style: TextStyle(fontSize: context.font(14), fontWeight: FontWeight.bold)),
+                        ),
+                      ),
+                    ],
                   ),
                 ],
               ),

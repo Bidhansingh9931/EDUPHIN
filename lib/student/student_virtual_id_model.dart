@@ -31,6 +31,19 @@ class StudentVirtualIdData {
       instituteEmail: json['institute_email'],
     );
   }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'user': user?.toJson(),
+      'student': student?.toJson(),
+      'institute_name': instituteName,
+      'institute_logo': instituteLogo,
+      'institute_address': instituteAddress,
+      'institute_phone': institutePhone,
+      'institute_website': instituteWebsite,
+      'institute_email': instituteEmail,
+    };
+  }
 }
 
 class User {
@@ -46,6 +59,14 @@ class User {
       name: json['name'] ?? '',
       email: json['email'] ?? '',
     );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'name': name,
+      'email': email,
+    };
   }
 }
 
@@ -108,5 +129,26 @@ class Student {
                     json['image'] ?? 
                     json['avatar'])?.toString(),
     );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'first_name': firstName,
+      'last_name': lastName,
+      'student_roll_no': studentRollNo,
+      'registration_no': registrationNo,
+      'dob': dob,
+      'mobile': mobile,
+      'address_line1': addressLine1,
+      'city': city,
+      'state': state,
+      'pincode': pincode,
+      'country': country,
+      'guardian_first_name': guardianFirstName,
+      'guardian_mobile': guardianMobile,
+      'academic_year': academicYear,
+      'profile_image': profileImage,
+    };
   }
 }

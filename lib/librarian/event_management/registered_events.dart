@@ -15,7 +15,7 @@ class MyRegisteredEventsPage extends StatefulWidget {
 class _MyRegisteredEventsPageState extends State<MyRegisteredEventsPage> {
   String selectedStatus = "All";
   String selectedType = "All";
-  
+
   late Stream<List<librarian_model.EventRegistration>> _registrationsStream;
 
   @override

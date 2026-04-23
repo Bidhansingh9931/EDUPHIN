@@ -57,6 +57,7 @@ class _UploadAssignmentPageState extends State<Uploadstudymaterial> {
   Future<void> _pickFile() async {
     final result = await FilePicker.platform.pickFiles(
       type: FileType.custom,
+      withData: true,
       allowedExtensions: ['pdf', 'doc', 'docx', 'ppt', 'pptx', 'jpg', 'jpeg', 'png', 'mp4', 'avi', 'mkv'],
     );
 

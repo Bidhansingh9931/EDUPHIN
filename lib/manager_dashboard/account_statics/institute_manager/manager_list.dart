@@ -315,13 +315,63 @@ class CustomManagerListBox extends StatelessWidget {
   }
 
   Widget _buildSkeleton(BuildContext context) {
-    return Column(
-      children: List.generate(
-        5,
-        (index) => Padding(
-          padding: EdgeInsets.only(bottom: context.scale(12)),
-          child: SkeletonBox(height: context.scale(80), borderRadius: context.scale(12)),
-        ),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final crossAxisCount = context.responsive(1, tablet: 2, desktop: 3);
+        if (crossAxisCount > 1) {
+          return GridView.builder(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            itemCount: 6,
+            gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: crossAxisCount,
+              crossAxisSpacing: context.scale(16),
+              mainAxisSpacing: context.scale(16),
+              mainAxisExtent: context.scale(80),
+            ),
+            itemBuilder: (context, index) => _buildSkeletonItem(context),
+          );
+        } else {
+          return ListView.separated(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            itemCount: 6,
+            separatorBuilder: (context, index) => SizedBox(height: context.scale(12)),
+            itemBuilder: (context, index) => _buildSkeletonItem(context),
+          );
+        }
+      },
+    );
+  }
+
+  Widget _buildSkeletonItem(BuildContext context) {
+    final theme = context.theme;
+    return Container(
+      padding: EdgeInsets.all(context.scale(12)),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surfaceContainerLow,
+        borderRadius: BorderRadius.circular(context.scale(12)),
+      ),
+      child: Row(
+        children: [
+          SkeletonBox(
+            width: context.scale(48),
+            height: context.scale(48),
+            borderRadius: context.scale(24),
+          ),
+          SizedBox(width: context.scale(16)),
+          const Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                SkeletonBox(height: 16),
+                SizedBox(height: 4),
+                SkeletonBox(height: 12, width: 80),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }

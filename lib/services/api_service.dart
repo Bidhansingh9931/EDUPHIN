@@ -1,3 +1,4 @@
+import 'package:eduphin/services/caching_service.dart';
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io' show File, Platform;
@@ -43,14 +44,7 @@ class ApiService {
   );
 
   static String get baseUrl {
-    if (kIsWeb) {
-      return _envUrl;
-    } else if (Platform.isAndroid) {
-      // Use 10.0.2.2 for Emulator or your PC IP for physical devices
-      return 'http://10.0.2.2/Eduphin-Portal/public';
-    } else {
-      return _envUrl;
-    }
+    return _envUrl;
   }
 
   static String get baseImageUrl => baseUrl;
@@ -62,7 +56,11 @@ class ApiService {
   }
 
   static Uri _uri(String endpoint, [Map<String, dynamic>? queryParameters]) {
-    final uri = Uri.parse('$baseUrl/api/$endpoint');
+    String baseUrlString = baseUrl.endsWith('/') ? baseUrl.substring(0, baseUrl.length - 1) : baseUrl;
+    // On Web, sometimes the browser or proxy might have issues with how URIs are constructed
+    // Ensure we don't have double slashes after /api/
+    String cleanEndpoint = endpoint.startsWith('/') ? endpoint.substring(1) : endpoint;
+    final uri = Uri.parse('$baseUrlString/api/$cleanEndpoint');
     if (queryParameters != null) {
       return uri.replace(queryParameters: queryParameters);
     }
@@ -84,6 +82,7 @@ class ApiService {
     await prefs.remove('auth_token');
     await prefs.remove('role_id');
     await prefs.remove('user_name');
+    await CacheService.clearAll();
     try {
       await post('logout', {});
     } catch (_) {}
@@ -255,7 +254,11 @@ class ApiService {
     try {
       final headers = await _getHeaders();
       headers.remove('Content-Type');
-      final request = http.MultipartRequest('POST', _uri(endpoint));
+      
+      final uri = _uri(endpoint);
+      
+      _logRequest('POST-MULTIPART', uri, body: fields);
+      final request = http.MultipartRequest('POST', uri);
       request.headers.addAll(headers);
 
       fields.forEach((key, value) {
@@ -267,8 +270,6 @@ class ApiService {
       if (files != null) {
         for (final entry in files.entries) {
           if (kIsWeb) {
-            // On Web, we can't use fromPath. Use fromBytes instead if available,
-            // otherwise throw a more helpful error.
             throw Exception('Web uploads must use postMultipartFromBytes instead of postMultipart');
           } else {
             request.files.add(await http.MultipartFile.fromPath(entry.key, entry.value.path));
@@ -285,7 +286,11 @@ class ApiService {
     try {
       final headers = await _getHeaders();
       headers.remove('Content-Type');
-      final request = http.MultipartRequest('POST', _uri(endpoint));
+      
+      final uri = _uri(endpoint);
+
+      _logRequest('POST-MULTIPART-BYTES', uri, body: fields);
+      final request = http.MultipartRequest('POST', uri);
       request.headers.addAll(headers);
 
       fields.forEach((key, value) {
@@ -399,14 +404,14 @@ class ApiService {
   static Stream<Map<String, dynamic>> getAccountantExamScheduleStream(String id) => Stream.fromFuture(getAccountantExamSchedule(id));
   static Stream<teacher_library.BookPagination> getAccountantLibraryBooksStream(Map<String, String> filters, int page) => Stream.fromFuture(getAccountantLibraryBooks(filters, page));
   static Stream<teacher_library.LendingPagination> getAccountantLendingBooksStream(Map<String, String> filters, int page) => Stream.fromFuture(getAccountantLendingBooks(filters, page));
-  static Stream<List<dynamic>> getAccountantStudentsStream(Map<String, String> filters) => Stream.fromFuture(getAccountantStudents(filters));
+  static Stream<Map<String, dynamic>> getAccountantStudentsStream(Map<String, String> filters) => Stream.fromFuture(getAccountantStudents(filters));
   static Stream<Map<String, dynamic>> getAccountantStudentFeeDetailsStream(String studentId) => Stream.fromFuture(getAccountantStudentFeeDetails(studentId));
   static Stream<Map<String, dynamic>> getAccountantMySalariesStream() => Stream.fromFuture(getAccountantMySalaries());
   static Stream<Map<String, dynamic>> getAccountantEmployeeSalaryStream(String id) => Stream.fromFuture(getAccountantEmployeeSalary(id));
   static Stream<Map<String, dynamic>> getAccountantSalaryDetailStream(String id, {String? employeeId}) => Stream.fromFuture(getAccountantSalaryDetail(id, employeeId: employeeId));
   static Stream<Map<String, dynamic>> getAccountantFeesStream() => Stream.fromFuture(getAccountantFees());
   static Stream<List<accountant_model.UserDetail>> getEmployeesByRoleStream(dynamic roleId) => Stream.fromFuture(getEmployeesByRole(roleId));
-  static Stream<teacher_ticket_details.TicketDetails> getTicketDetailsAccountantStream(String id) => Stream.fromFuture(getTicketDetailsAccountant(id));
+  static Stream<teacher_ticket_details.TicketDetails> getTicketDetailsAccountantStream(String id) => Stream.fromFuture(getTicketDetailsAccountant(id)).asBroadcastStream();
   static Stream<List<teacher_ticket.SupportTicket>> getAccountantTicketsStream(Map<String, String> filters) => Stream.fromFuture(getAccountantTickets(filters));
   static Stream<List<teacher_ticket.SupportTicket>> getAccountantAssignedTicketsStream(Map<String, String> filters) => Stream.fromFuture(getAccountantAssignedTickets(filters));
 
@@ -498,13 +503,19 @@ class ApiService {
     final fields = {'schedule_id': scheduleId.toString(), 'title': title, 'due_date': dueDate, if (description != null) 'description': description};
     final files = {'attachment': attachment};
     final response = await postMultipart('teacher/assignments', fields, files: files);
-    if (response.statusCode != 200 && response.statusCode != 201) throw Exception('Failed to create assignment');
+    if (response.statusCode != 200 && response.statusCode != 201) {
+      final body = await response.stream.bytesToString();
+      throw Exception('Failed to create assignment: $body');
+    }
   }
 
   static Future<void> createAssignmentFromBytes(int scheduleId, String title, String? description, String dueDate, Uint8List attachmentBytes, String fileName) async {
     final fields = {'schedule_id': scheduleId.toString(), 'title': title, 'due_date': dueDate, if (description != null) 'description': description};
     final response = await postMultipartFromBytes('teacher/assignments', fields, files: {'attachment': attachmentBytes}, fileNames: {'attachment': fileName});
-    if (response.statusCode != 200 && response.statusCode != 201) throw Exception('Failed to create assignment');
+    if (response.statusCode != 200 && response.statusCode != 201) {
+      final body = await response.stream.bytesToString();
+      throw Exception('Failed to create assignment: $body');
+    }
   }
 
   static Future<void> updateAssignment(int assignmentId, String title, String? description, String dueDate, File? attachment) async {
@@ -1059,10 +1070,22 @@ class ApiService {
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
         if (data['success'] == true || data['status'] == true) return data['data'];
+      } else if (response.statusCode == 500 || response.body.contains('DecryptException')) {
+        // If 500, it's likely a DecryptException. Fallback to body-based ID if possible,
+        // though GET routes usually don't support body. Try POST if applicable or move to fallback 2.
       }
     } catch (_) {}
 
-    // 2. Fallback: Search in My Salaries or Employee Salaries list
+    // 2. Try POST with ID in body (Workaround for DecryptException on parameterized routes)
+    try {
+      final response = await post('accountants/salary/view', {'id': id});
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        if (data['success'] == true || data['status'] == true) return data['data'];
+      }
+    } catch (_) {}
+
+    // 3. Fallback: Search in My Salaries or Employee Salaries list
     try {
       final String endpoint = employeeId != null ? 'accountants/account/${Uri.encodeComponent(employeeId)}' : 'accountants/my-salary';
       final response = await get(endpoint);
@@ -1090,8 +1113,21 @@ class ApiService {
 
   static Future<void> deleteAccountantSalary(String id) async {
     final encodedId = Uri.encodeComponent(id);
-    final response = await delete('accountants/salary/destroy/$encodedId');
-    if (response.statusCode != 200) throw Exception(jsonDecode(response.body)['message'] ?? 'Failed to delete salary');
+    var response = await delete('accountants/salary/destroy/$encodedId');
+    
+    if (response.statusCode != 200) {
+      if (response.statusCode == 500 || response.body.contains('DecryptException')) {
+        // Fallback: try POST to delete endpoint with ID in body
+        final altResponse = await post('accountants/salary/destroy', {'id': id});
+        if (altResponse.statusCode == 200) return;
+
+        // Try POST to parameterized URL
+        final postResponse = await post('accountants/salary/destroy/$encodedId', {});
+        if (postResponse.statusCode == 200) return;
+      }
+      
+      throw Exception(jsonDecode(response.body)['message'] ?? 'Failed to delete salary (Status: ${response.statusCode})');
+    }
   }
 
   static Future<void> storeAccountantEmployeeSalary(String id, Map<String, dynamic> data) async {
@@ -1223,23 +1259,34 @@ class ApiService {
     if (response.statusCode != 200) throw Exception('Failed to update status');
   }
 
-  static Future<void> addTicketReply(int ticketId, String message, {File? attachment}) async {
+  static Future<void> addTicketReply(int ticketId, String message, {File? attachment, Uint8List? fileBytes, String? fileName}) async {
     final fields = {'message': message};
-    final files = attachment != null ? {'attachment': attachment} : null;
-    final response = await postMultipart('teacher/tickets/$ticketId/reply', fields, files: files);
-    if (response.statusCode != 201) throw Exception('Failed to add reply');
+    if (kIsWeb && fileBytes != null && fileName != null) {
+      final response = await postMultipartFromBytes('teacher/tickets/$ticketId/reply', fields, files: {'attachment': fileBytes}, fileNames: {'attachment': fileName});
+      if (response.statusCode != 201) throw Exception('Failed to add reply');
+    } else {
+      final files = attachment != null ? {'attachment': attachment} : null;
+      final response = await postMultipart('teacher/tickets/$ticketId/reply', fields, files: files);
+      if (response.statusCode != 201) throw Exception('Failed to add reply');
+    }
   }
 
   static Future<void> uploadStudyMaterial(int scheduleId, String title, String? description, File file) async {
     final fields = {'schedule_id': scheduleId.toString(), 'title': title, if (description != null) 'description': description};
     final response = await postMultipart('teacher/notes', fields, files: {'file_path': file});
-    if (response.statusCode != 201) throw Exception('Failed to upload');
+    if (response.statusCode != 200 && response.statusCode != 201) {
+      final body = await response.stream.bytesToString();
+      throw Exception('Failed to upload: $body');
+    }
   }
 
   static Future<void> uploadStudyMaterialFromBytes(int scheduleId, String title, String? description, Uint8List fileBytes, String fileName) async {
     final fields = {'schedule_id': scheduleId.toString(), 'title': title, if (description != null) 'description': description};
     final response = await postMultipartFromBytes('teacher/notes', fields, files: {'file_path': fileBytes}, fileNames: {'file_path': fileName});
-    if (response.statusCode != 201) throw Exception('Failed to upload');
+    if (response.statusCode != 200 && response.statusCode != 201) {
+      final body = await response.stream.bytesToString();
+      throw Exception('Failed to upload: $body');
+    }
   }
 
   static Future<void> deleteStudyMaterial(int materialId) async {
@@ -1254,6 +1301,37 @@ class ApiService {
       if (data['status'] == true) return teacher_salary.SalaryPageData.fromJson(data);
     }
     throw Exception('Failed to load salary');
+  }
+
+  static Future<Map<String, dynamic>> getTeacherSalarySlip(String salaryId) async {
+    final encodedId = Uri.encodeComponent(salaryId);
+    try {
+      final response = await get('teacher/salary/$encodedId');
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        if (data['status'] == true) return data['data'] ?? data;
+      }
+    } catch (_) {}
+
+    // Fallback: Search in My Salaries list if specific fetch fails
+    try {
+      final response = await get('teacher/salary');
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        final list = data['salaries'] ?? data['data']?['salaries'] ?? data['data'];
+        if (list is List) {
+          final record = list.firstWhere(
+            (s) => s['id'].toString() == salaryId || s['encrypted_id']?.toString() == salaryId,
+            orElse: () => null,
+          );
+          if (record != null) {
+            return {'salary': record, 'amount_in_words': 'N/A', 'status': true};
+          }
+        }
+      }
+    } catch (_) {}
+
+    throw Exception('Salary slip details are currently unavailable. (Status: 404)');
   }
 
   static Future<Map<String, dynamic>> getAccountantFees() async {
@@ -1337,15 +1415,19 @@ class ApiService {
 
   static Future<void> deleteAccountantFee(String feeId) async {
     final encodedId = Uri.encodeComponent(feeId);
-    final response = await delete('accountants/fees/delete/$encodedId');
+    // Try standard DELETE first
+    var response = await delete('accountants/fees/delete/$encodedId');
+    
     if (response.statusCode != 200) {
-      // If DELETE fails with 405 or 404, try POST as some Laravel versions/configs require POST for deletes
-      if (response.statusCode == 405 || response.statusCode == 404) {
+      // If decryption fails, try sending ID in the body via POST
+      // Some backends allow raw IDs if passed as a body parameter
+      if (response.body.contains('DecryptException') || response.statusCode == 500) {
+        final altResponse = await post('accountants/fees/delete', {'id': feeId});
+        if (altResponse.statusCode == 200) return;
+        
+        // Final fallback: try POST to the parameterized URL
         final postResponse = await post('accountants/fees/delete/$encodedId', {});
         if (postResponse.statusCode == 200) return;
-
-        final postData = jsonDecode(postResponse.body);
-        throw Exception(postData['message'] ?? 'Failed to delete fee (Status: ${postResponse.statusCode})');
       }
 
       final data = jsonDecode(response.body);
@@ -1371,6 +1453,11 @@ class ApiService {
         return data['data'] ?? data;
       }
     }
+    
+    if (response.statusCode == 500 && response.body.contains('DecryptException')) {
+      throw Exception("Server Error: Decryption failed for ID '$feeId'. The backend expects an encrypted ID.");
+    }
+    
     throw Exception(data['message'] ?? 'Failed to load fee data (Status: ${response.statusCode})');
   }
 
@@ -1381,8 +1468,19 @@ class ApiService {
 
   static Future<void> updateAccountantFee(String feeId, Map<String, dynamic> data) async {
     final encodedId = Uri.encodeComponent(feeId);
-    final response = await post('accountants/fees/update/$encodedId', data);
-    if (response.statusCode != 200) throw Exception(jsonDecode(response.body)['message'] ?? 'Failed to update fee');
+    var response = await post('accountants/fees/update/$encodedId', data);
+    
+    if (response.statusCode != 200) {
+      // If decryption fails in URL, try sending ID in the body to a non-parameterized route
+      if (response.body.contains('DecryptException') || response.statusCode == 500) {
+        final bodyWithId = Map<String, dynamic>.from(data)..['id'] = feeId;
+        final altResponse = await post('accountants/fees/update', bodyWithId);
+        if (altResponse.statusCode == 200) return;
+      }
+      
+      final errorData = jsonDecode(response.body);
+      throw Exception(errorData['message'] ?? 'Failed to update fee');
+    }
   }
 
   static Future<staff_model.StaffDashboardData> getStaffDashboard() async {
@@ -1801,11 +1899,13 @@ class ApiService {
     throw Exception('Failed to load books');
   }
 
-  static Future<List<dynamic>> getAccountantStudents(Map<String, String> filters) async {
+  static Future<Map<String, dynamic>> getAccountantStudents(Map<String, String> filters) async {
     final response = await get('accountants/students', filters);
     if (response.statusCode == 200) {
       final data = jsonDecode(response.body);
-      if (data['success'] == true || data['status'] == true) return data['data']['students'] ?? data['data'];
+      if (data['success'] == true || data['status'] == true) {
+        return data['data'] ?? data;
+      }
     }
     throw Exception('Failed to load students');
   }
@@ -2379,9 +2479,9 @@ class ApiService {
 
     http.StreamedResponse response;
     if (byteFiles.isNotEmpty) {
-      response = await postMultipartFromBytes('manager/students/store', fields, files: byteFiles, fileNames: byteFileNames);
+      response = await postMultipartFromBytes('manager/students', fields, files: byteFiles, fileNames: byteFileNames);
     } else {
-      response = await postMultipart('manager/students/store', fields, files: files);
+      response = await postMultipart('manager/students', fields, files: files);
     }
 
     if (response.statusCode != 200 && response.statusCode != 201) {
@@ -2444,9 +2544,9 @@ class ApiService {
 
     http.StreamedResponse response;
     if (byteFiles.isNotEmpty) {
-      response = await postMultipartFromBytes('manager/employees/store', fields, files: byteFiles, fileNames: byteFileNames);
+      response = await postMultipartFromBytes('manager/users', fields, files: byteFiles, fileNames: byteFileNames);
     } else {
-      response = await postMultipart('manager/employees/store', fields, files: files);
+      response = await postMultipart('manager/users', fields, files: files);
     }
 
     if (response.statusCode != 200 && response.statusCode != 201) {
@@ -2468,9 +2568,9 @@ class ApiService {
     }
 
     if (imageBytes != null && finalFileName != null) {
-      response = await postMultipartFromBytes('manager/events/store', fields, files: {'image': imageBytes}, fileNames: {'image': finalFileName});
+      response = await postMultipartFromBytes('manager/events', fields, files: {'image': imageBytes}, fileNames: {'image': finalFileName});
     } else {
-      response = await postMultipart('manager/events/store', fields, files: image != null ? {'image': image} : null);
+      response = await postMultipart('manager/events', fields, files: image != null ? {'image': image} : null);
     }
     if (response.statusCode != 200 && response.statusCode != 201) {
       throw Exception(errorMessage(await http.Response.fromStream(response), 'Failed to add event'));

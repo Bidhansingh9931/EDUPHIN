@@ -5,8 +5,10 @@ import 'package:eduphin/models/academic_data.dart';
 import 'package:eduphin/models/class.dart';
 import 'package:eduphin/models/new_student.dart';
 import 'package:eduphin/models/section.dart';
-import 'package:eduphin/services/api_service.dart';
+import 'package:eduphin/services/common_widgets.dart';
+import 'package:eduphin/services/responsive_helper.dart';
 import 'package:eduphin/services/caching_service.dart';
+import 'package:eduphin/services/api_service.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:http/http.dart' as http;
 import 'package:flutter/material.dart';
@@ -91,7 +93,7 @@ class _AddNewStudentPageState extends State<AddNewStudentPage> {
       if (mounted) {
         setState(() {
           _error = e;
-          _isLoading = false;
+          _isLoading = _academicData == null;
         });
       }
     }
@@ -151,19 +153,73 @@ class _AddNewStudentPageState extends State<AddNewStudentPage> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
+    final theme = context.theme;
     return Scaffold(
       backgroundColor: theme.scaffoldBackgroundColor,
-      appBar: AppBar(title: const Text("Add New Student"), centerTitle: true),
+      appBar: AppBar(
+        title: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text("Add New Student", style: theme.appBarTheme.titleTextStyle?.copyWith(fontSize: context.font(18))),
+            Text("Register a new student to the institution", style: theme.textTheme.labelSmall?.copyWith(color: theme.hintColor, fontSize: context.font(11))),
+          ],
+        ),
+        centerTitle: false,
+      ),
       floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
-      floatingActionButton: _buildActionButtons(theme),
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : _error != null
-              ? Center(child: Text("Error: ${_error.toString().replaceFirst("Exception: ", "")}"))
-              : _academicData != null
-                  ? _buildForm(theme, _academicData!)
-                  : const Center(child: Text("No academic data available.")),
+      floatingActionButton: _isLoading && _academicData == null ? null : _buildActionButtons(theme),
+      body: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 800),
+          child: LoadingWrapper(
+            isLoading: _isLoading,
+            hasData: _academicData != null,
+            error: _error,
+            onRetry: _fetchAcademicData,
+            skeleton: _buildSkeleton(),
+            child: _academicData != null ? _buildForm(theme, _academicData!) : const SizedBox.shrink(),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSkeleton() {
+    return SingleChildScrollView(
+      padding: context.pagePadding.copyWith(bottom: context.scale(120)),
+      child: Column(
+        children: List.generate(
+          3,
+          (index) => Card(
+            margin: EdgeInsets.only(bottom: context.scale(16)),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(context.scale(12))),
+            child: Padding(
+              padding: EdgeInsets.all(context.scale(16)),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  SkeletonBox(height: context.scale(20), width: context.scale(150)),
+                  SizedBox(height: context.scale(16)),
+                  ...List.generate(
+                    3,
+                    (i) => Padding(
+                      padding: EdgeInsets.only(bottom: context.scale(16)),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          SkeletonBox(height: context.scale(14), width: context.scale(100)),
+                          SizedBox(height: context.scale(8)),
+                          SkeletonBox(height: context.scale(48), borderRadius: context.scale(10)),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
     );
   }
 

@@ -1,5 +1,7 @@
 import 'dart:convert';
 import 'package:eduphin/services/api_service.dart';
+import 'package:eduphin/services/caching_service.dart';
+import 'package:eduphin/services/common_widgets.dart';
 import 'package:eduphin/services/responsive_helper.dart';
 import 'package:eduphin/teacher/dashboard/common_widgets.dart';
 import 'package:flutter/material.dart';
@@ -70,63 +72,81 @@ class ShowSchedulePage extends StatefulWidget {
 class _ShowSchedulePageState extends State<ShowSchedulePage> {
   bool _isLoading = true;
   Map<String, List<Schedule>> _scheduleByDay = {};
+  String get _cacheKey => 'manager_schedule_${widget.classId}_${widget.sectionId}';
 
   @override
   void initState() {
     super.initState();
+    _loadCacheAndFetch();
+  }
+
+  Future<void> _loadCacheAndFetch() async {
+    final cachedData = await CacheService.getCache(_cacheKey);
+    if (cachedData != null && mounted) {
+      setState(() {
+        _scheduleByDay = _processScheduleData(cachedData);
+        _isLoading = false;
+      });
+    }
     _fetchSchedule();
+  }
+
+  Map<String, List<Schedule>> _processScheduleData(dynamic data) {
+    final List<dynamic> scheduleData = data['data'] ?? [];
+
+    final List<Schedule> schedules = scheduleData
+        .where((json) => json != null)
+        .map((json) => Schedule.fromJson(json as Map<String, dynamic>))
+        .toList();
+
+    // Group by day
+    final Map<String, List<Schedule>> grouped = {};
+    for (var schedule in schedules) {
+      (grouped[schedule.day] ??= []).add(schedule);
+    }
+
+    // Sort days of the week
+    final sortedDays = grouped.keys.toList()
+      ..sort((a, b) {
+        const dayOrder = {"Monday": 1, "Tuesday": 2, "Wednesday": 3, "Thursday": 4, "Friday": 5, "Saturday": 6, "Sunday": 7};
+        return (dayOrder[a] ?? 8) - (dayOrder[b] ?? 8);
+      });
+
+    return {for (var day in sortedDays) day: grouped[day]!};
   }
 
   Future<void> _fetchSchedule() async {
     if (!mounted) return;
-    setState(() {
-      _isLoading = true;
-    });
+    if (_scheduleByDay.isEmpty) {
+      setState(() {
+        _isLoading = true;
+      });
+    }
 
     try {
       final response = await ApiService.get('manager/class-schedules?class_id=${widget.classId}&section_id=${widget.sectionId}');
-      
+
       if (!mounted) return;
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
-        final List<dynamic> scheduleData = data['data'] ?? [];
-
-        final List<Schedule> schedules = scheduleData
-            .where((json) => json != null)
-            .map((json) => Schedule.fromJson(json as Map<String, dynamic>))
-            .toList();
-
-        // Group by day
-        final Map<String, List<Schedule>> grouped = {};
-        for (var schedule in schedules) {
-          (grouped[schedule.day] ??= []).add(schedule);
-        }
-        
-        // Sort days of the week
-        final sortedDays = grouped.keys.toList()..sort((a, b) {
-            const dayOrder = {"Monday": 1, "Tuesday": 2, "Wednesday": 3, "Thursday": 4, "Friday": 5, "Saturday": 6, "Sunday": 7};
-            return (dayOrder[a] ?? 8) - (dayOrder[b] ?? 8);
-        });
-        
-        final Map<String, List<Schedule>> sortedSchedules = {
-            for (var day in sortedDays) day: grouped[day]!
-        };
+        await CacheService.setCache(_cacheKey, data);
 
         setState(() {
-          _scheduleByDay = sortedSchedules;
+          _scheduleByDay = _processScheduleData(data);
           _isLoading = false;
         });
-
       } else {
         throw Exception('Failed to load schedule: ${response.body}');
       }
     } catch (e) {
       if (mounted) {
         setState(() => _isLoading = false);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(e.toString().replaceFirst('Exception: ', ''))),
-        );
+        if (_scheduleByDay.isEmpty) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(e.toString().replaceFirst('Exception: ', ''))),
+          );
+        }
       }
     }
   }
@@ -184,28 +204,92 @@ class _ShowSchedulePageState extends State<ShowSchedulePage> {
         ),
         centerTitle: false,
       ),
-      body: _isLoading
-          ? Center(child: CircularProgressIndicator(color: theme.colorScheme.primary))
-          : _scheduleByDay.isEmpty
-              ? Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(Icons.calendar_today_outlined, size: context.scale(64), color: theme.colorScheme.outlineVariant.withValues(alpha: 0.5)),
-                      SizedBox(height: context.scale(16)),
-                      Text("No schedule found for this class.", style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: context.font(16))),
-                    ],
-                  ),
-                )
-              : Center(
-                  child: ConstrainedBox(
-                    constraints: const BoxConstraints(maxWidth: 1200),
-                    child: context.responsive(
-                      _buildListView(),
-                      tablet: _buildGridView(),
-                    ),
+      body: LoadingWrapper(
+        isLoading: _isLoading,
+        hasData: _scheduleByDay.isNotEmpty,
+        onRefresh: _fetchSchedule,
+        skeleton: _buildSkeleton(),
+        child: _scheduleByDay.isEmpty
+            ? Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(Icons.calendar_today_outlined, size: context.scale(64), color: theme.colorScheme.outlineVariant.withValues(alpha: 0.5)),
+                    SizedBox(height: context.scale(16)),
+                    Text("No schedule found for this class.", style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: context.font(16))),
+                  ],
+                ),
+              )
+            : Center(
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 1200),
+                  child: context.responsive(
+                    _buildListView(),
+                    tablet: _buildGridView(),
                   ),
                 ),
+              ),
+      ),
+    );
+  }
+
+  Widget _buildSkeleton() {
+    return ListView.separated(
+      padding: context.pagePadding,
+      itemCount: 3,
+      separatorBuilder: (context, index) => SizedBox(height: context.scale(16)),
+      itemBuilder: (context, index) {
+        return Container(
+          decoration: BoxDecoration(
+            color: context.theme.colorScheme.surfaceContainerLow,
+            borderRadius: BorderRadius.circular(context.scale(16)),
+            border: Border.all(color: context.theme.colorScheme.outlineVariant),
+          ),
+          padding: EdgeInsets.all(context.scale(16)),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  SkeletonBox(width: context.scale(18), height: context.scale(18)),
+                  SizedBox(width: context.scale(8)),
+                  SkeletonBox(width: context.scale(100), height: context.scale(20)),
+                ],
+              ),
+              SizedBox(height: context.scale(12)),
+              Divider(color: context.theme.colorScheme.outlineVariant),
+              SizedBox(height: context.scale(8)),
+              ListView.separated(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                itemCount: 2,
+                separatorBuilder: (context, index) => SizedBox(height: context.scale(12)),
+                itemBuilder: (context, index) {
+                  return Container(
+                    width: double.infinity,
+                    decoration: BoxDecoration(
+                      color: context.theme.colorScheme.surface,
+                      borderRadius: BorderRadius.circular(context.scale(12)),
+                      border: Border.all(color: context.theme.colorScheme.outlineVariant.withValues(alpha: 0.5)),
+                    ),
+                    padding: EdgeInsets.all(context.scale(12)),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        SkeletonBox(width: context.scale(150), height: context.scale(16)),
+                        SizedBox(height: context.scale(8)),
+                        SkeletonBox(width: context.scale(120), height: context.scale(14)),
+                        SizedBox(height: context.scale(4)),
+                        SkeletonBox(width: context.scale(100), height: context.scale(14)),
+                      ],
+                    ),
+                  );
+                },
+              )
+            ],
+          ),
+        );
+      },
     );
   }
 

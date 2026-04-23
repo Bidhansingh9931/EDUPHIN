@@ -47,6 +47,23 @@ class StudentDashboardData {
       assignments: (json['assignments'] as List? ?? []).map((e) => Assignment.fromJson(e)).toList(),
     );
   }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'user': user?.toJson(),
+      'student': student?.toJson(),
+      'attendance_percentage': attendancePercentage,
+      'events': events.map((e) => e.toJson()).toList(),
+      'available_exams': availableExams.map((e) => e.toJson()).toList(),
+      'registered_exam_ids': registeredExamIds,
+      'tickets': tickets.map((e) => e.toJson()).toList(),
+      'total_paid': totalPaid,
+      'total_payable': totalPayable,
+      'due': due,
+      'study_materials': studyMaterials.map((e) => e.toJson()).toList(),
+      'assignments': assignments.map((e) => e.toJson()).toList(),
+    };
+  }
 }
 
 // Helper functions for safe type conversion
@@ -92,6 +109,17 @@ class User {
       instituteId: _toInt(json['institute_id']),
     );
   }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'name': name,
+      'email': email,
+      'status': status,
+      'role_id': roleId,
+      'institute_id': instituteId,
+    };
+  }
 }
 
 class Student {
@@ -133,6 +161,21 @@ class Student {
       profileImage: json['profile_image'],
     );
   }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'first_name': firstName,
+      'middle_name': middleName,
+      'last_name': lastName,
+      'student_roll_no': studentRollNo,
+      'registration_no': registrationNo,
+      'academic_session': academicSession,
+      'class_id': classId,
+      'section_id': sectionId,
+      'profile_image': profileImage,
+    };
+  }
 }
 
 class Event {
@@ -165,6 +208,18 @@ class Event {
       endTime: json['end_time'],
     );
   }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'title': title,
+      'description': description,
+      'venue': venue,
+      'event_date': eventDate,
+      'start_time': startTime,
+      'end_time': endTime,
+    };
+  }
 }
 
 class Exam {
@@ -193,6 +248,17 @@ class Exam {
       startDate: json['start_date'],
       endDate: json['end_date'],
     );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'name': name,
+      'type': type,
+      'code': code,
+      'start_date': startDate,
+      'end_date': endDate,
+    };
   }
 }
 
@@ -223,6 +289,17 @@ class Ticket {
       status: json['status'],
     );
   }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'encrypted_id': encryptedId,
+      'title': title,
+      'description': description,
+      'priority': priority,
+      'status': status,
+    };
+  }
 }
 
 class StudyMaterial {
@@ -242,6 +319,14 @@ class StudyMaterial {
       title: json['title'] ?? '',
       description: json['description'],
     );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'title': title,
+      'description': description,
+    };
   }
 }
 
@@ -265,5 +350,14 @@ class Assignment {
       description: json['description'],
       dueDate: json['due_date'],
     );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'title': title,
+      'description': description,
+      'due_date': dueDate,
+    };
   }
 }

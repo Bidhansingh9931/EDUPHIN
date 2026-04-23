@@ -33,6 +33,16 @@ class ViewSchedulePageData {
           .toList(),
     );
   }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'classes': classes.map((i) => i.toJson()).toList(),
+      'sections': sections.map((i) => i.toJson()).toList(),
+      'schedules': schedules.map((i) => i.toJson()).toList(),
+      'subjects': subjects.map((i) => i.toJson()).toList(),
+      'teachers': teachers.map((i) => i.toJson()).toList(),
+    };
+  }
 }
 
 class ClassDropdownItem {
@@ -46,6 +56,13 @@ class ClassDropdownItem {
       id: json['id'] ?? 0, 
       name: json['name'] ?? json['class_name'] ?? 'Unknown Class'
     );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'name': name,
+    };
   }
 }
 
@@ -62,6 +79,14 @@ class SectionDropdownItem {
       name: json['name'] ?? json['section_name'] ?? 'Section ${json['id'] ?? ''}',
       classId: json['class_id'] ?? 0,
     );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'name': name,
+      'class_id': classId,
+    };
   }
 }
 
@@ -98,6 +123,19 @@ class ScheduleEntry {
       endTime: json['end_time'] ?? 'N/A',
     );
   }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'class_id': classId,
+      'section_id': sectionId,
+      'subject_id': subjectId,
+      'teacher_id': teacherId,
+      'weekday': weekday,
+      'start_time': startTime,
+      'end_time': endTime,
+    };
+  }
 }
 
 class SubjectInfo {
@@ -111,6 +149,13 @@ class SubjectInfo {
       id: json['id'] ?? 0, 
       name: json['name'] ?? json['subject_name'] ?? 'Unknown Subject'
     );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'name': name,
+    };
   }
 }
 
@@ -128,5 +173,12 @@ class TeacherInfo {
       name = json['user']['name'];
     }
     return TeacherInfo(id: json['id'] ?? 0, name: name);
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'name': name,
+    };
   }
 }

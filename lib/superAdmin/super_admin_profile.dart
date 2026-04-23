@@ -6,6 +6,8 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import '../services/api_service.dart';
+import 'cache_service.dart';
+import 'super_admin_common_widgets.dart';
 
 class ManageProfileScreen extends StatefulWidget {
   const ManageProfileScreen({super.key});
@@ -51,18 +53,26 @@ class _ManageProfileScreenState extends State<ManageProfileScreen> {
   @override
   void initState() {
     super.initState();
+    _loadInitialData();
+  }
+
+  Future<void> _loadInitialData() async {
+    final cachedData = await SuperAdminCacheService.load('super_admin_profile');
+    if (cachedData != null && mounted) {
+      setState(() {
+        _nameController.text = cachedData['name'] ?? '';
+        _emailController.text = cachedData['email'] ?? '';
+        _existingPhotoUrl = cachedData['photo'];
+        _isLoading = false;
+      });
+    }
     _fetchProfile();
   }
 
-  @override
-  void dispose() {
-    _nameController.dispose();
-    _emailController.dispose();
-    _passwordController.dispose();
-    super.dispose();
-  }
-
   Future<void> _fetchProfile() async {
+    if (_nameController.text.isEmpty) {
+      setState(() => _isLoading = true);
+    }
     try {
       final data = await ApiService.getSuperAdminProfile();
       if (data != null) {
@@ -71,7 +81,9 @@ class _ManageProfileScreenState extends State<ManageProfileScreen> {
             _nameController.text = data['name'] ?? '';
             _emailController.text = data['email'] ?? '';
             _existingPhotoUrl = data['photo'];
+            _isLoading = false;
           });
+          await SuperAdminCacheService.save('super_admin_profile', data);
         }
       }
     } catch (e) {
@@ -129,9 +141,11 @@ class _ManageProfileScreenState extends State<ManageProfileScreen> {
           onPressed: () => Navigator.pop(context),
         ),
       ),
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : SingleChildScrollView(
+      body: SuperAdminLoadingWrapper(
+        isLoading: _isLoading,
+        hasData: _nameController.text.isNotEmpty,
+        skeleton: _buildSkeleton(context),
+        child: SingleChildScrollView(
               padding: context.pagePadding,
               child: Center(
                 child: ConstrainedBox(
@@ -207,6 +221,60 @@ class _ManageProfileScreenState extends State<ManageProfileScreen> {
                 ),
               ),
             ),
+      ),
+    );
+  }
+
+  Widget _buildSkeleton(BuildContext context) {
+    return SingleChildScrollView(
+      padding: context.pagePadding,
+      child: Center(
+        child: ConstrainedBox(
+          constraints: BoxConstraints(maxWidth: context.scale(600)),
+          child: Card(
+            child: Padding(
+              padding: EdgeInsets.all(context.scale(24.0)),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      SuperAdminSkeleton(height: context.scale(70), width: context.scale(70), borderRadius: BorderRadius.circular(context.scale(35))),
+                      SizedBox(width: context.scale(16)),
+                      const Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            SuperAdminSkeleton(height: 24, width: 200),
+                            SizedBox(height: 8),
+                            SuperAdminSkeleton(height: 14, width: 250),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                  SizedBox(height: context.scale(24)),
+                  const Divider(),
+                  SizedBox(height: context.scale(24)),
+                  const SuperAdminSkeleton(height: 16, width: 100),
+                  const SizedBox(height: 8),
+                  const SuperAdminSkeleton(height: 48),
+                  SizedBox(height: context.scale(20)),
+                  const SuperAdminSkeleton(height: 16, width: 100),
+                  const SizedBox(height: 8),
+                  const SuperAdminSkeleton(height: 48),
+                  SizedBox(height: context.scale(20)),
+                  const SuperAdminSkeleton(height: 16, width: 100),
+                  const SizedBox(height: 8),
+                  const SuperAdminSkeleton(height: 48),
+                  SizedBox(height: context.scale(40)),
+                  const SuperAdminSkeleton(height: 54),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
     );
   }
 

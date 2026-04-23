@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:eduphin/services/api_service.dart';
 import 'package:eduphin/services/responsive_helper.dart';
+import 'package:eduphin/services/common_widgets.dart';
+import 'package:eduphin/services/caching_service.dart';
 import 'package:eduphin/teacher/dashboard/student_leave_model.dart';
 import 'package:intl/intl.dart';
 
@@ -22,27 +24,44 @@ class _LeaveApplicationPageState extends State<LeaveApplicationPage> {
   @override
   void initState() {
     super.initState();
+    _loadCachedLeaves();
     _fetchLeaveApplications();
   }
 
-  Future<void> _fetchLeaveApplications() async {
-    setState(() => _isLoading = true);
-    try {
-      final leaves = await ApiService.getStudentLeaveList();
+  Future<void> _loadCachedLeaves() async {
+    final cached = await CacheService.getData('student_leaves');
+    if (cached != null && mounted) {
       setState(() {
-        _allLeaves = leaves;
+        _allLeaves = (cached as List).map((e) => StudentLeave.fromJson(e)).toList();
         _applyFilters();
         _isLoading = false;
       });
-    } catch (e) {
-      setState(() => _isLoading = false);
+    }
+  }
+
+  Future<void> _fetchLeaveApplications() async {
+    if (_allLeaves.isEmpty) setState(() => _isLoading = true);
+    try {
+      final leaves = await ApiService.getStudentLeaveList();
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text("Error fetching leaves: $e"),
-            backgroundColor: Theme.of(context).colorScheme.error,
-          ),
-        );
+        setState(() {
+          _allLeaves = leaves;
+          _applyFilters();
+          _isLoading = false;
+        });
+        CacheService.saveData('student_leaves', leaves.map((e) => e.toJson()).toList());
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isLoading = false);
+        if (_allLeaves.isEmpty) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text("Error fetching leaves: $e"),
+              backgroundColor: Theme.of(context).colorScheme.error,
+            ),
+          );
+        }
       }
     }
   }
@@ -83,76 +102,80 @@ class _LeaveApplicationPageState extends State<LeaveApplicationPage> {
           ),
         ],
       ),
-      body: _isLoading
-          ? Center(child: CircularProgressIndicator(color: theme.colorScheme.primary))
-          : RefreshIndicator(
-              onRefresh: _fetchLeaveApplications,
-              color: theme.colorScheme.primary,
-              child: SingleChildScrollView(
-                physics: const AlwaysScrollableScrollPhysics(),
-                padding: context.pagePadding,
-                child: Center(
-                  child: Container(
-                    constraints: const BoxConstraints(maxWidth: 1000),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+      body: LoadingWrapper(
+        isLoading: _isLoading,
+        hasData: _allLeaves.isNotEmpty,
+        skeleton: const _LeaveSkeleton(),
+        onRefresh: _fetchLeaveApplications,
+        child: RefreshIndicator(
+          onRefresh: _fetchLeaveApplications,
+          color: theme.colorScheme.primary,
+          child: SingleChildScrollView(
+            physics: const AlwaysScrollableScrollPhysics(),
+            padding: context.pagePadding,
+            child: Center(
+              child: Container(
+                constraints: const BoxConstraints(maxWidth: 1000),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    /// APPLY BUTTON
+                    SizedBox(
+                      width: double.infinity,
+                      height: context.scale(56),
+                      child: ElevatedButton.icon(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: theme.colorScheme.primary,
+                          foregroundColor: theme.colorScheme.onPrimary,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(context.scale(12))),
+                          elevation: 0,
+                        ),
+                        onPressed: () => _showApplyLeaveSheet(context),
+                        icon: Icon(Icons.add, size: context.scale(20)),
+                        label: Text("APPLY FOR NEW LEAVE", style: TextStyle(fontWeight: FontWeight.bold, letterSpacing: 1, fontSize: context.font(14))),
+                      ),
+                    ),
+                    SizedBox(height: context.lg),
+
+                    /// FILTER CARD
+                    _buildSectionHeader("Filter Applications", Icons.filter_list_rounded),
+                    SizedBox(height: context.md),
+                    _buildFilters(),
+                    SizedBox(height: context.xl),
+
+                    /// HISTORY LIST
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        /// APPLY BUTTON
-                        SizedBox(
-                          width: double.infinity,
-                          height: context.scale(56),
-                          child: ElevatedButton.icon(
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: theme.colorScheme.primary,
-                              foregroundColor: theme.colorScheme.onPrimary,
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(context.scale(12))),
-                              elevation: 0,
-                            ),
-                            onPressed: () => _showApplyLeaveSheet(context),
-                            icon: Icon(Icons.add, size: context.scale(20)),
-                            label: Text("APPLY FOR NEW LEAVE", style: TextStyle(fontWeight: FontWeight.bold, letterSpacing: 1, fontSize: context.font(14))),
-                          ),
-                        ),
-                        SizedBox(height: context.lg),
-
-                        /// FILTER CARD
-                        _buildSectionHeader("Filter Applications", Icons.filter_list_rounded),
-                        SizedBox(height: context.md),
-                        _buildFilters(),
-                        SizedBox(height: context.xl),
-
-                        /// HISTORY LIST
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            _buildSectionHeader("Leave History", Icons.history_rounded),
-                            Text("${_filteredLeaves.length} applications", style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant, fontSize: context.font(12))),
-                          ],
-                        ),
-                        SizedBox(height: context.md),
-
-                        if (_filteredLeaves.isEmpty)
-                          _buildEmptyState()
-                        else
-                          GridView.builder(
-                            shrinkWrap: true,
-                            physics: const NeverScrollableScrollPhysics(),
-                            itemCount: _filteredLeaves.length,
-                            gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                              crossAxisCount: context.responsive(1, tablet: 2, desktop: 2),
-                              crossAxisSpacing: context.md,
-                              mainAxisSpacing: context.md,
-                              mainAxisExtent: context.responsive(220, tablet: 230),
-                            ),
-                            itemBuilder: (context, index) => _buildLeaveCard(_filteredLeaves[index]),
-                          ),
-                        SizedBox(height: context.xl),
+                        _buildSectionHeader("Leave History", Icons.history_rounded),
+                        Text("${_filteredLeaves.length} applications", style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant, fontSize: context.font(12))),
                       ],
                     ),
-                  ),
+                    SizedBox(height: context.md),
+
+                    if (_filteredLeaves.isEmpty)
+                      _buildEmptyState()
+                    else
+                      GridView.builder(
+                        shrinkWrap: true,
+                        physics: const NeverScrollableScrollPhysics(),
+                        itemCount: _filteredLeaves.length,
+                        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                          crossAxisCount: context.responsive(1, tablet: 2, desktop: 2),
+                          crossAxisSpacing: context.md,
+                          mainAxisSpacing: context.md,
+                          mainAxisExtent: context.responsive(220, tablet: 230),
+                        ),
+                        itemBuilder: (context, index) => _buildLeaveCard(_filteredLeaves[index]),
+                      ),
+                    SizedBox(height: context.xl),
+                  ],
                 ),
               ),
             ),
+          ),
+        ),
+      ),
     );
   }
 
@@ -377,6 +400,57 @@ class _LeaveApplicationPageState extends State<LeaveApplicationPage> {
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (context) => const _ApplyLeaveBottomSheet(),
+    );
+  }
+}
+
+class _LeaveSkeleton extends StatelessWidget {
+  const _LeaveSkeleton();
+
+  @override
+  Widget build(BuildContext context) {
+    return SingleChildScrollView(
+      padding: context.pagePadding,
+      child: Center(
+        child: Container(
+          constraints: const BoxConstraints(maxWidth: 1000),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              SkeletonBox(height: context.scale(56), width: double.infinity, borderRadius: context.scale(12)),
+              SizedBox(height: context.lg),
+              SkeletonBox(height: context.scale(20), width: context.scale(150)),
+              SizedBox(height: context.md),
+              SkeletonBox(height: context.scale(200), width: double.infinity, borderRadius: context.scale(16)),
+              SizedBox(height: context.xl),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  SkeletonBox(height: context.scale(20), width: context.scale(150)),
+                  SkeletonBox(height: context.scale(15), width: context.scale(100)),
+                ],
+              ),
+              SizedBox(height: context.md),
+              GridView.builder(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                itemCount: 4,
+                gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: context.responsive(1, tablet: 2, desktop: 2),
+                  crossAxisSpacing: context.md,
+                  mainAxisSpacing: context.md,
+                  mainAxisExtent: 220,
+                ),
+                itemBuilder: (context, index) => SkeletonBox(
+                  height: 220,
+                  width: double.infinity,
+                  borderRadius: context.scale(16),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }

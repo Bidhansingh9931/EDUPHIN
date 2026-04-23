@@ -2,9 +2,26 @@ import 'dart:convert';
 import 'package:eduphin/services/api_service.dart';
 import 'package:flutter/foundation.dart';
 import 'dashboard_models.dart';
+import 'cache_helper.dart';
 
 class DashboardDataProvider {
-  Future<DashboardData> fetchDashboardData() async {
+  static const String _cacheKey = 'dashboard_data';
+
+  Future<DashboardData?> getCachedData() async {
+    final cached = await CacheHelper.load(_cacheKey);
+    if (cached != null) {
+      try {
+        // The cached data should already be the 'data' part + profile if we saved it that way,
+        // but let's check how we save it.
+        return DashboardData.fromJson(cached['dashboard'], profileJson: cached['profile']);
+      } catch (e) {
+        if (kDebugMode) print('Error parsing cached dashboard data: $e');
+      }
+    }
+    return null;
+  }
+
+  Future<DashboardData> fetchDashboardData({bool bypassCache = false}) async {
     try {
       final responses = await Future.wait([
         ApiService.get('moderator/dashboard'),
@@ -14,51 +31,32 @@ class DashboardDataProvider {
       final dashboardResponse = responses[0];
       final profileResponse = responses[1];
 
-      if (kDebugMode) {
-        print('Dashboard API Response Status Code: ${dashboardResponse.statusCode}');
-        print('Profile API Response Status Code: ${profileResponse.statusCode}');
-      }
-
       if (dashboardResponse.statusCode == 200) {
-        try {
-          final dashboardBody = json.decode(dashboardResponse.body);
-          Map<String, dynamic>? profileBody;
+        final dashboardBody = json.decode(dashboardResponse.body);
+        Map<String, dynamic>? profileBody;
 
-          if (profileResponse.statusCode == 200) {
-            profileBody = json.decode(profileResponse.body);
-          }
+        if (profileResponse.statusCode == 200) {
+          profileBody = json.decode(profileResponse.body);
+        }
 
-          if (kDebugMode) {
-            print('Dashboard API Response Body: $dashboardBody');
-            if (profileBody != null) {
-              print('Profile API Response Data: $profileBody');
-            }
-          }
-
-          // The actual dashboard data is nested under the 'data' key.
-          if (dashboardBody['success'] == true && dashboardBody['data'] != null) {
-            return DashboardData.fromJson(dashboardBody['data'], profileJson: profileBody);
-          } else {
-            // Handle cases where success is false or data is null.
-            throw Exception('Dashboard API call successful but returned no data or indicated failure.');
-          }
-        } catch (e) {
-          if (kDebugMode) {
-            print('Error parsing dashboard data: $e');
-          }
-          throw Exception('Failed to load dashboard data.');
+        if (dashboardBody['success'] == true && dashboardBody['data'] != null) {
+          // Save to cache
+          await CacheHelper.save(_cacheKey, {
+            'dashboard': dashboardBody['data'],
+            'profile': profileBody,
+          });
+          
+          return DashboardData.fromJson(dashboardBody['data'], profileJson: profileBody);
+        } else {
+          throw Exception('Dashboard API call successful but returned no data or indicated failure.');
         }
       } else {
-        if (kDebugMode) {
-          print('Dashboard API responded with error code: ${dashboardResponse.statusCode}');
-        }
         throw Exception('Failed to load dashboard data.');
       }
     } catch (e) {
       if (kDebugMode) {
         print('An error occurred while fetching dashboard data: $e');
       }
-      // Re-throw the exception to be handled by the FutureBuilder.
       throw Exception('An error occurred: $e');
     }
   }

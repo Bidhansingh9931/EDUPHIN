@@ -119,7 +119,7 @@ class _FeeStructurePageState extends State<FeeStructurePage> {
   Future<void> _fetchData() async {
     if (!mounted) return;
     setState(() {
-      _isLoading = true;
+      _isLoading = _instituteFees.isEmpty && _classFees.isEmpty;
       _error = null;
     });
 

@@ -1,6 +1,8 @@
 import 'package:eduphin/services/responsive_helper.dart';
 import 'package:flutter/material.dart';
 import 'package:eduphin/services/api_service.dart';
+import 'package:eduphin/services/caching_service.dart';
+import 'package:eduphin/services/common_widgets.dart';
 import 'package:intl/intl.dart';
 
 class AttendanceReportPage extends StatefulWidget {
@@ -14,31 +16,50 @@ class _AttendanceReportPageState extends State<AttendanceReportPage> {
   bool _isLoading = true;
   Map<String, dynamic>? _attendanceData;
   final Map<int, bool> _subjectOpenStates = {};
+  static const String _cacheKey = 'student_attendance';
 
   @override
   void initState() {
     super.initState();
+    _loadCachedData();
     _fetchAttendance();
   }
 
-  Future<void> _fetchAttendance() async {
-    setState(() => _isLoading = true);
-    try {
-      final data = await ApiService.getStudentAttendance();
+  Future<void> _loadCachedData() async {
+    final cachedData = await CacheService.getData(_cacheKey);
+    if (cachedData != null && mounted) {
       setState(() {
-        _attendanceData = data;
+        _attendanceData = cachedData as Map<String, dynamic>;
         _isLoading = false;
       });
-    } catch (e) {
-      setState(() => _isLoading = false);
+    }
+  }
+
+  Future<void> _fetchAttendance() async {
+    if (_attendanceData == null) {
+      setState(() => _isLoading = true);
+    }
+    try {
+      final data = await ApiService.getStudentAttendance();
       if (mounted) {
-        final theme = Theme.of(context);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text("Error fetching attendance: $e"),
-            backgroundColor: theme.colorScheme.error,
-          ),
-        );
+        setState(() {
+          _attendanceData = data;
+          _isLoading = false;
+        });
+        await CacheService.saveData(_cacheKey, data);
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isLoading = false);
+        if (_attendanceData == null) {
+          final theme = Theme.of(context);
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text("Error fetching attendance: $e"),
+              backgroundColor: theme.colorScheme.error,
+            ),
+          );
+        }
       }
     }
   }
@@ -51,56 +72,50 @@ class _AttendanceReportPageState extends State<AttendanceReportPage> {
     return Scaffold(
       appBar: AppBar(
         title: const Text("Attendance Report"),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.refresh),
-            onPressed: _fetchAttendance,
-          ),
-        ],
       ),
-      body: RefreshIndicator(
+      body: LoadingWrapper(
+        isLoading: _isLoading,
+        hasData: _attendanceData != null,
+        skeleton: const _AttendanceSkeleton(),
         onRefresh: _fetchAttendance,
-        color: colorScheme.primary,
-        child: _isLoading
-            ? Center(child: CircularProgressIndicator(color: colorScheme.primary))
-            : _attendanceData == null
-                ? Center(child: Text("No data found", style: TextStyle(color: colorScheme.onSurfaceVariant)))
-                : SingleChildScrollView(
-                    physics: const AlwaysScrollableScrollPhysics(),
-                    padding: context.pagePadding,
-                    child: Center(
-                      child: Container(
-                        constraints: const BoxConstraints(maxWidth: 1000),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
+        child: _attendanceData == null
+            ? Center(child: Text("No data found", style: TextStyle(color: colorScheme.onSurfaceVariant)))
+            : SingleChildScrollView(
+                physics: const AlwaysScrollableScrollPhysics(),
+                padding: context.pagePadding,
+                child: Center(
+                  child: Container(
+                    constraints: const BoxConstraints(maxWidth: 1000),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        _buildStudentHeader(),
+                        SizedBox(height: context.lg),
+                        _buildStatsGrid(),
+                        SizedBox(height: context.xl),
+                        Row(
                           children: [
-                            _buildStudentHeader(),
-                            SizedBox(height: context.lg),
-                            _buildStatsGrid(),
-                            SizedBox(height: context.xl),
-                            Row(
-                              children: [
-                                Icon(Icons.list_alt, color: colorScheme.primary, size: 22),
-                                SizedBox(width: context.sm),
-                                Text(
-                                  "Subject-wise Records",
-                                  style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
-                                ),
-                              ],
-                            ),
-                            SizedBox(height: context.xs),
+                            Icon(Icons.list_alt, color: colorScheme.primary, size: 22),
+                            SizedBox(width: context.sm),
                             Text(
-                              "Detailed attendance log, grouped by subject.",
-                              style: theme.textTheme.bodyMedium?.copyWith(color: colorScheme.onSurfaceVariant),
+                              "Subject-wise Records",
+                              style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
                             ),
-                            SizedBox(height: context.lg),
-                            _buildSubjectWiseList(),
-                            SizedBox(height: context.xl),
                           ],
                         ),
-                      ),
+                        SizedBox(height: context.xs),
+                        Text(
+                          "Detailed attendance log, grouped by subject.",
+                          style: theme.textTheme.bodyMedium?.copyWith(color: colorScheme.onSurfaceVariant),
+                        ),
+                        SizedBox(height: context.lg),
+                        _buildSubjectWiseList(),
+                        SizedBox(height: context.xl),
+                      ],
                     ),
                   ),
+                ),
+              ),
       ),
     );
   }
@@ -414,5 +429,138 @@ class _AttendanceReportPageState extends State<AttendanceReportPage> {
     } catch (e) {
       return dateStr;
     }
+  }
+}
+
+class _AttendanceSkeleton extends StatelessWidget {
+  const _AttendanceSkeleton();
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = context.theme.colorScheme;
+    return SingleChildScrollView(
+      padding: context.pagePadding,
+      child: Center(
+        child: Container(
+          constraints: const BoxConstraints(maxWidth: 1000),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Header Skeleton
+              Card(
+                elevation: 0,
+                color: colorScheme.surfaceContainerLow,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16),
+                  side: BorderSide(color: colorScheme.outlineVariant),
+                ),
+                child: Padding(
+                  padding: EdgeInsets.all(context.md),
+                  child: Row(
+                    children: [
+                      SkeletonBox(width: 44, height: 44, borderRadius: BorderRadius.circular(22)),
+                      SizedBox(width: context.md),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            SkeletonBox(width: context.scale(150), height: context.scale(20)),
+                            SizedBox(height: context.xs),
+                            SkeletonBox(width: context.scale(200), height: context.scale(14)),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              SizedBox(height: context.lg),
+              // Stats Grid Skeleton
+              Row(
+                children: [
+                  Expanded(child: _skeletonStatsCard(context)),
+                  SizedBox(width: context.md),
+                  Expanded(child: _skeletonStatsCard(context)),
+                ],
+              ),
+              SizedBox(height: context.md),
+              _skeletonStatsCard(context, isWide: true),
+              SizedBox(height: context.xl),
+              // List Skeleton
+              SkeletonBox(width: context.scale(180), height: context.scale(24)),
+              SizedBox(height: context.md),
+              ListView.builder(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                itemCount: 3,
+                itemBuilder: (context, index) => Card(
+                  elevation: 0,
+                  margin: EdgeInsets.only(bottom: context.md),
+                  color: colorScheme.surfaceContainerLow,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16),
+                    side: BorderSide(color: colorScheme.outlineVariant),
+                  ),
+                  child: Padding(
+                    padding: EdgeInsets.all(context.md),
+                    child: Row(
+                      children: [
+                        SkeletonBox(width: 50, height: 50, borderRadius: BorderRadius.circular(12)),
+                        SizedBox(width: context.md),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              SkeletonBox(width: context.scale(120), height: context.scale(16)),
+                              SizedBox(height: context.xs),
+                              SkeletonBox(width: context.scale(180), height: context.scale(12)),
+                            ],
+                          ),
+                        ),
+                        Icon(Icons.keyboard_arrow_down, color: colorScheme.outlineVariant),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _skeletonStatsCard(BuildContext context, {bool isWide = false}) {
+    final colorScheme = context.theme.colorScheme;
+    return Card(
+      elevation: 0,
+      color: colorScheme.surfaceContainerLow,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+        side: BorderSide(color: colorScheme.outlineVariant),
+      ),
+      child: Padding(
+        padding: EdgeInsets.all(context.md),
+        child: Column(
+          crossAxisAlignment: isWide ? CrossAxisAlignment.center : CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                SkeletonBox(width: 18, height: 18, borderRadius: BorderRadius.circular(4)),
+                SizedBox(width: context.sm),
+                SkeletonBox(width: 80, height: 12),
+              ],
+            ),
+            SizedBox(height: context.sm),
+            SkeletonBox(width: 60, height: 28),
+            if (isWide) ...[
+              SizedBox(height: context.md),
+              SkeletonBox(width: double.infinity, height: 8, borderRadius: BorderRadius.circular(4)),
+            ]
+          ],
+        ),
+      ),
+    );
   }
 }

@@ -1,4 +1,6 @@
 import 'dart:async';
+import 'package:eduphin/moderator_dashboard/cache_helper.dart';
+import 'package:eduphin/moderator_dashboard/skeleton_widgets.dart';
 import 'package:eduphin/moderator_dashboard/moderator_dashboard.dart';
 import 'package:eduphin/moderator_dashboard/dashboard_cards/active_institutes/manage/add_employee.dart';
 import 'package:eduphin/services/api_service.dart';
@@ -22,6 +24,29 @@ const List<String> employeeRoles = [
   'Physical Education',
 ];
 
+// 1. Data Provider to fetch employee data
+class EmployeeProvider {
+  String getCacheKey(String instituteId) => 'employees_list_$instituteId';
+
+  Future<List<Employee>> fetchEmployees(String instituteId, {bool bypassCache = false}) async {
+    if (!bypassCache) {
+      final cached = await getCachedEmployees(instituteId);
+      if (cached != null) return cached;
+    }
+    final data = await ApiService.getEmployees(instituteId);
+    await CacheHelper.save(getCacheKey(instituteId), data.map((e) => e.toJson()).toList());
+    return data;
+  }
+
+  Future<List<Employee>?> getCachedEmployees(String instituteId) async {
+    final cached = await CacheHelper.load(getCacheKey(instituteId));
+    if (cached != null) {
+      return (cached as List).map((e) => Employee.fromJson(e)).toList();
+    }
+    return null;
+  }
+}
+
 class ManageInstitute extends StatefulWidget {
   final String instituteName;
   final String instituteId;
@@ -37,52 +62,46 @@ class ManageInstitute extends StatefulWidget {
 }
 
 class _ManageInstitutePageState extends State<ManageInstitute> {
+  final EmployeeProvider _provider = EmployeeProvider();
   final _searchController = TextEditingController();
 
-  bool _isLoading = true;
-  String? _error;
   List<Employee> _allEmployees = [];
   List<Employee> _filteredEmployees = [];
   String _selectedRole = 'All';
+  late Future<List<Employee>> _employeesFuture;
+  List<Employee>? _cachedEmployees;
 
   @override
   void initState() {
     super.initState();
-    _fetchEmployees();
+    _loadInitialData();
     _searchController.addListener(_applyFilters);
+  }
+
+  Future<void> _loadInitialData() async {
+    _cachedEmployees = await _provider.getCachedEmployees(widget.instituteId);
+    if (_cachedEmployees != null) {
+      _allEmployees = _cachedEmployees!;
+      _applyFiltersNoState();
+    }
+    if (mounted) {
+      setState(() {
+        _employeesFuture = _provider.fetchEmployees(widget.instituteId);
+      });
+    }
+  }
+
+  Future<void> _fetchEmployees({bool bypassCache = false}) async {
+    setState(() {
+      _employeesFuture = _provider.fetchEmployees(widget.instituteId, bypassCache: bypassCache);
+    });
+    await _employeesFuture;
   }
 
   @override
   void dispose() {
     _searchController.dispose();
     super.dispose();
-  }
-
-  Future<void> _fetchEmployees() async {
-    setState(() {
-      _isLoading = true;
-      _error = null;
-    });
-    try {
-      final employees = await ApiService.getEmployees(widget.instituteId);
-      if (mounted) {
-        setState(() {
-          _allEmployees = employees;
-          _filteredEmployees = employees;
-          _isLoading = false;
-        });
-      }
-    } catch (e) {
-      if (mounted) {
-        setState(() {
-          _isLoading = false;
-          _error = e.toString();
-        });
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to load employees: $e')),
-        );
-      }
-    }
   }
 
   void _applyFilters() {
@@ -94,6 +113,15 @@ class _ManageInstitutePageState extends State<ManageInstitute> {
         return nameMatches && roleMatches;
       }).toList();
     });
+  }
+
+  void _applyFiltersNoState() {
+    final query = _searchController.text.toLowerCase();
+    _filteredEmployees = _allEmployees.where((employee) {
+      final nameMatches = employee.name.toLowerCase().contains(query);
+      final roleMatches = _selectedRole == 'All' || employee.role == _selectedRole;
+      return nameMatches && roleMatches;
+    }).toList();
   }
 
   void _onRoleSelected(String role) {
@@ -133,7 +161,7 @@ class _ManageInstitutePageState extends State<ManageInstitute> {
         ],
       ),
       body: RefreshIndicator(
-        onRefresh: _fetchEmployees,
+        onRefresh: () => _fetchEmployees(bypassCache: true),
         child: Column(
           children: [
             Padding(
@@ -213,62 +241,51 @@ class _ManageInstitutePageState extends State<ManageInstitute> {
             ),
             SizedBox(height: context.md),
             Expanded(
-              child: _isLoading
-                  ? const Center(child: CircularProgressIndicator())
-                  : _error != null
-                      ? _buildErrorState(context)
-                      : _filteredEmployees.isEmpty
-                          ? _buildEmptyState(context)
-                          : SingleChildScrollView(
-                              padding: context.pagePadding,
-                              physics: const AlwaysScrollableScrollPhysics(),
-                              child: Center(
-                                child: ConstrainedBox(
-                                  constraints: BoxConstraints(maxWidth: context.scale(1200)),
-                                  child: GridView.builder(
-                                    shrinkWrap: true,
-                                    physics: const NeverScrollableScrollPhysics(),
-                                    itemCount: _filteredEmployees.length,
-                                    gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                                      crossAxisCount: context.responsive(1, tablet: 2, desktop: 3),
-                                      crossAxisSpacing: context.md,
-                                      mainAxisSpacing: context.md,
-                                      mainAxisExtent: context.scale(80),
-                                    ),
-                                    itemBuilder: (context, index) {
-                                      return EmployeeCard(employee: _filteredEmployees[index]);
-                                    },
-                                  ),
-                                ),
+              child: FutureBuilder<List<Employee>>(
+                future: _employeesFuture,
+                builder: (context, snapshot) {
+                  return ModeratorLoadingWrapper<List<Employee>>(
+                    snapshot: snapshot,
+                    cachedData: _cachedEmployees,
+                    skeleton: const ListSkeleton(),
+                    onRefresh: () => _fetchEmployees(bypassCache: true),
+                    builder: (employees) {
+                      _allEmployees = employees;
+                      _applyFiltersNoState();
+
+                      if (_filteredEmployees.isEmpty) {
+                        return _buildEmptyState(context);
+                      }
+                      return SingleChildScrollView(
+                        padding: context.pagePadding,
+                        physics: const AlwaysScrollableScrollPhysics(),
+                        child: Center(
+                          child: ConstrainedBox(
+                            constraints: BoxConstraints(maxWidth: context.scale(1200)),
+                            child: GridView.builder(
+                              shrinkWrap: true,
+                              physics: const NeverScrollableScrollPhysics(),
+                              itemCount: _filteredEmployees.length,
+                              gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                                crossAxisCount: context.responsive(1, tablet: 2, desktop: 3),
+                                crossAxisSpacing: context.md,
+                                mainAxisSpacing: context.md,
+                                mainAxisExtent: context.scale(80),
                               ),
+                              itemBuilder: (context, index) {
+                                return EmployeeCard(employee: _filteredEmployees[index]);
+                              },
                             ),
+                          ),
+                        ),
+                      );
+                    },
+                  );
+                },
+              ),
             ),
           ],
         ),
-      ),
-    );
-  }
-
-  Widget _buildErrorState(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(Icons.error_outline_rounded, size: context.scale(64), color: colorScheme.error.withValues(alpha: 0.5)),
-          SizedBox(height: context.md),
-          Text("Failed to load employees", style: TextStyle(fontWeight: FontWeight.bold, fontSize: context.font(16), color: colorScheme.onSurface)),
-          SizedBox(height: context.scale(24)),
-          ElevatedButton.icon(
-            onPressed: _fetchEmployees,
-            icon: const Icon(Icons.refresh_rounded),
-            label: Text("Retry", style: TextStyle(fontSize: context.font(16))),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: colorScheme.primary,
-              foregroundColor: colorScheme.onPrimary,
-            ),
-          ),
-        ],
       ),
     );
   }
@@ -334,7 +351,7 @@ class EmployeeCard extends StatelessWidget {
                       overflow: TextOverflow.ellipsis,
                     ),
                     Text(
-                      employee.role,
+                      employee.email ?? employee.role, // Use email if available, else role
                       style: TextStyle(color: colorScheme.onSurfaceVariant, fontSize: context.font(12)),
                       overflow: TextOverflow.ellipsis,
                     ),

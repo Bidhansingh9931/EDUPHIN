@@ -1,6 +1,8 @@
 import 'package:eduphin/services/api_service.dart';
 import 'package:eduphin/services/responsive_helper.dart';
+import 'package:eduphin/teacher/dashboard/common_widgets.dart';
 import 'package:eduphin/teacher/dashboard/my_class_model.dart';
+import 'package:eduphin/teacher/dashboard/teacher_cache_service.dart';
 import 'package:flutter/material.dart';
 import 'class_models.dart';
 
@@ -12,12 +14,46 @@ class ClassesDetailsPage extends StatefulWidget {
 }
 
 class _ClassesDetailsPageState extends State<ClassesDetailsPage> {
-  late Future<MyClassData> _dataFuture;
+  bool _isLoading = true;
+  MyClassData? _data;
+  String? _error;
 
   @override
   void initState() {
     super.initState();
-    _dataFuture = ApiService.getMyClassData();
+    _loadData();
+  }
+
+  Future<void> _loadData() async {
+    // 1. Load from cache first
+    final cachedData = await TeacherCacheService.load('my_classes');
+    if (cachedData != null && mounted) {
+      setState(() {
+        _data = MyClassData.fromJson(cachedData);
+        _isLoading = _data == null;
+      });
+    }
+
+    // 2. Fetch from API
+    try {
+      final data = await ApiService.getMyClassData();
+      await TeacherCacheService.save('my_classes', data.toJson());
+
+      if (mounted) {
+        setState(() {
+          _data = data;
+          _isLoading = false;
+          _error = null;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _error = e.toString();
+          _isLoading = false;
+        });
+      }
+    }
   }
 
   void _showSectionsDialog(
@@ -84,108 +120,144 @@ class _ClassesDetailsPageState extends State<ClassesDetailsPage> {
   Widget build(BuildContext context) {
     final theme = context.theme;
 
+    final schedules = _data?.schedules;
+    final uniqueClasses = schedules
+        ?.where((schedule) => schedule.classInfo != null)
+        .map((schedule) => schedule.classInfo!)
+        .toSet()
+        .toList();
+
     return Scaffold(
       appBar: AppBar(
         title: const Text("My Classes"),
       ),
-      body: FutureBuilder<MyClassData>(
-          future: _dataFuture,
-          builder: (context, snapshot) {
-            if (snapshot.connectionState == ConnectionState.waiting) {
-              return const Center(child: CircularProgressIndicator());
-            } else if (snapshot.hasError) {
-              return Center(
+      body: TeacherLoadingWrapper(
+        isLoading: _isLoading,
+        hasData: uniqueClasses != null,
+        skeleton: _buildSkeleton(context),
+        child: _error != null && (uniqueClasses == null || uniqueClasses.isEmpty)
+            ? Center(
                 child: Padding(
                   padding: context.pagePadding,
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Text(snapshot.error.toString(), style: TextStyle(color: theme.colorScheme.error), textAlign: TextAlign.center),
+                      Text(_error!, style: TextStyle(color: theme.colorScheme.error), textAlign: TextAlign.center),
                       SizedBox(height: context.spacing),
                       ElevatedButton(
-                        onPressed: () => setState(() => _dataFuture = ApiService.getMyClassData()),
+                        onPressed: _loadData,
                         child: const Text('Retry'),
                       )
                     ],
                   ),
                 ),
-              );
-            } else if (snapshot.hasData) {
-              final schedules = snapshot.data!.schedules;
-              final uniqueClasses = schedules
-                  .where((schedule) => schedule.classInfo != null)
-                  .map((schedule) => schedule.classInfo!)
-                  .toSet()
-                  .toList();
-
-              if (uniqueClasses.isEmpty) {
-                return Center(child: Text("No classes found.", style: TextStyle(fontSize: context.font(14), color: theme.colorScheme.onSurfaceVariant)));
-              }
-
-              return SingleChildScrollView(
-                padding: context.pagePadding,
-                child: Center(
-                  child: ConstrainedBox(
-                    constraints: const BoxConstraints(maxWidth: 1000),
-                    child: Card(
-                      elevation: 0,
-                      color: theme.colorScheme.surface,
-                      surfaceTintColor: Colors.transparent,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(context.scale(20)),
-                        side: BorderSide(color: theme.colorScheme.outlineVariant.withValues(alpha: 0.5), width: 0.5),
-                      ),
-                      child: ClipRRect(
-                        borderRadius: BorderRadius.circular(context.scale(20)),
-                        child: SingleChildScrollView(
-                          scrollDirection: Axis.horizontal,
-                          child: DataTable(
-                            columnSpacing: context.scale(32),
-                            headingRowHeight: context.scale(56),
-                            dataRowMaxHeight: context.scale(56),
-                            dividerThickness: 0.5,
-                            headingRowColor: WidgetStateProperty.all(theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.3)),
-                            columns: [
-                              DataColumn(label: Text("#", style: TextStyle(fontWeight: FontWeight.bold, fontSize: context.font(14), color: theme.colorScheme.onSurface))),
-                              DataColumn(label: Text("Class Name", style: TextStyle(fontWeight: FontWeight.bold, fontSize: context.font(14), color: theme.colorScheme.onSurface))),
-                              DataColumn(label: Text("Code", style: TextStyle(fontWeight: FontWeight.bold, fontSize: context.font(14), color: theme.colorScheme.onSurface))),
-                              DataColumn(label: Text("Level", style: TextStyle(fontWeight: FontWeight.bold, fontSize: context.font(14), color: theme.colorScheme.onSurface))),
-                              DataColumn(label: Text("Sections", style: TextStyle(fontWeight: FontWeight.bold, fontSize: context.font(14), color: theme.colorScheme.onSurface))),
-                            ],
-                            rows: uniqueClasses.asMap().entries.map((entry) {
-                              final index = entry.key;
-                              final teacherClass = entry.value;
-                              return DataRow(cells: [
-                                DataCell(Text((index + 1).toString(), style: TextStyle(fontSize: context.font(13), color: theme.colorScheme.onSurfaceVariant))),
-                                DataCell(Text(teacherClass.name, style: TextStyle(fontWeight: FontWeight.w600, fontSize: context.font(14), color: theme.colorScheme.onSurface))),
-                                DataCell(Container(
-                                  padding: EdgeInsets.symmetric(horizontal: context.scale(10), vertical: context.scale(4)),
-                                  decoration: BoxDecoration(
-                                    color: theme.colorScheme.primary.withValues(alpha: 0.1),
-                                    borderRadius: BorderRadius.circular(context.scale(8)),
-                                    border: Border.all(color: theme.colorScheme.primary.withValues(alpha: 0.2), width: 0.5),
-                                  ),
-                                  child: Text(teacherClass.code, style: TextStyle(color: theme.colorScheme.primary, fontSize: context.font(11), fontWeight: FontWeight.bold)),
-                                )),
-                                DataCell(Text(teacherClass.level ?? 'N/A', style: TextStyle(fontSize: context.font(13), color: theme.colorScheme.onSurfaceVariant))),
-                                DataCell(TextButton.icon(
-                                  onPressed: () => _showSectionsDialog(context, teacherClass, schedules),
-                                  icon: Icon(Icons.visibility_outlined, size: context.scale(18), color: theme.colorScheme.primary),
-                                  label: Text("VIEW", style: TextStyle(fontSize: context.font(13), fontWeight: FontWeight.bold, color: theme.colorScheme.primary)),
-                                )),
-                              ]);
-                            }).toList(),
+              )
+            : uniqueClasses == null || uniqueClasses.isEmpty
+                ? Center(child: Text("No classes found.", style: TextStyle(fontSize: context.font(14), color: theme.colorScheme.onSurfaceVariant)))
+                : SingleChildScrollView(
+                    padding: context.pagePadding,
+                    child: Center(
+                      child: ConstrainedBox(
+                        constraints: const BoxConstraints(maxWidth: 1000),
+                        child: Card(
+                          elevation: 0,
+                          color: theme.colorScheme.surface,
+                          surfaceTintColor: Colors.transparent,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(context.scale(20)),
+                            side: BorderSide(color: theme.colorScheme.outlineVariant.withValues(alpha: 0.5), width: 0.5),
+                          ),
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.circular(context.scale(20)),
+                            child: SingleChildScrollView(
+                              scrollDirection: Axis.horizontal,
+                              child: DataTable(
+                                columnSpacing: context.scale(32),
+                                headingRowHeight: context.scale(56),
+                                dataRowMaxHeight: context.scale(56),
+                                dividerThickness: 0.5,
+                                headingRowColor: WidgetStateProperty.all(theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.3)),
+                                columns: [
+                                  DataColumn(label: Text("#", style: TextStyle(fontWeight: FontWeight.bold, fontSize: context.font(14), color: theme.colorScheme.onSurface))),
+                                  DataColumn(label: Text("Class Name", style: TextStyle(fontWeight: FontWeight.bold, fontSize: context.font(14), color: theme.colorScheme.onSurface))),
+                                  DataColumn(label: Text("Code", style: TextStyle(fontWeight: FontWeight.bold, fontSize: context.font(14), color: theme.colorScheme.onSurface))),
+                                  DataColumn(label: Text("Level", style: TextStyle(fontWeight: FontWeight.bold, fontSize: context.font(14), color: theme.colorScheme.onSurface))),
+                                  DataColumn(label: Text("Sections", style: TextStyle(fontWeight: FontWeight.bold, fontSize: context.font(14), color: theme.colorScheme.onSurface))),
+                                ],
+                                rows: uniqueClasses.asMap().entries.map((entry) {
+                                  final index = entry.key;
+                                  final teacherClass = entry.value;
+                                  return DataRow(cells: [
+                                    DataCell(Text((index + 1).toString(), style: TextStyle(fontSize: context.font(13), color: theme.colorScheme.onSurfaceVariant))),
+                                    DataCell(Text(teacherClass.name, style: TextStyle(fontWeight: FontWeight.w600, fontSize: context.font(14), color: theme.colorScheme.onSurface))),
+                                    DataCell(Container(
+                                      padding: EdgeInsets.symmetric(horizontal: context.scale(10), vertical: context.scale(4)),
+                                      decoration: BoxDecoration(
+                                        color: theme.colorScheme.primary.withValues(alpha: 0.1),
+                                        borderRadius: BorderRadius.circular(context.scale(8)),
+                                        border: Border.all(color: theme.colorScheme.primary.withValues(alpha: 0.2), width: 0.5),
+                                      ),
+                                      child: Text(teacherClass.code, style: TextStyle(color: theme.colorScheme.primary, fontSize: context.font(11), fontWeight: FontWeight.bold)),
+                                    )),
+                                    DataCell(Text(teacherClass.level ?? 'N/A', style: TextStyle(fontSize: context.font(13), color: theme.colorScheme.onSurfaceVariant))),
+                                    DataCell(TextButton.icon(
+                                      onPressed: () => _showSectionsDialog(context, teacherClass, schedules!),
+                                      icon: Icon(Icons.visibility_outlined, size: context.scale(18), color: theme.colorScheme.primary),
+                                      label: Text("VIEW", style: TextStyle(fontSize: context.font(13), fontWeight: FontWeight.bold, color: theme.colorScheme.primary)),
+                                    )),
+                                  ]);
+                                }).toList(),
+                              ),
+                            ),
                           ),
                         ),
                       ),
                     ),
                   ),
+      ),
+    );
+  }
+
+  Widget _buildSkeleton(BuildContext context) {
+    return SingleChildScrollView(
+      padding: context.pagePadding,
+      child: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 1000),
+          child: Card(
+            elevation: 0,
+            color: context.theme.colorScheme.surface,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(context.scale(20)),
+              side: BorderSide(color: context.theme.colorScheme.outlineVariant.withValues(alpha: 0.5), width: 0.5),
+            ),
+            child: Column(
+              children: List.generate(
+                6,
+                (index) => Container(
+                  height: context.scale(56),
+                  padding: EdgeInsets.symmetric(horizontal: context.scale(16)),
+                  decoration: BoxDecoration(
+                    border: index == 0 ? null : Border(top: BorderSide(color: context.theme.dividerColor, width: 0.5)),
+                    color: index == 0 ? context.theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.3) : null,
+                  ),
+                  child: Row(
+                    children: [
+                      TeacherSkeleton(width: context.scale(20), height: 14),
+                      SizedBox(width: context.scale(32)),
+                      TeacherSkeleton(width: context.scale(100), height: 14),
+                      SizedBox(width: context.scale(32)),
+                      TeacherSkeleton(width: context.scale(60), height: 24, borderRadius: BorderRadius.circular(8)),
+                      const Spacer(),
+                      TeacherSkeleton(width: context.scale(80), height: 14),
+                    ],
+                  ),
                 ),
-              );
-            } else {
-              return Center(child: Text("No classes found.", style: TextStyle(fontSize: context.font(14), color: theme.colorScheme.onSurfaceVariant)));
-            }
-          }),
+              ),
+            ),
+          ),
+        ),
+      ),
     );
   }
 }

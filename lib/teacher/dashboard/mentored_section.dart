@@ -1,3 +1,5 @@
+import 'package:eduphin/teacher/dashboard/common_widgets.dart';
+import 'package:eduphin/teacher/dashboard/teacher_cache_service.dart';
 import 'package:eduphin/services/api_service.dart';
 import 'package:eduphin/services/common_widgets.dart';
 import 'package:eduphin/services/responsive_helper.dart';
@@ -14,12 +16,47 @@ class MentoredSectionsPage extends StatefulWidget {
 
 class _MentoredSectionsPageState extends State<MentoredSectionsPage> {
   bool isExpanded = true;
-  late Future<MyClassData> _myClassDataFuture;
+  MyClassData? _myClassData;
+  bool _isLoading = true;
+  String? _error;
 
   @override
   void initState() {
     super.initState();
-    _myClassDataFuture = ApiService.getMyClassData();
+    _loadData();
+  }
+
+  Future<void> _loadData() async {
+    // 1. Load from cache
+    final cachedData = await TeacherCacheService.load('mentored_sections');
+    if (cachedData != null) {
+      if (mounted) {
+        setState(() {
+          _myClassData = MyClassData.fromJson(cachedData);
+          _isLoading = false;
+        });
+      }
+    }
+
+    // 2. Fetch from API
+    try {
+      final data = await ApiService.getMyClassData();
+      await TeacherCacheService.save('mentored_sections', data.toJson());
+      if (mounted) {
+        setState(() {
+          _myClassData = data;
+          _isLoading = false;
+          _error = null;
+        });
+      }
+    } catch (e) {
+      if (_myClassData == null) {
+        setState(() {
+          _error = e.toString();
+          _isLoading = false;
+        });
+      }
+    }
   }
 
   @override
@@ -30,86 +67,113 @@ class _MentoredSectionsPageState extends State<MentoredSectionsPage> {
         title: const Text("My Mentored Sections"),
       ),
       body: SafeArea(
-        child: FutureBuilder<MyClassData>(
-          future: _myClassDataFuture,
-          builder: (context, snapshot) {
-            if (snapshot.connectionState == ConnectionState.waiting) {
-              return const Center(child: CircularProgressIndicator());
-            } else if (snapshot.hasError) {
-              return Center(
-                child: Padding(
-                  padding: context.pagePadding,
-                  child: Text('Error: ${snapshot.error}', textAlign: TextAlign.center, style: TextStyle(color: theme.colorScheme.error, fontSize: context.font(14))),
-                ),
-              );
-            } else if (snapshot.hasData) {
-              final myClassData = snapshot.data!;
-              final sectionName = myClassData.sections.isNotEmpty ? myClassData.sections.first.name : "No Mentored Section";
+        child: _buildBody(theme),
+      ),
+    );
+  }
 
-              return SingleChildScrollView(
+  Widget _buildBody(ThemeData theme) {
+    final midTermExams = _myClassData; // Using this for hasData check if needed, but we have _myClassData directly
+
+    return TeacherLoadingWrapper(
+      isLoading: _isLoading,
+      hasData: _myClassData != null,
+      skeleton: _buildSkeleton(),
+      child: _error != null && _myClassData == null
+          ? Center(
+              child: Padding(
                 padding: context.pagePadding,
-                child: Center(
-                  child: ConstrainedBox(
-                    constraints: const BoxConstraints(maxWidth: 1000),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Text('Error: $_error', textAlign: TextAlign.center, style: TextStyle(color: theme.colorScheme.error, fontSize: context.font(14))),
+                    const SizedBox(height: 16),
+                    ElevatedButton(onPressed: _loadData, child: const Text("Retry")),
+                  ],
+                ),
+              ),
+            )
+          : _myClassData == null
+              ? Center(child: Text("No data", style: TextStyle(fontSize: context.font(14))))
+              : _buildContent(theme),
+    );
+  }
+
+  Widget _buildContent(ThemeData theme) {
+    final myClassData = _myClassData!;
+    final sectionName = myClassData.sections.isNotEmpty ? myClassData.sections.first.name : "No Mentored Section";
+
+    return SingleChildScrollView(
+      padding: context.pagePadding,
+      child: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 1000),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              /// DROPDOWN HEADER
+              GestureDetector(
+                onTap: () {
+                  setState(() {
+                    isExpanded = !isExpanded;
+                  });
+                },
+                child: Card(
+                  elevation: 0,
+                  color: theme.colorScheme.surfaceContainerLow,
+                  surfaceTintColor: Colors.transparent,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(context.scale(20)),
+                    side: BorderSide(color: theme.colorScheme.outlineVariant.withValues(alpha: 0.5), width: 0.5),
+                  ),
+                  child: Padding(
+                    padding: EdgeInsets.symmetric(horizontal: context.scale(16), vertical: context.scale(18)),
+                    child: Row(
                       children: [
-                        /// DROPDOWN HEADER
-                        GestureDetector(
-                          onTap: () {
-                            setState(() {
-                              isExpanded = !isExpanded;
-                            });
-                          },
-                          child: Card(
-                            elevation: 0,
-                            color: theme.colorScheme.surfaceContainerLow,
-                            surfaceTintColor: Colors.transparent,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(context.scale(20)),
-                              side: BorderSide(color: theme.colorScheme.outlineVariant.withValues(alpha: 0.5), width: 0.5),
-                            ),
-                            child: Padding(
-                              padding: EdgeInsets.symmetric(horizontal: context.scale(16), vertical: context.scale(18)),
-                              child: Row(
-                                children: [
-                                  Icon(Icons.groups, color: theme.colorScheme.primary, size: context.scale(24)),
-                                  SizedBox(width: context.scale(12)),
-                                  Expanded(
-                                    child: Text(
-                                      sectionName,
-                                      style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold, fontSize: context.font(16)),
-                                    ),
-                                  ),
-                                  Icon(
-                                    isExpanded ? Icons.keyboard_arrow_up : Icons.keyboard_arrow_down,
-                                    color: theme.colorScheme.onSurfaceVariant,
-                                    size: context.scale(24),
-                                  )
-                                ],
-                              ),
-                            ),
+                        Icon(Icons.groups, color: theme.colorScheme.primary, size: context.scale(24)),
+                        SizedBox(width: context.scale(12)),
+                        Expanded(
+                          child: Text(
+                            sectionName,
+                            style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold, fontSize: context.font(16)),
                           ),
                         ),
-
-                        /// EXPANDED CONTENT
-                        if (isExpanded) ...[
-                          SizedBox(height: context.spacing),
-                          buildSchedulesCard(context, myClassData.schedules),
-                          SizedBox(height: context.spacing),
-                          buildStudentsCard(context, myClassData.students),
-                        ]
+                        Icon(
+                          isExpanded ? Icons.keyboard_arrow_up : Icons.keyboard_arrow_down,
+                          color: theme.colorScheme.onSurfaceVariant,
+                          size: context.scale(24),
+                        )
                       ],
                     ),
                   ),
                 ),
-              );
-            }
-            return Center(
-              child: Text('No data found.', style: TextStyle(fontSize: context.font(14), color: theme.colorScheme.onSurfaceVariant)),
-            );
-          },
+              ),
+
+              /// EXPANDED CONTENT
+              if (isExpanded) ...[
+                SizedBox(height: context.spacing),
+                buildSchedulesCard(context, myClassData.schedules),
+                SizedBox(height: context.spacing),
+                buildStudentsCard(context, myClassData.students),
+              ]
+            ],
+          ),
         ),
+      ),
+    );
+  }
+
+  Widget _buildSkeleton() {
+    return SingleChildScrollView(
+      padding: context.pagePadding,
+      child: Column(
+        children: [
+          TeacherSkeleton(height: context.scale(60), borderRadius: BorderRadius.circular(context.scale(20))),
+          SizedBox(height: context.spacing),
+          TeacherSkeleton(height: context.scale(200), borderRadius: BorderRadius.circular(context.scale(20))),
+          SizedBox(height: context.spacing),
+          TeacherSkeleton(height: context.scale(400), borderRadius: BorderRadius.circular(context.scale(20))),
+        ],
       ),
     );
   }

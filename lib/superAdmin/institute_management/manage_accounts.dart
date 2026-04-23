@@ -4,6 +4,8 @@ import 'package:eduphin/services/theme_service.dart';
 import 'package:flutter/material.dart';
 import 'package:eduphin/services/api_service.dart';
 import 'package:eduphin/moderator_dashboard/institute/institute_model.dart';
+import 'package:eduphin/superAdmin/cache_service.dart';
+import 'package:eduphin/superAdmin/super_admin_common_widgets.dart';
 
 class ManageAccountsScreen extends StatefulWidget {
   final String instituteId;
@@ -22,6 +24,18 @@ class _ManageAccountsScreenState extends State<ManageAccountsScreen> {
   @override
   void initState() {
     super.initState();
+    _loadInitialData();
+  }
+
+  Future<void> _loadInitialData() async {
+    final cachedAccounts = await SuperAdminCacheService.load('institute_accounts_${widget.instituteId}');
+    final cachedInstitute = await SuperAdminCacheService.load('institute_details_${widget.instituteId}');
+    if (cachedAccounts != null || cachedInstitute != null) {
+      setState(() {
+        if (cachedAccounts != null) _accounts = cachedAccounts;
+        if (cachedInstitute != null) _institute = Institute.fromJson(cachedInstitute);
+      });
+    }
     _fetchAccounts();
   }
 
@@ -39,14 +53,16 @@ class _ManageAccountsScreenState extends State<ManageAccountsScreen> {
 
       if (mounted) {
         setState(() {
-          // Based on AccountController.php index method:
-          // 'data' => [ 'accounts' => $accounts, 'roles' => $roles, 'institute' => $institute ]
           if (accountsData['status'] == true) {
             _accounts = accountsData['data']['accounts'] ?? [];
+            SuperAdminCacheService.save('institute_accounts_${widget.instituteId}', _accounts);
           } else {
              _accounts = [];
           }
           _institute = data;
+          if (data != null) {
+            SuperAdminCacheService.save('institute_details_${widget.instituteId}', data.toJson());
+          }
           _isLoading = false;
         });
       }
@@ -68,14 +84,19 @@ class _ManageAccountsScreenState extends State<ManageAccountsScreen> {
         title: Text(_institute != null ? "Accounts: ${_institute!.name}" : "Manage Accounts",
             style: TextStyle(fontSize: context.font(20), fontWeight: FontWeight.bold)),
       ),
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : _errorMessage != null
+      body: SuperAdminLoadingWrapper(
+        isLoading: _isLoading,
+        hasData: _accounts.isNotEmpty || _institute != null,
+        skeleton: _buildSkeleton(context),
+        child: RefreshIndicator(
+          onRefresh: _fetchAccounts,
+          child: _errorMessage != null && _accounts.isEmpty
               ? Center(child: Padding(
                   padding: EdgeInsets.all(context.scale(24.0)),
                   child: Text(_errorMessage!, textAlign: TextAlign.center, style: TextStyle(color: theme.colorScheme.error, fontSize: context.font(14))),
                 ))
               : SingleChildScrollView(
+                  physics: const AlwaysScrollableScrollPhysics(),
                   padding: context.pagePadding,
                   child: Center(
                     child: ConstrainedBox(
@@ -111,6 +132,39 @@ class _ManageAccountsScreenState extends State<ManageAccountsScreen> {
                     ),
                   ),
                 ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSkeleton(BuildContext context) {
+    return SingleChildScrollView(
+      padding: context.pagePadding,
+      child: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 1000),
+          child: Card(
+            elevation: 0,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(context.scale(12)),
+            ),
+            child: Padding(
+              padding: EdgeInsets.all(context.spacing),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  SuperAdminSkeleton(width: 200, height: 24),
+                  SizedBox(height: context.spacing),
+                  ...List.generate(8, (index) => Padding(
+                    padding: const EdgeInsets.only(bottom: 12.0),
+                    child: SuperAdminSkeleton(height: 48),
+                  )),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
     );
   }
 

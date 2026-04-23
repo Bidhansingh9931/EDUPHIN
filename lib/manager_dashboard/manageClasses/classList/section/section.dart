@@ -41,7 +41,7 @@ class _SectionsPageState extends State<SectionsPage> {
   }
 
   Future<void> _loadCachedData() async {
-    final cachedData = await CachingService.getCache(_cacheKey);
+    final cachedData = await CacheService.getCache(_cacheKey);
     if (cachedData != null && mounted) {
       _processSectionsFromCache(cachedData);
     }
@@ -71,7 +71,7 @@ class _SectionsPageState extends State<SectionsPage> {
   Future<void> _fetchSections() async {
     if (!mounted) return;
     setState(() {
-      _isLoading = true;
+      _isLoading = _sections.isEmpty;
       _error = null;
     });
 
@@ -83,7 +83,7 @@ class _SectionsPageState extends State<SectionsPage> {
 
       if (response.statusCode == 200 && responseData['status'] == true) {
         final List allClasses = responseData['data'] as List? ?? [];
-        await CachingService.setCache(_cacheKey, allClasses);
+        await CacheService.setCache(_cacheKey, allClasses);
         
         final currentClass = allClasses.firstWhere(
               (classData) => (classData['id'] is int ? classData['id'] : int.tryParse(classData['id'].toString())) == widget.classId,

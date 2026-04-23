@@ -70,9 +70,10 @@ class _EventManagementPageState extends State<EventManagementPage> {
   }
 
   Future<void> _loadCachedData() async {
-    final cache = await CachingService.getCache('event_management_data');
+    final cache = await CacheService.getCache('event_management_data');
     if (cache != null && mounted) {
       _processEventData(cache);
+      setState(() => _isLoading = false);
     }
   }
 
@@ -116,39 +117,42 @@ class _EventManagementPageState extends State<EventManagementPage> {
         .cast<String>()
         .toList());
 
-    setState(() {
-      String? statusParam;
-      if (_selectedStatus == 'Upcoming') {
-        statusParam = 'upcoming';
-      } else if (_selectedStatus == 'Past') {
-        statusParam = 'expired';
-      }
+    if (mounted) {
+      setState(() {
+        String? statusParam;
+        if (_selectedStatus == 'Upcoming') {
+          statusParam = 'upcoming';
+        } else if (_selectedStatus == 'Past') {
+          statusParam = 'expired';
+        }
 
-      if (statusParam == 'upcoming') {
-        _upcomingEvents = allEvents;
-        _pastEvents.clear();
-      } else if (statusParam == 'expired') {
-        _pastEvents = allEvents;
-        _upcomingEvents.clear();
-      } else {
-        _upcomingEvents = upcoming;
-        _pastEvents = past;
-      }
+        if (statusParam == 'upcoming') {
+          _upcomingEvents = allEvents;
+          _pastEvents.clear();
+        } else if (statusParam == 'expired') {
+          _pastEvents = allEvents;
+          _upcomingEvents.clear();
+        } else {
+          _upcomingEvents = upcoming;
+          _pastEvents = past;
+        }
 
-      _audienceOptions = roles.toSet().toList();
-      if (!_audienceOptions.contains(_selectedAudience)) {
-        _selectedAudience = 'Audience';
-      }
-      _isLoading = false;
-    });
+        _audienceOptions = roles.toSet().toList();
+        if (!_audienceOptions.contains(_selectedAudience)) {
+          _selectedAudience = 'Audience';
+        }
+      });
+    }
   }
 
   Future<void> _fetchEvents() async {
     if (!mounted) return;
-    setState(() {
-      _isLoading = _upcomingEvents.isEmpty && _pastEvents.isEmpty;
-      _error = null;
-    });
+    if (_upcomingEvents.isEmpty && _pastEvents.isEmpty) {
+      setState(() {
+        _isLoading = true;
+        _error = null;
+      });
+    }
 
     try {
       String? statusParam;
@@ -183,10 +187,11 @@ class _EventManagementPageState extends State<EventManagementPage> {
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
         if (queryParams.isEmpty) {
-          await CachingService.setCache('event_management_data', data);
+          await CacheService.setCache('event_management_data', data);
         }
         if (mounted) {
           _processEventData(data);
+          setState(() => _isLoading = false);
         }
       } else {
         throw Exception('Failed to load events. Status code: ${response.statusCode}');
@@ -194,7 +199,7 @@ class _EventManagementPageState extends State<EventManagementPage> {
     } catch (e) {
       if (mounted) {
         setState(() {
-          _isLoading = false;
+          _isLoading = _upcomingEvents.isEmpty && _pastEvents.isEmpty;
           _error = e;
         });
       }
@@ -203,7 +208,7 @@ class _EventManagementPageState extends State<EventManagementPage> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
+    final theme = context.theme;
     return Scaffold(
       backgroundColor: theme.scaffoldBackgroundColor,
       appBar: AppBar(
@@ -213,17 +218,17 @@ class _EventManagementPageState extends State<EventManagementPage> {
             children: [
               Text("Event Management",
                   style: theme.textTheme.titleLarge
-                      ?.copyWith(color: theme.colorScheme.onSurface)),
-              Icon(Icons.download, color: theme.colorScheme.onSurface),
+                      ?.copyWith(color: theme.colorScheme.onSurface, fontSize: context.font(20))),
+              Icon(Icons.download, color: theme.colorScheme.onSurface, size: context.scale(24)),
             ],
           )),
       body: Padding(
-        padding: const EdgeInsets.fromLTRB(16, 16, 16, 50),
+        padding: EdgeInsets.fromLTRB(context.scale(16), context.scale(16), context.scale(16), context.scale(50)),
         child: Column(
           children: [
             SizedBox(
               width: double.infinity,
-              height: 50,
+              height: context.scale(50),
               child: ElevatedButton.icon(
                 onPressed: () {
                   Navigator.push(
@@ -234,24 +239,24 @@ class _EventManagementPageState extends State<EventManagementPage> {
                 style: ElevatedButton.styleFrom(
                   backgroundColor: theme.colorScheme.surface,
                   shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
+                    borderRadius: BorderRadius.circular(context.scale(12)),
                   ),
                 ),
                 icon: Icon(Icons.add,
-                    size: 30, color: theme.colorScheme.onPrimary),
+                    size: context.scale(30), color: theme.colorScheme.onPrimary),
                 label: Text("Generate New Event",
                     style: theme.textTheme.titleMedium
-                        ?.copyWith(color: theme.colorScheme.onPrimary)),
+                        ?.copyWith(color: theme.colorScheme.onPrimary, fontSize: context.font(16))),
               ),
             ),
-            const SizedBox(height: 16),
+            SizedBox(height: context.scale(16)),
             Divider(
               color: theme.colorScheme.onSurface.withAlpha(50),
               thickness: 1,
             ),
-            const SizedBox(height: 16),
+            SizedBox(height: context.scale(16)),
             _buildFilters(theme),
-            const SizedBox(height: 16),
+            SizedBox(height: context.scale(16)),
             Expanded(
               child: LoadingWrapper(
                 isLoading: _isLoading,
@@ -279,22 +284,22 @@ class _EventManagementPageState extends State<EventManagementPage> {
       child: Column(
         children: [
           Container(
-            padding: const EdgeInsets.all(16.0),
+            padding: EdgeInsets.all(context.scale(16)),
             decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(12),
+              color: context.theme.cardColor,
+              borderRadius: BorderRadius.circular(context.scale(12)),
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const SkeletonBox(width: 200, height: 24),
-                const SizedBox(height: 16),
+                SkeletonBox(width: context.scale(200), height: context.scale(24)),
+                SizedBox(height: context.scale(16)),
                 ListView.separated(
                   shrinkWrap: true,
                   physics: const NeverScrollableScrollPhysics(),
                   itemCount: 3,
-                  separatorBuilder: (context, index) => const SizedBox(height: 16),
-                  itemBuilder: (context, index) => const SkeletonBox(height: 80, borderRadius: 12),
+                  separatorBuilder: (context, index) => SizedBox(height: context.scale(16)),
+                  itemBuilder: (context, index) => SkeletonBox(height: context.scale(80), borderRadius: context.scale(12)),
                 ),
               ],
             ),
@@ -306,8 +311,8 @@ class _EventManagementPageState extends State<EventManagementPage> {
 
   Widget _buildFilters(ThemeData theme) {
     return Wrap(
-      spacing: 10.0,
-      runSpacing: 10.0,
+      spacing: context.scale(10),
+      runSpacing: context.scale(10),
       children: [
         _buildDropdown(
             theme, _selectedStatus, ['Status', 'Upcoming', 'Past'],
@@ -338,10 +343,10 @@ class _EventManagementPageState extends State<EventManagementPage> {
   Widget _buildDropdown(ThemeData theme, String value, List<String> items,
       ValueChanged<String?> onChanged) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10.0),
+      padding: EdgeInsets.symmetric(horizontal: context.scale(10)),
       decoration: BoxDecoration(
         color: theme.primaryColor,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(context.scale(12)),
       ),
       child: DropdownButtonHideUnderline(
         child: DropdownButton<String>(
@@ -352,6 +357,7 @@ class _EventManagementPageState extends State<EventManagementPage> {
               child: Text(
                 value,
                 overflow: TextOverflow.ellipsis,
+                style: TextStyle(fontSize: context.font(14)),
               ),
             );
           }).toList(),
@@ -371,13 +377,13 @@ class _EventManagementPageState extends State<EventManagementPage> {
             if (_upcomingEvents.isNotEmpty)
               _buildEventSection(context, "Upcoming Events", _upcomingEvents),
             if (_upcomingEvents.isNotEmpty && _pastEvents.isNotEmpty)
-              const SizedBox(height: 16),
+              SizedBox(height: context.scale(16)),
             if (_pastEvents.isNotEmpty)
               _buildEventSection(context, "Past Events", _pastEvents),
             if (_upcomingEvents.isEmpty && _pastEvents.isEmpty)
               SizedBox(
-                height: MediaQuery.of(context).size.height * 0.4,
-                child: const Center(child: Text('No events found.')),
+                height: context.screenHeight * 0.4,
+                child: Center(child: Text('No events found.', style: TextStyle(fontSize: context.font(16)))),
               )
           ],
         ),
@@ -397,13 +403,13 @@ class _EventManagementPageState extends State<EventManagementPage> {
               child: _upcomingEvents.isNotEmpty
                   ? _buildEventSection(
                   context, "Upcoming Events", _upcomingEvents)
-                  : const Center(child: Text("No upcoming events.")),
+                  : Center(child: Text("No upcoming events.", style: TextStyle(fontSize: context.font(16)))),
             ),
-            const SizedBox(width: 16),
+            SizedBox(width: context.scale(16)),
             Expanded(
               child: _pastEvents.isNotEmpty
                   ? _buildEventSection(context, "Past Events", _pastEvents)
-                  : const Center(child: Text("No past events.")),
+                  : Center(child: Text("No past events.", style: TextStyle(fontSize: context.font(16)))),
             ),
           ],
         ),
@@ -413,12 +419,12 @@ class _EventManagementPageState extends State<EventManagementPage> {
 
   Widget _buildEventSection(
       BuildContext context, String title, List<Event> events) {
-    final theme = Theme.of(context);
+    final theme = context.theme;
     return Container(
-      padding: const EdgeInsets.all(16.0),
+      padding: EdgeInsets.all(context.scale(16)),
       decoration: BoxDecoration(
         color: theme.primaryColor,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(context.scale(12)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -426,19 +432,19 @@ class _EventManagementPageState extends State<EventManagementPage> {
           Row(
             children: [
               Icon(Icons.event,
-                  size: 30, color: theme.colorScheme.onPrimary),
-              const SizedBox(width: 8),
+                  size: context.scale(30), color: theme.colorScheme.onPrimary),
+              SizedBox(width: context.scale(8)),
               Text(title,
                   style: theme.textTheme.titleLarge
-                      ?.copyWith(color: theme.colorScheme.onPrimary)),
+                      ?.copyWith(color: theme.colorScheme.onPrimary, fontSize: context.font(20))),
             ],
           ),
-          const SizedBox(height: 16),
+          SizedBox(height: context.scale(16)),
           ListView.separated(
             shrinkWrap: true,
             physics: const NeverScrollableScrollPhysics(),
             itemCount: events.length,
-            separatorBuilder: (context, index) => const SizedBox(height: 16),
+            separatorBuilder: (context, index) => SizedBox(height: context.scale(16)),
             itemBuilder: (context, index) {
               final event = events[index];
               return _buildEventCard(context, event);
@@ -450,7 +456,7 @@ class _EventManagementPageState extends State<EventManagementPage> {
   }
 
   Widget _buildEventCard(BuildContext context, Event event) {
-    final theme = Theme.of(context);
+    final theme = context.theme;
     return InkWell(
       onTap: () {
         Navigator.push(
@@ -459,10 +465,10 @@ class _EventManagementPageState extends State<EventManagementPage> {
                 builder: (context) => EventAttendees(eventId: event.id)));
       },
       child: Container(
-        padding: const EdgeInsets.all(12),
+        padding: EdgeInsets.all(context.scale(12)),
         decoration: BoxDecoration(
           color: theme.colorScheme.onPrimary.withAlpha(25),
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(context.scale(12)),
         ),
         child: Row(
           children: [
@@ -470,13 +476,13 @@ class _EventManagementPageState extends State<EventManagementPage> {
               children: [
                 Text(event.day,
                     style: theme.textTheme.headlineSmall
-                        ?.copyWith(color: theme.colorScheme.onPrimary)),
+                        ?.copyWith(color: theme.colorScheme.onPrimary, fontSize: context.font(24))),
                 Text(event.month,
                     style: theme.textTheme.titleMedium?.copyWith(
-                        color: theme.colorScheme.onPrimary.withAlpha(180))),
+                        color: theme.colorScheme.onPrimary.withAlpha(180), fontSize: context.font(16))),
               ],
             ),
-            const SizedBox(width: 16),
+            SizedBox(width: context.scale(16)),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -484,20 +490,20 @@ class _EventManagementPageState extends State<EventManagementPage> {
                   Text(
                     event.title,
                     style: theme.textTheme.titleMedium
-                        ?.copyWith(color: theme.colorScheme.onPrimary),
+                        ?.copyWith(color: theme.colorScheme.onPrimary, fontSize: context.font(16)),
                   ),
-                  const SizedBox(height: 4),
+                  SizedBox(height: context.scale(4)),
                   Text(
                     event.fullDate,
                     style: theme.textTheme.bodyMedium?.copyWith(
-                        color: theme.colorScheme.onPrimary.withAlpha(180)),
+                        color: theme.colorScheme.onPrimary.withAlpha(180), fontSize: context.font(14)),
                   )
                 ],
               ),
             ),
             Icon(
               Icons.arrow_forward_ios_outlined,
-              size: 20,
+              size: context.scale(20),
               color: theme.colorScheme.onPrimary,
             ),
           ],

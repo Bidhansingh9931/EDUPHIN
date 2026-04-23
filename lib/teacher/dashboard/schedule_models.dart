@@ -38,4 +38,19 @@ class TeacherScheduleItem {
       newTeacher: json['new_teacher'] as Map<String, dynamic>?,
     );
   }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'start_time': startTime,
+      'end_time': endTime,
+      'subject': subject,
+      'class': classInfo,
+      'section': section,
+      'is_override': isOverride,
+      'override_type': overrideType,
+      'note': note,
+      'new_teacher': newTeacher,
+    };
+  }
 }

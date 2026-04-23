@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'package:eduphin/services/api_service.dart';
 import 'package:eduphin/services/responsive_helper.dart';
+import 'package:eduphin/teacher/dashboard/teacher_cache_service.dart';
 import 'package:eduphin/teacher/dashboard/teacher_dashboard_model.dart';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
@@ -20,7 +21,9 @@ class AssignmentPage extends StatefulWidget {
 }
 
 class _AssignmentPageState extends State<AssignmentPage> {
-  late Future<AssignmentPageData> _dataFuture;
+  bool _isLoading = true;
+  AssignmentPageData? _data;
+  String? _error;
   AssignmentSchedule? _selectedSchedule;
   List<Assignment> _allAssignments = [];
   List<Assignment> _filteredAssignments = [];
@@ -31,16 +34,66 @@ class _AssignmentPageState extends State<AssignmentPage> {
     _loadData();
   }
 
-  void _loadData() {
-    _dataFuture = ApiService.getAssignmentsPageData();
-    _dataFuture.then((data) {
+  Future<void> _loadData() async {
+    // 1. Load from cache
+    final cachedData = await TeacherCacheService.load('assignments');
+    if (cachedData != null) {
       if (mounted) {
         setState(() {
-          _allAssignments = data.assignments;
-          _filteredAssignments = data.assignments;
+          _data = AssignmentPageData.fromJson(cachedData);
+          _allAssignments = _data!.assignments;
+          _applyFilter();
+          _isLoading = false;
         });
       }
-    });
+    }
+
+    // 2. Fetch from API
+    try {
+      final freshData = await ApiService.getAssignmentsPageData();
+      await TeacherCacheService.save('assignments', freshData.toJson());
+      
+      if (mounted) {
+        setState(() {
+          _data = freshData;
+          _allAssignments = freshData.assignments;
+          
+          // Re-sync selected schedule if possible
+          if (_selectedSchedule != null) {
+            try {
+              _selectedSchedule = freshData.schedules.firstWhere(
+                (s) => s.classId == _selectedSchedule!.classId && 
+                       s.sectionId == _selectedSchedule!.sectionId && 
+                       s.subjectId == _selectedSchedule!.subjectId
+              );
+            } catch (_) {}
+          }
+          
+          _applyFilter();
+          _isLoading = false;
+          _error = null;
+        });
+      }
+    } catch (e) {
+      if (_data == null && mounted) {
+        setState(() {
+          _error = e.toString();
+          _isLoading = false;
+        });
+      }
+    }
+  }
+
+  void _applyFilter() {
+    if (_selectedSchedule == null) {
+      _filteredAssignments = _allAssignments;
+    } else {
+      _filteredAssignments = _allAssignments.where((a) => 
+        a.classId == _selectedSchedule!.classId && 
+        a.sectionId == _selectedSchedule!.sectionId && 
+        a.subjectId == _selectedSchedule!.subjectId
+      ).toList();
+    }
   }
 
   Future<void> _viewFile(String? attachment) async {
@@ -110,20 +163,7 @@ class _AssignmentPageState extends State<AssignmentPage> {
         title: const Text("Assignments"),
       ),
       drawer: const AppDrawer(),
-      body: FutureBuilder<AssignmentPageData>(
-        future: _dataFuture,
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
-          } else if (snapshot.hasError) {
-            return Center(child: Text('Error: ${snapshot.error}'));
-          } else if (snapshot.hasData) {
-            final pageData = snapshot.data!;
-            return _buildContent(context, pageData);
-          }
-          return const Center(child: Text("No data"));
-        },
-      ),
+      body: _buildBody(),
       floatingActionButton: FloatingActionButton(
         onPressed: () async {
           final result = await Navigator.push(context, MaterialPageRoute(builder: (_) => const CreateAssignmentPage()));
@@ -131,6 +171,21 @@ class _AssignmentPageState extends State<AssignmentPage> {
         },
         child: const Icon(Icons.add),
       ),
+    );
+  }
+
+  Widget _buildBody() {
+    final theme = context.theme;
+
+    if (_error != null && _data == null) {
+      return Center(child: Text('Error: $_error', style: TextStyle(color: theme.colorScheme.error)));
+    }
+
+    return TeacherLoadingWrapper(
+      isLoading: _isLoading,
+      hasData: _data != null,
+      skeleton: _buildSkeletonLoader(context),
+      child: _data == null ? const Center(child: Text("No data")) : _buildContent(context, _data!),
     );
   }
 
@@ -152,11 +207,10 @@ class _AssignmentPageState extends State<AssignmentPage> {
                     setState(() {
                       if (newValue == 'All Classes') {
                         _selectedSchedule = null;
-                        _filteredAssignments = _allAssignments;
                       } else {
                         _selectedSchedule = pageData.schedules.firstWhere((s) => '${s.subjectName} - ${s.className} (${s.sectionName})' == newValue);
-                        _filteredAssignments = _allAssignments.where((a) => a.classId == _selectedSchedule!.classId && a.sectionId == _selectedSchedule!.sectionId && a.subjectId == _selectedSchedule!.subjectId).toList();
                       }
+                      _applyFilter();
                     });
                   },
                   hint: "Select Schedule",
@@ -357,5 +411,32 @@ class _AssignmentPageState extends State<AssignmentPage> {
         if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Error: $e")));
       }
     }
+  }
+
+  Widget _buildSkeletonLoader(BuildContext context) {
+    return Column(
+      children: [
+        Padding(
+          padding: context.pagePadding,
+          child: TeacherSkeleton(
+            height: context.scale(100),
+            borderRadius: BorderRadius.circular(context.scale(16)),
+          ),
+        ),
+        Expanded(
+          child: ListView.builder(
+            padding: context.pagePadding,
+            itemCount: 5,
+            itemBuilder: (context, index) => Padding(
+              padding: EdgeInsets.only(bottom: context.spacing),
+              child: TeacherSkeleton(
+                height: context.scale(150),
+                borderRadius: BorderRadius.circular(context.scale(20)),
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
   }
 }

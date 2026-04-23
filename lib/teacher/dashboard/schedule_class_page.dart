@@ -1,4 +1,5 @@
 import 'package:eduphin/services/responsive_helper.dart';
+import 'package:eduphin/teacher/dashboard/teacher_cache_service.dart';
 import 'package:flutter/material.dart';
 import 'package:eduphin/services/api_service.dart';
 import 'package:eduphin/teacher/dashboard/schedule_models.dart';
@@ -13,18 +14,50 @@ class ScheduleClassPage extends StatefulWidget {
 }
 
 class _ScheduleClassPageState extends State<ScheduleClassPage> {
-  late Future<List<TeacherScheduleItem>> _scheduleFuture;
+  List<TeacherScheduleItem>? _schedules;
+  bool _isLoading = true;
+  String? _error;
   DateTime _selectedDate = DateTime.now();
 
   @override
   void initState() {
     super.initState();
-    _scheduleFuture = _fetchScheduleForDate(_selectedDate);
+    _loadData();
   }
 
-  Future<List<TeacherScheduleItem>> _fetchScheduleForDate(DateTime date) {
-    final formattedDate = DateFormat('yyyy-MM-dd').format(date);
-    return ApiService.getMySchedule(formattedDate);
+  Future<void> _loadData() async {
+    final formattedDate = DateFormat('yyyy-MM-dd').format(_selectedDate);
+    final cacheKey = 'schedule_class_$formattedDate';
+
+    // 1. Load from cache
+    final cachedData = await TeacherCacheService.load(cacheKey);
+    if (cachedData != null && mounted) {
+      setState(() {
+        _schedules = (cachedData as List).map((i) => TeacherScheduleItem.fromJson(i)).toList();
+        _isLoading = false;
+      });
+    }
+
+    // 2. Fetch from API
+    try {
+      final data = await ApiService.getMySchedule(formattedDate);
+      await TeacherCacheService.save(cacheKey, data.map((i) => i.toJson()).toList());
+
+      if (mounted) {
+        setState(() {
+          _schedules = data;
+          _isLoading = false;
+          _error = null;
+        });
+      }
+    } catch (e) {
+      if (_schedules == null && mounted) {
+        setState(() {
+          _error = e.toString();
+          _isLoading = false;
+        });
+      }
+    }
   }
 
   Future<void> _selectDate(BuildContext context) async {
@@ -37,8 +70,11 @@ class _ScheduleClassPageState extends State<ScheduleClassPage> {
     if (picked != null && picked != _selectedDate) {
       setState(() {
         _selectedDate = picked;
-        _scheduleFuture = _fetchScheduleForDate(picked);
+        _isLoading = true;
+        _schedules = null;
+        _error = null;
       });
+      _loadData();
     }
   }
 
@@ -64,23 +100,26 @@ class _ScheduleClassPageState extends State<ScheduleClassPage> {
             children: [
               _buildDateHeader(),
               Expanded(
-                child: FutureBuilder<List<TeacherScheduleItem>>(
-                    future: _scheduleFuture,
-                    builder: (context, snapshot) {
-                      if (snapshot.connectionState == ConnectionState.waiting) {
-                        return const Center(child: CircularProgressIndicator());
-                      } else if (snapshot.hasError) {
-                        return Center(child: Padding(
-                          padding: EdgeInsets.all(context.spacing),
-                          child: Text('Error: ${snapshot.error}', style: TextStyle(fontSize: context.font(14))),
-                        ));
-                      } else if (snapshot.hasData && snapshot.data!.isNotEmpty) {
-                        return _buildScheduleList(snapshot.data!);
-                      } else {
-                        return Center(
-                            child: Text("No classes scheduled for this day.", style: TextStyle(fontSize: context.font(14), color: theme.hintColor)));
-                      }
-                    }),
+                child: TeacherLoadingWrapper(
+                  isLoading: _isLoading,
+                  hasData: _schedules != null,
+                  skeleton: _buildSkeleton(),
+                  child: _error != null && _schedules == null
+                      ? Center(
+                          child: Padding(
+                            padding: EdgeInsets.all(context.spacing),
+                            child: Text('Error: $_error', style: TextStyle(fontSize: context.font(14))),
+                          ),
+                        )
+                      : _schedules == null || _schedules!.isEmpty
+                          ? Center(
+                              child: Text(
+                                "No classes scheduled for this day.",
+                                style: TextStyle(fontSize: context.font(14), color: theme.hintColor),
+                              ),
+                            )
+                          : _buildScheduleList(_schedules!),
+                ),
               ),
             ],
           ),
@@ -110,13 +149,30 @@ class _ScheduleClassPageState extends State<ScheduleClassPage> {
   }
 
   Widget _buildScheduleList(List<TeacherScheduleItem> schedules) {
+    return RefreshIndicator(
+      onRefresh: _loadData,
+      child: ListView.builder(
+        padding: context.pagePadding,
+        itemCount: schedules.length,
+        itemBuilder: (context, index) {
+          final item = schedules[index];
+          return ScheduleCard(scheduleItem: item);
+        },
+      ),
+    );
+  }
+
+  Widget _buildSkeleton() {
     return ListView.builder(
       padding: context.pagePadding,
-      itemCount: schedules.length,
-      itemBuilder: (context, index) {
-        final item = schedules[index];
-        return ScheduleCard(scheduleItem: item);
-      },
+      itemCount: 5,
+      itemBuilder: (context, index) => Padding(
+        padding: EdgeInsets.only(bottom: context.spacing),
+        child: TeacherSkeleton(
+          height: context.scale(100),
+          borderRadius: BorderRadius.circular(context.scale(12)),
+        ),
+      ),
     );
   }
 }

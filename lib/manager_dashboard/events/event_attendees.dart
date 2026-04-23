@@ -1,5 +1,8 @@
 import 'dart:convert';
 
+import 'package:eduphin/services/caching_service.dart';
+import 'package:eduphin/services/common_widgets.dart';
+import 'package:eduphin/services/responsive_helper.dart';
 import 'package:flutter/material.dart';
 import 'package:eduphin/services/api_service.dart';
 
@@ -42,29 +45,56 @@ class _EventAttendeesState extends State<EventAttendees> {
   List<Attendee> _allAttendees = [];
   List<Attendee> _filteredAttendees = [];
   bool _isLoading = true;
+  Object? _error;
   String _eventName = "";
-  String _errorMessage = "";
   final TextEditingController _searchController = TextEditingController();
 
   @override
   void initState() {
     super.initState();
-    _fetchAttendees();
+    _loadCachedData().then((_) => _fetchAttendees());
     _searchController.addListener(_filterAttendees);
   }
 
-  @override
-  void dispose() {
-    _searchController.dispose();
-    super.dispose();
+  Future<void> _loadCachedData() async {
+    final cache = await CachingService.getCache('event_attendees_${widget.eventId}');
+    if (cache != null && mounted) {
+      _processData(cache);
+    }
   }
 
+  void _processData(dynamic data) {
+    final event = data['event'] as Map<String, dynamic>?;
+    final participants = data['participants'] as List<dynamic>?;
+    final users = data['users'] as List<dynamic>?;
+
+    if (event == null || participants == null || users == null) return;
+
+    final userMap = {for (var user in users) user['id']: user};
+
+    final attendees = participants.map((p) {
+      try {
+        final user = userMap[p['user_id']];
+        return Attendee.fromJson(p, user);
+      } catch (e) {
+        debugPrint('Error parsing attendee: $e');
+        return null;
+      }
+    }).where((a) => a != null).cast<Attendee>().toList();
+
+    setState(() {
+      _eventName = event['title'] as String? ?? 'Event Attendees';
+      _allAttendees = attendees;
+      _isLoading = false;
+      _filterAttendees();
+    });
+  }
 
   Future<void> _fetchAttendees() async {
     if (!mounted) return;
     setState(() {
-      _isLoading = true;
-      _errorMessage = "";
+      _isLoading = _allAttendees.isEmpty;
+      _error = null;
     });
 
     try {
@@ -72,33 +102,9 @@ class _EventAttendeesState extends State<EventAttendees> {
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
-        final event = data['event'] as Map<String, dynamic>?;
-        final participants = data['participants'] as List<dynamic>?;
-        final users = data['users'] as List<dynamic>?;
-
-        if (event == null || participants == null || users == null) {
-          throw Exception('Invalid API response format');
-        }
-
-        final userMap = {for (var user in users) user['id']: user};
-
-        final attendees = participants.map((p) {
-          try {
-            final user = userMap[p['user_id']];
-            return Attendee.fromJson(p, user);
-          } catch (e) {
-            debugPrint('Error parsing attendee: $e');
-            return null;
-          }
-        }).where((a) => a != null).cast<Attendee>().toList();
-
+        await CachingService.setCache('event_attendees_${widget.eventId}', data);
         if (mounted) {
-          setState(() {
-            _eventName = event['title'] as String? ?? 'Event Attendees';
-            _allAttendees = attendees;
-            _filteredAttendees = attendees;
-            _isLoading = false;
-          });
+          _processData(data);
         }
       } else {
         throw Exception('Failed to load attendees. Status: ${response.statusCode}');
@@ -107,11 +113,8 @@ class _EventAttendeesState extends State<EventAttendees> {
       if (mounted) {
         setState(() {
           _isLoading = false;
-          _errorMessage = e.toString().replaceFirst("Exception: ", "");
+          _error = e;
         });
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(_errorMessage)),
-        );
       }
     }
   }
@@ -141,47 +144,52 @@ class _EventAttendeesState extends State<EventAttendees> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
+    final theme = context.theme;
     return Scaffold(
       appBar: AppBar(
-        title: const Row(
+        title: Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Text("Event Attendees"),
-            Icon(Icons.download),
+            Text("Event Attendees", style: theme.textTheme.titleLarge?.copyWith(fontSize: context.font(20))),
+            Icon(Icons.download, size: context.scale(24)),
           ],
         ),
       ),
       backgroundColor: theme.scaffoldBackgroundColor,
       body: Padding(
-        padding: const EdgeInsets.fromLTRB(16, 16, 16, 50),
+        padding: EdgeInsets.fromLTRB(context.scale(16), context.scale(16), context.scale(16), context.scale(50)),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(_eventName, style: theme.textTheme.headlineSmall),
-            const SizedBox(height: 8),
+            Text(_eventName, style: theme.textTheme.headlineSmall?.copyWith(fontSize: context.font(24))),
+            SizedBox(height: context.scale(8)),
             SearchBar(
               controller: _searchController,
-              leading:
-              Icon(Icons.search, color: theme.colorScheme.onSurface),
+              leading: Icon(Icons.search, color: theme.colorScheme.onSurface, size: context.scale(24)),
               hintText: "Search for students, teachers...",
               hintStyle: WidgetStateProperty.all(TextStyle(
                 color: theme.hintColor,
+                fontSize: context.font(16),
               )),
               elevation: const WidgetStatePropertyAll(2),
               backgroundColor: WidgetStatePropertyAll(theme.cardColor),
               shape: WidgetStatePropertyAll(
                 RoundedRectangleBorder(
-                  borderRadius: const BorderRadius.all(Radius.circular(30)),
+                  borderRadius: BorderRadius.all(Radius.circular(context.scale(30))),
                   side: BorderSide(color: theme.dividerColor, width: 1),
                 ),
               ),
             ),
-            const SizedBox(height: 16),
+            SizedBox(height: context.scale(16)),
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Expanded(child: Text("ATTENDEE LIST (${_filteredAttendees.length})", style: theme.textTheme.titleMedium)),
+                Expanded(
+                  child: Text(
+                    "ATTENDEE LIST (${_filteredAttendees.length})",
+                    style: theme.textTheme.titleMedium?.copyWith(fontSize: context.font(16)),
+                  ),
+                ),
                 DropdownButton<String>(
                   value: _selectedFilter,
                   underline: const SizedBox.shrink(),
@@ -189,7 +197,7 @@ class _EventAttendeesState extends State<EventAttendees> {
                       .map((String value) {
                     return DropdownMenuItem<String>(
                       value: value,
-                      child: Text(value),
+                      child: Text(value, style: TextStyle(fontSize: context.font(14))),
                     );
                   }).toList(),
                   onChanged: (String? newValue) {
@@ -208,22 +216,62 @@ class _EventAttendeesState extends State<EventAttendees> {
               thickness: 2,
             ),
             Expanded(
-              child: _isLoading
-                  ? const Center(child: CircularProgressIndicator())
-                  : _errorMessage.isNotEmpty
-                  ? Center(child: Text(_errorMessage, style: TextStyle(color: theme.colorScheme.error)))
-                  : _filteredAttendees.isEmpty
-                  ? const Center(child: Text("No attendees found."))
-                  : LayoutBuilder(
-                builder: (context, constraints) {
-                  if (constraints.maxWidth < 600) {
-                    return _buildAttendeeList();
-                  } else {
-                    return _buildAttendeeGrid();
-                  }
-                },
+              child: LoadingWrapper(
+                isLoading: _isLoading,
+                hasData: _allAttendees.isNotEmpty,
+                error: _error,
+                onRetry: _fetchAttendees,
+                skeleton: _buildSkeleton(),
+                child: RefreshIndicator(
+                  onRefresh: _fetchAttendees,
+                  child: _filteredAttendees.isEmpty
+                      ? ListView(
+                          children: [
+                            SizedBox(
+                              height: context.screenHeight * 0.4,
+                              child: const Center(child: Text("No attendees found.")),
+                            ),
+                          ],
+                        )
+                      : LayoutBuilder(
+                          builder: (context, constraints) {
+                            if (constraints.maxWidth < 600) {
+                              return _buildAttendeeList();
+                            } else {
+                              return _buildAttendeeGrid();
+                            }
+                          },
+                        ),
+                ),
               ),
             ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSkeleton() {
+    return ListView.separated(
+      itemCount: 8,
+      separatorBuilder: (context, index) => Divider(color: Theme.of(context).dividerColor, thickness: 1),
+      itemBuilder: (context, index) => Padding(
+        padding: EdgeInsets.symmetric(vertical: context.scale(8)),
+        child: Row(
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  SkeletonBox(width: context.scale(150), height: context.scale(20)),
+                  SizedBox(height: context.scale(8)),
+                  SkeletonBox(width: context.scale(200), height: context.scale(16)),
+                  SizedBox(height: context.scale(4)),
+                  SkeletonBox(width: context.scale(100), height: context.scale(16)),
+                ],
+              ),
+            ),
+            SkeletonBox(width: context.scale(80), height: context.scale(24)),
           ],
         ),
       ),
@@ -269,24 +317,26 @@ class _EventAttendeesState extends State<EventAttendees> {
     return ListTile(
       title: Text(
         attendee.name,
-        style: theme.textTheme.titleMedium,
+        style: theme.textTheme.titleMedium?.copyWith(fontSize: context.font(16)),
       ),
       subtitle: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisSize: MainAxisSize.min,
         children: [
-          const SizedBox(height: 4),
+          SizedBox(height: context.scale(4)),
           Text(
             attendee.email,
             style: theme.textTheme.bodyMedium?.copyWith(
               color: theme.colorScheme.onSurface.withAlpha(180),
+              fontSize: context.font(14),
             ),
           ),
-          const SizedBox(height: 4),
+          SizedBox(height: context.scale(4)),
           Text(
             attendee.status,
             style: theme.textTheme.bodyMedium?.copyWith(
               color: theme.colorScheme.onSurface.withAlpha(180),
+              fontSize: context.font(14),
             ),
           )
         ],
@@ -296,15 +346,15 @@ class _EventAttendeesState extends State<EventAttendees> {
         children: [
           Text(
             attendee.attendance,
-            style: theme.textTheme.bodyMedium?.copyWith(color: statusColor),
+            style: theme.textTheme.bodyMedium?.copyWith(color: statusColor, fontSize: context.font(14)),
           ),
-          const SizedBox(width: 8),
+          SizedBox(width: context.scale(8)),
           Icon(
             isAttended
                 ? Icons.check_circle_outline
                 : Icons.cancel_outlined,
             color: statusColor,
-            size: 16,
+            size: context.scale(16),
           ),
         ],
       ),

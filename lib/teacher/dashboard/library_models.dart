@@ -49,6 +49,19 @@ class BookPagination {
       currentPage: currentPage > 0 ? currentPage : 1,
     );
   }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'books': {
+        'data': books.map((e) => e.toJson()).toList(),
+        'total': lastPage * 10, // Approximate total for persistence
+        'per_page': 10,
+        'current_page': currentPage,
+        'last_page': lastPage,
+      },
+      'filters': filters.toJson(),
+    };
+  }
 }
 
 class Book {
@@ -99,6 +112,24 @@ class Book {
       publisher: json['publisher']?.toString(),
     );
   }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'title': title,
+      'author': author,
+      'isbn': isbn,
+      'quantity': quantity,
+      'available_copies': availableCopies,
+      'category': category,
+      'language': language,
+      'format': format,
+      'publication_year': publicationYear,
+      'edition': edition,
+      'volume': volume,
+      'publisher': publisher,
+    };
+  }
 }
 
 class BookFilters {
@@ -128,6 +159,15 @@ class BookFilters {
       years: _toList(json['years']),
     );
   }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'categories': categories,
+      'languages': languages,
+      'formats': formats,
+      'years': years,
+    };
+  }
 }
 
 class LendingPagination {
@@ -150,6 +190,16 @@ class LendingPagination {
       lastPage: lendingPagination['last_page'] ?? 1,
       currentPage: lendingPagination['current_page'] ?? 1,
     );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'issued_books': {
+        'data': issuedBooks.map((e) => e.toJson()).toList(),
+        'last_page': lastPage,
+        'current_page': currentPage,
+      }
+    };
   }
 }
 
@@ -182,5 +232,17 @@ class IssuedBook {
       issueNo: json['issue_no']?.toString() ?? 'ISN-${json['id']}',
       daysOverdue: json['days_overdue'] ?? 0,
     );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'book': book.toJson(),
+      'issued_at': issuedAt,
+      'due_date': dueDate,
+      'returned_at': returnedAt,
+      'issue_no': issueNo,
+      'days_overdue': daysOverdue,
+    };
   }
 }

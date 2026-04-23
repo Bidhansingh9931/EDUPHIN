@@ -4,6 +4,8 @@ import '../services/responsive_helper.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../services/api_service.dart';
+import '../services/pdf_service.dart';
+import 'librarian_models.dart' as librarian_model;
 import 'package:intl/intl.dart';
 
 class SalaryBankDetailsPage extends StatefulWidget {
@@ -188,16 +190,34 @@ class _SalaryBankDetailsPageState extends State<SalaryBankDetailsPage> {
                   ),
                 ),
                 SizedBox(height: context.xl),
-                SizedBox(
-                  width: double.infinity,
-                  child: FilledButton(
-                    onPressed: () => Navigator.pop(context),
-                    style: FilledButton.styleFrom(
-                      padding: EdgeInsets.all(context.md),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(context.scale(16))),
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        onPressed: () => PdfService.generateSalaryPdf(
+                          librarian_model.Salary.fromJson(salary),
+                          amountInWords,
+                        ),
+                        icon: const Icon(Icons.download),
+                        label: const Text("DOWNLOAD PDF"),
+                        style: OutlinedButton.styleFrom(
+                          padding: EdgeInsets.all(context.md),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(context.scale(16))),
+                        ),
+                      ),
                     ),
-                    child: const Text("DISMISS"),
-                  ),
+                    SizedBox(width: context.md),
+                    Expanded(
+                      child: FilledButton(
+                        onPressed: () => Navigator.pop(context),
+                        style: FilledButton.styleFrom(
+                          padding: EdgeInsets.all(context.md),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(context.scale(16))),
+                        ),
+                        child: const Text("DISMISS"),
+                      ),
+                    ),
+                  ],
                 ),
               ],
             ),

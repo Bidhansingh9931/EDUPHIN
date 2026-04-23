@@ -1,19 +1,42 @@
 import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
+import 'package:eduphin/moderator_dashboard/cache_helper.dart';
+import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:eduphin/services/api_service.dart';
 import 'employee_details.dart';
 
 class EmployeeDetailsProvider {
-  Future<EmployeeDetails?> fetchEmployeeDetails(String employeeId) async {
+  static const String _cacheKeyPrefix = 'employee_details_';
+
+  Future<EmployeeDetails?> getCachedEmployeeDetails(String employeeId) async {
+    final cached = await CacheHelper.load(_cacheKeyPrefix + employeeId);
+    if (cached != null) {
+      return EmployeeDetails.fromJson(cached);
+    }
+    return null;
+  }
+
+  Future<EmployeeDetails?> fetchEmployeeDetails(String employeeId, {bool bypassCache = false}) async {
     try {
-      final response = await ApiService.get('moderator/accounts/$employeeId');
+      if (!bypassCache) {
+        final cached = await getCachedEmployeeDetails(employeeId);
+        if (cached != null) {
+          debugPrint('DEBUG: Using cached details for $employeeId');
+          return cached;
+        }
+      }
+      final url = 'moderator/accounts/$employeeId';
+      debugPrint('DEBUG: Calling API: $url');
+      final response = await ApiService.get(url);
 
       if (response.statusCode == 200) {
         final responseData = json.decode(response.body);
+        debugPrint('DEBUG: API Response for $employeeId: ${response.body}');
         final data = responseData['account'] ?? responseData['data'];
         if (data != null && data is Map<String, dynamic>) {
+          await CacheHelper.save(_cacheKeyPrefix + employeeId, data);
           return EmployeeDetails.fromJson(data);
         } else {
           return null;

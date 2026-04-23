@@ -1,4 +1,6 @@
 import 'dart:async';
+import 'package:eduphin/moderator_dashboard/cache_helper.dart';
+import 'package:eduphin/moderator_dashboard/skeleton_widgets.dart';
 import 'package:eduphin/services/responsive_helper.dart';
 import 'package:flutter/material.dart';
 
@@ -11,19 +13,43 @@ class ExamType {
     required this.name,
     required this.description,
   });
+
+  factory ExamType.fromJson(Map<String, dynamic> json) {
+    return ExamType(
+      name: json['name'] ?? '',
+      description: json['description'] ?? '',
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'name': name,
+      'description': description,
+    };
+  }
 }
 
 // 2. Data Provider to fetch exam types
 class ExamTypeProvider {
-  Future<List<ExamType>> fetchExamTypes() async {
+  static const String _cacheKey = 'moderator_exam_types_list';
+
+  Future<List<ExamType>> fetchExamTypes({bool bypassCache = false}) async {
+    if (!bypassCache) {
+      final cached = await CacheHelper.load(_cacheKey);
+      if (cached != null && cached is List) {
+        return (cached as List).map((e) => ExamType.fromJson(e)).toList();
+      }
+    }
     await Future.delayed(const Duration(seconds: 2));
-    return List.generate(
+    final data = List.generate(
       15,
       (index) => ExamType(
         name: 'Exam Type ${index + 1}',
         description: 'Description for exam type ${index + 1}',
       ),
     );
+    await CacheHelper.save(_cacheKey, data.map((e) => e.toJson()).toList());
+    return data;
   }
 }
 
@@ -38,11 +64,28 @@ class ExamTypesPage extends StatefulWidget {
 class _ExamTypesPageState extends State<ExamTypesPage> {
   final ExamTypeProvider _provider = ExamTypeProvider();
   late Future<List<ExamType>> _examTypesFuture;
+  List<ExamType>? _cachedData;
 
   @override
   void initState() {
     super.initState();
+    _loadCachedData();
     _examTypesFuture = _provider.fetchExamTypes();
+  }
+
+  Future<void> _loadCachedData() async {
+    final cached = await CacheHelper.load(ExamTypeProvider._cacheKey);
+    if (cached != null && cached is List) {
+      setState(() {
+        _cachedData = cached.map((e) => ExamType.fromJson(e)).toList();
+      });
+    }
+  }
+
+  void _refreshData({bool bypassCache = false}) {
+    setState(() {
+      _examTypesFuture = _provider.fetchExamTypes(bypassCache: bypassCache);
+    });
   }
 
   @override
@@ -60,51 +103,42 @@ class _ExamTypesPageState extends State<ExamTypesPage> {
       body: FutureBuilder<List<ExamType>>(
         future: _examTypesFuture,
         builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return Center(child: CircularProgressIndicator(color: theme.colorScheme.primary));
-          }
-          if (snapshot.hasError) {
-            return Center(
-              child: Padding(
-                padding: context.pagePadding,
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(Icons.error_outline_rounded, size: context.scale(48), color: theme.colorScheme.error),
-                    SizedBox(height: context.md),
-                    Text('Error: ${snapshot.error}', textAlign: TextAlign.center, style: TextStyle(color: theme.colorScheme.onSurface, fontSize: context.font(14))),
-                  ],
+          return ModeratorLoadingWrapper<List<ExamType>>(
+            snapshot: snapshot,
+            cachedData: _cachedData,
+            skeleton: const ListSkeleton(),
+            onRefresh: () async => _refreshData(bypassCache: true),
+            builder: (examTypes) {
+              if (examTypes.isEmpty) {
+                return Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.description_outlined, size: context.scale(64), color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.3)),
+                      SizedBox(height: context.md),
+                      Text('No exam types found.', style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: context.font(16), fontWeight: FontWeight.bold)),
+                    ],
+                  ),
+                );
+              }
+
+              return RefreshIndicator(
+                onRefresh: () async => _refreshData(bypassCache: true),
+                child: GridView.builder(
+                  padding: context.pagePadding,
+                  itemCount: examTypes.length,
+                  gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                    crossAxisCount: context.responsive(1, tablet: 2, desktop: 3),
+                    crossAxisSpacing: context.md,
+                    mainAxisSpacing: context.md,
+                    mainAxisExtent: context.scale(100),
+                  ),
+                  itemBuilder: (context, index) {
+                    return ExamTypeCard(
+                      examType: examTypes[index],
+                    );
+                  },
                 ),
-              ),
-            );
-          }
-          if (!snapshot.hasData || snapshot.data!.isEmpty) {
-            return Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(Icons.description_outlined, size: context.scale(64), color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.3)),
-                  SizedBox(height: context.md),
-                  Text('No exam types found.', style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: context.font(16), fontWeight: FontWeight.bold)),
-                ],
-              ),
-            );
-          }
-
-          final examTypes = snapshot.data!;
-
-          return GridView.builder(
-            padding: context.pagePadding,
-            itemCount: examTypes.length,
-            gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-              crossAxisCount: context.responsive(1, tablet: 2, desktop: 3),
-              crossAxisSpacing: context.md,
-              mainAxisSpacing: context.md,
-              mainAxisExtent: context.scale(100),
-            ),
-            itemBuilder: (context, index) {
-              return ExamTypeCard(
-                examType: examTypes[index],
               );
             },
           );

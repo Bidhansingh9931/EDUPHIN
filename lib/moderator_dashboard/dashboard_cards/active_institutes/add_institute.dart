@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
 
+import 'package:eduphin/moderator_dashboard/cache_helper.dart';
 import 'package:eduphin/services/api_service.dart';
 import 'package:eduphin/services/common_widgets.dart';
 import 'package:eduphin/services/responsive_helper.dart';
@@ -128,6 +129,9 @@ class _AddInstitutePageState extends State<AddNewInstitutePage> {
       final responseBody = await response.stream.bytesToString();
 
       if (response.statusCode == 201 || response.statusCode == 200) {
+        // Clear institute list cache to force refresh
+        await CacheHelper.clear('institutes_list');
+
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Institute added successfully!'), backgroundColor: Colors.green));
           Navigator.of(context).pop(true);

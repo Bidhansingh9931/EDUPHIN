@@ -3,6 +3,8 @@ import 'dart:io';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:eduphin/services/api_service.dart';
+import 'package:eduphin/services/caching_service.dart';
+import 'package:eduphin/services/common_widgets.dart';
 import 'package:intl/intl.dart';
 
 class AssignmentsPage extends StatefulWidget {
@@ -16,45 +18,65 @@ class _AssignmentsPageState extends State<AssignmentsPage> {
   List<dynamic> _assignments = [];
   bool _isLoading = true;
   final Map<String, bool> _subjectOpenStates = {};
+  static const String _cacheKey = 'student_assignments';
 
   @override
   void initState() {
     super.initState();
+    _loadCachedData();
     _fetchAssignments();
   }
 
-  Future<void> _fetchAssignments() async {
-    setState(() => _isLoading = true);
-    try {
-      final data = await ApiService.getStudentAssignments();
+  Future<void> _loadCachedData() async {
+    final cachedData = await CacheService.getData(_cacheKey);
+    if (cachedData != null && mounted) {
       setState(() {
-        if (data is List) {
-          _assignments = data;
-        } else if (data is Map && data.containsKey('assignments')) {
-          _assignments = data['assignments'] as List? ?? [];
-        } else if (data is Map && data.containsKey('data')) {
-           var nestedData = data['data'];
-           if (nestedData is List) {
-             _assignments = nestedData;
-           } else if (nestedData is Map && nestedData.containsKey('assignments')) {
-             _assignments = nestedData['assignments'] as List? ?? [];
-           } else {
-             _assignments = nestedData as List? ?? [];
-           }
-        } else {
-          _assignments = [];
-        }
+        _assignments = List<dynamic>.from(cachedData as List);
         _isLoading = false;
       });
-    } catch (e) {
-      setState(() => _isLoading = false);
+    }
+  }
+
+  Future<void> _fetchAssignments() async {
+    if (_assignments.isEmpty) {
+      setState(() => _isLoading = true);
+    }
+    try {
+      final data = await ApiService.getStudentAssignments();
+      List<dynamic> fetchedAssignments = [];
+      if (data is List) {
+        fetchedAssignments = data;
+      } else if (data is Map && data.containsKey('assignments')) {
+        fetchedAssignments = data['assignments'] as List? ?? [];
+      } else if (data is Map && data.containsKey('data')) {
+        var nestedData = data['data'];
+        if (nestedData is List) {
+          fetchedAssignments = nestedData;
+        } else if (nestedData is Map && nestedData.containsKey('assignments')) {
+          fetchedAssignments = nestedData['assignments'] as List? ?? [];
+        } else {
+          fetchedAssignments = nestedData as List? ?? [];
+        }
+      }
+
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text("Error fetching assignments: $e"),
-            backgroundColor: Theme.of(context).colorScheme.error,
-          ),
-        );
+        setState(() {
+          _assignments = fetchedAssignments;
+          _isLoading = false;
+        });
+        await CacheService.saveData(_cacheKey, fetchedAssignments);
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isLoading = false);
+        if (_assignments.isEmpty) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text("Error fetching assignments: $e"),
+              backgroundColor: Theme.of(context).colorScheme.error,
+            ),
+          );
+        }
       }
     }
   }
@@ -196,84 +218,84 @@ class _AssignmentsPageState extends State<AssignmentsPage> {
       appBar: AppBar(
         title: Text("Assignments", style: TextStyle(fontWeight: FontWeight.bold, fontSize: context.font(20))),
       ),
-      body: _isLoading
-          ? Center(child: CircularProgressIndicator(color: colorScheme.primary))
-          : groupedAssignments.isEmpty
-              ? Center(child: Text("No assignments available", style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: context.font(16))))
-              : RefreshIndicator(
-                  onRefresh: _fetchAssignments,
-                  color: colorScheme.primary,
-                  child: Center(
-                    child: ConstrainedBox(
-                      constraints: const BoxConstraints(maxWidth: 1000),
-                      child: ListView.separated(
-                        padding: context.pagePadding,
-                        itemCount: groupedAssignments.length,
-                        separatorBuilder: (context, index) => SizedBox(height: context.md),
-                        itemBuilder: (context, index) {
-                          final subjectName = groupedAssignments.keys.elementAt(index);
-                          final subjectAssignments = groupedAssignments[subjectName]!;
-                          final bool isOpen = _subjectOpenStates[subjectName] ?? false;
+      body: LoadingWrapper(
+        isLoading: _isLoading,
+        hasData: _assignments.isNotEmpty,
+        skeleton: const _AssignmentsSkeleton(),
+        onRefresh: _fetchAssignments,
+        child: groupedAssignments.isEmpty
+            ? Center(child: Text("No assignments available", style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: context.font(16))))
+            : Center(
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 1000),
+                  child: ListView.separated(
+                    padding: context.pagePadding,
+                    itemCount: groupedAssignments.length,
+                    separatorBuilder: (context, index) => SizedBox(height: context.md),
+                    itemBuilder: (context, index) {
+                      final subjectName = groupedAssignments.keys.elementAt(index);
+                      final subjectAssignments = groupedAssignments[subjectName]!;
+                      final bool isOpen = _subjectOpenStates[subjectName] ?? false;
 
-                          return Container(
-                            decoration: BoxDecoration(
-                              color: theme.colorScheme.surfaceContainerLow,
-                              borderRadius: BorderRadius.circular(context.md),
-                              border: Border.all(color: theme.colorScheme.outlineVariant.withValues(alpha: 0.5)),
+                      return Container(
+                        decoration: BoxDecoration(
+                          color: theme.colorScheme.surfaceContainerLow,
+                          borderRadius: BorderRadius.circular(context.md),
+                          border: Border.all(color: theme.colorScheme.outlineVariant.withValues(alpha: 0.5)),
+                        ),
+                        child: Column(
+                          children: [
+                            ListTile(
+                              title: Text(
+                                subjectName,
+                                style: TextStyle(fontSize: context.font(16), fontWeight: FontWeight.bold, color: theme.colorScheme.onSurface),
+                              ),
+                              trailing: AnimatedRotation(
+                                duration: const Duration(milliseconds: 200),
+                                turns: isOpen ? 0.5 : 0,
+                                child: Icon(Icons.expand_more, color: theme.colorScheme.onSurfaceVariant, size: context.scale(24)),
+                              ),
+                              onTap: () {
+                                setState(() {
+                                  _subjectOpenStates[subjectName] = !isOpen;
+                                });
+                              },
                             ),
-                            child: Column(
-                              children: [
-                                ListTile(
-                                  title: Text(
-                                    subjectName,
-                                    style: TextStyle(fontSize: context.font(16), fontWeight: FontWeight.bold, color: theme.colorScheme.onSurface),
-                                  ),
-                                  trailing: AnimatedRotation(
-                                    duration: const Duration(milliseconds: 200),
-                                    turns: isOpen ? 0.5 : 0,
-                                    child: Icon(Icons.expand_more, color: theme.colorScheme.onSurfaceVariant, size: context.scale(24)),
-                                  ),
-                                  onTap: () {
-                                    setState(() {
-                                      _subjectOpenStates[subjectName] = !isOpen;
-                                    });
+                            if (isOpen)
+                              Padding(
+                                padding: EdgeInsets.only(bottom: context.sm),
+                                child: LayoutBuilder(
+                                  builder: (context, constraints) {
+                                    final crossAxisCount = constraints.maxWidth > 600 ? 2 : 1;
+                                    if (crossAxisCount > 1) {
+                                      return GridView.builder(
+                                        shrinkWrap: true,
+                                        physics: const NeverScrollableScrollPhysics(),
+                                        padding: EdgeInsets.symmetric(horizontal: context.sm),
+                                        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                                          crossAxisCount: crossAxisCount,
+                                          crossAxisSpacing: context.sm,
+                                          mainAxisSpacing: context.sm,
+                                          childAspectRatio: 2.2,
+                                        ),
+                                        itemCount: subjectAssignments.length,
+                                        itemBuilder: (context, idx) => _assignmentCard(subjectAssignments[idx]),
+                                      );
+                                    }
+                                    return Column(
+                                      children: subjectAssignments.map((a) => _assignmentCard(a)).toList(),
+                                    );
                                   },
                                 ),
-                                if (isOpen)
-                                  Padding(
-                                    padding: EdgeInsets.only(bottom: context.sm),
-                                    child: LayoutBuilder(
-                                      builder: (context, constraints) {
-                                        final crossAxisCount = constraints.maxWidth > 600 ? 2 : 1;
-                                        if (crossAxisCount > 1) {
-                                          return GridView.builder(
-                                            shrinkWrap: true,
-                                            physics: const NeverScrollableScrollPhysics(),
-                                            padding: EdgeInsets.symmetric(horizontal: context.sm),
-                                            gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                                              crossAxisCount: crossAxisCount,
-                                              crossAxisSpacing: context.sm,
-                                              mainAxisSpacing: context.sm,
-                                              childAspectRatio: 2.2,
-                                            ),
-                                            itemCount: subjectAssignments.length,
-                                            itemBuilder: (context, idx) => _assignmentCard(subjectAssignments[idx]),
-                                          );
-                                        }
-                                        return Column(
-                                          children: subjectAssignments.map((a) => _assignmentCard(a)).toList(),
-                                        );
-                                      },
-                                    ),
-                                  ),
-                              ],
-                            ),
-                          );
-                        },
-                      ),
-                    ),
+                              ),
+                          ],
+                        ),
+                      );
+                    },
                   ),
                 ),
+              ),
+      ),
     );
   }
 
@@ -350,7 +372,6 @@ class _AssignmentsPageState extends State<AssignmentsPage> {
               overflow: TextOverflow.ellipsis,
             ),
           ],
-          const Spacer(),
           SizedBox(height: context.md),
           SizedBox(
             width: double.infinity,
@@ -367,6 +388,100 @@ class _AssignmentsPageState extends State<AssignmentsPage> {
               child: Text(isSubmitted ? "VIEW SUBMISSION" : "SUBMIT ASSIGNMENT", style: TextStyle(fontWeight: FontWeight.bold, fontSize: context.font(13))),
             ),
           )
+        ],
+      ),
+    );
+  }
+}
+
+class _AssignmentsSkeleton extends StatelessWidget {
+  const _AssignmentsSkeleton();
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 1000),
+        child: ListView.separated(
+          padding: context.pagePadding,
+          itemCount: 5,
+          separatorBuilder: (context, index) => SizedBox(height: context.md),
+          itemBuilder: (context, index) => Container(
+            decoration: BoxDecoration(
+              color: context.theme.colorScheme.surfaceContainerLow,
+              borderRadius: BorderRadius.circular(context.md),
+              border: Border.all(color: context.theme.colorScheme.outlineVariant.withValues(alpha: 0.5)),
+            ),
+            child: Column(
+              children: [
+                ListTile(
+                  title: SkeletonBox(width: context.scale(150), height: context.scale(18)),
+                  trailing: Icon(Icons.expand_more, color: context.theme.colorScheme.outlineVariant, size: context.scale(24)),
+                ),
+                if (index == 0) // Show first one expanded in skeleton
+                  Padding(
+                    padding: EdgeInsets.all(context.sm),
+                    child: context.isDesktop
+                        ? GridView.builder(
+                            shrinkWrap: true,
+                            physics: const NeverScrollableScrollPhysics(),
+                            gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                              crossAxisCount: 2,
+                              crossAxisSpacing: context.sm,
+                              mainAxisSpacing: context.sm,
+                              childAspectRatio: 2.2,
+                            ),
+                            itemCount: 2,
+                            itemBuilder: (context, _) => const _AssignmentCardSkeleton(),
+                          )
+                        : Column(
+                            children: List.generate(2, (_) => const _AssignmentCardSkeleton()),
+                          ),
+                  ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _AssignmentCardSkeleton extends StatelessWidget {
+  const _AssignmentCardSkeleton();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: EdgeInsets.symmetric(horizontal: context.md, vertical: context.xs),
+      padding: EdgeInsets.all(context.md),
+      decoration: BoxDecoration(
+        color: context.theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
+        borderRadius: BorderRadius.circular(context.md),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  SkeletonBox(width: context.scale(120), height: context.scale(16)),
+                  SizedBox(height: context.xs),
+                  SkeletonBox(width: context.scale(80), height: context.scale(12)),
+                ],
+              ),
+              SkeletonBox(width: context.scale(60), height: context.scale(20)),
+            ],
+          ),
+          SizedBox(height: context.md),
+          SkeletonBox(width: double.infinity, height: context.scale(12)),
+          SizedBox(height: context.xs),
+          SkeletonBox(width: context.scale(200), height: context.scale(12)),
+          SizedBox(height: context.md),
+          SkeletonBox(width: double.infinity, height: context.scale(40)),
         ],
       ),
     );

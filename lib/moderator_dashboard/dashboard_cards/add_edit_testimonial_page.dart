@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:eduphin/moderator_dashboard/cache_helper.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:eduphin/services/common_widgets.dart';
 import 'package:eduphin/services/api_service.dart';
@@ -136,6 +137,7 @@ class _AddEditTestimonialPageState extends State<AddEditTestimonialPage> {
 
       if (response.statusCode == 200 || response.statusCode == 201) {
         debugPrint("Submission successful: $responseBody");
+        await CacheHelper.clear('moderator_testimonials_list');
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(content: Text(decodedBody['message'] ?? 'Success!'), backgroundColor: Colors.green),

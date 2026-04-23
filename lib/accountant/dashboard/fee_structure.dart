@@ -304,8 +304,9 @@ class _FeeStructurePageState extends State<FeeStructurePage> {
 
   void _showEditFeeDialog(Fee fee) async {
     try {
-      final targetId = fee.encryptedId ?? fee.id.toString();
-      final editData = await ApiService.getAccountantFeeEditData(targetId);
+      // Bypassing getAccountantFeeEditData as it currently fails with 500 DecryptException on some IDs.
+      // We already have the fee details, we just need the classes for the dropdown.
+      final classes = await ApiService.getAccountantFeeCreateData();
       if (mounted) {
         showModalBottomSheet(
           context: context,
@@ -314,8 +315,8 @@ class _FeeStructurePageState extends State<FeeStructurePage> {
           builder: (context) => FeeFormDialog(
             title: "Update Fee Structure",
             buttonLabel: "UPDATE STRUCTURE",
-            classes: editData['classes'] ?? [],
-            fee: Fee.fromJson(editData['fee'] ?? editData),
+            classes: classes,
+            fee: fee,
             onSuccess: _refreshFees,
           ),
         );
@@ -375,19 +376,25 @@ class _FeeFormDialogState extends State<FeeFormDialog> {
 
     setState(() => _isLoading = true);
     try {
+      final targetId = widget.fee?.encryptedId ?? widget.fee?.id.toString();
+      
       final data = {
         'fee_name': _feeNameController.text,
         'amount': _amountController.text,
         'description': _descController.text,
         'class_id': _selectedClassId?.toString(),
       };
+      
+      if (targetId != null) {
+        data['id'] = targetId;
+      }
+      
       if (_isOptional) data['is_optional'] = '1';
 
       if (widget.fee == null) {
         await ApiService.storeAccountantFee(data);
       } else {
-        final targetId = widget.fee!.encryptedId ?? widget.fee!.id.toString();
-        await ApiService.updateAccountantFee(targetId, data);
+        await ApiService.updateAccountantFee(targetId!, data);
       }
 
       if (mounted) {
@@ -457,7 +464,7 @@ class _FeeFormDialogState extends State<FeeFormDialog> {
 
   Widget _buildDropdownField(List<dynamic> classes) {
     return DropdownButtonFormField<dynamic>(
-      initialValue: _selectedClassId,
+      value: _selectedClassId,
       isExpanded: true,
       hint: const Text("Institute-Wide"),
       items: [

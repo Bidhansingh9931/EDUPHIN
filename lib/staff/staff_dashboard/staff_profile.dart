@@ -1,5 +1,7 @@
 import 'package:eduphin/services/common_widgets.dart';
 import 'dart:io';
+import 'dart:convert';
+import 'package:http/http.dart' as http;
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
@@ -42,6 +44,7 @@ class _StaffProfilePageState extends State<StaffProfilePage> {
   Uint8List? _webImage;
   String? _fileName;
   UserDetail? _currentDetail;
+  Map<String, String> _serverErrors = {};
 
   @override
   void initState() {
@@ -101,23 +104,31 @@ class _StaffProfilePageState extends State<StaffProfilePage> {
         return;
       }
 
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) => const Center(child: CircularProgressIndicator()),
+      );
+
+      setState(() => _serverErrors = {});
+
       try {
         final Map<String, String> data = {
           'gender': _genderController.text,
           'date_of_birth': _dobController.text,
-          'phone': _phoneController.text,
-          'alternate_phone': _altPhoneController.text,
+          'phone': _phoneController.text.trim(),
+          'alternate_phone': _altPhoneController.text.trim(),
           'relationship_status': _relationshipController.text,
-          'address': _addressController.text,
-          'city': _cityController.text,
-          'state': _stateController.text,
-          'pincode': _pincodeController.text,
-          'bank_account_number': _accountNumberController.text,
-          'ifsc_code': _ifscController.text,
-          'bank_name': _bankNameController.text,
-          'branch_name': _branchController.text,
-          'emergency_contact_name': _emergencyNameController.text,
-          'emergency_contact_number': _emergencyNumberController.text,
+          'address': _addressController.text.trim(),
+          'city': _cityController.text.trim(),
+          'state': _stateController.text.trim(),
+          'pincode': _pincodeController.text.trim(),
+          'bank_account_number': _accountNumberController.text.trim(),
+          'ifsc_code': _ifscController.text.trim(),
+          'bank_name': _bankNameController.text.trim(),
+          'branch_name': _branchController.text.trim(),
+          'emergency_contact_name': _emergencyNameController.text.trim(),
+          'emergency_contact_number': _emergencyNumberController.text.trim(),
         };
 
         if (_passwordController.text.isNotEmpty) {
@@ -125,26 +136,62 @@ class _StaffProfilePageState extends State<StaffProfilePage> {
           data['password_confirmation'] = _confirmPasswordController.text;
         }
 
+        http.StreamedResponse response;
         if (kIsWeb && _webImage != null) {
-          await ApiService.updateStaffProfileFromBytes(data, _webImage!, _fileName);
+          response = await ApiService.postMultipartFromBytes(
+            'staff/profile/update', 
+            data, 
+            files: {'photo': _webImage!}, 
+            fileNames: _fileName != null ? {'photo': _fileName!} : null,
+          );
         } else {
-          await ApiService.updateStaffProfile(data, photo: _imageFile);
+          response = await ApiService.postMultipart('staff/profile/update', data, files: _imageFile != null ? {'photo': _imageFile!} : null);
         }
 
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Profile updated successfully')),
-          );
-          _loadProfile();
-          setState(() {
-            _passwordController.clear();
-            _confirmPasswordController.clear();
-          });
+          Navigator.pop(context); // Close loading dialog
+          
+          final responseBody = await response.stream.bytesToString();
+          dynamic decoded;
+          try {
+            decoded = jsonDecode(responseBody);
+          } catch (e) {
+            decoded = {'message': 'Server Error (${response.statusCode}): The backend encountered an issue.'};
+          }
+
+          if (response.statusCode >= 200 && response.statusCode < 300) {
+            if (!mounted) return;
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Profile updated successfully'), backgroundColor: Colors.green),
+            );
+            _loadProfile();
+            setState(() {
+              _passwordController.clear();
+              _confirmPasswordController.clear();
+              _imageFile = null;
+              _webImage = null;
+              _serverErrors = {};
+            });
+          } else if (response.statusCode == 422) {
+            final errors = decoded['errors'] as Map<String, dynamic>?;
+            if (errors != null) {
+              setState(() {
+                _serverErrors = errors.map((key, value) => MapEntry(key, (value as List).first.toString()));
+              });
+              if (!mounted) return;
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Please correct the errors in the form'), backgroundColor: Colors.orange),
+              );
+            }
+          } else {
+            throw Exception(decoded['message'] ?? 'Failed to update profile');
+          }
         }
       } catch (e) {
         if (mounted) {
+          if (Navigator.canPop(context)) Navigator.pop(context); // Close loading dialog if still open
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Error updating profile: $e')),
+            SnackBar(content: Text(e.toString().replaceFirst('Exception: ', '')), backgroundColor: Colors.red),
           );
         }
       }
@@ -227,12 +274,16 @@ class _StaffProfilePageState extends State<StaffProfilePage> {
                         value: _genderController.text.isEmpty ? null : _genderController.text,
                         items: const ["Male", "Female", "Other"],
                         onChanged: (v) => setState(() => _genderController.text = v ?? ''),
+                        validator: (v) => (v == null || v.isEmpty) ? "Gender is required" : null,
+                        errorText: _serverErrors['gender'],
                       ),
                       ProfileTextField(
                         label: "Date of Birth *",
                         controller: _dobController,
                         icon: Icons.calendar_today_rounded,
                         readOnly: true,
+                        validator: (v) => (v == null || v.isEmpty) ? "Date of Birth is required" : null,
+                        errorText: _serverErrors['date_of_birth'],
                         onTap: () async {
                           final picked = await showDatePicker(
                             context: context,
@@ -249,15 +300,37 @@ class _StaffProfilePageState extends State<StaffProfilePage> {
                       ),
                     ]),
                     AdaptiveFieldRow(children: [
-                      ProfileTextField(label: "Phone Number *", controller: _phoneController, icon: Icons.phone_android_rounded),
+                      ProfileTextField(
+                        label: "Phone Number *", 
+                        controller: _phoneController, 
+                        icon: Icons.phone_android_rounded,
+                        keyboardType: TextInputType.phone,
+                        errorText: _serverErrors['phone'],
+                        validator: (v) {
+                          if (v == null || v.isEmpty) return "Phone number is required";
+                          if (!RegExp(r'^\d{10}$').hasMatch(v.trim())) return "Enter a valid 10-digit phone number";
+                          return null;
+                        },
+                      ),
                       ProfileDropdown(
                         label: "Relationship Status",
                         value: _relationshipController.text.isEmpty ? "Single" : _relationshipController.text,
                         items: const ["Single", "Married", "Divorced", "Widowed"],
                         onChanged: (v) => setState(() => _relationshipController.text = v ?? 'Single'),
+                        errorText: _serverErrors['relationship_status'],
                       ),
                     ]),
-                    ProfileTextField(label: "Alternate Phone", controller: _altPhoneController),
+                    ProfileTextField(
+                      label: "Alternate Phone *", 
+                      controller: _altPhoneController,
+                      keyboardType: TextInputType.phone,
+                      errorText: _serverErrors['alternate_phone'],
+                      validator: (v) {
+                        if (v == null || v.isEmpty) return "Alternate phone is required";
+                        if (!RegExp(r'^\d{10}$').hasMatch(v.trim())) return "Enter a valid 10-digit phone number";
+                        return null;
+                      },
+                    ),
                   ],
                 ),
 
@@ -267,12 +340,34 @@ class _StaffProfilePageState extends State<StaffProfilePage> {
                   status: "Editable",
                   children: [
                     AdaptiveFieldRow(children: [
-                      ProfileTextField(label: "Bank Name", controller: _bankNameController),
-                      ProfileTextField(label: "Account Number *", controller: _accountNumberController),
+                      ProfileTextField(
+                        label: "Bank Name", 
+                        controller: _bankNameController,
+                        errorText: _serverErrors['bank_name'],
+                      ),
+                      ProfileTextField(
+                        label: "Account Number *", 
+                        controller: _accountNumberController,
+                        keyboardType: TextInputType.number,
+                        errorText: _serverErrors['bank_account_number'],
+                        validator: (v) {
+                          if (v == null || v.isEmpty) return "Account number is required";
+                          if (!RegExp(r'^\d+$').hasMatch(v.trim())) return "Enter digits only";
+                          return null;
+                        },
+                      ),
                     ]),
                     AdaptiveFieldRow(children: [
-                      ProfileTextField(label: "IFSC Code", controller: _ifscController),
-                      ProfileTextField(label: "Branch Name", controller: _branchController),
+                      ProfileTextField(
+                        label: "IFSC Code", 
+                        controller: _ifscController,
+                        errorText: _serverErrors['ifsc_code'],
+                      ),
+                      ProfileTextField(
+                        label: "Branch Name", 
+                        controller: _branchController,
+                        errorText: _serverErrors['branch_name'],
+                      ),
                     ]),
                   ],
                 ),
@@ -283,8 +378,23 @@ class _StaffProfilePageState extends State<StaffProfilePage> {
                   status: "Editable",
                   children: [
                     AdaptiveFieldRow(children: [
-                      ProfileTextField(label: "Contact Name", controller: _emergencyNameController),
-                      ProfileTextField(label: "Contact Number", controller: _emergencyNumberController),
+                      ProfileTextField(
+                        label: "Contact Name", 
+                        controller: _emergencyNameController,
+                        errorText: _serverErrors['emergency_contact_name'],
+                      ),
+                      ProfileTextField(
+                        label: "Contact Number", 
+                        controller: _emergencyNumberController,
+                        keyboardType: TextInputType.phone,
+                        errorText: _serverErrors['emergency_contact_number'],
+                        validator: (v) {
+                          if (v != null && v.isNotEmpty && !RegExp(r'^\d{10}$').hasMatch(v.trim())) {
+                            return "Enter a valid 10-digit phone number";
+                          }
+                          return null;
+                        },
+                      ),
                     ]),
                   ],
                 ),
@@ -294,12 +404,52 @@ class _StaffProfilePageState extends State<StaffProfilePage> {
                   icon: Icons.location_on_outlined,
                   status: "Editable",
                   children: [
-                    ProfileTextField(label: "Full Address *", controller: _addressController, icon: Icons.home_outlined),
+                    ProfileTextField(
+                      label: "Full Address *", 
+                      controller: _addressController, 
+                      icon: Icons.home_outlined,
+                      errorText: _serverErrors['address'],
+                      validator: (v) {
+                        if (v == null || v.isEmpty) return "Address is required";
+                        if (!RegExp(r'^[a-zA-Z0-9\s,.\-\/#()]+$').hasMatch(v.trim())) {
+                          return "Special characters not allowed except , . - / # ( )";
+                        }
+                        return null;
+                      },
+                    ),
                     AdaptiveFieldRow(children: [
-                      ProfileTextField(label: "City *", controller: _cityController),
-                      ProfileTextField(label: "State *", controller: _stateController),
+                      ProfileTextField(
+                        label: "City *", 
+                        controller: _cityController,
+                        errorText: _serverErrors['city'],
+                        validator: (v) {
+                          if (v == null || v.isEmpty) return "City is required";
+                          if (!RegExp(r'^[a-zA-Z0-9\s,.\-\/#()]+$').hasMatch(v.trim())) return "Invalid characters";
+                          return null;
+                        },
+                      ),
+                      ProfileTextField(
+                        label: "State *", 
+                        controller: _stateController,
+                        errorText: _serverErrors['state'],
+                        validator: (v) {
+                          if (v == null || v.isEmpty) return "State is required";
+                          if (!RegExp(r'^[a-zA-Z0-9\s,.\-\/#()]+$').hasMatch(v.trim())) return "Invalid characters";
+                          return null;
+                        },
+                      ),
                     ]),
-                    ProfileTextField(label: "Pincode *", controller: _pincodeController),
+                    ProfileTextField(
+                      label: "Pincode *", 
+                      controller: _pincodeController,
+                      keyboardType: TextInputType.number,
+                      errorText: _serverErrors['pincode'],
+                      validator: (v) {
+                        if (v == null || v.isEmpty) return "Pincode is required";
+                        if (!RegExp(r'^\d{6}$').hasMatch(v.trim())) return "Enter a valid 6-digit pincode";
+                        return null;
+                      },
+                    ),
                   ],
                 ),
 
@@ -309,8 +459,21 @@ class _StaffProfilePageState extends State<StaffProfilePage> {
                   status: "Editable",
                   children: [
                     AdaptiveFieldRow(children: [
-                      ProfileTextField(label: "New Password", controller: _passwordController, isPassword: true),
-                      ProfileTextField(label: "Confirm Password", controller: _confirmPasswordController, isPassword: true),
+                      ProfileTextField(
+                        label: "New Password", 
+                        controller: _passwordController, 
+                        isPassword: true,
+                        errorText: _serverErrors['password'],
+                        validator: (v) {
+                          if (v != null && v.isNotEmpty && v.length < 6) return "Password must be at least 6 characters";
+                          return null;
+                        },
+                      ),
+                      ProfileTextField(
+                        label: "Confirm Password", 
+                        controller: _confirmPasswordController, 
+                        isPassword: true,
+                      ),
                     ]),
                   ],
                 ),
@@ -394,7 +557,6 @@ class _StaffProfilePageState extends State<StaffProfilePage> {
   }
 
   Widget _buildActionButtons(BuildContext context) {
-    final theme = context.theme;
     return Column(
       children: [
         SizedBox(

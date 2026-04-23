@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:eduphin/services/api_service.dart';
 import 'package:eduphin/services/responsive_helper.dart';
+import 'package:eduphin/services/caching_service.dart';
+import 'package:eduphin/services/common_widgets.dart';
 
 class MyLendingBooksPage extends StatefulWidget {
   const MyLendingBooksPage({super.key});
@@ -31,26 +33,51 @@ class _MyLendingBooksPageState extends State<MyLendingBooksPage> {
   @override
   void initState() {
     super.initState();
+    _loadCachedData();
     _fetchLendingBooks();
   }
 
+  Future<void> _loadCachedData() async {
+    final cachedData = await CacheService.getData('student_lending_books');
+    if (cachedData != null && mounted) {
+      setState(() {
+        _issuedBooks = List<dynamic>.from(cachedData as List? ?? []);
+        _isLoading = false;
+      });
+    }
+  }
+
   Future<void> _fetchLendingBooks() async {
-    setState(() {
-      _isLoading = true;
-      _errorMessage = null;
-    });
+    if (_issuedBooks.isEmpty) {
+      setState(() {
+        _isLoading = true;
+      });
+    }
+    _errorMessage = null;
 
     try {
       final response = await ApiService.getStudentLendingBooks(_filters, 1);
-      setState(() {
-        _issuedBooks = response['data']['data'] ?? [];
-        _isLoading = false;
-      });
+      final data = response['data']['data'] ?? [];
+      if (mounted) {
+        setState(() {
+          _issuedBooks = data;
+          _isLoading = false;
+        });
+        await CacheService.saveData('student_lending_books', data);
+      }
     } catch (e) {
-      setState(() {
-        _isLoading = false;
-        _errorMessage = e.toString();
-      });
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+          if (_issuedBooks.isEmpty) {
+            _errorMessage = e.toString();
+          } else {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text("Failed to refresh: ${e.toString()}")),
+            );
+          }
+        });
+      }
     }
   }
 
@@ -203,88 +230,91 @@ class _MyLendingBooksPageState extends State<MyLendingBooksPage> {
                   SizedBox(height: context.scale(32)),
 
                   /// ================= RESULTS TABLE =================
-                  Card(
-                    elevation: 0,
-                    color: colorScheme.surfaceContainerLow,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(context.scale(16)),
-                      side: BorderSide(color: colorScheme.outlineVariant.withValues(alpha: 0.5)),
-                    ),
-                    clipBehavior: Clip.antiAlias,
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        Padding(
-                          padding: EdgeInsets.all(context.scale(24.0)),
-                          child: Text("Lending Records", style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold, fontSize: context.font(18))),
-                        ),
-                        if (_isLoading)
-                          Center(child: Padding(padding: EdgeInsets.all(context.scale(40.0)), child: CircularProgressIndicator(color: colorScheme.primary)))
-                        else if (_errorMessage != null)
-                          Center(child: Padding(padding: EdgeInsets.all(context.scale(40.0)), child: Text(_errorMessage!, style: TextStyle(color: colorScheme.error, fontSize: context.font(14)))))
-                        else if (_issuedBooks.isEmpty)
-                          _buildEmptyState()
-                        else
-                          SingleChildScrollView(
-                            scrollDirection: Axis.horizontal,
-                            child: Theme(
-                              data: theme.copyWith(dividerColor: colorScheme.outlineVariant.withValues(alpha: 0.5)),
-                              child: DataTable(
-                                headingRowColor: WidgetStateProperty.all(colorScheme.surfaceContainerHighest.withValues(alpha: 0.3)),
-                                columnSpacing: context.responsive(24.0, tablet: 48.0, desktop: 64.0),
-                                columns: [
-                                  DataColumn(label: Text("#", style: TextStyle(fontWeight: FontWeight.bold, fontSize: context.font(14)))),
-                                  DataColumn(label: Text("BOOK TITLE", style: TextStyle(fontWeight: FontWeight.bold, fontSize: context.font(14)))),
-                                  DataColumn(label: Text("ISSUED AT", style: TextStyle(fontWeight: FontWeight.bold, fontSize: context.font(14)))),
-                                  DataColumn(label: Text("DUE DATE", style: TextStyle(fontWeight: FontWeight.bold, fontSize: context.font(14)))),
-                                  DataColumn(label: Text("STATUS", style: TextStyle(fontWeight: FontWeight.bold, fontSize: context.font(14)))),
-                                  DataColumn(label: Text("RETURNED", style: TextStyle(fontWeight: FontWeight.bold, fontSize: context.font(14)))),
-                                ],
-                                rows: _issuedBooks.asMap().entries.map((entry) {
-                                  int index = entry.key;
-                                  var record = entry.value;
-                                  
-                                  // Calculate overdue
-                                  DateTime now = DateTime.now();
-                                  DateTime? dueDate = record['due_date'] != null ? DateTime.tryParse(record['due_date']) : null;
-                                  String statusText = "N/A";
-                                  Color statusColor = Colors.grey;
+                  LoadingWrapper(
+                    isLoading: _isLoading,
+                    hasData: _issuedBooks.isNotEmpty,
+                    error: _errorMessage,
+                    skeleton: const _LendingSkeleton(),
+                    onRetry: _fetchLendingBooks,
+                    child: Card(
+                      elevation: 0,
+                      color: colorScheme.surfaceContainerLow,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(context.scale(16)),
+                        side: BorderSide(color: colorScheme.outlineVariant.withValues(alpha: 0.5)),
+                      ),
+                      clipBehavior: Clip.antiAlias,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          Padding(
+                            padding: EdgeInsets.all(context.scale(24.0)),
+                            child: Text("Lending Records", style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold, fontSize: context.font(18))),
+                          ),
+                          if (_issuedBooks.isEmpty)
+                            _buildEmptyState()
+                          else
+                            SingleChildScrollView(
+                              scrollDirection: Axis.horizontal,
+                              child: Theme(
+                                data: theme.copyWith(dividerColor: colorScheme.outlineVariant.withValues(alpha: 0.5)),
+                                child: DataTable(
+                                  headingRowColor: WidgetStateProperty.all(colorScheme.surfaceContainerHighest.withValues(alpha: 0.3)),
+                                  columnSpacing: context.responsive(24.0, tablet: 48.0, desktop: 64.0),
+                                  columns: [
+                                    DataColumn(label: Text("#", style: TextStyle(fontWeight: FontWeight.bold, fontSize: context.font(14)))),
+                                    DataColumn(label: Text("BOOK TITLE", style: TextStyle(fontWeight: FontWeight.bold, fontSize: context.font(14)))),
+                                    DataColumn(label: Text("ISSUED AT", style: TextStyle(fontWeight: FontWeight.bold, fontSize: context.font(14)))),
+                                    DataColumn(label: Text("DUE DATE", style: TextStyle(fontWeight: FontWeight.bold, fontSize: context.font(14)))),
+                                    DataColumn(label: Text("STATUS", style: TextStyle(fontWeight: FontWeight.bold, fontSize: context.font(14)))),
+                                    DataColumn(label: Text("RETURNED", style: TextStyle(fontWeight: FontWeight.bold, fontSize: context.font(14)))),
+                                  ],
+                                  rows: _issuedBooks.asMap().entries.map((entry) {
+                                    int index = entry.key;
+                                    var record = entry.value;
 
-                                  if (dueDate != null) {
-                                    int diff = dueDate.difference(now).inDays;
-                                    statusText = diff < 0 ? "${diff.abs()} days overdue" : "$diff days left";
-                                    statusColor = diff < 0 ? const Color(0xFFEF4444) : const Color(0xFF10B981); // Red : Emerald
-                                  }
+                                    // Calculate overdue
+                                    DateTime now = DateTime.now();
+                                    DateTime? dueDate = record['due_date'] != null ? DateTime.tryParse(record['due_date']) : null;
+                                    String statusText = "N/A";
+                                    Color statusColor = Colors.grey;
 
-                                  return DataRow(cells: [
-                                    DataCell(Text((index + 1).toString(), style: theme.textTheme.bodySmall?.copyWith(fontSize: context.font(12)))),
-                                    DataCell(Text(record['book']?['title'] ?? 'N/A', style: theme.textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w600, fontSize: context.font(12)))),
-                                    DataCell(Text(record['issued_at'] ?? 'N/A', style: theme.textTheme.bodySmall?.copyWith(fontSize: context.font(12)))),
-                                    DataCell(Text(record['due_date'] ?? 'N/A', style: theme.textTheme.bodySmall?.copyWith(fontSize: context.font(12)))),
-                                    DataCell(Container(
-                                      padding: EdgeInsets.symmetric(horizontal: context.scale(10), vertical: context.scale(4)),
-                                      decoration: BoxDecoration(
-                                        color: statusColor.withValues(alpha: 0.1),
-                                        borderRadius: BorderRadius.circular(context.scale(6)),
-                                        border: Border.all(color: statusColor.withValues(alpha: 0.2)),
-                                      ),
-                                      child: Text(statusText, style: TextStyle(color: statusColor, fontSize: context.font(10), fontWeight: FontWeight.w800)),
-                                    )),
-                                    DataCell(Text(
-                                      record['returned_at'] ?? 'Pending', 
-                                      style: theme.textTheme.bodySmall?.copyWith(
-                                        color: record['returned_at'] != null ? colorScheme.onSurfaceVariant : const Color(0xFFF59E0B), // Amber
-                                        fontWeight: record['returned_at'] == null ? FontWeight.bold : FontWeight.normal,
-                                        fontSize: context.font(12),
-                                      )
-                                    )),
-                                  ]);
-                                }).toList(),
+                                    if (dueDate != null) {
+                                      int diff = dueDate.difference(now).inDays;
+                                      statusText = diff < 0 ? "${diff.abs()} days overdue" : "$diff days left";
+                                      statusColor = diff < 0 ? const Color(0xFFEF4444) : const Color(0xFF10B981); // Red : Emerald
+                                    }
+
+                                    return DataRow(cells: [
+                                      DataCell(Text((index + 1).toString(), style: theme.textTheme.bodySmall?.copyWith(fontSize: context.font(12)))),
+                                      DataCell(Text(record['book']?['title'] ?? 'N/A', style: theme.textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w600, fontSize: context.font(12)))),
+                                      DataCell(Text(record['issued_at'] ?? 'N/A', style: theme.textTheme.bodySmall?.copyWith(fontSize: context.font(12)))),
+                                      DataCell(Text(record['due_date'] ?? 'N/A', style: theme.textTheme.bodySmall?.copyWith(fontSize: context.font(12)))),
+                                      DataCell(Container(
+                                        padding: EdgeInsets.symmetric(horizontal: context.scale(10), vertical: context.scale(4)),
+                                        decoration: BoxDecoration(
+                                          color: statusColor.withValues(alpha: 0.1),
+                                          borderRadius: BorderRadius.circular(context.scale(6)),
+                                          border: Border.all(color: statusColor.withValues(alpha: 0.2)),
+                                        ),
+                                        child: Text(statusText, style: TextStyle(color: statusColor, fontSize: context.font(10), fontWeight: FontWeight.w800)),
+                                      )),
+                                      DataCell(Text(
+                                          record['returned_at'] ?? 'Pending',
+                                          style: theme.textTheme.bodySmall?.copyWith(
+                                            color: record['returned_at'] != null ? colorScheme.onSurfaceVariant : const Color(0xFFF59E0B), // Amber
+                                            fontWeight: record['returned_at'] == null ? FontWeight.bold : FontWeight.normal,
+                                            fontSize: context.font(12),
+                                          )
+                                      )),
+                                    ]);
+                                  }).toList(),
+                                ),
                               ),
                             ),
-                          ),
-                        SizedBox(height: context.scale(24)),
-                      ],
+                          SizedBox(height: context.scale(24)),
+                        ],
+                      ),
                     ),
                   ),
                 ],
@@ -376,6 +406,44 @@ class _MyLendingBooksPageState extends State<MyLendingBooksPage> {
           borderSide: BorderSide(color: colorScheme.primary),
           borderRadius: BorderRadius.circular(context.scale(12)),
         ),
+      ),
+    );
+  }
+}
+
+class _LendingSkeleton extends StatelessWidget {
+  const _LendingSkeleton();
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      elevation: 0,
+      color: context.theme.colorScheme.surfaceContainerLow,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(context.scale(16)),
+        side: BorderSide(color: context.theme.colorScheme.outlineVariant.withValues(alpha: 0.5)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: EdgeInsets.all(context.scale(24)),
+            child: SkeletonBox(width: context.scale(150), height: context.scale(20), borderRadius: context.scale(4)),
+          ),
+          ...List.generate(5, (index) => Padding(
+            padding: EdgeInsets.symmetric(horizontal: context.scale(24), vertical: context.scale(12)),
+            child: Row(
+              children: [
+                SkeletonBox(width: context.scale(30), height: context.scale(16), borderRadius: context.scale(4)),
+                SizedBox(width: context.scale(16)),
+                Expanded(child: SkeletonBox(height: context.scale(16), borderRadius: context.scale(4))),
+                SizedBox(width: context.scale(16)),
+                SkeletonBox(width: context.scale(80), height: context.scale(16), borderRadius: context.scale(4)),
+              ],
+            ),
+          )),
+          SizedBox(height: context.scale(24)),
+        ],
       ),
     );
   }

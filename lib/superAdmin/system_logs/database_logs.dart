@@ -2,6 +2,8 @@ import 'dart:convert';
 import 'package:eduphin/services/responsive_helper.dart';
 import 'package:flutter/material.dart';
 import 'package:eduphin/services/api_service.dart';
+import '../cache_service.dart';
+import '../super_admin_common_widgets.dart';
 import 'log_details.dart';
 
 class DatabaseLogsScreen extends StatefulWidget {
@@ -21,12 +23,30 @@ class _DatabaseLogsScreenState extends State<DatabaseLogsScreen> {
   @override
   void initState() {
     super.initState();
+    _loadInitialData();
+  }
+
+  Future<void> _loadInitialData() async {
+    final cachedData = await SuperAdminCacheService.load('database_logs');
+    if (cachedData != null && mounted) {
+      setState(() {
+        if (cachedData is Map) {
+          _logs = cachedData['logs'] ?? [];
+          _institutes = cachedData['institutes'] ?? [];
+          _roles = cachedData['roles'] ?? [];
+          _events = cachedData['events'] ?? [];
+        }
+        _isLoading = false;
+      });
+    }
     _fetchLogs();
   }
 
   Future<void> _fetchLogs() async {
     if (!mounted) return;
-    setState(() => _isLoading = true);
+    if (_logs.isEmpty) {
+      setState(() => _isLoading = true);
+    }
     try {
       final response = await ApiService.get('superadmin/audit/database');
       if (mounted) {
@@ -41,6 +61,7 @@ class _DatabaseLogsScreenState extends State<DatabaseLogsScreen> {
             }
             _isLoading = false;
           });
+          await SuperAdminCacheService.save('database_logs', data);
         } else {
           setState(() => _isLoading = false);
           ScaffoldMessenger.of(context).showSnackBar(
@@ -63,21 +84,37 @@ class _DatabaseLogsScreenState extends State<DatabaseLogsScreen> {
       appBar: AppBar(
         title: const Text("Database Audit Logs"),
       ),
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : RefreshIndicator(
-              onRefresh: _fetchLogs,
-              child: SingleChildScrollView(
-                padding: context.pagePadding,
-                child: Column(
-                  children: [
-                    _buildFilterSection(context),
-                    const SizedBox(height: 24),
-                    _buildLogEntries(context),
-                  ],
-                ),
-              ),
+      body: SuperAdminLoadingWrapper(
+        isLoading: _isLoading,
+        hasData: _logs.isNotEmpty,
+        skeleton: _buildSkeleton(context),
+        child: RefreshIndicator(
+          onRefresh: _fetchLogs,
+          child: SingleChildScrollView(
+            padding: context.pagePadding,
+            child: Column(
+              children: [
+                _buildFilterSection(context),
+                const SizedBox(height: 24),
+                _buildLogEntries(context),
+              ],
             ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSkeleton(BuildContext context) {
+    return SingleChildScrollView(
+      padding: context.pagePadding,
+      child: Column(
+        children: [
+          SuperAdminSkeleton(height: context.scale(200)),
+          const SizedBox(height: 24),
+          SuperAdminSkeleton(height: context.scale(400)),
+        ],
+      ),
     );
   }
 
@@ -161,7 +198,14 @@ class _DatabaseLogsScreenState extends State<DatabaseLogsScreen> {
             const SizedBox(height: 4),
             Text("Detailed records of database changes.", style: theme.textTheme.bodySmall?.copyWith(color: theme.hintColor)),
             const SizedBox(height: 24),
-            _buildTable(context),
+            if (_logs.isEmpty && !_isLoading)
+              const SuperAdminEmptyState(
+                title: "No Database Logs Found",
+                subtitle: "Try adjusting your filters or resetting them.",
+                icon: Icons.storage_outlined,
+              )
+            else
+              _buildTable(context),
           ],
         ),
       ),
@@ -170,12 +214,6 @@ class _DatabaseLogsScreenState extends State<DatabaseLogsScreen> {
 
   Widget _buildTable(BuildContext context) {
     final theme = Theme.of(context);
-    if (_logs.isEmpty) {
-      return const Center(child: Padding(
-        padding: EdgeInsets.all(20.0),
-        child: Text("No database logs found."),
-      ));
-    }
     return SingleChildScrollView(
       scrollDirection: Axis.horizontal,
       child: ConstrainedBox(

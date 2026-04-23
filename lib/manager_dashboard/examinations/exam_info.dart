@@ -34,7 +34,7 @@ class Exam {
 
   factory Exam.fromJson(Map<String, dynamic> json) {
     return Exam(
-      id: json['id'],
+      id: int.tryParse(json['id']?.toString() ?? '') ?? 0,
       name: json['name'] as String? ?? 'Unnamed Exam',
       type: json['type'] as String?,
       examCode: json['code'] as String? ?? 'N/A',
@@ -70,6 +70,7 @@ class _ExamInfoPageState extends State<ExamInfoPage> {
       final List<dynamic> examJson = cachedData;
       setState(() {
         _exams = examJson.map((json) => Exam.fromJson(json)).toList();
+        _isLoading = _exams.isEmpty;
       });
     }
     _fetchExams();
@@ -78,7 +79,7 @@ class _ExamInfoPageState extends State<ExamInfoPage> {
   Future<void> _fetchExams() async {
     if (!mounted) return;
     setState(() {
-      _isLoading = true;
+      _isLoading = _exams.isEmpty;
       _error = null;
     });
 
@@ -192,7 +193,18 @@ class _ExamInfoPageState extends State<ExamInfoPage> {
           crossAxisCount: 2,
           mainAxisSpacing: context.scale(16),
           crossAxisSpacing: context.scale(16),
-          childAspectRatio: 1.4,
+          mainAxisExtent: context.scale(220),
+        ),
+        itemBuilder: (context, index) => SkeletonBox(height: context.scale(220), borderRadius: context.scale(16)),
+      ),
+      desktop: GridView.builder(
+        padding: context.pagePadding,
+        itemCount: 6,
+        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+          crossAxisCount: 3,
+          mainAxisSpacing: context.scale(16),
+          crossAxisSpacing: context.scale(16),
+          mainAxisExtent: context.scale(220),
         ),
         itemBuilder: (context, index) => SkeletonBox(height: context.scale(220), borderRadius: context.scale(16)),
       ),

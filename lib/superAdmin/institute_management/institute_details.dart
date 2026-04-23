@@ -4,6 +4,8 @@ import 'package:eduphin/services/common_widgets.dart';
 import 'package:flutter/material.dart';
 import 'package:eduphin/services/api_service.dart';
 import 'package:eduphin/moderator_dashboard/institute/institute_model.dart';
+import 'package:eduphin/superAdmin/cache_service.dart';
+import 'package:eduphin/superAdmin/super_admin_common_widgets.dart';
 import 'add_institute.dart';
 import 'manage_accounts.dart';
 
@@ -23,6 +25,16 @@ class _InstituteDetailsScreenState extends State<InstituteDetailsScreen> {
   @override
   void initState() {
     super.initState();
+    _loadInitialData();
+  }
+
+  Future<void> _loadInitialData() async {
+    final cached = await SuperAdminCacheService.load('institute_details_${widget.instituteId}');
+    if (cached != null) {
+      setState(() {
+        _institute = Institute.fromJson(cached);
+      });
+    }
     _fetchDetails();
   }
 
@@ -39,6 +51,9 @@ class _InstituteDetailsScreenState extends State<InstituteDetailsScreen> {
           _institute = institute;
           _isLoading = false;
         });
+        if (institute != null) {
+          await SuperAdminCacheService.save('institute_details_${widget.instituteId}', institute.toJson());
+        }
       }
     } catch (e) {
       if (mounted) {
@@ -61,34 +76,63 @@ class _InstituteDetailsScreenState extends State<InstituteDetailsScreen> {
           IconButton(onPressed: () => Navigator.pop(context), icon: Icon(Icons.close, size: context.scale(24))),
         ],
       ),
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : _errorMessage != null
-              ? Center(child: Padding(
-                  padding: EdgeInsets.all(context.scale(24.0)),
-                  child: Text(_errorMessage!, textAlign: TextAlign.center, style: TextStyle(color: theme.colorScheme.error, fontSize: context.font(14))),
-                ))
-              : _institute == null
-                  ? Center(child: Text("No data found", style: TextStyle(fontSize: context.font(14))))
-                  : SingleChildScrollView(
-                      padding: context.pagePadding,
-                      child: Center(
-                        child: ConstrainedBox(
-                          constraints: const BoxConstraints(maxWidth: 800),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              _buildProfileHeader(context),
-                              SizedBox(height: context.scale(32)),
-                              _buildDetailsCard(context),
-                              SizedBox(height: context.scale(32)),
-                              _buildActionButtons(context),
-                              SizedBox(height: context.scale(40)),
-                            ],
+      body: SuperAdminLoadingWrapper(
+        isLoading: _isLoading,
+        hasData: _institute != null,
+        skeleton: _buildSkeleton(context),
+        child: _errorMessage != null && _institute == null
+            ? Center(child: Padding(
+                padding: EdgeInsets.all(context.scale(24.0)),
+                child: Text(_errorMessage!, textAlign: TextAlign.center, style: TextStyle(color: theme.colorScheme.error, fontSize: context.font(14))),
+              ))
+            : _institute == null
+                ? Center(child: Text("No data found", style: TextStyle(fontSize: context.font(14))))
+                : RefreshIndicator(
+                    onRefresh: _fetchDetails,
+                    child: SingleChildScrollView(
+                        padding: context.pagePadding,
+                        child: Center(
+                          child: ConstrainedBox(
+                            constraints: const BoxConstraints(maxWidth: 800),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                _buildProfileHeader(context),
+                                SizedBox(height: context.scale(32)),
+                                _buildDetailsCard(context),
+                                SizedBox(height: context.scale(32)),
+                                _buildActionButtons(context),
+                                SizedBox(height: context.scale(40)),
+                              ],
+                            ),
                           ),
                         ),
                       ),
-                    ),
+                  ),
+      ),
+    );
+  }
+
+  Widget _buildSkeleton(BuildContext context) {
+    return SingleChildScrollView(
+      padding: context.pagePadding,
+      child: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 800),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              SuperAdminSkeleton(height: context.scale(200), borderRadius: BorderRadius.circular(context.scale(16))),
+              SizedBox(height: context.scale(32)),
+              SuperAdminSkeleton(height: context.scale(300), borderRadius: BorderRadius.circular(context.scale(16))),
+              SizedBox(height: context.scale(32)),
+              SuperAdminSkeleton(height: context.scale(50), borderRadius: BorderRadius.circular(context.scale(8))),
+              SizedBox(height: context.scale(12)),
+              SuperAdminSkeleton(height: context.scale(50), borderRadius: BorderRadius.circular(context.scale(8))),
+            ],
+          ),
+        ),
+      ),
     );
   }
 

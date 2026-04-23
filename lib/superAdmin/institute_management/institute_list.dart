@@ -2,6 +2,8 @@ import 'package:eduphin/services/responsive_helper.dart';
 import 'package:flutter/material.dart';
 import '../../services/api_service.dart';
 import '../../moderator_dashboard/institute/institute_model.dart';
+import '../cache_service.dart';
+import '../super_admin_common_widgets.dart';
 import 'add_institute.dart';
 import 'institute_details.dart';
 
@@ -22,12 +24,27 @@ class _InstituteListScreenState extends State<InstituteListScreen> {
   @override
   void initState() {
     super.initState();
+    _loadInitialData();
+  }
+
+  Future<void> _loadInitialData() async {
+    final cachedData = await SuperAdminCacheService.load('institute_list');
+    if (cachedData != null && mounted) {
+      final List<Institute> institutes = (cachedData as List).map((e) => Institute.fromJson(e)).toList();
+      setState(() {
+        _institutes = institutes;
+        _filteredInstitutes = institutes;
+        _isLoading = false;
+      });
+    }
     _fetchInstitutes();
   }
 
   Future<void> _fetchInstitutes() async {
     if (!mounted) return;
-    setState(() => _isLoading = true);
+    if (_institutes.isEmpty) {
+      setState(() => _isLoading = true);
+    }
     try {
       final institutes = await ApiService.getSuperAdminInstitutes();
       if (mounted) {
@@ -36,6 +53,7 @@ class _InstituteListScreenState extends State<InstituteListScreen> {
           _filteredInstitutes = institutes;
           _isLoading = false;
         });
+        await SuperAdminCacheService.save('institute_list', institutes.map((e) => e.toJson()).toList());
       }
     } catch (e) {
       if (mounted) {
@@ -72,26 +90,42 @@ class _InstituteListScreenState extends State<InstituteListScreen> {
           ),
         ],
       ),
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : RefreshIndicator(
-              onRefresh: _fetchInstitutes,
-              child: SingleChildScrollView(
-                padding: context.pagePadding,
-                child: Center(
-                  child: ConstrainedBox(
-                    constraints: const BoxConstraints(maxWidth: 1200),
-                    child: Column(
-                      children: [
-                        _buildFilterSection(context),
-                        SizedBox(height: context.spacing),
-                        _buildInstituteDirectory(context),
-                      ],
-                    ),
-                  ),
+      body: SuperAdminLoadingWrapper(
+        isLoading: _isLoading,
+        hasData: _institutes.isNotEmpty,
+        skeleton: _buildSkeleton(context),
+        child: RefreshIndicator(
+          onRefresh: _fetchInstitutes,
+          child: SingleChildScrollView(
+            padding: context.pagePadding,
+            child: Center(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 1200),
+                child: Column(
+                  children: [
+                    _buildFilterSection(context),
+                    SizedBox(height: context.spacing),
+                    _buildInstituteDirectory(context),
+                  ],
                 ),
               ),
             ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSkeleton(BuildContext context) {
+    return SingleChildScrollView(
+      padding: context.pagePadding,
+      child: Column(
+        children: [
+          SuperAdminSkeleton(height: context.scale(150)),
+          SizedBox(height: context.spacing),
+          SuperAdminSkeleton(height: context.scale(300)),
+        ],
+      ),
     );
   }
 

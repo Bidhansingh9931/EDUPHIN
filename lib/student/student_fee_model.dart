@@ -43,6 +43,15 @@ class StudentFeeData {
       summary: FeeSummary.fromJson(summaryJson),
     );
   }
+
+  Map<String, dynamic> toJson() => {
+    'student': student?.toJson(),
+    'fees': fees.map((e) => e.toJson()).toList(),
+    'overrides': overrides.map((k, v) => MapEntry(k, v.toJson())),
+    'fine': fines.map((e) => e.toJson()).toList(),
+    'payments': payments.map((e) => e.toJson()).toList(),
+    'summary': summary.toJson(),
+  };
 }
 
 class Student {
@@ -75,6 +84,16 @@ class Student {
       classInfo: json['class'] != null ? ClassInfo.fromJson(json['class']) : null,
     );
   }
+
+  Map<String, dynamic> toJson() => {
+    'id': id,
+    'first_name': firstName,
+    'last_name': lastName,
+    'student_roll_no': studentRollNo,
+    'email': email,
+    'fee_frequency': feeFrequency,
+    'class': classInfo?.toJson(),
+  };
 }
 
 class ClassInfo {
@@ -89,6 +108,8 @@ class ClassInfo {
       name: json['name'] ?? '',
     );
   }
+
+  Map<String, dynamic> toJson() => {'id': id, 'name': name};
 }
 
 class Fee {
@@ -107,6 +128,13 @@ class Fee {
       classId: json['class_id'],
     );
   }
+
+  Map<String, dynamic> toJson() => {
+    'id': id,
+    'fee_name': name,
+    'amount': amount,
+    'class_id': classId,
+  };
 }
 
 class Override {
@@ -123,6 +151,12 @@ class Override {
       overriddenAmount: json['overridden_amount'],
     );
   }
+
+  Map<String, dynamic> toJson() => {
+    'id': id,
+    'fee_id': feeId,
+    'overridden_amount': overriddenAmount,
+  };
 }
 
 class Fine {
@@ -141,6 +175,13 @@ class Fine {
       remarks: json['remarks'],
     );
   }
+
+  Map<String, dynamic> toJson() => {
+    'id': id,
+    'reason': reason,
+    'amount': amount,
+    'remarks': remarks,
+  };
 }
 
 class Payment {
@@ -179,6 +220,17 @@ class Payment {
       submitter: json['submitter'] != null ? Submitter.fromJson(json['submitter']) : null,
     );
   }
+
+  Map<String, dynamic> toJson() => {
+    'id': id,
+    'id_hash': idHash,
+    'paid_amount': paidAmount,
+    'date': date,
+    'payment_method': paymentMethod,
+    'reference_no': referenceNo,
+    'remark': remark,
+    'submitter': submitter?.toJson(),
+  };
 }
 
 class Submitter {
@@ -193,6 +245,8 @@ class Submitter {
       name: json['name'] ?? '',
     );
   }
+
+  Map<String, dynamic> toJson() => {'id': id, 'name': name};
 }
 
 class FeeSummary {
@@ -219,4 +273,12 @@ class FeeSummary {
       due: json['due'] ?? 0,
     );
   }
+
+  Map<String, dynamic> toJson() => {
+    'totalFee': totalFee,
+    'totalFine': totalFine,
+    'totalPayable': totalPayable,
+    'totalPaid': totalPaid,
+    'due': due,
+  };
 }

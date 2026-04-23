@@ -37,8 +37,23 @@ class Event {
       endTime: json['end_time'] ?? '',
       isTicketed: json['is_ticketed'] == 1,
       ticketPrice: json['ticket_price'],
-      maxParticipants: json['max_participants'].toString(),
+      maxParticipants: json['max_participants']?.toString(),
       audience: List<String>.from(json['audience'] ?? []),
     );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'title': title,
+      'description': description,
+      'venue': venue,
+      'event_date': eventDate.toIso8601String(),
+      'start_time': startTime,
+      'end_time': endTime,
+      'is_ticketed': isTicketed ? 1 : 0,
+      'ticket_price': ticketPrice,
+      'max_participants': maxParticipants,
+      'audience': audience,
+    };
   }
 }

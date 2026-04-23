@@ -32,6 +32,7 @@ class EmployeeDetails {
   final String? branch;
   final String? emergencyContactName;
   final String? emergencyContactNumber;
+  final String? instituteId;
 
   // For updates
   final File? profileImage;
@@ -71,6 +72,7 @@ class EmployeeDetails {
     this.profileImage,
     this.webImage,
     this.imageName,
+    this.instituteId,
   });
 
   factory EmployeeDetails.fromJson(Map<String, dynamic> json) {
@@ -112,6 +114,7 @@ class EmployeeDetails {
       emergencyContactName: json['emergency_contact_name'] as String?,
       emergencyContactNumber: json['emergency_contact_number']?.toString(),
       photo: ApiService.getStorageUrl(json['photo']),
+      instituteId: json['institute_id']?.toString(),
     );
   }
 
@@ -142,6 +145,7 @@ class EmployeeDetails {
       'branch_name': branch ?? '',
       'emergency_contact_name': emergencyContactName ?? '',
       'emergency_contact_number': emergencyContactNumber ?? '',
+      'institute_id': instituteId,
     };
 
     if (dateOfBirth != null && dateOfBirth!.isNotEmpty) {

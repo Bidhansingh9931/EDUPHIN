@@ -1,5 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
+import 'package:eduphin/moderator_dashboard/cache_helper.dart';
+import 'package:eduphin/moderator_dashboard/skeleton_widgets.dart';
 import 'package:eduphin/services/api_service.dart';
 import 'package:eduphin/services/common_widgets.dart';
 import 'package:eduphin/services/responsive_helper.dart';
@@ -35,13 +37,20 @@ class Student {
 
 // 2. Data Provider to fetch student data
 class StudentProvider {
-  Future<List<Student>> fetchStudents(String instituteId) async {
+  static const String _cacheKeyPrefix = 'students_list_';
+
+  Future<List<Student>> fetchStudents(String instituteId, {bool bypassCache = false}) async {
     try {
+      if (!bypassCache) {
+        final cached = await getCachedStudents(instituteId);
+        if (cached != null) return cached;
+      }
       final response = await ApiService.get('moderator/institutes/$instituteId/students');
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
         if ((data['success'] == true || data['status'] == true) && data['students'] != null) {
+          await CacheHelper.save(_cacheKeyPrefix + instituteId, data);
           final List<dynamic> studentsJson = data['students'];
           return studentsJson.map((json) => Student.fromJson(json)).toList();
         } else {
@@ -53,6 +62,15 @@ class StudentProvider {
     } catch (e) {
       throw Exception('Failed to fetch students: $e');
     }
+  }
+
+  Future<List<Student>?> getCachedStudents(String instituteId) async {
+    final cached = await CacheHelper.load(_cacheKeyPrefix + instituteId);
+    if (cached != null && cached['students'] != null) {
+      final List<dynamic> studentsJson = cached['students'];
+      return studentsJson.map((json) => Student.fromJson(json)).toList();
+    }
+    return null;
   }
 }
 
@@ -68,11 +86,25 @@ class StudentsPage extends StatefulWidget {
 class _StudentsPageState extends State<StudentsPage> {
   final StudentProvider _provider = StudentProvider();
   late Future<List<Student>> _studentsFuture;
+  List<Student>? _cachedStudents;
 
   @override
   void initState() {
     super.initState();
-    _studentsFuture = _provider.fetchStudents(widget.instituteId);
+    _loadInitialData();
+  }
+
+  Future<void> _loadInitialData() async {
+    _cachedStudents = await _provider.getCachedStudents(widget.instituteId);
+    _fetchStudents();
+  }
+
+  void _fetchStudents({bool bypassCache = false}) {
+    if (mounted) {
+      setState(() {
+        _studentsFuture = _provider.fetchStudents(widget.instituteId, bypassCache: bypassCache);
+      });
+    }
   }
 
   @override
@@ -90,43 +122,47 @@ class _StudentsPageState extends State<StudentsPage> {
       body: FutureBuilder<List<Student>>(
         future: _studentsFuture,
         builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return Center(child: CircularProgressIndicator(color: theme.colorScheme.primary));
-          }
-          if (snapshot.hasError) {
-            return _buildComingSoon(context);
-          }
-          if (!snapshot.hasData || snapshot.data!.isEmpty) {
-            return Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(Icons.person_off_rounded, size: context.scale(64), color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.3)),
-                  SizedBox(height: context.md),
-                  Text('No students found', style: TextStyle(fontWeight: FontWeight.bold, fontSize: context.font(16), color: theme.colorScheme.onSurfaceVariant)),
-                ],
-              ),
-            );
-          }
+          return ModeratorLoadingWrapper<List<Student>>(
+            snapshot: snapshot,
+            cachedData: _cachedStudents,
+            skeleton: const ListSkeleton(),
+            onRefresh: _fetchStudents,
+            builder: (students) {
+              if (snapshot.hasError && (_cachedStudents == null || _cachedStudents!.isEmpty)) {
+                return _buildComingSoon(context);
+              }
 
-          final students = snapshot.data!;
+              if (students.isEmpty) {
+                return Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.person_off_rounded, size: context.scale(64), color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.3)),
+                      SizedBox(height: context.md),
+                      Text('No students found', style: TextStyle(fontWeight: FontWeight.bold, fontSize: context.font(16), color: theme.colorScheme.onSurfaceVariant)),
+                    ],
+                  ),
+                );
+              }
 
-          return RefreshIndicator(
-            onRefresh: () async => setState(() { _studentsFuture = _provider.fetchStudents(widget.instituteId); }),
-            color: theme.colorScheme.primary,
-            child: GridView.builder(
-              padding: context.pagePadding,
-              itemCount: students.length,
-              gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                crossAxisCount: context.responsive(1, tablet: 2, desktop: 3),
-                crossAxisSpacing: context.md,
-                mainAxisSpacing: context.md,
-                mainAxisExtent: context.responsive(100, tablet: 110, desktop: 110),
-              ),
-              itemBuilder: (context, index) {
-                return StudentCard(student: students[index]);
-              },
-            ),
+              return RefreshIndicator(
+                onRefresh: () async => _fetchStudents(bypassCache: true),
+                color: theme.colorScheme.primary,
+                child: GridView.builder(
+                  padding: context.pagePadding,
+                  itemCount: students.length,
+                  gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                    crossAxisCount: context.responsive(1, tablet: 2, desktop: 3),
+                    crossAxisSpacing: context.md,
+                    mainAxisSpacing: context.md,
+                    mainAxisExtent: context.responsive(100, tablet: 110, desktop: 110),
+                  ),
+                  itemBuilder: (context, index) {
+                    return StudentCard(student: students[index]);
+                  },
+                ),
+              );
+            },
           );
         },
       ),

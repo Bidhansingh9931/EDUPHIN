@@ -27,6 +27,14 @@ class MyClassData {
           [],
     );
   }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'sections': sections.map((e) => e.toJson()).toList(),
+      'schedules': schedules.map((e) => e.toJson()).toList(),
+      'students': students.map((e) => e.toJson()).toList(),
+    };
+  }
 }
 
 class Section {
@@ -40,6 +48,13 @@ class Section {
       id: json['id'] ?? 0,
       name: json['name'] ?? 'Unnamed Section',
     );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'name': name,
+    };
   }
 }
 
@@ -74,6 +89,17 @@ class Schedule {
           : null,
     );
   }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'weekday': dayOfWeek,
+      'start_time': startTime,
+      'end_time': endTime,
+      'subject': subject?.toJson(),
+      'class': classInfo?.toJson(),
+      'section': sectionInfo?.toJson(),
+    };
+  }
 }
 
 class Subject {
@@ -83,6 +109,12 @@ class Subject {
 
   factory Subject.fromJson(Map<String, dynamic> json) {
     return Subject(name: json['name'] ?? 'Unnamed Subject');
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'name': name,
+    };
   }
 }
 
@@ -108,5 +140,14 @@ class Student {
       rollNumber: (json['roll_no'] ?? json['roll_number'] ?? json['roll'])?.toString(),
       photo: json['user']?['photo'] ?? json['photo'],
     );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'name': name,
+      'roll_no': rollNumber,
+      'photo': photo,
+    };
   }
 }

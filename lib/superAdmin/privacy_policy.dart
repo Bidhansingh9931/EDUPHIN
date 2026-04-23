@@ -1,6 +1,8 @@
 import 'package:eduphin/services/responsive_helper.dart';
 import 'package:flutter/material.dart';
 import '../services/api_service.dart';
+import 'cache_service.dart';
+import 'super_admin_common_widgets.dart';
 
 class PrivacyPolicyScreen extends StatefulWidget {
   const PrivacyPolicyScreen({super.key});
@@ -17,23 +19,33 @@ class _PrivacyPolicyScreenState extends State<PrivacyPolicyScreen> {
   @override
   void initState() {
     super.initState();
-    _fetchPolicy();
+    _loadInitialData();
   }
 
-  @override
-  void dispose() {
-    _contentController.dispose();
-    super.dispose();
+  Future<void> _loadInitialData() async {
+    final cachedData = await SuperAdminCacheService.load('privacy_policy');
+    if (cachedData != null && mounted) {
+      setState(() {
+        _contentController.text = cachedData['content'] ?? '';
+        _isLoading = false;
+      });
+    }
+    _fetchPolicy();
   }
 
   Future<void> _fetchPolicy() async {
     if (!mounted) return;
+    if (_contentController.text.isEmpty) {
+      setState(() => _isLoading = true);
+    }
     try {
       final data = await ApiService.getPrivacyPolicy();
       if (data != null && mounted) {
         setState(() {
           _contentController.text = data['content'] ?? '';
+          _isLoading = false;
         });
+        await SuperAdminCacheService.save('privacy_policy', data);
       }
     } catch (e) {
       debugPrint("Error fetching Privacy Policy: $e");
@@ -79,9 +91,11 @@ class _PrivacyPolicyScreenState extends State<PrivacyPolicyScreen> {
             ),
         ],
       ),
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : SingleChildScrollView(
+      body: SuperAdminLoadingWrapper(
+        isLoading: _isLoading,
+        hasData: _contentController.text.isNotEmpty,
+        skeleton: _buildSkeleton(context),
+        child: SingleChildScrollView(
               padding: context.pagePadding,
               child: Center(
                 child: ConstrainedBox(
@@ -134,6 +148,43 @@ class _PrivacyPolicyScreenState extends State<PrivacyPolicyScreen> {
                 ),
               ),
             ),
+      ),
+    );
+  }
+
+  Widget _buildSkeleton(BuildContext context) {
+    return SingleChildScrollView(
+      padding: context.pagePadding,
+      child: Center(
+        child: ConstrainedBox(
+          constraints: BoxConstraints(maxWidth: context.scale(900)),
+          child: Card(
+            child: Padding(
+              padding: EdgeInsets.all(context.scale(24.0)),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Row(
+                    children: [
+                      SuperAdminSkeleton(height: 24, width: 24),
+                      SizedBox(width: 12),
+                      SuperAdminSkeleton(height: 24, width: 250),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  const SuperAdminSkeleton(height: 14, width: 350),
+                  SizedBox(height: context.scale(24)),
+                  const Divider(),
+                  SizedBox(height: context.scale(24)),
+                  const SuperAdminSkeleton(height: 400),
+                  SizedBox(height: context.scale(24)),
+                  const SuperAdminSkeleton(height: 54),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
     );
   }
 }

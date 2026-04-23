@@ -1,4 +1,6 @@
 import 'dart:io';
+import 'package:eduphin/services/caching_service.dart';
+import 'package:eduphin/services/common_widgets.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:eduphin/services/responsive_helper.dart';
 import 'package:flutter/material.dart';
@@ -17,21 +19,57 @@ class StudentTicketDetailsPage extends StatefulWidget {
 }
 
 class _StudentTicketDetailsPageState extends State<StudentTicketDetailsPage> {
-  late Future<TicketDetails> _detailsFuture;
+  TicketDetails? _details;
+  bool _isLoading = true;
   final TextEditingController _replyController = TextEditingController();
   File? _selectedFile;
   bool _isSending = false;
 
+  String get _cacheKey => 'student_support_ticket_${widget.ticketId}';
+
   @override
   void initState() {
     super.initState();
-    _refreshDetails();
+    _loadCachedData();
+    _fetchDetails();
   }
 
-  void _refreshDetails() {
-    setState(() {
-      _detailsFuture = ApiService.getStudentTicketDetails(widget.ticketId);
-    });
+  Future<void> _loadCachedData() async {
+    final cachedData = await CacheService.getData(_cacheKey);
+    if (cachedData != null && mounted) {
+      setState(() {
+        _details = TicketDetails.fromJson(cachedData as Map<String, dynamic>);
+        _isLoading = false;
+      });
+    }
+  }
+
+  Future<void> _fetchDetails() async {
+    if (_details == null) {
+      setState(() => _isLoading = true);
+    }
+    try {
+      final details = await ApiService.getStudentTicketDetails(widget.ticketId);
+      if (mounted) {
+        setState(() {
+          _details = details;
+          _isLoading = false;
+        });
+        await CacheService.saveData(_cacheKey, details.toJson());
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isLoading = false);
+        if (_details == null) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text("Error fetching ticket details: $e"),
+              backgroundColor: context.theme.colorScheme.error,
+            ),
+          );
+        }
+      }
+    }
   }
 
   Future<void> _pickFile() async {
@@ -58,7 +96,7 @@ class _StudentTicketDetailsPageState extends State<StudentTicketDetailsPage> {
         _selectedFile = null;
         _isSending = false;
       });
-      _refreshDetails();
+      _fetchDetails();
     } catch (e) {
       setState(() => _isSending = false);
       if (!mounted) return;
@@ -92,79 +130,56 @@ class _StudentTicketDetailsPageState extends State<StudentTicketDetailsPage> {
         actions: [
           IconButton(
             icon: Icon(Icons.refresh, size: context.scale(24), color: colorScheme.onSurface),
-            onPressed: _refreshDetails,
+            onPressed: _fetchDetails,
           ),
         ],
       ),
-      body: FutureBuilder<TicketDetails>(
-        future: _detailsFuture,
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return Center(child: CircularProgressIndicator(color: colorScheme.primary));
-          } else if (snapshot.hasError) {
-            return Center(
-                child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(Icons.error_outline, color: colorScheme.error, size: context.scale(48)),
-                SizedBox(height: context.md),
-                Text("Error: ${snapshot.error}", style: TextStyle(fontSize: context.font(14), color: colorScheme.onSurface)),
-                SizedBox(height: context.md),
-                ElevatedButton(
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: colorScheme.primary,
-                    foregroundColor: colorScheme.onPrimary,
-                  ),
-                  onPressed: _refreshDetails,
-                  child: Text("RETRY", style: TextStyle(fontSize: context.font(14))),
-                )
-              ],
-            ));
-          } else if (!snapshot.hasData) {
-            return Center(child: Text("No data found", style: TextStyle(fontSize: context.font(14), color: colorScheme.onSurface)));
-          }
-
-          final details = snapshot.data!;
-          return Center(
-            child: Container(
-              constraints: const BoxConstraints(maxWidth: 1000),
-              child: Column(
-                children: [
-                  Expanded(
-                    child: ListView(
-                      padding: context.pagePadding,
-                      children: [
-                        _buildTicketInfo(details.ticket),
-                        SizedBox(height: context.xl),
-                        Padding(
-                          padding: EdgeInsets.symmetric(horizontal: context.xs),
-                          child: Row(
-                            children: [
-                              Icon(Icons.forum_outlined, color: colorScheme.primary, size: context.scale(20)),
-                              SizedBox(width: context.sm),
-                              Text(
-                                "Conversation (${details.replies.length})",
-                                style: TextStyle(
-                                  color: colorScheme.onSurface,
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: context.font(18),
-                                ),
+      body: LoadingWrapper(
+        isLoading: _isLoading,
+        hasData: _details != null,
+        skeleton: const _TicketDetailsSkeleton(),
+        onRefresh: _fetchDetails,
+        child: _details == null
+            ? const SizedBox.shrink()
+            : Center(
+                child: Container(
+                  constraints: const BoxConstraints(maxWidth: 1000),
+                  child: Column(
+                    children: [
+                      Expanded(
+                        child: ListView(
+                          padding: context.pagePadding,
+                          children: [
+                            _buildTicketInfo(_details!.ticket),
+                            SizedBox(height: context.xl),
+                            Padding(
+                              padding: EdgeInsets.symmetric(horizontal: context.xs),
+                              child: Row(
+                                children: [
+                                  Icon(Icons.forum_outlined, color: colorScheme.primary, size: context.scale(20)),
+                                  SizedBox(width: context.sm),
+                                  Text(
+                                    "Conversation (${_details!.replies.length})",
+                                    style: TextStyle(
+                                      color: colorScheme.onSurface,
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: context.font(18),
+                                    ),
+                                  ),
+                                ],
                               ),
-                            ],
-                          ),
+                            ),
+                            SizedBox(height: context.lg),
+                            ..._details!.replies.map((reply) => _buildReplyBubble(reply)),
+                            SizedBox(height: context.md),
+                          ],
                         ),
-                        SizedBox(height: context.lg),
-                        ...details.replies.map((reply) => _buildReplyBubble(reply)),
-                        SizedBox(height: context.md),
-                      ],
-                    ),
+                      ),
+                      if (_details!.ticket.status.toLowerCase() != 'closed') _buildInputArea(),
+                    ],
                   ),
-                  if (details.ticket.status.toLowerCase() != 'closed') _buildInputArea(),
-                ],
+                ),
               ),
-            ),
-          );
-        },
       ),
     );
   }
@@ -486,5 +501,72 @@ class _StudentTicketDetailsPageState extends State<StudentTicketDetailsPage> {
     } catch (e) {
       return dateStr;
     }
+  }
+}
+
+class _TicketDetailsSkeleton extends StatelessWidget {
+  const _TicketDetailsSkeleton();
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = context.theme.colorScheme;
+    return SingleChildScrollView(
+      padding: context.pagePadding,
+      child: Center(
+        child: Container(
+          constraints: const BoxConstraints(maxWidth: 1000),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                padding: EdgeInsets.all(context.scale(20)),
+                decoration: BoxDecoration(
+                  color: colorScheme.surfaceContainerLow,
+                  borderRadius: BorderRadius.circular(context.scale(16)),
+                  border: Border.all(color: colorScheme.outlineVariant),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        SkeletonBox(width: context.scale(60), height: context.scale(12)),
+                        SkeletonBox(width: context.scale(100), height: context.scale(12)),
+                      ],
+                    ),
+                    SizedBox(height: context.scale(16)),
+                    SkeletonBox(width: context.scale(200), height: context.scale(24)),
+                    SizedBox(height: context.scale(12)),
+                    SkeletonBox(width: double.infinity, height: context.scale(16)),
+                    SkeletonBox(width: double.infinity, height: context.scale(16)),
+                    SizedBox(height: context.scale(20)),
+                    Wrap(
+                      spacing: context.scale(8),
+                      runSpacing: context.scale(8),
+                      children: List.generate(3, (index) => SkeletonBox(width: context.scale(80), height: context.scale(32))),
+                    ),
+                  ],
+                ),
+              ),
+              SizedBox(height: context.scale(24)),
+              SkeletonBox(width: context.scale(150), height: context.scale(20)),
+              SizedBox(height: context.scale(16)),
+              ...List.generate(3, (index) => Padding(
+                padding: EdgeInsets.only(bottom: context.scale(16)),
+                child: Align(
+                  alignment: index % 2 == 0 ? Alignment.centerLeft : Alignment.centerRight,
+                  child: SkeletonBox(
+                    width: context.screenWidth * 0.6,
+                    height: context.scale(80),
+                    borderRadius: BorderRadius.circular(context.scale(16)),
+                  ),
+                ),
+              )),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 }

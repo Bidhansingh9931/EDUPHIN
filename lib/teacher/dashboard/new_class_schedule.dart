@@ -1,9 +1,10 @@
 import 'package:eduphin/services/responsive_helper.dart';
+import 'package:eduphin/teacher/dashboard/teacher_cache_service.dart';
 import 'package:flutter/material.dart';
 import 'package:eduphin/services/api_service.dart';
 import 'package:eduphin/teacher/dashboard/view_schedule_model.dart';
 import 'package:intl/intl.dart';
-import 'common_widgets.dart';
+import 'common_widgets.dart' as teacher_common;
 
 class ViewClassSchedulePage extends StatefulWidget {
   const ViewClassSchedulePage({super.key});
@@ -13,7 +14,9 @@ class ViewClassSchedulePage extends StatefulWidget {
 }
 
 class _ViewClassSchedulePageState extends State<ViewClassSchedulePage> {
-  late Future<ViewSchedulePageData> _dataFuture;
+  ViewSchedulePageData? _pageData;
+  bool _isLoading = true;
+  String? _error;
   ClassDropdownItem? _selectedClass;
   SectionDropdownItem? _selectedSection;
   List<SectionDropdownItem> _filteredSections = [];
@@ -22,7 +25,54 @@ class _ViewClassSchedulePageState extends State<ViewClassSchedulePage> {
   @override
   void initState() {
     super.initState();
-    _dataFuture = ApiService.getViewSchedulePageData();
+    _fetchData();
+  }
+
+  Future<void> _fetchData() async {
+    setState(() {
+      _isLoading = true;
+      _error = null;
+    });
+
+    const cacheKey = 'view_class_schedule_data';
+
+    try {
+      // Load from cache first
+      final cachedData = await TeacherCacheService.load(cacheKey);
+      if (cachedData != null && cachedData is Map<String, dynamic>) {
+        setState(() {
+          _pageData = ViewSchedulePageData.fromJson(cachedData);
+          _isLoading = false;
+        });
+      }
+
+      // Fetch fresh data
+      final freshData = await ApiService.getViewSchedulePageData();
+      await TeacherCacheService.save(cacheKey, freshData.toJson());
+
+      if (mounted) {
+        setState(() {
+          _pageData = freshData;
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        if (_pageData == null) {
+          setState(() {
+            _error = e.toString();
+            _isLoading = false;
+          });
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text("Failed to update schedule data: $e")),
+          );
+          setState(() {
+            _isLoading = false;
+          });
+        }
+      }
+    }
   }
 
   void _onClassSelected(ClassDropdownItem? selectedClass, List<SectionDropdownItem> allSections) {
@@ -48,15 +98,13 @@ class _ViewClassSchedulePageState extends State<ViewClassSchedulePage> {
   }
 
   void _showSchedule() {
-    if (_selectedClass == null || _selectedSection == null) return;
+    if (_selectedClass == null || _selectedSection == null || _pageData == null) return;
 
-    _dataFuture.then((data) {
-      setState(() {
-        _filteredSchedules = data.schedules
-            .where((s) => s.classId == _selectedClass!.id && s.sectionId == _selectedSection!.id)
-            .toList()
-          ..sort((a, b) => a.startTime.compareTo(b.startTime));
-      });
+    setState(() {
+      _filteredSchedules = _pageData!.schedules
+          .where((s) => s.classId == _selectedClass!.id && s.sectionId == _selectedSection!.id)
+          .toList()
+        ..sort((a, b) => a.startTime.compareTo(b.startTime));
     });
   }
 
@@ -78,25 +126,47 @@ class _ViewClassSchedulePageState extends State<ViewClassSchedulePage> {
       appBar: AppBar(
         title: const Text("View Class Schedule"),
       ),
-      body: FutureBuilder<ViewSchedulePageData>(
-        future: _dataFuture,
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
-          } else if (snapshot.hasError) {
-            return Center(child: Text('Error: ${snapshot.error}', style: TextStyle(fontSize: context.font(14))));
-          } else if (snapshot.hasData) {
-            final pageData = snapshot.data!;
-            return Center(
-              child: ConstrainedBox(
-                constraints: BoxConstraints(maxWidth: context.scale(800)),
-                child: _buildContent(pageData),
-              ),
-            );
-          } else {
-            return const Center(child: Text("No data found"));
-          }
-        },
+      body: RefreshIndicator(
+        onRefresh: _fetchData,
+        child: teacher_common.TeacherLoadingWrapper(
+          isLoading: _isLoading,
+          hasData: _pageData != null,
+          skeleton: _buildSkeleton(),
+          child: _error != null
+              ? Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Text('Error: $_error', style: TextStyle(fontSize: context.font(14))),
+                      const SizedBox(height: 16),
+                      ElevatedButton(onPressed: _fetchData, child: const Text("Retry"))
+                    ],
+                  ),
+                )
+              : _pageData == null
+                  ? const Center(child: Text("No data found"))
+                  : Center(
+                      child: ConstrainedBox(
+                        constraints: BoxConstraints(maxWidth: context.scale(800)),
+                        child: _buildContent(_pageData!),
+                      ),
+                    ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSkeleton() {
+    return SingleChildScrollView(
+      padding: context.pagePadding,
+      child: Column(
+        children: [
+          teacher_common.TeacherSkeleton(height: context.scale(250), borderRadius: BorderRadius.circular(context.scale(16))),
+          SizedBox(height: context.spacing * 2),
+          teacher_common.TeacherSkeleton(height: context.scale(100), borderRadius: BorderRadius.circular(context.scale(12))),
+          SizedBox(height: context.spacing),
+          teacher_common.TeacherSkeleton(height: context.scale(100), borderRadius: BorderRadius.circular(context.scale(12))),
+        ],
       ),
     );
   }
@@ -104,6 +174,7 @@ class _ViewClassSchedulePageState extends State<ViewClassSchedulePage> {
   Widget _buildContent(ViewSchedulePageData pageData) {
     final theme = context.theme;
     return SingleChildScrollView(
+      physics: const AlwaysScrollableScrollPhysics(),
       padding: context.pagePadding,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -147,8 +218,8 @@ class _ViewClassSchedulePageState extends State<ViewClassSchedulePage> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            buildLabel(context, "Class *"),
-            buildDropdown(
+            teacher_common.buildLabel(context, "Class *"),
+            teacher_common.buildDropdown(
                 context,
                 pageData.classes.map((e) => e.name).toList(),
                 _selectedClass?.name,
@@ -158,8 +229,8 @@ class _ViewClassSchedulePageState extends State<ViewClassSchedulePage> {
                 },
                 hint: "Select Class"),
             SizedBox(height: context.spacing),
-            buildLabel(context, "Section *"),
-            buildDropdown(
+            teacher_common.buildLabel(context, "Section *"),
+            teacher_common.buildDropdown(
                 context,
                 _filteredSections.map((e) => e.name).toList(),
                 _selectedSection?.name,
@@ -170,7 +241,7 @@ class _ViewClassSchedulePageState extends State<ViewClassSchedulePage> {
                 },
                 hint: "Select Section"),
             SizedBox(height: context.spacing * 1.5),
-            buildActionButton(context, "SHOW SCHEDULE", _showSchedule),
+            teacher_common.buildActionButton(context, "SHOW SCHEDULE", _showSchedule),
           ],
         ),
       ),

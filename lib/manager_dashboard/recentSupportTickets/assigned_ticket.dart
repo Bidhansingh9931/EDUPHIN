@@ -5,7 +5,7 @@ import 'package:eduphin/services/responsive_helper.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
-import '../../services/api_service.dart';
+import 'package:eduphin/services/api_service.dart';
 import 'ticket_info.dart'; // To use TicketStatus and TicketPriority enums if needed, or keep local
 import 'ticket_details.dart';
 
@@ -93,15 +93,13 @@ class AssignedTicketsScreenState extends State<AssignedTicketsScreen> {
   }
 
   Future<void> _loadCachedData() async {
-    final cachedData = await CachingService.getCache(_cacheKey);
-    if (cachedData != null) {
-      if (mounted) {
-        setState(() {
-          final List<dynamic> ticketsJson = cachedData['data'] ?? [];
-          _tickets = ticketsJson.map((json) => AssignedTicket.fromJson(json)).toList();
-          _isLoading = false;
-        });
-      }
+    final cachedData = await CacheService.getCache(_cacheKey);
+    if (cachedData != null && mounted) {
+      final List<dynamic> ticketsJson = cachedData['data'] ?? [];
+      setState(() {
+        _tickets = ticketsJson.map((json) => AssignedTicket.fromJson(json)).toList();
+        _isLoading = _tickets.isEmpty;
+      });
     }
   }
 
@@ -124,7 +122,7 @@ class AssignedTicketsScreenState extends State<AssignedTicketsScreen> {
       if (response.statusCode == 200) {
         final Map<String, dynamic> responseData = json.decode(response.body);
         if (responseData['status'] == true) {
-          await CachingService.setCache(_cacheKey, responseData);
+        await CacheService.setCache(_cacheKey, responseData);
           final List<dynamic> ticketsJson = responseData['data'];
           final tickets = ticketsJson.map((json) => AssignedTicket.fromJson(json)).toList();
 
@@ -218,11 +216,12 @@ class AssignedTicketsScreenState extends State<AssignedTicketsScreen> {
   }
 
   Widget _buildSkeleton() {
+    final theme = context.theme;
     return Column(
       children: [
         Padding(
           padding: context.pagePadding,
-          child: const SkeletonBox(height: 50, borderRadius: 12),
+          child: SkeletonBox(height: context.scale(50), borderRadius: context.scale(12)),
         ),
         Expanded(
           child: ListView.builder(
@@ -233,9 +232,9 @@ class AssignedTicketsScreenState extends State<AssignedTicketsScreen> {
               child: Container(
                 padding: context.pagePadding,
                 decoration: BoxDecoration(
-                  color: Colors.white,
+                  color: theme.colorScheme.surfaceContainerLow,
                   borderRadius: BorderRadius.circular(context.scale(12)),
-                  border: Border.all(color: Colors.grey.shade200),
+                  border: Border.all(color: theme.colorScheme.outlineVariant),
                 ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -243,20 +242,20 @@ class AssignedTicketsScreenState extends State<AssignedTicketsScreen> {
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        const SkeletonBox(height: 15, width: 40),
-                        const SkeletonBox(height: 25, width: 60),
+                        SkeletonBox(height: context.scale(15), width: context.scale(40)),
+                        SkeletonBox(height: context.scale(25), width: context.scale(60)),
                       ],
                     ),
-                    const SizedBox(height: 12),
-                    const SkeletonBox(height: 20, width: 180),
-                    const SizedBox(height: 8),
-                    const SkeletonBox(height: 15, width: 100),
-                    const SizedBox(height: 16),
+                    SizedBox(height: context.scale(12)),
+                    SkeletonBox(height: context.scale(20), width: context.scale(180)),
+                    SizedBox(height: context.scale(8)),
+                    SkeletonBox(height: context.scale(15), width: context.scale(100)),
+                    SizedBox(height: context.scale(16)),
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        const SkeletonBox(height: 35, width: 100),
-                        const SkeletonBox(height: 15, width: 80),
+                        SkeletonBox(height: context.scale(35), width: context.scale(100)),
+                        SkeletonBox(height: context.scale(15), width: context.scale(80)),
                       ],
                     ),
                   ],

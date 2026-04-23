@@ -113,6 +113,7 @@ class _MySalaryPageState extends State<MySalaryPage> {
     final cachedData = await CacheService.getCache('manager_my_salary');
     if (cachedData != null && mounted) {
       _processData(cachedData);
+      setState(() => _isLoading = false);
     }
     _fetchSalaryData();
   }
@@ -125,25 +126,29 @@ class _MySalaryPageState extends State<MySalaryPage> {
           .map((record) => PastSalaryRecord.fromJson(record))
           .toList();
 
-      setState(() {
-        _pastRecords.clear();
-        _pastRecords.addAll(records);
+      if (mounted) {
+        setState(() {
+          _pastRecords.clear();
+          _pastRecords.addAll(records);
 
-        _bankAccountController.text = details.bankAccount;
-        _ifscController.text = details.ifsc;
-        _bankNameController.text = details.bankName;
-        _employerBranchController.text = details.employerBranch;
-        _zoneController.text = details.zone;
-      });
+          _bankAccountController.text = details.bankAccount;
+          _ifscController.text = details.ifsc;
+          _bankNameController.text = details.bankName;
+          _employerBranchController.text = details.employerBranch;
+          _zoneController.text = details.zone;
+        });
+      }
     }
   }
 
   Future<void> _fetchSalaryData() async {
     if (!mounted) return;
-    setState(() {
-      _isLoading = true;
-      _error = null;
-    });
+    if (_accountDetails == null) {
+      setState(() {
+        _isLoading = true;
+        _error = null;
+      });
+    }
 
     try {
       final token = await ApiService.getToken();
@@ -172,7 +177,7 @@ class _MySalaryPageState extends State<MySalaryPage> {
     } catch (e) {
       if (!mounted) return;
       setState(() {
-        _isLoading = false;
+        _isLoading = _accountDetails == null;
         _error = e;
       });
     }
@@ -311,12 +316,17 @@ class _MySalaryPageState extends State<MySalaryPage> {
   Widget _buildSkeleton() {
     return SingleChildScrollView(
       padding: context.pagePadding,
-      child: Column(
-        children: [
-          SkeletonBox(height: context.scale(300), borderRadius: context.scale(16)),
-          SizedBox(height: context.scale(24)),
-          SkeletonBox(height: context.scale(400), borderRadius: context.scale(16)),
-        ],
+      child: Center(
+        child: ConstrainedBox(
+          constraints: BoxConstraints(maxWidth: context.scale(1000)),
+          child: Column(
+            children: [
+              SkeletonBox(height: context.scale(350), borderRadius: context.scale(16)),
+              SizedBox(height: context.scale(24)),
+              SkeletonBox(height: context.scale(400), borderRadius: context.scale(16)),
+            ],
+          ),
+        ),
       ),
     );
   }

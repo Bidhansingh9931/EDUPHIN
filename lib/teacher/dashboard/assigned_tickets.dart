@@ -1,9 +1,11 @@
 import 'package:eduphin/services/responsive_helper.dart';
+import 'package:eduphin/teacher/dashboard/teacher_cache_service.dart';
 import 'package:eduphin/teacher/dashboard/tickets.dart';
 import 'package:flutter/material.dart';
 import 'package:eduphin/services/api_service.dart';
 import 'package:eduphin/teacher/dashboard/ticket_models.dart';
 import 'package:intl/intl.dart';
+import 'common_widgets.dart';
 
 class AssignedTicketsPage extends StatefulWidget {
   const AssignedTicketsPage({super.key});
@@ -13,8 +15,8 @@ class AssignedTicketsPage extends StatefulWidget {
 }
 
 class _AssignedTicketsPageState extends State<AssignedTicketsPage> {
-  Future<void>? _ticketsFuture;
   List<SupportTicket> _tickets = [];
+  bool _isLoading = true;
   String? _error;
 
   final Map<String, String> _filters = {'priority': '', 'status': '', 'search': ''};
@@ -26,24 +28,43 @@ class _AssignedTicketsPageState extends State<AssignedTicketsPage> {
   }
 
   Future<void> _loadAssignedTickets() async {
-    setState(() {
-      _ticketsFuture = _fetchAssignedTickets();
-    });
-  }
+    const cacheKey = 'assigned_tickets';
 
-  Future<void> _fetchAssignedTickets() async {
+    // 1. Load from cache if no filters are applied
+    if (_filters.values.every((v) => v.isEmpty)) {
+      final cachedData = await TeacherCacheService.load(cacheKey);
+      if (cachedData != null && mounted) {
+        setState(() {
+          _tickets = (cachedData as List).map((e) => SupportTicket.fromJson(e)).toList();
+          _isLoading = false;
+        });
+      }
+    }
+
+    // 2. Fetch from API
+    if (_tickets.isEmpty) {
+      setState(() => _isLoading = true);
+    }
+
     try {
       final tickets = await ApiService.getAssignedTickets(_filters);
       if (mounted) {
         setState(() {
           _tickets = tickets;
+          _isLoading = false;
           _error = null;
         });
+
+        // 3. Save to cache if no filters are applied
+        if (_filters.values.every((v) => v.isEmpty)) {
+          await TeacherCacheService.save(cacheKey, tickets.map((e) => e.toJson()).toList());
+        }
       }
     } catch (e) {
       if (mounted) {
         setState(() {
           _error = 'Failed to load assigned tickets: $e';
+          _isLoading = false;
         });
       }
     }
@@ -65,35 +86,48 @@ class _AssignedTicketsPageState extends State<AssignedTicketsPage> {
             children: [
               _buildFilterSection(),
               Expanded(
-                child: FutureBuilder(
-                  future: _ticketsFuture,
-                  builder: (context, snapshot) {
-                    if (snapshot.connectionState == ConnectionState.waiting && _tickets.isEmpty) {
-                      return const Center(child: CircularProgressIndicator());
-                    } else if (_error != null) {
-                      return Center(
-                        child: Padding(
-                          padding: EdgeInsets.all(context.scale(24)),
-                          child: Text(_error!, textAlign: TextAlign.center, style: TextStyle(color: theme.colorScheme.error, fontSize: context.font(14))),
-                        ),
-                      );
-                    } else if (_tickets.isEmpty) {
-                      return Center(child: Text("No tickets assigned to you.", style: TextStyle(fontSize: context.font(14))));
-                    }
-                    return RefreshIndicator(
-                      onRefresh: _loadAssignedTickets,
-                      child: ListView.builder(
-                        padding: context.pagePadding,
-                        itemCount: _tickets.length,
-                        itemBuilder: (context, index) => TicketCard(ticket: _tickets[index]),
-                      ),
-                    );
-                  },
+                child: TeacherLoadingWrapper(
+                  isLoading: _isLoading,
+                  hasData: _tickets.isNotEmpty,
+                  skeleton: _buildSkeleton(),
+                  child: RefreshIndicator(
+                    onRefresh: _loadAssignedTickets,
+                    child: _error != null && _tickets.isEmpty
+                        ? Center(
+                            child: Padding(
+                              padding: EdgeInsets.all(context.scale(24)),
+                              child: Text(_error!, textAlign: TextAlign.center, style: TextStyle(color: theme.colorScheme.error, fontSize: context.font(14))),
+                            ),
+                          )
+                        : _tickets.isEmpty
+                            ? ListView(
+                                children: [
+                                  SizedBox(height: context.scale(100)),
+                                  Center(child: Text("No tickets assigned to you.", style: TextStyle(fontSize: context.font(14)))),
+                                ],
+                              )
+                            : ListView.builder(
+                                padding: context.pagePadding,
+                                itemCount: _tickets.length,
+                                itemBuilder: (context, index) => TicketCard(ticket: _tickets[index]),
+                              ),
+                  ),
                 ),
               ),
             ],
           ),
         ),
+      ),
+    );
+  }
+
+  Widget _buildSkeleton() {
+    return ListView.builder(
+      padding: context.pagePadding,
+      itemCount: 5,
+      itemBuilder: (context, index) => Padding(
+        padding: EdgeInsets.only(bottom: context.spacing),
+        child: TeacherSkeleton(height: context.scale(180), borderRadius: BorderRadius.circular(context.scale(16))),
       ),
     );
   }

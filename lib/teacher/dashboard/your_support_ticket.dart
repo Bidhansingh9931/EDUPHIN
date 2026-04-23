@@ -1,5 +1,7 @@
+import 'dart:convert';
 import 'package:eduphin/teacher/dashboard/ticket_details_page.dart';
 import 'package:eduphin/teacher/dashboard/create_new_support_ticket.dart';
+import 'package:eduphin/teacher/dashboard/teacher_cache_service.dart';
 import 'package:flutter/material.dart';
 import 'package:eduphin/services/api_service.dart';
 import 'package:eduphin/teacher/dashboard/ticket_models.dart';
@@ -17,12 +19,67 @@ class YourSupportTicketPage extends StatefulWidget {
 class _YourSupportTicketPageState extends State<YourSupportTicketPage> {
   final Map<String, String?> _filters = {'priority': null, 'status': null};
   final TextEditingController _searchController = TextEditingController();
-  Key _listKey = UniqueKey();
+  List<SupportTicket>? _tickets;
+  bool _isLoading = true;
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchTickets();
+  }
 
   @override
   void dispose() {
     _searchController.dispose();
     super.dispose();
+  }
+
+  Future<void> _fetchTickets() async {
+    setState(() {
+      _isLoading = true;
+      _error = null;
+    });
+
+    final filterKey = 'tickets_${jsonEncode(_getCleanFilters())}';
+
+    try {
+      // Load from cache first
+      final cachedData = await TeacherCacheService.load(filterKey);
+      if (cachedData != null && cachedData is List) {
+        setState(() {
+          _tickets = cachedData.map((e) => SupportTicket.fromJson(e)).toList();
+          _isLoading = false;
+        });
+      }
+
+      // Fetch fresh data
+      final freshData = await ApiService.getMyTickets(_getCleanFilters());
+      await TeacherCacheService.save(filterKey, freshData.map((e) => e.toJson()).toList());
+
+      if (mounted) {
+        setState(() {
+          _tickets = freshData;
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        if (_tickets == null) {
+          setState(() {
+            _error = e.toString();
+            _isLoading = false;
+          });
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text("Failed to update tickets: $e")),
+          );
+          setState(() {
+            _isLoading = false;
+          });
+        }
+      }
+    }
   }
 
   @override
@@ -35,61 +92,66 @@ class _YourSupportTicketPageState extends State<YourSupportTicketPage> {
         elevation: 0,
         title: Text("Your Support Tickets", style: theme.appBarTheme.titleTextStyle?.copyWith(fontWeight: FontWeight.bold) ?? TextStyle(fontWeight: FontWeight.bold, color: theme.colorScheme.onSurface)),
       ),
-      body: SingleChildScrollView(
-        child: Center(
-          child: Container(
-            constraints: const BoxConstraints(maxWidth: 1000),
-            padding: context.pagePadding,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                _buildFilterSection(),
-                const SizedBox(height: 24),
-                _buildSectionHeader("Ticket List", Icons.list_alt_outlined),
-                const SizedBox(height: 16),
-                FutureBuilder<List<SupportTicket>>(
-                  key: _listKey,
-                  future: ApiService.getMyTickets(_getCleanFilters()),
-                  builder: (context, snapshot) {
-                    if (snapshot.connectionState == ConnectionState.waiting) {
-                      return const Center(
-                        child: Padding(
-                          padding: EdgeInsets.all(40.0),
-                          child: CircularProgressIndicator(),
-                        ),
-                      );
-                    } else if (snapshot.hasError) {
-                      return _buildErrorState(snapshot.error.toString());
-                    } else if (!snapshot.hasData || snapshot.data!.isEmpty) {
-                      return _buildEmptyState();
-                    }
-
-                    final tickets = snapshot.data!;
-                    return _buildTicketsList(tickets);
-                  },
-                ),
-                const SizedBox(height: 32),
-                SizedBox(
-                  width: double.infinity,
-                  child: ElevatedButton.icon(
-                    onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const CreateSupportTicketPage())).then((_) => setState(() => _listKey = UniqueKey())),
-                    icon: Icon(Icons.add, size: context.scale(20)),
-                    label: Text("CREATE NEW TICKET", style: TextStyle(fontWeight: FontWeight.bold, fontSize: context.font(14), letterSpacing: 1.1)),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: theme.colorScheme.primary,
-                      foregroundColor: theme.colorScheme.onPrimary,
-                      padding: EdgeInsets.symmetric(vertical: context.scale(16)),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(context.scale(12))),
-                      elevation: 0,
+      body: RefreshIndicator(
+        onRefresh: _fetchTickets,
+        child: SingleChildScrollView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          child: Center(
+            child: Container(
+              constraints: const BoxConstraints(maxWidth: 1000),
+              padding: context.pagePadding,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _buildFilterSection(),
+                  const SizedBox(height: 24),
+                  _buildSectionHeader("Ticket List", Icons.list_alt_outlined),
+                  const SizedBox(height: 16),
+                  teacher_common.TeacherLoadingWrapper(
+                    isLoading: _isLoading,
+                    hasData: _tickets != null,
+                    skeleton: _buildSkeleton(),
+                    child: _error != null
+                        ? _buildErrorState(_error!)
+                        : (_tickets == null || _tickets!.isEmpty)
+                            ? _buildEmptyState()
+                            : _buildTicketsList(_tickets!),
+                  ),
+                  const SizedBox(height: 32),
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton.icon(
+                      onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const CreateSupportTicketPage())).then((_) => _fetchTickets()),
+                      icon: Icon(Icons.add, size: context.scale(20)),
+                      label: Text("CREATE NEW TICKET", style: TextStyle(fontWeight: FontWeight.bold, fontSize: context.font(14), letterSpacing: 1.1)),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: theme.colorScheme.primary,
+                        foregroundColor: theme.colorScheme.onPrimary,
+                        padding: EdgeInsets.symmetric(vertical: context.scale(16)),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(context.scale(12))),
+                        elevation: 0,
+                      ),
                     ),
                   ),
-                ),
-                const SizedBox(height: 32),
-              ],
+                  const SizedBox(height: 32),
+                ],
+              ),
             ),
           ),
         ),
       ),
+    );
+  }
+
+  Widget _buildSkeleton() {
+    return Column(
+      children: List.generate(3, (index) => Padding(
+        padding: EdgeInsets.only(bottom: context.scale(16)),
+        child: teacher_common.TeacherSkeleton(
+          height: context.scale(100),
+          borderRadius: BorderRadius.circular(context.scale(20)),
+        ),
+      )),
     );
   }
 
@@ -120,7 +182,7 @@ class _YourSupportTicketPageState extends State<YourSupportTicketPage> {
             Text(error, style: theme.textTheme.bodySmall, textAlign: TextAlign.center),
             const SizedBox(height: 24),
             ElevatedButton(
-              onPressed: () => setState(() => _listKey = UniqueKey()),
+              onPressed: _fetchTickets,
               style: ElevatedButton.styleFrom(elevation: 0),
               child: const Text("Retry"),
             )
@@ -222,7 +284,7 @@ class _YourSupportTicketPageState extends State<YourSupportTicketPage> {
                       _searchController.clear();
                       _filters['priority'] = null;
                       _filters['status'] = null;
-                      _listKey = UniqueKey();
+                      _fetchTickets();
                     });
                   },
                   icon: Icon(Icons.clear_all, size: context.scale(18)),
@@ -230,7 +292,7 @@ class _YourSupportTicketPageState extends State<YourSupportTicketPage> {
                   style: TextButton.styleFrom(foregroundColor: theme.colorScheme.onSurfaceVariant),
                 ),
                 ElevatedButton.icon(
-                  onPressed: () => setState(() => _listKey = UniqueKey()),
+                  onPressed: _fetchTickets,
                   icon: Icon(Icons.search, size: context.scale(18)),
                   label: Text("Apply Search", style: TextStyle(fontSize: context.font(12))),
                   style: ElevatedButton.styleFrom(

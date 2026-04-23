@@ -3,6 +3,8 @@ import 'package:eduphin/services/theme_service.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_widget_from_html/flutter_widget_from_html.dart';
 import '../services/api_service.dart';
+import 'cache_service.dart';
+import 'super_admin_common_widgets.dart';
 
 class CancellationPolicyScreen extends StatefulWidget {
   const CancellationPolicyScreen({super.key});
@@ -20,24 +22,33 @@ class _CancellationPolicyScreenState extends State<CancellationPolicyScreen> {
   @override
   void initState() {
     super.initState();
-    _fetchPolicy();
+    _loadInitialData();
   }
 
-  @override
-  void dispose() {
-    _contentController.dispose();
-    super.dispose();
+  Future<void> _loadInitialData() async {
+    final cachedData = await SuperAdminCacheService.load('cancellation_policy');
+    if (cachedData != null && mounted) {
+      setState(() {
+        _contentController.text = cachedData['content'] ?? '';
+        _isLoading = false;
+      });
+    }
+    _fetchPolicy();
   }
 
   Future<void> _fetchPolicy() async {
     if (!mounted) return;
-    setState(() => _isLoading = true);
+    if (_contentController.text.isEmpty) {
+      setState(() => _isLoading = true);
+    }
     try {
       final data = await ApiService.getCancellationPolicy();
       if (mounted) {
         setState(() {
           _contentController.text = data['content'] ?? '';
+          _isLoading = false;
         });
+        await SuperAdminCacheService.save('cancellation_policy', data);
       }
     } catch (e) {
       debugPrint("Error fetching Cancellation Policy: $e");
@@ -88,9 +99,11 @@ class _CancellationPolicyScreenState extends State<CancellationPolicyScreen> {
             ),
         ],
       ),
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : SingleChildScrollView(
+      body: SuperAdminLoadingWrapper(
+        isLoading: _isLoading,
+        hasData: _contentController.text.isNotEmpty,
+        skeleton: _buildSkeleton(context),
+        child: SingleChildScrollView(
               padding: context.pagePadding,
               child: Center(
                 child: ConstrainedBox(
@@ -176,6 +189,48 @@ class _CancellationPolicyScreenState extends State<CancellationPolicyScreen> {
                 ),
               ),
             ),
+      ),
+    );
+  }
+
+  Widget _buildSkeleton(BuildContext context) {
+    return SingleChildScrollView(
+      padding: context.pagePadding,
+      child: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 900),
+          child: Card(
+            elevation: 0,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(context.scale(16)),
+              side: BorderSide(color: Colors.grey.withValues(alpha: 0.1)),
+            ),
+            child: Padding(
+              padding: EdgeInsets.all(context.spacing * 1.5),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Row(
+                    children: [
+                      SuperAdminSkeleton(height: 24, width: 24),
+                      SizedBox(width: 12),
+                      SuperAdminSkeleton(height: 24, width: 250),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  const SuperAdminSkeleton(height: 14, width: 350),
+                  SizedBox(height: context.scale(48)),
+                  const Divider(),
+                  SizedBox(height: context.scale(48)),
+                  const SuperAdminSkeleton(height: 400),
+                  SizedBox(height: context.scale(24)),
+                  const SuperAdminSkeleton(height: 54),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
     );
   }
 }

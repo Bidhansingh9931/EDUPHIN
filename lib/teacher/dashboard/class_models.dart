@@ -17,6 +17,13 @@ class ClassesAndSectionsData {
           [],
     );
   }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'classes': classes.map((e) => e.toJson()).toList(),
+      'sections': sections.map((e) => e.toJson()).toList(),
+    };
+  }
 }
 
 class TeacherClass {
@@ -43,6 +50,16 @@ class TeacherClass {
       level: json['level'],
     );
   }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'name': name,
+      'code': code,
+      'description': description,
+      'level': level,
+    };
+  }
 }
 
 class TeacherSection {
@@ -67,6 +84,15 @@ class TeacherSection {
       capacity: json['capacity'],
     );
   }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'name': name,
+      'class_id': classId,
+      'capacity': capacity,
+    };
+  }
 }
 
 class TeacherSchedule {
@@ -90,6 +116,15 @@ class TeacherSchedule {
       subject: TeacherSubject.fromJson(json['subject']),
     );
   }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'class': classModel.toJson(),
+      'section': section.toJson(),
+      'subject': subject.toJson(),
+    };
+  }
 }
 
 class TeacherSubject {
@@ -106,6 +141,13 @@ class TeacherSubject {
       id: json['id'],
       name: json['name'] ?? 'N/A',
     );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'name': name,
+    };
   }
 }
 
@@ -128,6 +170,13 @@ class TeacherStudent {
       id: json['id'],
       name: userName,
     );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'name': name,
+    };
   }
 }
 
@@ -154,5 +203,13 @@ class MyClassDetails {
           .map((studentJson) => TeacherStudent.fromJson(studentJson))
           .toList(),
     );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'sections': sections.map((e) => e.toJson()).toList(),
+      'schedules': schedules.map((e) => e.toJson()).toList(),
+      'students': students.map((e) => e.toJson()).toList(),
+    };
   }
 }

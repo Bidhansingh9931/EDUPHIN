@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:eduphin/services/responsive_helper.dart';
 import 'package:eduphin/manager_dashboard/recentSupportTickets/assigned_ticket.dart';
 import 'package:eduphin/services/api_service.dart';
+import 'package:eduphin/services/caching_service.dart';
 import 'package:eduphin/services/common_widgets.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
@@ -57,11 +58,11 @@ class Profile {
 
   factory Profile.fromJson(Map<String, dynamic> json) {
     return Profile(
-      name: json['name'] ?? 'N/A',
-      role: json['role']?['name'] ?? 'Manager', // Role might not be in profile data
-      email: json['email'] ?? 'N/A',
-      phone: json['phone'] ?? 'N/A',
-      imageUrl: ApiService.getStorageUrl(json['photo']),
+      name: json['name']?.toString() ?? 'N/A',
+      role: json['role']?['name']?.toString() ?? 'Manager', // Role might not be in profile data
+      email: json['email']?.toString() ?? 'N/A',
+      phone: json['phone']?.toString() ?? 'N/A',
+      imageUrl: ApiService.getStorageUrl(json['photo']?.toString()),
     );
   }
 }
@@ -74,8 +75,8 @@ class RoleSummary {
 
   factory RoleSummary.fromJson(Map<String, dynamic> json) {
     return RoleSummary(
-      name: json['name'] ?? 'Unknown Role',
-      count: json['user_details_count'] ?? 0,
+      name: json['name']?.toString() ?? 'Unknown Role',
+      count: int.tryParse(json['user_details_count']?.toString() ?? '') ?? 0,
     );
   }
 }
@@ -98,8 +99,8 @@ class UpcomingEvent {
 
   factory UpcomingEvent.fromJson(Map<String, dynamic> json, BuildContext context) {
     return UpcomingEvent(
-      title: json['title'] ?? 'Untitled Event',
-      eventDate: DateTime.tryParse(json['start_date'] ?? '') ?? DateTime.now(),
+      title: json['title']?.toString() ?? 'Untitled Event',
+      eventDate: DateTime.tryParse(json['start_date']?.toString() ?? '') ?? DateTime.now(),
       onTap: () {
         if (context.mounted) {
           Navigator.push(context, MaterialPageRoute(builder: (context) => const EventManagementPage()));
@@ -329,14 +330,58 @@ class ManagerDashboardPage extends StatefulWidget {
 }
 
 class _ManagerDashboardPageState extends State<ManagerDashboardPage> {
-  late Future<DashboardData> _dashboardDataFuture;
+  DashboardData? _dashboardData;
+  bool _isLoading = true;
+  Object? _error;
   final DashboardApiService _apiService = DashboardApiService();
 
   @override
   void initState() {
     super.initState();
-    // Move API call to initState to prevent multiple triggers during lifecycle changes
-    _dashboardDataFuture = _apiService.fetchDashboardData(context);
+    _loadCacheAndFetch();
+  }
+
+  Future<void> _loadCacheAndFetch() async {
+    final cachedData = await CacheService.getCache('manager_dashboard_data');
+    if (cachedData != null && mounted) {
+      setState(() {
+        _dashboardData = DashboardData.fromJson(cachedData, context);
+      });
+    }
+    _fetchDashboardData();
+  }
+
+  Future<void> _fetchDashboardData() async {
+    if (!mounted) return;
+    setState(() {
+      _isLoading = _dashboardData == null;
+      _error = null;
+    });
+
+    try {
+      final response = await ApiService.get('manager/dashboard');
+
+      if (!mounted) return;
+
+      if (response.statusCode == 200) {
+        final responseBody = jsonDecode(response.body);
+        if (responseBody['success'] == true) {
+          await CacheService.setCache('manager_dashboard_data', responseBody['data']);
+          setState(() {
+            _dashboardData = DashboardData.fromJson(responseBody['data'], context);
+            _isLoading = false;
+          });
+          return;
+        }
+      }
+      throw Exception('Failed to load dashboard data.');
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _isLoading = false;
+        _error = e;
+      });
+    }
   }
 
   Widget _buildSearchBar(BuildContext context) {
@@ -357,131 +402,132 @@ class _ManagerDashboardPageState extends State<ManagerDashboardPage> {
   }
 
   void _retry() {
-    setState(() {
-      _dashboardDataFuture = _apiService.fetchDashboardData(context);
-    });
+    _fetchDashboardData();
   }
 
   @override
   Widget build(BuildContext context) {
     final theme = context.theme;
-    return FutureBuilder<DashboardData>(
-      future: _dashboardDataFuture,
-      builder: (context, snapshot) {
-        return Scaffold(
-          backgroundColor: theme.scaffoldBackgroundColor,
-          appBar: AppBar(
-            title: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text("Manager Dashboard", style: theme.appBarTheme.titleTextStyle),
-                Text("Institution Overview", style: theme.textTheme.labelSmall?.copyWith(color: theme.hintColor)),
-              ],
-            ),
-            actions: [
-              IconButton(
-                icon: Icon(Icons.notifications_none_rounded, size: context.scale(24)),
-                onPressed: () {},
-              ),
-                if (snapshot.hasData)
-                  IconButton(
-                    onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => ManagerProfilePage())).then((_) => _retry()),
-                    icon: ProfileAvatar(
-                      imageUrl: snapshot.data!.profile.imageUrl,
-                      radius: context.scale(16),
-                    ),
-                  ),
-              SizedBox(width: context.scale(8)),
-            ],
+    return Scaffold(
+      backgroundColor: theme.scaffoldBackgroundColor,
+      appBar: AppBar(
+        title: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text("Manager Dashboard", style: theme.appBarTheme.titleTextStyle),
+            Text("Institution Overview", style: theme.textTheme.labelSmall?.copyWith(color: theme.hintColor)),
+          ],
+        ),
+        actions: [
+          IconButton(
+            icon: Icon(Icons.notifications_none_rounded, size: context.scale(24)),
+            onPressed: () {},
           ),
-          body: _buildBody(context, snapshot),
-        );
-      },
+          if (_dashboardData != null)
+            IconButton(
+              onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => ManagerProfilePage())).then((_) => _retry()),
+              icon: ProfileAvatar(
+                imageUrl: _dashboardData!.profile.imageUrl,
+                radius: context.scale(16),
+              ),
+            ),
+          SizedBox(width: context.scale(8)),
+        ],
+      ),
+      body: LoadingWrapper(
+        isLoading: _isLoading,
+        hasData: _dashboardData != null,
+        error: _error,
+        onRetry: _retry,
+        skeleton: _buildSkeleton(),
+        child: _dashboardData == null ? const SizedBox.shrink() : _buildContent(context, _dashboardData!),
+      ),
     );
   }
 
-  Widget _buildBody(BuildContext context, AsyncSnapshot<DashboardData> snapshot) {
+  Widget _buildSkeleton() {
+    return SingleChildScrollView(
+      padding: context.pagePadding,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SkeletonBox(height: context.scale(30), width: context.scale(200)),
+          SizedBox(height: context.spacing),
+          SkeletonBox(height: context.scale(50), borderRadius: context.scale(12)),
+          SizedBox(height: context.scale(24)),
+          SkeletonBox(height: context.scale(180), borderRadius: context.scale(20)),
+          SizedBox(height: context.scale(24)),
+          SkeletonBox(height: context.scale(100), borderRadius: context.scale(12)),
+          SizedBox(height: context.scale(24)),
+          SkeletonBox(height: context.scale(150), borderRadius: context.scale(16)),
+          SizedBox(height: context.scale(24)),
+          SkeletonBox(height: context.scale(200), borderRadius: context.scale(16)),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildContent(BuildContext context, DashboardData data) {
     final theme = context.theme;
-    if (snapshot.connectionState == ConnectionState.waiting) {
-      return const Center(child: CircularProgressIndicator());
-    } else if (snapshot.hasError) {
-      return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Text("Error: ${snapshot.error.toString().replaceFirst('Exception: ', '')}"),
-            SizedBox(height: context.spacing),
-            ElevatedButton(
-              onPressed: _retry,
-              child: const Text('Retry'),
-            ),
-          ],
-        ),
-      );
-    } else if (snapshot.hasData) {
-      final data = snapshot.data!;
-      return SingleChildScrollView(
-        padding: context.pagePadding,
-        child: Center(
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 1200),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text("Welcome back, ${data.profile.name.split(' ').first}",
-                    style: theme.textTheme.headlineSmall?.copyWith(
-                      fontWeight: FontWeight.bold,
-                      fontSize: context.font(24),
-                    )),
-                SizedBox(height: context.spacing),
-                _buildSearchBar(context),
-                SizedBox(height: context.scale(24)),
-                CustomProfileBox(profile: data.profile),
-                SizedBox(height: context.scale(24)),
-                CustomQuickActionBox(actions: data.quickActions),
-                SizedBox(height: context.scale(24)),
-                CustomAccountStaticsBox(statistics: data.accountStatistics),
-                SizedBox(height: context.scale(24)),
-                _buildSectionHeader(context, "Upcoming Events", Icons.event_note),
-                SizedBox(height: context.scale(12)),
-                CustomUpcomingEventsBox(events: data.upcomingEvents),
-                SizedBox(height: context.scale(24)),
-                _buildSectionHeader(context, "Salary Information", Icons.account_balance_wallet_outlined),
-                SizedBox(height: context.scale(12)),
-                CustomSalaryInformationBox(salaryInfo: data.salaryInformation),
-                SizedBox(height: context.scale(24)),
-                _buildSectionHeader(context, "Manage Classes", Icons.class_outlined),
-                SizedBox(height: context.scale(12)),
-                CustomManageClassesSectionBox(manageClasses: data.manageClasses),
-                SizedBox(height: context.scale(24)),
-                _buildSectionHeader(context, "Fee Structure", Icons.payments_outlined),
-                SizedBox(height: context.scale(12)),
-                CustomFeeStructureBox(feeStructure: data.feeStructure),
-                SizedBox(height: context.scale(24)),
-                _buildSectionHeader(context, "Examinations", Icons.assignment_outlined),
-                SizedBox(height: context.scale(12)),
-                CustomExaminationsBox(examinations: data.examinations),
-                SizedBox(height: context.scale(24)),
-                _buildSectionHeader(context, "Library", Icons.local_library_outlined),
-                SizedBox(height: context.scale(12)),
-                CustomLibraryBox(library: data.library),
-                SizedBox(height: context.scale(24)),
-                _buildSectionHeader(context, "Study Material", Icons.book_outlined),
-                SizedBox(height: context.scale(12)),
-                CustomStudyMaterialBox(studyMaterial: data.studyMaterial),
-                SizedBox(height: context.scale(24)),
-                _buildSectionHeader(context, "Recent Support Tickets", Icons.confirmation_number_outlined),
-                SizedBox(height: context.scale(12)),
-                CustomRecentSupportTicketsBox(tickets: data.recentSupportTickets),
-                SizedBox(height: context.scale(40)),
-              ],
-            ),
+    return SingleChildScrollView(
+      padding: context.pagePadding,
+      child: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 1200),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text("Welcome back, ${data.profile.name.split(' ').first}",
+                  style: theme.textTheme.headlineSmall?.copyWith(
+                    fontWeight: FontWeight.bold,
+                    fontSize: context.font(24),
+                  )),
+              SizedBox(height: context.spacing),
+              _buildSearchBar(context),
+              SizedBox(height: context.scale(24)),
+              CustomProfileBox(profile: data.profile),
+              SizedBox(height: context.scale(24)),
+              CustomQuickActionBox(actions: data.quickActions),
+              SizedBox(height: context.scale(24)),
+              CustomAccountStaticsBox(statistics: data.accountStatistics),
+              SizedBox(height: context.scale(24)),
+              _buildSectionHeader(context, "Upcoming Events", Icons.event_note),
+              SizedBox(height: context.scale(12)),
+              CustomUpcomingEventsBox(events: data.upcomingEvents),
+              SizedBox(height: context.scale(24)),
+              _buildSectionHeader(context, "Salary Information", Icons.account_balance_wallet_outlined),
+              SizedBox(height: context.scale(12)),
+              CustomSalaryInformationBox(salaryInfo: data.salaryInformation),
+              SizedBox(height: context.scale(24)),
+              _buildSectionHeader(context, "Manage Classes", Icons.class_outlined),
+              SizedBox(height: context.scale(12)),
+              CustomManageClassesSectionBox(manageClasses: data.manageClasses),
+              SizedBox(height: context.scale(24)),
+              _buildSectionHeader(context, "Fee Structure", Icons.payments_outlined),
+              SizedBox(height: context.scale(12)),
+              CustomFeeStructureBox(feeStructure: data.feeStructure),
+              SizedBox(height: context.scale(24)),
+              _buildSectionHeader(context, "Examinations", Icons.assignment_outlined),
+              SizedBox(height: context.scale(12)),
+              CustomExaminationsBox(examinations: data.examinations),
+              SizedBox(height: context.scale(24)),
+              _buildSectionHeader(context, "Library", Icons.local_library_outlined),
+              SizedBox(height: context.scale(12)),
+              CustomLibraryBox(library: data.library),
+              SizedBox(height: context.scale(24)),
+              _buildSectionHeader(context, "Study Material", Icons.book_outlined),
+              SizedBox(height: context.scale(12)),
+              CustomStudyMaterialBox(studyMaterial: data.studyMaterial),
+              SizedBox(height: context.scale(24)),
+              _buildSectionHeader(context, "Recent Support Tickets", Icons.confirmation_number_outlined),
+              SizedBox(height: context.scale(12)),
+              CustomRecentSupportTicketsBox(tickets: data.recentSupportTickets),
+              SizedBox(height: context.scale(40)),
+            ],
           ),
         ),
-      );
-    } else {
-      return const Center(child: Text("No data available"));
-    }
+      ),
+    );
   }
 
   Widget _buildSectionHeader(BuildContext context, String title, IconData icon) {

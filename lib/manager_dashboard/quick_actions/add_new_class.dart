@@ -76,7 +76,7 @@ class _AddNewClassPageState extends State<AddNewClassPage> {
   }
 
   Future<void> _loadCachedData() async {
-    final cachedData = await CachingService.getCache(_cacheKey);
+    final cachedData = await CacheService.getCache(_cacheKey);
     if (cachedData != null && cachedData is List) {
       if (mounted) {
         setState(() {
@@ -96,7 +96,7 @@ class _AddNewClassPageState extends State<AddNewClassPage> {
     }
     try {
       final levels = await _apiService.fetchClassLevels();
-      await CachingService.setCache(_cacheKey, levels);
+      await CacheService.setCache(_cacheKey, levels);
       if (mounted) {
         setState(() {
           _levels = levels;
@@ -108,7 +108,7 @@ class _AddNewClassPageState extends State<AddNewClassPage> {
       if (mounted) {
         setState(() {
           _error = e;
-          _isLoading = false;
+          _isLoading = _levels.isEmpty;
         });
       }
     }

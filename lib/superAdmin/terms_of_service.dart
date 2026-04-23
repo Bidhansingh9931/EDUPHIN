@@ -2,6 +2,8 @@ import 'package:eduphin/services/responsive_helper.dart';
 import 'package:eduphin/services/theme_service.dart';
 import 'package:flutter/material.dart';
 import '../services/api_service.dart';
+import 'cache_service.dart';
+import 'super_admin_common_widgets.dart';
 
 class TermsOfServiceScreen extends StatefulWidget {
   const TermsOfServiceScreen({super.key});
@@ -18,24 +20,33 @@ class _TermsOfServiceScreenState extends State<TermsOfServiceScreen> {
   @override
   void initState() {
     super.initState();
-    _fetchPolicy();
+    _loadInitialData();
   }
 
-  @override
-  void dispose() {
-    _contentController.dispose();
-    super.dispose();
+  Future<void> _loadInitialData() async {
+    final cachedData = await SuperAdminCacheService.load('terms_of_service');
+    if (cachedData != null && mounted) {
+      setState(() {
+        _contentController.text = cachedData['content'] ?? '';
+        _isLoading = false;
+      });
+    }
+    _fetchPolicy();
   }
 
   Future<void> _fetchPolicy() async {
     if (!mounted) return;
-    setState(() => _isLoading = true);
+    if (_contentController.text.isEmpty) {
+      setState(() => _isLoading = true);
+    }
     try {
       final data = await ApiService.getTermsOfService();
       if (data != null && mounted) {
         setState(() {
           _contentController.text = data['content'] ?? '';
+          _isLoading = false;
         });
+        await SuperAdminCacheService.save('terms_of_service', data);
       }
     } catch (e) {
       debugPrint("Error fetching Terms of Service: $e");
@@ -81,9 +92,11 @@ class _TermsOfServiceScreenState extends State<TermsOfServiceScreen> {
             ),
         ],
       ),
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : SingleChildScrollView(
+      body: SuperAdminLoadingWrapper(
+        isLoading: _isLoading,
+        hasData: _contentController.text.isNotEmpty,
+        skeleton: _buildSkeleton(context),
+        child: SingleChildScrollView(
               padding: context.pagePadding,
               child: Center(
                 child: ConstrainedBox(
@@ -141,6 +154,48 @@ class _TermsOfServiceScreenState extends State<TermsOfServiceScreen> {
                 ),
               ),
             ),
+      ),
+    );
+  }
+
+  Widget _buildSkeleton(BuildContext context) {
+    return SingleChildScrollView(
+      padding: context.pagePadding,
+      child: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 900),
+          child: Card(
+            elevation: 0,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(context.scale(16)),
+              side: BorderSide(color: Colors.grey.withValues(alpha: 0.1)),
+            ),
+            child: Padding(
+              padding: EdgeInsets.all(context.spacing * 1.5),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Row(
+                    children: [
+                      SuperAdminSkeleton(height: 24, width: 24),
+                      SizedBox(width: 12),
+                      SuperAdminSkeleton(height: 24, width: 250),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  const SuperAdminSkeleton(height: 14, width: 350),
+                  SizedBox(height: context.scale(48)),
+                  const Divider(),
+                  SizedBox(height: context.scale(48)),
+                  const SuperAdminSkeleton(height: 400),
+                  SizedBox(height: context.scale(24)),
+                  const SuperAdminSkeleton(height: 54),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
     );
   }
 }

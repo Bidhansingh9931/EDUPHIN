@@ -2,6 +2,8 @@ import 'package:eduphin/services/responsive_helper.dart';
 import 'package:flutter/material.dart';
 import 'package:eduphin/services/api_service.dart';
 import 'package:intl/intl.dart';
+import 'cache_service.dart';
+import 'super_admin_common_widgets.dart';
 
 class FAQManagementScreen extends StatefulWidget {
   const FAQManagementScreen({super.key});
@@ -18,15 +20,28 @@ class _FAQManagementScreenState extends State<FAQManagementScreen> {
   @override
   void initState() {
     super.initState();
+    _loadInitialData();
+  }
+
+  Future<void> _loadInitialData() async {
+    final cachedData = await SuperAdminCacheService.load('faqs');
+    if (cachedData != null && mounted) {
+      setState(() {
+        _faqs = cachedData;
+        _isLoading = false;
+      });
+    }
     _fetchFaqs();
   }
 
   Future<void> _fetchFaqs() async {
     if (!mounted) return;
-    setState(() {
-      _isLoading = true;
-      _errorMessage = null;
-    });
+    if (_faqs.isEmpty) {
+      setState(() {
+        _isLoading = true;
+        _errorMessage = null;
+      });
+    }
     try {
       final faqs = await ApiService.getFaqs();
       if (mounted) {
@@ -34,6 +49,7 @@ class _FAQManagementScreenState extends State<FAQManagementScreen> {
           _faqs = faqs;
           _isLoading = false;
         });
+        await SuperAdminCacheService.save('faqs', faqs);
       }
     } catch (e) {
       if (mounted) {
@@ -127,43 +143,58 @@ class _FAQManagementScreenState extends State<FAQManagementScreen> {
           ),
         ],
       ),
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : _errorMessage != null
-              ? Center(
-                  child: Padding(
-                    padding: EdgeInsets.all(context.scale(24.0)),
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Text(_errorMessage!, textAlign: TextAlign.center, style: TextStyle(color: theme.colorScheme.error, fontSize: context.font(14))),
-                        SizedBox(height: context.scale(16)),
-                        ElevatedButton(onPressed: _fetchFaqs, child: const Text("Retry")),
-                      ],
-                    ),
-                  ),
-                )
-              : RefreshIndicator(
-                  onRefresh: _fetchFaqs,
-                  child: SingleChildScrollView(
-                    padding: context.pagePadding,
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Card(
-                          color: theme.colorScheme.secondaryContainer,
-                          child: Padding(
-                            padding: EdgeInsets.symmetric(horizontal: context.scale(16), vertical: context.scale(12)),
-                            child: Text("Total FAQs: ${_faqs.length}",
-                              style: TextStyle(color: theme.colorScheme.onSecondaryContainer, fontWeight: FontWeight.bold, fontSize: context.font(14))),
-                          ),
-                        ),
-                        SizedBox(height: context.scale(24)),
-                        ..._faqs.map((faq) => _buildFAQCard(faq)),
-                      ],
-                    ),
+      body: SuperAdminLoadingWrapper(
+        isLoading: _isLoading,
+        hasData: _faqs.isNotEmpty,
+        skeleton: _buildSkeleton(context),
+        child: _errorMessage != null
+            ? Center(
+                child: Padding(
+                  padding: EdgeInsets.all(context.scale(24.0)),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Text(_errorMessage!, textAlign: TextAlign.center, style: TextStyle(color: theme.colorScheme.error, fontSize: context.font(14))),
+                      SizedBox(height: context.scale(16)),
+                      ElevatedButton(onPressed: _fetchFaqs, child: const Text("Retry")),
+                    ],
                   ),
                 ),
+              )
+            : RefreshIndicator(
+                onRefresh: _fetchFaqs,
+                child: SingleChildScrollView(
+                  padding: context.pagePadding,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Card(
+                        color: theme.colorScheme.secondaryContainer,
+                        child: Padding(
+                          padding: EdgeInsets.symmetric(horizontal: context.scale(16), vertical: context.scale(12)),
+                          child: Text("Total FAQs: ${_faqs.length}",
+                            style: TextStyle(color: theme.colorScheme.onSecondaryContainer, fontWeight: FontWeight.bold, fontSize: context.font(14))),
+                        ),
+                      ),
+                      SizedBox(height: context.scale(24)),
+                      ..._faqs.map((faq) => _buildFAQCard(faq)),
+                    ],
+                  ),
+                ),
+              ),
+      ),
+    );
+  }
+
+  Widget _buildSkeleton(BuildContext context) {
+    return SingleChildScrollView(
+      padding: context.pagePadding,
+      child: Column(
+        children: List.generate(5, (index) => Padding(
+          padding: const EdgeInsets.only(bottom: 16),
+          child: SuperAdminSkeleton(height: context.scale(60)),
+        )),
+      ),
     );
   }
 

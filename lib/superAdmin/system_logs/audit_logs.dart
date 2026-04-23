@@ -2,6 +2,8 @@ import 'dart:convert';
 import 'package:eduphin/services/responsive_helper.dart';
 import 'package:flutter/material.dart';
 import 'package:eduphin/services/api_service.dart';
+import '../cache_service.dart';
+import '../super_admin_common_widgets.dart';
 import 'log_details.dart';
 
 class AuditLogsScreen extends StatefulWidget {
@@ -20,6 +22,23 @@ class _AuditLogsScreenState extends State<AuditLogsScreen> {
   @override
   void initState() {
     super.initState();
+    _loadInitialData();
+  }
+
+  Future<void> _loadInitialData() async {
+    final cachedData = await SuperAdminCacheService.load('audit_logs');
+    if (cachedData != null && mounted) {
+      setState(() {
+        if (cachedData is Map) {
+          _logs = cachedData['logs'] ?? [];
+          _institutes = cachedData['institutes'] ?? [];
+          _roles = cachedData['roles'] ?? [];
+        } else if (cachedData is List) {
+          _logs = cachedData;
+        }
+        _isLoading = false;
+      });
+    }
     _fetchLogs();
   }
 
@@ -28,7 +47,9 @@ class _AuditLogsScreenState extends State<AuditLogsScreen> {
 
   Future<void> _fetchLogs() async {
     if (!mounted) return;
-    setState(() => _isLoading = true);
+    if (_logs.isEmpty) {
+      setState(() => _isLoading = true);
+    }
     try {
       String url = 'superadmin/audit';
       List<String> params = [];
@@ -41,7 +62,8 @@ class _AuditLogsScreenState extends State<AuditLogsScreen> {
 
       final response = await ApiService.get(url);
       if (response.statusCode == 200) {
-        final data = jsonDecode(response.body)['data'];
+        final decoded = jsonDecode(response.body);
+        final data = decoded['data'];
         if (mounted) {
           setState(() {
             if (data is Map) {
@@ -53,6 +75,10 @@ class _AuditLogsScreenState extends State<AuditLogsScreen> {
             }
             _isLoading = false;
           });
+          // Only cache when no filters are applied to avoid bloating or showing partial data as full
+          if (_selectedInstituteId == null && _selectedRoleId == null) {
+            await SuperAdminCacheService.save('audit_logs', data);
+          }
         }
       }
     } catch (e) {
@@ -70,21 +96,37 @@ class _AuditLogsScreenState extends State<AuditLogsScreen> {
       appBar: AppBar(
         title: const Text("Audit Logs"),
       ),
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : RefreshIndicator(
-              onRefresh: _fetchLogs,
-              child: SingleChildScrollView(
-                padding: context.pagePadding,
-                child: Column(
-                  children: [
-                    _buildFilterSection(context),
-                    const SizedBox(height: 24),
-                    _buildLogEntries(context),
-                  ],
-                ),
-              ),
+      body: SuperAdminLoadingWrapper(
+        isLoading: _isLoading,
+        hasData: _logs.isNotEmpty,
+        skeleton: _buildSkeleton(context),
+        child: RefreshIndicator(
+          onRefresh: _fetchLogs,
+          child: SingleChildScrollView(
+            padding: context.pagePadding,
+            child: Column(
+              children: [
+                _buildFilterSection(context),
+                const SizedBox(height: 24),
+                _buildLogEntries(context),
+              ],
             ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSkeleton(BuildContext context) {
+    return SingleChildScrollView(
+      padding: context.pagePadding,
+      child: Column(
+        children: [
+          SuperAdminSkeleton(height: context.scale(200)),
+          const SizedBox(height: 24),
+          SuperAdminSkeleton(height: context.scale(400)),
+        ],
+      ),
     );
   }
 
@@ -193,7 +235,14 @@ class _AuditLogsScreenState extends State<AuditLogsScreen> {
             const SizedBox(height: 4),
             Text("Detailed records of system activities.", style: theme.textTheme.bodySmall?.copyWith(color: theme.hintColor)),
             const SizedBox(height: 24),
-            _buildTable(context),
+            if (_logs.isEmpty && !_isLoading)
+              const SuperAdminEmptyState(
+                title: "No Audit Logs Found",
+                subtitle: "Try adjusting your filters or resetting them.",
+                icon: Icons.assignment_late_outlined,
+              )
+            else
+              _buildTable(context),
           ],
         ),
       ),

@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:io';
 import 'dart:typed_data';
 
+import 'package:eduphin/moderator_dashboard/cache_helper.dart';
 import 'package:eduphin/services/api_service.dart';
 import 'package:eduphin/services/responsive_helper.dart';
 import 'package:eduphin/services/common_widgets.dart';
@@ -153,6 +154,10 @@ class _AddEmployeePageState extends State<AddEmployeePage> {
 
     try {
       await ApiService.addEmployee(newEmployee);
+
+      // Clear employee list cache for this institute
+      await CacheHelper.clear('employees_list_${widget.instituteId}');
+
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(

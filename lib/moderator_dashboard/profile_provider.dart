@@ -9,10 +9,25 @@ import 'package:path_provider/path_provider.dart';
 import 'package:permission_handler/permission_handler.dart';
 
 import 'profile_model.dart';
+import 'cache_helper.dart';
 
 class ProfileProvider {
-  Future<ProfileData> fetchProfileData() async {
+  static const String _cacheKey = 'profile_data';
+
+  Future<ProfileData?> getCachedProfileData() async {
+    final cached = await CacheHelper.load(_cacheKey);
+    if (cached != null) {
+      return ProfileData.fromMap(cached);
+    }
+    return null;
+  }
+
+  Future<ProfileData> fetchProfileData({bool bypassCache = false}) async {
     try {
+      if (!bypassCache) {
+        final cached = await getCachedProfileData();
+        if (cached != null) return cached;
+      }
       final response = await ApiService.get('moderator/profile');
 
       if (response.statusCode == 200) {
@@ -31,6 +46,9 @@ class ProfileProvider {
           final Map<String, dynamic> combinedData = {}
             ..addAll(userMap)
             ..addAll(detailsMap);
+
+          // Save to cache
+          await CacheHelper.save(_cacheKey, combinedData);
 
           return ProfileData.fromMap(combinedData);
         } else {
@@ -70,6 +88,8 @@ class ProfileProvider {
           throw Exception(errorMessage);
         }
       }
+      // Invalidate cache on success so the next fetch gets fresh data
+      await CacheHelper.clear(_cacheKey);
     } catch (e) {
       debugPrint("An error occurred saving profile: $e");
       rethrow;
@@ -107,5 +127,6 @@ class ProfileProvider {
 
   Future<void> logout() async {
     await ApiService.logout();
+    await CacheHelper.clearAll();
   }
 }

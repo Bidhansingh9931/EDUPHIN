@@ -1,12 +1,14 @@
 import 'package:eduphin/services/api_service.dart';
 import 'package:eduphin/services/responsive_helper.dart';
 import 'package:eduphin/teacher/dashboard/study_material_model.dart';
+import 'package:eduphin/teacher/dashboard/teacher_cache_service.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'dart:io';
 import 'common_widgets.dart';
 import 'app_drawer.dart';
+import 'package:shimmer/shimmer.dart';
 
 class StudentMaterialPage extends StatefulWidget {
   const StudentMaterialPage({super.key});
@@ -16,14 +18,64 @@ class StudentMaterialPage extends StatefulWidget {
 }
 
 class _StudentMaterialPageState extends State<StudentMaterialPage> {
-  late Future<StudyMaterialPageData> _dataFuture;
+  bool _isLoading = true;
+  StudyMaterialPageData? _data;
+  String? _error;
   ScheduleInfo? _selectedSchedule;
   List<StudyMaterialInfo> _filteredMaterials = [];
 
   @override
   void initState() {
     super.initState();
-    _dataFuture = ApiService.getStudyMaterialsData();
+    _loadData();
+  }
+
+  Future<void> _loadData() async {
+    // 1. Load from cache
+    final cachedData = await TeacherCacheService.load('student_materials');
+    if (cachedData != null) {
+      if (mounted) {
+        setState(() {
+          _data = StudyMaterialPageData.fromJson(cachedData);
+          _isLoading = false;
+          if (_selectedSchedule != null) {
+            _filterMaterials(_data!.studyMaterials);
+          }
+        });
+      }
+    }
+
+    // 2. Fetch from API
+    try {
+      final freshData = await ApiService.getStudyMaterialsData();
+      await TeacherCacheService.save('student_materials', freshData.toJson());
+      
+      if (mounted) {
+        setState(() {
+          _data = freshData;
+          _isLoading = false;
+          _error = null;
+          if (_selectedSchedule != null) {
+            // Find the updated version of the selected schedule if possible
+            try {
+              _selectedSchedule = freshData.schedules.firstWhere(
+                (s) => s.classId == _selectedSchedule!.classId && 
+                       s.sectionId == _selectedSchedule!.sectionId && 
+                       s.subjectId == _selectedSchedule!.subjectId
+              );
+            } catch (_) {}
+            _filterMaterials(freshData.studyMaterials);
+          }
+        });
+      }
+    } catch (e) {
+      if (_data == null && mounted) {
+        setState(() {
+          _error = e.toString();
+          _isLoading = false;
+        });
+      }
+    }
   }
 
   void _filterMaterials(List<StudyMaterialInfo> allMaterials) {
@@ -37,7 +89,6 @@ class _StudentMaterialPageState extends State<StudentMaterialPage> {
               material.subjectId == _selectedSchedule!.subjectId)
           .toList();
     }
-    if (mounted) setState(() {});
   }
 
   void _showUploadDialog() {
@@ -146,9 +197,7 @@ class _StudentMaterialPageState extends State<StudentMaterialPage> {
                         
                         if (mounted) {
                           Navigator.of(context).pop();
-                          setState(() {
-                            _dataFuture = ApiService.getStudyMaterialsData();
-                          });
+                          _loadData();
                         }
                       } catch (e) {
                         if (mounted) {
@@ -206,88 +255,91 @@ class _StudentMaterialPageState extends State<StudentMaterialPage> {
         ),
       ),
       drawer: const AppDrawer(),
-      body: FutureBuilder<StudyMaterialPageData>(
-        future: _dataFuture,
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
-          } else if (snapshot.hasError) {
-            return Center(child: Text('Error: ${snapshot.error}', style: TextStyle(fontSize: context.font(14), color: theme.colorScheme.error)));
-          } else if (snapshot.hasData) {
-            final pageData = snapshot.data!;
-            
-            if (_selectedSchedule != null) {
-               _filteredMaterials = pageData.studyMaterials
-                  .where((material) =>
-                      material.classId == _selectedSchedule!.classId &&
-                      material.sectionId == _selectedSchedule!.sectionId &&
-                      material.subjectId == _selectedSchedule!.subjectId)
-                  .toList();
-            }
+      body: _buildBody(),
+    );
+  }
 
-            return SingleChildScrollView(
-              padding: context.pagePadding,
-              child: Center(
-                child: ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 800),
+  Widget _buildBody() {
+    final theme = context.theme;
+    if (_isLoading && _data == null) {
+      return _buildSkeletonLoader(context);
+    }
+
+    if (_error != null && _data == null) {
+      return Center(child: Text('Error: $_error', style: TextStyle(fontSize: context.font(14), color: theme.colorScheme.error)));
+    }
+
+    if (_data == null) {
+      return Center(child: Text('No data', style: TextStyle(fontSize: context.font(14))));
+    }
+
+    final pageData = _data!;
+    if (_selectedSchedule != null) {
+      _filteredMaterials = pageData.studyMaterials
+          .where((material) =>
+              material.classId == _selectedSchedule!.classId &&
+              material.sectionId == _selectedSchedule!.sectionId &&
+              material.subjectId == _selectedSchedule!.subjectId)
+          .toList();
+    }
+
+    return SingleChildScrollView(
+      padding: context.pagePadding,
+      child: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 800),
+          child: Column(
+            children: [
+              Card(
+                elevation: 0,
+                color: theme.colorScheme.surfaceContainerLow,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(context.scale(16)),
+                  side: BorderSide(color: theme.colorScheme.outlineVariant.withValues(alpha: 0.5)),
+                ),
+                child: Padding(
+                  padding: EdgeInsets.all(context.spacing),
                   child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Card(
-                        elevation: 0,
-                        color: theme.colorScheme.surfaceContainerLow,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(context.scale(16)),
-                          side: BorderSide(color: theme.colorScheme.outlineVariant.withValues(alpha: 0.5)),
-                        ),
-                        child: Padding(
-                          padding: EdgeInsets.all(context.spacing),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                "Select Class Schedule",
-                                style: TextStyle(
-                                  fontSize: context.font(15),
-                                  fontWeight: FontWeight.bold,
-                                  color: theme.colorScheme.onSurface,
-                                ),
-                              ),
-                              SizedBox(height: context.scale(16)),
-                              buildDropdown(context, pageData.schedules.map((e) => e.displayText).toList(), _selectedSchedule?.displayText, (newValue) {
-                                 setState(() {
-                                  _selectedSchedule = pageData.schedules.firstWhere((element) => element.displayText == newValue);
-                                  _filterMaterials(pageData.studyMaterials);
-                                });
-                              }, hint: "Select Schedule"),
-                              SizedBox(height: context.scale(20)),
-                              ElevatedButton.icon(
-                                onPressed: _selectedSchedule != null ? _showUploadDialog : null,
-                                icon: Icon(Icons.add, size: context.scale(18)),
-                                label: Text("UPLOAD NEW MATERIAL", style: TextStyle(fontSize: context.font(13), fontWeight: FontWeight.bold, letterSpacing: 1.1)),
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: theme.colorScheme.primary,
-                                  foregroundColor: theme.colorScheme.onPrimary,
-                                  minimumSize: Size(double.infinity, context.scale(48)),
-                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(context.scale(12))),
-                                  elevation: 0,
-                                ),
-                              ),
-                            ],
-                          ),
+                      Text(
+                        "Select Class Schedule",
+                        style: TextStyle(
+                          fontSize: context.font(15),
+                          fontWeight: FontWeight.bold,
+                          color: theme.colorScheme.onSurface,
                         ),
                       ),
-                      SizedBox(height: context.spacing),
-                      _buildMaterialSection(context),
-                      SizedBox(height: context.spacing * 2),
+                      SizedBox(height: context.scale(16)),
+                      buildDropdown(context, pageData.schedules.map((e) => e.displayText).toList(), _selectedSchedule?.displayText, (newValue) {
+                        setState(() {
+                          _selectedSchedule = pageData.schedules.firstWhere((element) => element.displayText == newValue);
+                          _filterMaterials(pageData.studyMaterials);
+                        });
+                      }, hint: "Select Schedule"),
+                      SizedBox(height: context.scale(20)),
+                      ElevatedButton.icon(
+                        onPressed: _selectedSchedule != null ? _showUploadDialog : null,
+                        icon: Icon(Icons.add, size: context.scale(18)),
+                        label: Text("UPLOAD NEW MATERIAL", style: TextStyle(fontSize: context.font(13), fontWeight: FontWeight.bold, letterSpacing: 1.1)),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: theme.colorScheme.primary,
+                          foregroundColor: theme.colorScheme.onPrimary,
+                          minimumSize: Size(double.infinity, context.scale(48)),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(context.scale(12))),
+                          elevation: 0,
+                        ),
+                      ),
                     ],
                   ),
                 ),
               ),
-            );
-          } else {
-            return Center(child: Text('No data', style: TextStyle(fontSize: context.font(14))));
-          }
-        },
+              SizedBox(height: context.spacing),
+              _buildMaterialSection(context),
+              SizedBox(height: context.spacing * 2),
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -403,12 +455,48 @@ class _StudentMaterialPageState extends State<StudentMaterialPage> {
     if (confirmed == true) {
       try {
         await ApiService.deleteStudyMaterial(id);
-        setState(() {
-          _dataFuture = ApiService.getStudyMaterialsData();
-        });
+        _loadData();
       } catch (e) {
         if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
       }
     }
+  }
+
+  Widget _buildSkeletonLoader(BuildContext context) {
+    final theme = context.theme;
+    return Shimmer.fromColors(
+      baseColor: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
+      highlightColor: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.1),
+      child: SingleChildScrollView(
+        padding: context.pagePadding,
+        child: Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 800),
+            child: Column(
+              children: [
+                Container(
+                  height: context.scale(180),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(context.scale(16)),
+                  ),
+                ),
+                SizedBox(height: context.spacing),
+                ...List.generate(5, (index) => Padding(
+                  padding: EdgeInsets.only(bottom: context.scale(12)),
+                  child: Container(
+                    height: context.scale(80),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(context.scale(12)),
+                    ),
+                  ),
+                )),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
   }
 }

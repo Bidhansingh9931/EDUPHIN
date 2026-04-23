@@ -5,6 +5,7 @@ import 'accountant_dashboard_model.dart' as accountant_model;
 import 'package:intl/intl.dart';
 import 'package:eduphin/teacher/dashboard/common_widgets.dart';
 import 'package:eduphin/services/common_widgets.dart';
+import 'package:eduphin/services/pdf_service.dart';
 
 class SalarySlipsPage extends StatefulWidget {
   final String? employeeId;
@@ -503,6 +504,24 @@ class _SalarySlipsPageState extends State<SalarySlipsPage> {
                               ),
                             _detailRow(context, "Payment Date", data['payment_date'] ?? salary.paymentDate ?? "N/A"),
                             _detailRow(context, "Status", salary.status),
+                            SizedBox(height: context.scale(24)),
+                            SizedBox(
+                              width: double.infinity,
+                              child: ElevatedButton.icon(
+                                onPressed: () {
+                                  PdfService.generateSalaryPdf(salary, amountInWords);
+                                },
+                                icon: const Icon(Icons.download),
+                                label: const Text("DOWNLOAD PAYSLIP"),
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: theme.colorScheme.secondaryContainer,
+                                  foregroundColor: theme.colorScheme.onSecondaryContainer,
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(context.scale(12)),
+                                  ),
+                                ),
+                              ),
+                            ),
                           ],
                         );
                       },

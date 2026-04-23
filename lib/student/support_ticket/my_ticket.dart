@@ -1,3 +1,5 @@
+import 'package:eduphin/services/caching_service.dart';
+import 'package:eduphin/services/common_widgets.dart';
 import 'package:flutter/material.dart';
 import 'package:eduphin/services/api_service.dart';
 import 'package:eduphin/services/responsive_helper.dart';
@@ -15,6 +17,125 @@ class YourSupportTicket extends StatelessWidget {
   }
 }
 
+class _TicketSkeleton extends StatelessWidget {
+  const _TicketSkeleton();
+
+  @override
+  Widget build(BuildContext context) {
+    return SingleChildScrollView(
+      padding: context.pagePadding,
+      child: Center(
+        child: Container(
+          constraints: const BoxConstraints(maxWidth: 1200),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _buildFilterSkeleton(context),
+              SizedBox(height: context.scale(24)),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  SkeletonBox(width: context.scale(150), height: context.scale(24)),
+                  SkeletonBox(width: context.scale(80), height: context.scale(24)),
+                ],
+              ),
+              SizedBox(height: context.scale(16)),
+              LayoutBuilder(builder: (context, constraints) {
+                final int crossAxisCount = context.responsive(1, tablet: 2, desktop: 3);
+                return GridView.builder(
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                    crossAxisCount: crossAxisCount,
+                    crossAxisSpacing: context.scale(16),
+                    mainAxisSpacing: context.scale(16),
+                    mainAxisExtent: context.scale(180),
+                  ),
+                  itemCount: 6,
+                  itemBuilder: (context, index) {
+                    return _buildCardSkeleton(context);
+                  },
+                );
+              }),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildFilterSkeleton(BuildContext context) {
+    final colorScheme = context.theme.colorScheme;
+    return Container(
+      padding: EdgeInsets.all(context.scale(20)),
+      decoration: BoxDecoration(
+        color: colorScheme.surfaceContainerLow,
+        borderRadius: BorderRadius.circular(context.scale(16)),
+        border: Border.all(color: colorScheme.outlineVariant),
+      ),
+      child: Column(
+        children: [
+          Row(
+            children: [
+              SkeletonBox(width: context.scale(24), height: context.scale(24)),
+              SizedBox(width: context.scale(8)),
+              SkeletonBox(width: context.scale(120), height: context.scale(20)),
+            ],
+          ),
+          SizedBox(height: context.scale(20)),
+          Row(
+            children: [
+              Expanded(child: SkeletonBox(height: context.scale(40))),
+              SizedBox(width: context.scale(16)),
+              Expanded(child: SkeletonBox(height: context.scale(40))),
+              SizedBox(width: context.scale(16)),
+              Expanded(child: SkeletonBox(height: context.scale(40))),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildCardSkeleton(BuildContext context) {
+    final colorScheme = context.theme.colorScheme;
+    return Container(
+      padding: EdgeInsets.all(context.scale(16)),
+      decoration: BoxDecoration(
+        color: colorScheme.surfaceContainerLow,
+        borderRadius: BorderRadius.circular(context.scale(16)),
+        border: Border.all(color: colorScheme.outlineVariant),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              SkeletonBox(width: context.scale(40), height: context.scale(12)),
+              SkeletonBox(width: context.scale(60), height: context.scale(12)),
+            ],
+          ),
+          SizedBox(height: context.scale(12)),
+          SkeletonBox(width: double.infinity, height: context.scale(16)),
+          SizedBox(height: context.scale(8)),
+          SkeletonBox(width: context.scale(100), height: context.scale(12)),
+          SizedBox(height: context.scale(4)),
+          SkeletonBox(width: context.scale(120), height: context.scale(12)),
+          const Spacer(),
+          Row(
+            children: [
+              SkeletonBox(width: context.scale(60), height: context.scale(20)),
+              SizedBox(width: context.scale(8)),
+              SkeletonBox(width: context.scale(60), height: context.scale(20)),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class SupportTicketsPage extends StatefulWidget {
   const SupportTicketsPage({super.key});
 
@@ -28,12 +149,14 @@ class _SupportTicketsPageState extends State<SupportTicketsPage> {
   String _searchQuery = "";
   String _selectedPriority = "all";
   String _selectedStatus = "all";
+  static const String _cacheKey = 'student_support_tickets';
 
   final TextEditingController _searchController = TextEditingController();
 
   @override
   void initState() {
     super.initState();
+    _loadCachedData();
     _fetchTickets();
   }
 
@@ -43,8 +166,20 @@ class _SupportTicketsPageState extends State<SupportTicketsPage> {
     super.dispose();
   }
 
+  Future<void> _loadCachedData() async {
+    final cachedData = await CacheService.getData(_cacheKey);
+    if (cachedData != null && mounted) {
+      setState(() {
+        _tickets = (cachedData as List).map((e) => SupportTicket.fromJson(e)).toList();
+        _isLoading = false;
+      });
+    }
+  }
+
   Future<void> _fetchTickets() async {
-    setState(() => _isLoading = true);
+    if (_tickets.isEmpty) {
+      setState(() => _isLoading = true);
+    }
     try {
       final filters = {
         'search': _searchQuery,
@@ -52,13 +187,16 @@ class _SupportTicketsPageState extends State<SupportTicketsPage> {
         'status': _selectedStatus,
       };
       final tickets = await ApiService.getStudentTickets(filters);
-      setState(() {
-        _tickets = tickets;
-        _isLoading = false;
-      });
-    } catch (e) {
-      setState(() => _isLoading = false);
       if (mounted) {
+        setState(() {
+          _tickets = tickets;
+          _isLoading = false;
+        });
+        await CacheService.saveData(_cacheKey, tickets.map((e) => e.toJson()).toList());
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isLoading = false);
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text("Error fetching tickets: $e"),
@@ -98,10 +236,11 @@ class _SupportTicketsPageState extends State<SupportTicketsPage> {
           ),
         ],
       ),
-      body: RefreshIndicator(
+      body: LoadingWrapper(
+        isLoading: _isLoading,
+        hasData: _tickets.isNotEmpty,
+        skeleton: const _TicketSkeleton(),
         onRefresh: _fetchTickets,
-        color: colorScheme.primary,
-        backgroundColor: colorScheme.surface,
         child: SingleChildScrollView(
           physics: const AlwaysScrollableScrollPhysics(),
           padding: context.pagePadding,
@@ -311,9 +450,7 @@ class _SupportTicketsPageState extends State<SupportTicketsPage> {
           ),
         ),
         SizedBox(height: context.scale(16)),
-        if (_isLoading)
-          Center(child: Padding(padding: EdgeInsets.all(context.scale(40)), child: CircularProgressIndicator(color: colorScheme.primary)))
-        else if (_tickets.isEmpty)
+        if (_tickets.isEmpty)
           Container(
             width: double.infinity,
             padding: EdgeInsets.symmetric(vertical: context.scale(60)),

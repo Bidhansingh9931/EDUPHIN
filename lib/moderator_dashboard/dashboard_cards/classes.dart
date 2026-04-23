@@ -1,5 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
+import 'package:eduphin/moderator_dashboard/cache_helper.dart';
+import 'package:eduphin/moderator_dashboard/skeleton_widgets.dart';
 import 'package:eduphin/services/api_service.dart';
 import 'package:eduphin/services/responsive_helper.dart';
 import 'package:flutter/material.dart';
@@ -25,31 +27,51 @@ class ClassInfo {
 
 // 2. Data Provider to fetch class data
 class ClassProvider {
-  Future<List<ClassInfo>> fetchClasses(String instituteId) async {
-    final token = await ApiService.getToken();
-    if (token == null) {
-      throw Exception('Authentication token not found.');
-    }
+  static const String _cacheKeyPrefix = 'classes_list_';
 
-    final response = await http.get(
-      Uri.parse('${ApiService.baseUrl}/moderator/institutes/$instituteId/classes'),
-      headers: {
-        'Authorization': 'Bearer $token',
-        'Accept': 'application/json',
-      },
-    );
-
-    if (response.statusCode == 200) {
-      final data = jsonDecode(response.body);
-      if (data['success'] == true && data['classes'] != null) {
-        final List<dynamic> classesJson = data['classes'];
-        return classesJson.map((json) => ClassInfo.fromJson(json)).toList();
-      } else {
-        throw Exception(data['message'] ?? 'Failed to load classes.');
+  Future<List<ClassInfo>> fetchClasses(String instituteId, {bool bypassCache = false}) async {
+    try {
+      if (!bypassCache) {
+        final cached = await getCachedClasses(instituteId);
+        if (cached != null) return cached;
       }
-    } else {
-      throw Exception('Failed to load classes. Status Code: ${response.statusCode}');
+      final token = await ApiService.getToken();
+      if (token == null) {
+        throw Exception('Authentication token not found.');
+      }
+
+      final response = await http.get(
+        Uri.parse('${ApiService.baseUrl}/moderator/institutes/$instituteId/classes'),
+        headers: {
+          'Authorization': 'Bearer $token',
+          'Accept': 'application/json',
+        },
+      );
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        if (data['success'] == true && data['classes'] != null) {
+          await CacheHelper.save(_cacheKeyPrefix + instituteId, data);
+          final List<dynamic> classesJson = data['classes'];
+          return classesJson.map((json) => ClassInfo.fromJson(json)).toList();
+        } else {
+          throw Exception(data['message'] ?? 'Failed to load classes.');
+        }
+      } else {
+        throw Exception('Failed to load classes. Status Code: ${response.statusCode}');
+      }
+    } catch (e) {
+      throw Exception('Failed to fetch classes: $e');
     }
+  }
+
+  Future<List<ClassInfo>?> getCachedClasses(String instituteId) async {
+    final cached = await CacheHelper.load(_cacheKeyPrefix + instituteId);
+    if (cached != null && cached['classes'] != null) {
+      final List<dynamic> classesJson = cached['classes'];
+      return classesJson.map((json) => ClassInfo.fromJson(json)).toList();
+    }
+    return null;
   }
 }
 
@@ -65,16 +87,22 @@ class ClassesPage extends StatefulWidget {
 class _ClassesPageState extends State<ClassesPage> {
   final ClassProvider _provider = ClassProvider();
   late Future<List<ClassInfo>> _classesFuture;
+  List<ClassInfo>? _cachedClasses;
 
   @override
   void initState() {
     super.initState();
-    _classesFuture = _provider.fetchClasses(widget.instituteId);
+    _loadInitialData();
   }
 
-  Future<void> _refreshClasses() async {
+  Future<void> _loadInitialData() async {
+    _cachedClasses = await _provider.getCachedClasses(widget.instituteId);
+    _refreshClasses();
+  }
+
+  Future<void> _refreshClasses({bool bypassCache = false}) async {
     setState(() {
-      _classesFuture = _provider.fetchClasses(widget.instituteId);
+      _classesFuture = _provider.fetchClasses(widget.instituteId, bypassCache: bypassCache);
     });
   }
 
@@ -89,76 +117,55 @@ class _ClassesPageState extends State<ClassesPage> {
         title: Text('Institute Classes', style: TextStyle(fontSize: context.font(20), fontWeight: FontWeight.bold)),
         actions: [
           IconButton(
-            onPressed: _refreshClasses,
+            onPressed: () => _refreshClasses(bypassCache: true),
             icon: Icon(Icons.refresh_rounded, size: context.scale(24)),
           ),
           SizedBox(width: context.md),
         ],
       ),
-      body: RefreshIndicator(
-        onRefresh: _refreshClasses,
-        color: theme.colorScheme.primary,
-        child: FutureBuilder<List<ClassInfo>>(
-          future: _classesFuture,
-          builder: (context, snapshot) {
-            if (snapshot.connectionState == ConnectionState.waiting) {
-              return Center(child: CircularProgressIndicator(color: theme.colorScheme.primary));
-            }
-            if (snapshot.hasError) {
-              return Center(
-                child: Padding(
+      body: FutureBuilder<List<ClassInfo>>(
+        future: _classesFuture,
+        builder: (context, snapshot) {
+          return ModeratorLoadingWrapper<List<ClassInfo>>(
+            snapshot: snapshot,
+            cachedData: _cachedClasses,
+            skeleton: const ListSkeleton(),
+            onRefresh: () => _refreshClasses(bypassCache: true),
+            builder: (classes) {
+              if (classes.isEmpty) {
+                return _buildEmptyState(context);
+              }
+
+              return RefreshIndicator(
+                onRefresh: () => _refreshClasses(bypassCache: true),
+                color: theme.colorScheme.primary,
+                child: SingleChildScrollView(
                   padding: context.pagePadding,
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(Icons.error_outline_rounded, size: context.scale(48), color: colorScheme.error),
-                      SizedBox(height: context.md),
-                      Text('Error: ${snapshot.error}', textAlign: TextAlign.center, style: TextStyle(fontSize: context.font(14), color: theme.colorScheme.onSurface)),
-                      SizedBox(height: context.lg),
-                      ElevatedButton(
-                        onPressed: _refreshClasses,
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: theme.colorScheme.primary,
-                          foregroundColor: theme.colorScheme.onPrimary,
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  child: Center(
+                    child: ConstrainedBox(
+                      constraints: BoxConstraints(maxWidth: context.scale(1200)),
+                      child: GridView.builder(
+                        shrinkWrap: true,
+                        physics: const NeverScrollableScrollPhysics(),
+                        itemCount: classes.length,
+                        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                          crossAxisCount: context.responsive(1, tablet: 2, desktop: 3),
+                          crossAxisSpacing: context.md,
+                          mainAxisSpacing: context.md,
+                          mainAxisExtent: context.scale(100),
                         ),
-                        child: Text("Retry", style: TextStyle(fontSize: context.font(16))),
+                        itemBuilder: (context, index) {
+                          return _buildClassCard(context, classes[index]);
+                        },
                       ),
-                    ],
+                    ),
                   ),
                 ),
               );
-            }
-            if (!snapshot.hasData || snapshot.data!.isEmpty) {
-              return _buildEmptyState(context);
-            }
-
-            final classes = snapshot.data!;
-
-            return SingleChildScrollView(
-              padding: context.pagePadding,
-              physics: const AlwaysScrollableScrollPhysics(),
-              child: Center(
-                child: ConstrainedBox(
-                  constraints: BoxConstraints(maxWidth: context.scale(1200)),
-                  child: GridView.builder(
-                    shrinkWrap: true,
-                    physics: const NeverScrollableScrollPhysics(),
-                    itemCount: classes.length,
-                    gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                      crossAxisCount: context.responsive(1, tablet: 2, desktop: 3),
-                      crossAxisSpacing: context.md,
-                      mainAxisSpacing: context.md,
-                      mainAxisExtent: context.scale(100),
-                    ),
-                    itemBuilder: (context, index) {
-                      return _buildClassCard(context, classes[index]);
-                    },
-                  ),
-                ),
-              ),
-            );
-          },
-        ),
+            },
+          );
+        },
       ),
     );
   }

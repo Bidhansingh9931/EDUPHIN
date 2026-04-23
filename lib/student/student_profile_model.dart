@@ -12,6 +12,14 @@ class StudentProfileData {
       health: json['health'] != null ? HealthDetail.fromJson(json['health']) : null,
     );
   }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'student': student?.toJson(),
+      'family': family?.toJson(),
+      'health': health?.toJson(),
+    };
+  }
 }
 
 class StudentDetail {
@@ -110,6 +118,39 @@ class StudentDetail {
       mentorName: json['mentor_name'],
     );
   }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'first_name': firstName,
+      'middle_name': middleName,
+      'last_name': lastName,
+      'profile_image': profileImage,
+      'student_roll_no': studentRollNo,
+      'registration_no': registrationNo,
+      'academic_session': academicSession,
+      'academic_year': academicYear,
+      'admission_category': admissionCategory,
+      'dob': dob,
+      'gender': gender,
+      'email': email,
+      'mobile': mobile,
+      'address_line1': addressLine1,
+      'city': city,
+      'state': state,
+      'pincode': pincode,
+      'blood_group': bloodGroup,
+      'nationality': nationality,
+      'religion': religion,
+      'caste': caste,
+      'domicile_state': domicileState,
+      'age': age,
+      'place_of_birth': placeOfBirth,
+      'aadhar_number': aadharNumber,
+      'date_of_admission': dateOfAdmission,
+      'mentor_name': mentorName,
+    };
+  }
 }
 
 class FamilyDetail {
@@ -136,6 +177,16 @@ class FamilyDetail {
       motherMobile: json['mother_mobile'],
     );
   }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'father_name': fatherName,
+      'father_mobile': fatherMobile,
+      'mother_name': motherName,
+      'mother_mobile': motherMobile,
+    };
+  }
 }
 
 class HealthDetail {
@@ -158,5 +209,14 @@ class HealthDetail {
       weight: json['weight'] != null ? double.tryParse(json['weight'].toString()) : null,
       bloodGroup: json['blood_group'],
     );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'height': height,
+      'weight': weight,
+      'blood_group': bloodGroup,
+    };
   }
 }

@@ -104,7 +104,7 @@ class _AddNewSubjectPageState extends State<AddNewSubjectPage> {
   }
 
   Future<void> _loadCachedData() async {
-    final cachedData = await CachingService.getCache(_cacheKey);
+    final cachedData = await CacheService.getCache(_cacheKey);
     if (cachedData != null) {
       if (mounted) {
         setState(() {
@@ -127,7 +127,7 @@ class _AddNewSubjectPageState extends State<AddNewSubjectPage> {
     }
     try {
       final formData = await _apiService.fetchSubjectFormData();
-      await CachingService.setCache(_cacheKey, {
+      await CacheService.setCache(_cacheKey, {
         'types': formData.types,
         'statuses': formData.statuses,
       });
@@ -142,7 +142,7 @@ class _AddNewSubjectPageState extends State<AddNewSubjectPage> {
       if (mounted) {
         setState(() {
           _error = e;
-          _isLoading = false;
+          _isLoading = _formData == null;
         });
       }
     }

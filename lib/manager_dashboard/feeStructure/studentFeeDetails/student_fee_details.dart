@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'package:eduphin/services/api_service.dart';
+import 'package:eduphin/services/caching_service.dart';
 import 'package:eduphin/services/responsive_helper.dart';
 import 'package:eduphin/services/common_widgets.dart';
 import 'package:flutter/material.dart';
@@ -104,14 +105,57 @@ class _StudentFeeDetailsPageState extends State<StudentFeeDetailsPage> {
 
   int? _selectedClassId;
   int? _selectedSectionId;
+  Object? _error;
 
   @override
   void initState() {
     super.initState();
+    _loadCacheAndFetch();
+  }
+
+  Future<void> _loadCacheAndFetch() async {
+    // 1. Load cached classes
+    final cachedClassData = await CacheService.getCache('manager_classes_fee');
+    if (cachedClassData != null && mounted) {
+      final List<dynamic> classData = cachedClassData as List? ?? [];
+      final List<ClassInfo> fetchedClasses = classData
+          .whereType<Map<String, dynamic>>()
+          .map((json) => ClassInfo.fromJson(json))
+          .toList();
+
+      setState(() {
+        _classList = fetchedClasses;
+        if (_classList.isNotEmpty) {
+          _selectedClassId = _classList.first.id;
+          _sectionList = _classList.first.sections;
+          if (_sectionList.isNotEmpty) {
+            _selectedSectionId = _sectionList.first.id;
+          }
+        }
+      });
+
+      // 2. Load cached students for the first class/section
+      if (_selectedClassId != null && _selectedSectionId != null) {
+        final cachedStudents = await CacheService.getCache('students_fee_${_selectedClassId}_$_selectedSectionId');
+        if (cachedStudents != null && mounted) {
+          setState(() {
+            _studentFeeDetails = (cachedStudents as List)
+                .map((json) => StudentFeeInfo.fromJson(json))
+                .toList();
+          });
+        }
+      }
+    }
     _fetchInitialData();
   }
 
   Future<void> _fetchInitialData() async {
+    if (!mounted) return;
+    setState(() {
+      _isLoading = _classList.isEmpty;
+      _error = null;
+    });
+
     try {
       final response = await ApiService.get('manager/classes');
       if (!mounted) return;
@@ -119,6 +163,8 @@ class _StudentFeeDetailsPageState extends State<StudentFeeDetailsPage> {
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
         final List<dynamic> classData = data['data'] as List? ?? [];
+        await CacheService.setCache('manager_classes_fee', classData);
+
         final List<ClassInfo> fetchedClasses = classData
             .whereType<Map<String, dynamic>>()
             .map((json) => ClassInfo.fromJson(json))
@@ -127,10 +173,18 @@ class _StudentFeeDetailsPageState extends State<StudentFeeDetailsPage> {
         setState(() {
           _classList = fetchedClasses;
           if (_classList.isNotEmpty) {
-            _selectedClassId = _classList.first.id;
-            _sectionList = _classList.first.sections;
+            // Keep current selection if valid, otherwise reset
+            final currentClass = _classList.any((c) => c.id == _selectedClassId) 
+                ? _classList.firstWhere((c) => c.id == _selectedClassId)
+                : _classList.first;
+            
+            _selectedClassId = currentClass.id;
+            _sectionList = currentClass.sections;
+            
             if (_sectionList.isNotEmpty) {
-              _selectedSectionId = _sectionList.first.id;
+              _selectedSectionId = _sectionList.any((s) => s.id == _selectedSectionId)
+                  ? _selectedSectionId
+                  : _sectionList.first.id;
             }
           }
         });
@@ -144,7 +198,7 @@ class _StudentFeeDetailsPageState extends State<StudentFeeDetailsPage> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString())));
+        setState(() => _error = e);
       }
     } finally {
       if (mounted) {
@@ -156,7 +210,7 @@ class _StudentFeeDetailsPageState extends State<StudentFeeDetailsPage> {
   Future<void> _fetchStudents() async {
     if (_selectedClassId == null || _selectedSectionId == null) return;
 
-    setState(() => _isFetchingStudents = true);
+    if (mounted) setState(() => _isFetchingStudents = true);
 
     try {
       final response = await ApiService.get('manager/fees/students?class_id=$_selectedClassId&section_id=$_selectedSectionId');
@@ -165,6 +219,9 @@ class _StudentFeeDetailsPageState extends State<StudentFeeDetailsPage> {
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
         final List<dynamic> studentData = data['students'] as List? ?? [];
+        
+        await CacheService.setCache('students_fee_${_selectedClassId}_$_selectedSectionId', studentData);
+
         setState(() {
           _studentFeeDetails = studentData
               .whereType<Map<String, dynamic>>()
@@ -207,119 +264,153 @@ class _StudentFeeDetailsPageState extends State<StudentFeeDetailsPage> {
           onPressed: () => Navigator.pop(context),
         ),
       ),
-      body: _isLoading
-          ? Center(child: CircularProgressIndicator(color: theme.colorScheme.primary))
-          : Center(
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 1200),
-                child: Padding(
-                  padding: context.pagePadding,
-                  child: Column(
+      body: LoadingWrapper(
+        isLoading: _isLoading,
+        hasData: _classList.isNotEmpty,
+        error: _error,
+        onRetry: _fetchInitialData,
+        skeleton: _buildSkeleton(),
+        child: Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 1200),
+            child: Padding(
+              padding: context.pagePadding,
+              child: Column(
+                children: [
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Expanded(
-                            child: _buildDropdown(
-                              label: "Class",
-                              value: _selectedClassId,
-                              items: _classList.map((c) => DropdownMenuItem(value: c.id, child: Text(c.name, style: TextStyle(fontSize: context.font(14))))).toList(),
-                              onChanged: (value) {
-                                if (value == null || value == _selectedClassId) return;
-                                setState(() {
-                                  _selectedClassId = value;
-                                  _sectionList = _classList.firstWhere((c) => c.id == value).sections;
-                                  _selectedSectionId = _sectionList.isNotEmpty ? _sectionList.first.id : null;
-                                });
-                                _fetchStudents();
-                              },
-                            ),
-                          ),
-                          SizedBox(width: context.spacing),
-                          Expanded(
-                            child: _buildDropdown(
-                              label: "Section",
-                              value: _selectedSectionId,
-                              items: _sectionList.map((s) => DropdownMenuItem(value: s.id, child: Text(s.name, style: TextStyle(fontSize: context.font(14))))).toList(),
-                              onChanged: (value) {
-                                 if (value == null || value == _selectedSectionId) return;
-                                setState(() => _selectedSectionId = value);
-                                _fetchStudents();
-                              },
-                            ),
-                          ),
-                        ],
-                      ),
-                      SizedBox(height: context.spacing),
                       Expanded(
-                        child: _isFetchingStudents
-                            ? Center(child: CircularProgressIndicator(color: theme.colorScheme.primary))
-                            : _studentFeeDetails.isEmpty
-                                ? Center(child: Text("No students found for this section.", style: TextStyle(fontSize: context.font(16), color: theme.colorScheme.onSurfaceVariant)))
-                                : context.responsive(
-                                    ListView.builder(
-                                      itemCount: _studentFeeDetails.length,
-                                      itemBuilder: (context, index) {
-                                        final student = _studentFeeDetails[index];
-                                        return Padding(
-                                          padding: EdgeInsets.only(bottom: context.spacing),
-                                          child: CustomStudentInfoFeeDetailContainerBox(
-                                            studentId: student.id,
-                                            heading: student.name,
-                                            subHeading: "Reg. No: ${student.regNo}, Class: ${student.className}-${student.sectionName}",
-                                            isActive: student.status,
-                                            imageUrl: student.imageUrl,
-                                          ),
-                                        );
-                                      },
-                                    ),
-                                    tablet: GridView.builder(
-                                      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                                        crossAxisCount: 2,
-                                        mainAxisSpacing: context.spacing,
-                                        crossAxisSpacing: context.spacing,
-                                        mainAxisExtent: context.scale(180),
-                                      ),
-                                      itemCount: _studentFeeDetails.length,
-                                      itemBuilder: (context, index) {
-                                        final student = _studentFeeDetails[index];
-                                        return CustomStudentInfoFeeDetailContainerBox(
-                                          studentId: student.id,
-                                          heading: student.name,
-                                          subHeading: "Reg. No: ${student.regNo}\nClass: ${student.className}-${student.sectionName}",
-                                          isActive: student.status,
-                                          imageUrl: student.imageUrl,
-                                        );
-                                      },
-                                    ),
-                                    desktop: GridView.builder(
-                                      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                                        crossAxisCount: 3,
-                                        mainAxisSpacing: context.spacing,
-                                        crossAxisSpacing: context.spacing,
-                                        mainAxisExtent: context.scale(180),
-                                      ),
-                                      itemCount: _studentFeeDetails.length,
-                                      itemBuilder: (context, index) {
-                                        final student = _studentFeeDetails[index];
-                                        return CustomStudentInfoFeeDetailContainerBox(
-                                          studentId: student.id,
-                                          heading: student.name,
-                                          subHeading: "Reg. No: ${student.regNo}\nClass: ${student.className}-${student.sectionName}",
-                                          isActive: student.status,
-                                          imageUrl: student.imageUrl,
-                                        );
-                                      },
-                                    ),
-                                  ),
+                        child: _buildDropdown(
+                          label: "Class",
+                          value: _selectedClassId,
+                          items: _classList.map((c) => DropdownMenuItem(value: c.id, child: Text(c.name, style: TextStyle(fontSize: context.font(14))))).toList(),
+                          onChanged: (value) {
+                            if (value == null || value == _selectedClassId) return;
+                            setState(() {
+                              _selectedClassId = value;
+                              _sectionList = _classList.firstWhere((c) => c.id == value).sections;
+                              _selectedSectionId = _sectionList.isNotEmpty ? _sectionList.first.id : null;
+                            });
+                            _fetchStudents();
+                          },
+                        ),
+                      ),
+                      SizedBox(width: context.spacing),
+                      Expanded(
+                        child: _buildDropdown(
+                          label: "Section",
+                          value: _selectedSectionId,
+                          items: _sectionList.map((s) => DropdownMenuItem(value: s.id, child: Text(s.name, style: TextStyle(fontSize: context.font(14))))).toList(),
+                          onChanged: (value) {
+                             if (value == null || value == _selectedSectionId) return;
+                            setState(() => _selectedSectionId = value);
+                            _fetchStudents();
+                          },
+                        ),
                       ),
                     ],
                   ),
-                ),
+                  SizedBox(height: context.spacing),
+                  Expanded(
+                    child: _isFetchingStudents && _studentFeeDetails.isEmpty
+                        ? Center(child: CircularProgressIndicator(color: theme.colorScheme.primary))
+                        : _studentFeeDetails.isEmpty
+                            ? Center(child: Text("No students found for this section.", style: TextStyle(fontSize: context.font(16), color: theme.colorScheme.onSurfaceVariant)))
+                            : RefreshIndicator(
+                                onRefresh: _fetchStudents,
+                                child: context.responsive(
+                                  ListView.builder(
+                                    itemCount: _studentFeeDetails.length,
+                                    itemBuilder: (context, index) {
+                                      final student = _studentFeeDetails[index];
+                                      return Padding(
+                                        padding: EdgeInsets.only(bottom: context.spacing),
+                                        child: CustomStudentInfoFeeDetailContainerBox(
+                                          studentId: student.id,
+                                          heading: student.name,
+                                          subHeading: "Reg. No: ${student.regNo}, Class: ${student.className}-${student.sectionName}",
+                                          isActive: student.status,
+                                          imageUrl: student.imageUrl,
+                                        ),
+                                      );
+                                    },
+                                  ),
+                                  tablet: GridView.builder(
+                                    gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                                      crossAxisCount: 2,
+                                      mainAxisSpacing: context.spacing,
+                                      crossAxisSpacing: context.spacing,
+                                      mainAxisExtent: context.scale(180),
+                                    ),
+                                    itemCount: _studentFeeDetails.length,
+                                    itemBuilder: (context, index) {
+                                      final student = _studentFeeDetails[index];
+                                      return CustomStudentInfoFeeDetailContainerBox(
+                                        studentId: student.id,
+                                        heading: student.name,
+                                        subHeading: "Reg. No: ${student.regNo}\nClass: ${student.className}-${student.sectionName}",
+                                        isActive: student.status,
+                                        imageUrl: student.imageUrl,
+                                      );
+                                    },
+                                  ),
+                                  desktop: GridView.builder(
+                                    gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                                      crossAxisCount: 3,
+                                      mainAxisSpacing: context.spacing,
+                                      crossAxisSpacing: context.spacing,
+                                      mainAxisExtent: context.scale(180),
+                                    ),
+                                    itemCount: _studentFeeDetails.length,
+                                    itemBuilder: (context, index) {
+                                      final student = _studentFeeDetails[index];
+                                      return CustomStudentInfoFeeDetailContainerBox(
+                                        studentId: student.id,
+                                        heading: student.name,
+                                        subHeading: "Reg. No: ${student.regNo}\nClass: ${student.className}-${student.sectionName}",
+                                        isActive: student.status,
+                                        imageUrl: student.imageUrl,
+                                      );
+                                    },
+                                  ),
+                                ),
+                              ),
+                  ),
+                ],
               ),
             ),
+          ),
+        ),
+      ),
     );
+  }
 
+  Widget _buildSkeleton() {
+    return Padding(
+      padding: context.pagePadding,
+      child: Column(
+        children: [
+          Row(
+            children: [
+              Expanded(child: SkeletonBox(height: context.scale(60))),
+              SizedBox(width: context.spacing),
+              Expanded(child: SkeletonBox(height: context.scale(60))),
+            ],
+          ),
+          SizedBox(height: context.spacing),
+          Expanded(
+            child: ListView.builder(
+              itemCount: 5,
+              itemBuilder: (context, index) => Padding(
+                padding: EdgeInsets.only(bottom: context.spacing),
+                child: SkeletonBox(height: context.scale(150), borderRadius: context.scale(12)),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   Widget _buildDropdown<T>({ 

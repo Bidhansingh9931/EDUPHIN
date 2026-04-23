@@ -22,6 +22,13 @@ class SalaryPageData {
       salaries: salariesList,
     );
   }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'account': account.toJson(),
+      'salaries': salaries.map((s) => s.toJson()).toList(),
+    };
+  }
 }
 
 class BankAccount {
@@ -51,6 +58,17 @@ class BankAccount {
       basicSalary: (json['basic_salary'] ?? json['salary'])?.toString(),
     );
   }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'name': accountHolderName,
+      'bank_account_number': accountNumber,
+      'ifsc_code': ifscCode,
+      'bank_name': bankName,
+      'branch_name': branch,
+      'basic_salary': basicSalary,
+    };
+  }
 }
 
 class SalaryRecord {
@@ -79,5 +97,16 @@ class SalaryRecord {
       netSalary: (json['net_salary'] ?? json['amount'] ?? '0').toString(),
       status: json['status'] ?? 'Paid',
     );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'payment_date': paymentDate,
+      'basic_salary': baseSalary,
+      'deductions': deduction,
+      'net_salary': netSalary,
+      'status': status,
+    };
   }
 }

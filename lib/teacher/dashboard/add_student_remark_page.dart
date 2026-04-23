@@ -1,7 +1,9 @@
 import 'dart:async';
 import 'dart:convert';
+import 'package:eduphin/services/responsive_helper.dart';
 import 'package:flutter/material.dart';
 import 'package:eduphin/services/api_service.dart';
+import 'common_widgets.dart';
 
 class AddStudentRemarkPage extends StatefulWidget {
   final int studentId;
@@ -81,65 +83,76 @@ class _AddStudentRemarkPageState extends State<AddStudentRemarkPage> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
+    final theme = context.theme;
     return Scaffold(
       appBar: AppBar(title: const Text("Add New Remark")),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
-        child: Form(
-          key: _formKey,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text("Add remark for ${widget.studentName}", style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
-              const SizedBox(height: 20),
-              DropdownButtonFormField<String>(
-                initialValue: _remarkType,
-                decoration: const InputDecoration(labelText: "Remark Type", border: OutlineInputBorder()),
-                items: ['Positive', 'Negative'].map((t) => DropdownMenuItem(value: t, child: Text(t))).toList(),
-                onChanged: (val) => setState(() => _remarkType = val!),
-              ),
-              const SizedBox(height: 16),
-              TextFormField(
-                controller: _remarkController,
-                maxLines: 4,
-                decoration: const InputDecoration(labelText: "Remark Description", border: OutlineInputBorder(), alignLabelWithHint: true),
-                validator: (val) => val == null || val.isEmpty ? "Required" : null,
-              ),
-              const SizedBox(height: 16),
-              Row(
+      body: Center(
+        child: ConstrainedBox(
+          constraints: BoxConstraints(maxWidth: context.responsive(800.0, tablet: 1000.0, desktop: 1200.0)),
+          child: SingleChildScrollView(
+            padding: context.pagePadding,
+            child: Form(
+              key: _formKey,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Expanded(
-                    child: TextFormField(
-                      controller: _fromDateController,
-                      readOnly: true,
-                      decoration: const InputDecoration(labelText: "From Date", border: OutlineInputBorder(), suffixIcon: Icon(Icons.calendar_today)),
-                      onTap: () => _selectDate(context, _fromDateController),
-                      validator: (val) => val == null || val.isEmpty ? "Required" : null,
-                    ),
+                  Text("Add remark for ${widget.studentName}", 
+                    style: TextStyle(
+                      fontSize: context.font(16), 
+                      fontWeight: FontWeight.bold,
+                      color: theme.colorScheme.onSurface,
+                    )
                   ),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    child: TextFormField(
-                      controller: _toDateController,
-                      readOnly: true,
-                      decoration: const InputDecoration(labelText: "To Date (Optional)", border: OutlineInputBorder(), suffixIcon: Icon(Icons.calendar_today)),
-                      onTap: () => _selectDate(context, _toDateController),
-                    ),
+                  SizedBox(height: context.scale(24)),
+                  
+                  buildLabel(context, "Remark Type"),
+                  buildDropdown<String>(
+                    context, 
+                    ['Positive', 'Negative'], 
+                    _remarkType, 
+                    (val) => setState(() => _remarkType = val!),
                   ),
+                  
+                  SizedBox(height: context.scale(16)),
+                  buildLabel(context, "Remark Description"),
+                  buildTextField(
+                    context, 
+                    _remarkController, 
+                    "Enter remark description...", 
+                    maxLines: 4,
+                  ),
+                  
+                  SizedBox(height: context.scale(16)),
+                  buildResponsiveRow(context, [
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        buildLabel(context, "From Date"),
+                        buildDateField(context, _fromDateController, "Select start date"),
+                      ],
+                    ),
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        buildLabel(context, "To Date (Optional)"),
+                        buildDateField(context, _toDateController, "Select end date"),
+                      ],
+                    ),
+                  ]),
+                  
+                  SizedBox(height: context.scale(32)),
+                  buildActionButton(
+                    context, 
+                    "SAVE REMARK", 
+                    _saveRemark,
+                  ),
+                  if (_isSaving) ...[
+                    SizedBox(height: context.scale(16)),
+                    const Center(child: CircularProgressIndicator()),
+                  ]
                 ],
               ),
-              const SizedBox(height: 32),
-              SizedBox(
-                width: double.infinity,
-                height: 50,
-                child: ElevatedButton(
-                  onPressed: _isSaving ? null : _saveRemark,
-                  style: ElevatedButton.styleFrom(shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))),
-                  child: _isSaving ? const CircularProgressIndicator() : const Text("SAVE REMARK"),
-                ),
-              ),
-            ],
+            ),
           ),
         ),
       ),

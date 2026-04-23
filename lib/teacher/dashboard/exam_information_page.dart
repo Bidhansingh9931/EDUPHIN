@@ -2,6 +2,7 @@ import 'package:eduphin/services/responsive_helper.dart';
 import 'package:flutter/material.dart';
 import 'package:eduphin/services/api_service.dart';
 import 'package:eduphin/teacher/dashboard/exam_models.dart';
+import 'package:eduphin/teacher/dashboard/teacher_cache_service.dart';
 import 'common_widgets.dart';
 import 'exam_schedule_page.dart';
 
@@ -13,44 +14,92 @@ class ExamInformationPage extends StatefulWidget {
 }
 
 class _ExamInformationPageState extends State<ExamInformationPage> {
-  late Future<ExamPageData> _examsFuture;
+  ExamPageData? _examData;
+  bool _isLoading = true;
+  String? _errorMessage;
 
   @override
   void initState() {
     super.initState();
-    _examsFuture = ApiService.getTeacherExams();
+    _loadData();
+  }
+
+  Future<void> _loadData() async {
+    const cacheKey = 'exam_information';
+
+    // 1. Load from cache
+    final cachedData = await TeacherCacheService.load(cacheKey);
+    if (cachedData != null && mounted) {
+      setState(() {
+        _examData = ExamPageData.fromJson(cachedData);
+        _isLoading = false;
+      });
+    }
+
+    // 2. Fetch from API
+    try {
+      final data = await ApiService.getTeacherExams();
+      if (mounted) {
+        setState(() {
+          _examData = data;
+          _isLoading = false;
+          _errorMessage = null;
+        });
+        // 3. Save to cache
+        await TeacherCacheService.save(cacheKey, data.toJson());
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _errorMessage = e.toString();
+          _isLoading = false;
+        });
+      }
+    }
   }
 
   @override
   Widget build(BuildContext context) {
-    final theme = context.theme;
-
     return Scaffold(
       appBar: AppBar(
         title: const Text("Exam Information"),
       ),
-      body: Center(
-        child: ConstrainedBox(
-          constraints: BoxConstraints(maxWidth: context.responsive(800.0, tablet: 1000.0, desktop: 1200.0)),
-          child: FutureBuilder<ExamPageData>(
-            future: _examsFuture,
-            builder: (context, snapshot) {
-              if (snapshot.connectionState == ConnectionState.waiting) {
-                return const Center(child: CircularProgressIndicator());
-              } else if (snapshot.hasError) {
-                return Center(child: Text("Error: ${snapshot.error}", style: TextStyle(fontSize: context.font(14))));
-              } else if (!snapshot.hasData || snapshot.data!.exams.isEmpty) {
-                return Center(child: Text("No exams found.", style: TextStyle(fontSize: context.font(14))));
-              }
+      body: TeacherLoadingWrapper(
+        isLoading: _isLoading,
+        hasData: _examData != null,
+        skeleton: _buildSkeleton(),
+        child: RefreshIndicator(
+          onRefresh: _loadData,
+          child: _errorMessage != null && _examData == null
+              ? Center(child: Text("Error: $_errorMessage", style: TextStyle(fontSize: context.font(14))))
+              : (_examData == null || _examData!.exams.isEmpty)
+                  ? Center(child: Text("No exams found.", style: TextStyle(fontSize: context.font(14))))
+                  : _buildContent(),
+        ),
+      ),
+    );
+  }
 
-              final exams = snapshot.data!.exams;
-              return ListView.builder(
-                padding: context.pagePadding,
-                itemCount: exams.length,
-                itemBuilder: (context, index) => _buildExamCard(exams[index]),
-              );
-            },
-          ),
+  Widget _buildSkeleton() {
+    return ListView.builder(
+      padding: context.pagePadding,
+      itemCount: 5,
+      itemBuilder: (context, index) => Padding(
+        padding: EdgeInsets.only(bottom: context.scale(20)),
+        child: TeacherSkeleton(height: context.scale(180), borderRadius: BorderRadius.circular(context.scale(20))),
+      ),
+    );
+  }
+
+  Widget _buildContent() {
+    final exams = _examData!.exams;
+    return Center(
+      child: ConstrainedBox(
+        constraints: BoxConstraints(maxWidth: context.responsive(800.0, tablet: 1000.0, desktop: 1200.0)),
+        child: ListView.builder(
+          padding: context.pagePadding,
+          itemCount: exams.length,
+          itemBuilder: (context, index) => _buildExamCard(exams[index]),
         ),
       ),
     );

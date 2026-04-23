@@ -17,6 +17,13 @@ class StudyMaterialPageData {
           [],
     );
   }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'schedules': schedules.map((e) => e.toJson()).toList(),
+      'study_materials': studyMaterials.map((e) => e.toJson()).toList(),
+    };
+  }
 }
 
 class ScheduleInfo {
@@ -30,16 +37,23 @@ class ScheduleInfo {
       {required this.id, required this.displayText, required this.subjectId, required this.classId, required this.sectionId});
 
   factory ScheduleInfo.fromJson(Map<String, dynamic> json) {
-    final subject = json['subject']?['name'] ?? 'N/A';
-    final className = json['class']?['name'] ?? 'N/A';
-    final section = json['section']?['name'] ?? 'N/A';
     return ScheduleInfo(
       id: json['id'] ?? 0,
       subjectId: json['subject_id'] ?? 0,
       classId: json['class_id'] ?? 0,
       sectionId: json['section_id'] ?? 0,
-      displayText: '$subject ($className - $section)',
+      displayText: json['displayText'] ?? '${json['subject']?['name'] ?? 'N/A'} (${json['class']?['name'] ?? 'N/A'} - ${json['section']?['name'] ?? 'N/A'})',
     );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'subject_id': subjectId,
+      'class_id': classId,
+      'section_id': sectionId,
+      'displayText': displayText,
+    };
   }
 }
 
@@ -72,5 +86,17 @@ class StudyMaterialInfo {
       classId: json['class_id'] ?? 0,
       sectionId: json['section_id'] ?? 0,
     );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'title': title,
+      'description': description,
+      'file_path': filePath,
+      'subject_id': subjectId,
+      'class_id': classId,
+      'section_id': sectionId,
+    };
   }
 }

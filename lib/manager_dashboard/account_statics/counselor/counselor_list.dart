@@ -73,10 +73,12 @@ class _CounselorListPageState extends State<CounselorListPage> {
           .toList();
       final counselorRoles = allRoles.where((role) => role.name.toLowerCase().contains('counselor')).toList();
 
-      setState(() {
-        _roles = counselorRoles;
-        if (_roles.isNotEmpty) _selectedRoleId = _roles.first.id;
-      });
+      if (mounted) {
+        setState(() {
+          _roles = counselorRoles;
+          if (_roles.isNotEmpty) _selectedRoleId = _roles.first.id;
+        });
+      }
 
       if (_selectedRoleId != null) {
         final counselorCache = await CacheService.getCache('counselors_$_selectedRoleId');
@@ -92,10 +94,12 @@ class _CounselorListPageState extends State<CounselorListPage> {
 
   Future<void> _fetchInitialData() async {
     if (!mounted) return;
-    setState(() {
-      _isLoading = _roles.isEmpty;
-      _error = null;
-    });
+    if (_roles.isEmpty) {
+      setState(() {
+        _isLoading = true;
+        _error = null;
+      });
+    }
 
     try {
       final response = await ApiService.get('manager/salary/accounts');
@@ -138,10 +142,12 @@ class _CounselorListPageState extends State<CounselorListPage> {
 
   Future<void> _fetchCounselorsForRole(int roleId) async {
     if (!mounted) return;
-    setState(() {
-      _isLoading = _counselors.isEmpty;
-      _error = null;
-    });
+    if (_counselors.isEmpty) {
+      setState(() {
+        _isLoading = true;
+        _error = null;
+      });
+    }
 
     try {
       final response = await ApiService.get('manager/users/$roleId');
@@ -248,6 +254,7 @@ class _CounselorListPageState extends State<CounselorListPage> {
   }
 
   Widget _buildSkeleton(BuildContext context) {
+    final theme = context.theme;
     return SingleChildScrollView(
       padding: context.pagePadding,
       child: Center(
@@ -255,7 +262,7 @@ class _CounselorListPageState extends State<CounselorListPage> {
           constraints: const BoxConstraints(maxWidth: 1200),
           child: Card(
             elevation: 0,
-            color: Colors.white,
+            color: theme.cardColor,
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(context.scale(12))),
             child: Padding(
               padding: EdgeInsets.all(context.spacing),
@@ -276,12 +283,16 @@ class _CounselorListPageState extends State<CounselorListPage> {
                     itemBuilder: (context, index) => Container(
                       padding: EdgeInsets.all(context.scale(12)),
                       decoration: BoxDecoration(
-                        color: Colors.white,
+                        color: theme.colorScheme.surfaceContainerLow,
                         borderRadius: BorderRadius.circular(context.scale(12)),
                       ),
                       child: Row(
                         children: [
-                          CircleAvatar(radius: context.scale(24), backgroundColor: Colors.white),
+                          SkeletonBox(
+                            width: context.scale(48),
+                            height: context.scale(48),
+                            borderRadius: context.scale(24),
+                          ),
                           SizedBox(width: context.scale(16)),
                           const Expanded(
                             child: Column(
