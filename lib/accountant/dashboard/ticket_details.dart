@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'package:eduphin/services/error_handler.dart';
 import 'package:eduphin/services/responsive_helper.dart';
 import 'package:eduphin/services/common_widgets.dart';
 import 'package:flutter/material.dart';
@@ -68,7 +69,7 @@ class _TicketDetailsPageState extends State<TicketDetailsPage> {
       _selectedFile = null;
       setState(() => _updateStream());
     } catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Error: $e")));
+      if (mounted) ErrorHandler.showError(context, e);
     } finally {
       if (mounted) setState(() => _isActionLoading = false);
     }
@@ -80,7 +81,7 @@ class _TicketDetailsPageState extends State<TicketDetailsPage> {
       await ApiService.updateAccountantTicketStatus(widget.ticketId, status);
       setState(() => _updateStream());
     } catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Error: $e")));
+      if (mounted) ErrorHandler.showError(context, e);
     } finally {
       if (mounted) setState(() => _isActionLoading = false);
     }

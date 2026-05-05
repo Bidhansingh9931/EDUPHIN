@@ -51,12 +51,15 @@ dependencies:
 
   # Font handling
   google_fonts: ^6.2.1
+  flutter_launcher_icons: ^0.14.4
+  rename: ^3.1.0
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
+  integration_test:
+    sdk: flutter
   flutter_lints: ^4.0.0
-  flutter_launcher_icons: ^0.13.1
 
 # 🎯 App Icon (SAFE)
 flutter_launcher_icons:

@@ -137,6 +137,11 @@ class _FAQManagementScreenState extends State<FAQManagementScreen> {
         ),
         actions: [
           IconButton(
+            onPressed: () => _showFAQModal(),
+            icon: const Icon(Icons.add_circle_outline, color: Colors.blue),
+            tooltip: "Add FAQ",
+          ),
+          IconButton(
             onPressed: _handleLogout,
             icon: const Icon(Icons.logout, color: Colors.red),
             tooltip: "Logout",
@@ -294,7 +299,7 @@ class _CreateFAQModalState extends State<CreateFAQModal> {
       widget.onSuccess();
       if (mounted) {
         Navigator.pop(context);
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("FAQ saved successfully")));
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("FAQ saved successfully")));
       }
     } catch (e) {
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString())));

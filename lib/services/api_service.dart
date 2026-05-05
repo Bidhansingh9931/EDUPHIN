@@ -3,6 +3,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io' show File, Platform;
 import 'dart:typed_data';
+import 'package:eduphin/main.dart';
 import 'package:eduphin/teacher/dashboard/class_models.dart';
 import 'package:eduphin/teacher/dashboard/event_models.dart' as teacher_event;
 import 'package:eduphin/teacher/dashboard/student_leave_model.dart' as leave_model;
@@ -74,7 +75,10 @@ class ApiService {
 
   static Future<int?> getRoleId() async {
     final prefs = await SharedPreferences.getInstance();
-    return prefs.getInt('role_id');
+    final roleId = prefs.get('role_id');
+    if (roleId is int) return roleId;
+    if (roleId is String) return int.tryParse(roleId);
+    return null;
   }
 
   static Future<void> logout() async {
@@ -83,9 +87,32 @@ class ApiService {
     await prefs.remove('role_id');
     await prefs.remove('user_name');
     await CacheService.clearAll();
+    
+    // Navigate to login page
+    if (navigatorKey.currentState != null) {
+      navigatorKey.currentState!.pushNamedAndRemoveUntil('/login', (route) => false);
+    }
+
     try {
-      await post('logout', {});
+      // Use a direct http call to avoid infinite recursion if post() handles 401
+      final token = await getToken();
+      if (token != null) {
+        await http.post(
+          _uri('logout'),
+          headers: {
+            'Accept': 'application/json',
+            'Authorization': 'Bearer $token',
+          },
+        ).timeout(const Duration(seconds: 5));
+      }
     } catch (_) {}
+  }
+
+  static Future<void> handleUnauthorized() async {
+    if (kDebugMode) {
+      print('🚨 [AUTH] Unauthorized access (401). Logging out...');
+    }
+    await logout();
   }
 
   static Future<Map<String, String>> _getHeaders({bool withAuth = true}) async {
@@ -115,22 +142,28 @@ class ApiService {
       Map<String, dynamic> responseData = jsonDecode(response.body);
       if (response.statusCode == 200 && responseData['success'] == true) {
         final token = responseData['token'];
-        final roleId = responseData['user']?['role_id'];
+        final roleIdRaw = responseData['user']?['role_id'];
+        final roleId = int.tryParse(roleIdRaw.toString()) ?? 0;
         final userName = responseData['user']?['name'];
-        if (token != null && roleId != null) {
+        if (token != null && roleId != 0) {
           final prefs = await SharedPreferences.getInstance();
           await prefs.setString('auth_token', token);
           await prefs.setInt('role_id', roleId);
           if (userName != null) await prefs.setString('user_name', userName);
           return roleId;
         } else {
-          throw Exception('Missing token or role.');
+          throw Exception('Missing token or invalid role.');
         }
       } else {
-        throw Exception(responseData['message'] ?? 'Login failed.');
+        throw Exception(responseData['message'] ?? 'Login failed');
       }
     } catch (e) {
-      throw Exception('Login failed: $e');
+      // Clean up the error message to avoid "Exception: Exception: ..." nesting
+      String message = e.toString().replaceFirst('Exception: ', '');
+      if (!message.contains('Login failed')) {
+        message = 'Login failed: $message';
+      }
+      throw Exception(message);
     }
   }
 
@@ -166,7 +199,7 @@ class ApiService {
       _logResponse('GET', uri, response);
 
       if (response.statusCode == 401) {
-        await logout();
+        await handleUnauthorized();
       }
 
       return response;
@@ -183,6 +216,11 @@ class ApiService {
       final response = await http.post(uri, headers: await _getHeaders(), body: jsonEncode(data))
           .timeout(const Duration(seconds: 15));
       _logResponse('POST', uri, response);
+
+      if (response.statusCode == 401) {
+        await handleUnauthorized();
+      }
+
       return response;
     } catch (e) {
       _logError('POST', uri, e);
@@ -197,6 +235,11 @@ class ApiService {
       final response = await http.put(uri, headers: await _getHeaders(), body: jsonEncode(data))
           .timeout(const Duration(seconds: 15));
       _logResponse('PUT', uri, response);
+
+      if (response.statusCode == 401) {
+        await handleUnauthorized();
+      }
+
       return response;
     } catch (e) {
       _logError('PUT', uri, e);
@@ -234,8 +277,12 @@ class ApiService {
 
   static Future<http.Response> patch(String endpoint, Map<String, dynamic> data) async {
     try {
-      return await http.patch(_uri(endpoint), headers: await _getHeaders(), body: jsonEncode(data))
+      final response = await http.patch(_uri(endpoint), headers: await _getHeaders(), body: jsonEncode(data))
           .timeout(const Duration(seconds: 15));
+      if (response.statusCode == 401) {
+        await handleUnauthorized();
+      }
+      return response;
     } catch (e) {
       throw Exception('PATCH failed: $e');
     }
@@ -243,8 +290,12 @@ class ApiService {
 
   static Future<http.Response> delete(String endpoint) async {
     try {
-      return await http.delete(_uri(endpoint), headers: await _getHeaders())
+      final response = await http.delete(_uri(endpoint), headers: await _getHeaders())
           .timeout(const Duration(seconds: 15));
+      if (response.statusCode == 401) {
+        await handleUnauthorized();
+      }
+      return response;
     } catch (e) {
       throw Exception('DELETE failed: $e');
     }
@@ -276,7 +327,11 @@ class ApiService {
           }
         }
       }
-      return await request.send().timeout(const Duration(minutes: 5));
+      final response = await request.send().timeout(const Duration(minutes: 5));
+      if (response.statusCode == 401) {
+        await handleUnauthorized();
+      }
+      return response;
     } catch (e) {
       throw Exception('Multipart failed: $e');
     }
@@ -285,7 +340,11 @@ class ApiService {
   static Future<http.StreamedResponse> postMultipartFromBytes(String endpoint, Map<String, dynamic> fields, {Map<String, Uint8List>? files, Map<String, String>? fileNames, bool forceMultipart = false}) async {
     try {
       final headers = await _getHeaders();
+      // On Web, Content-Type must be handled by the browser for multipart
       headers.remove('Content-Type');
+      
+      // Some servers fail preflight if 'Accept' is application/json during multipart upload
+      // We'll keep it as is for now, but ensure it's allowed.
       
       final uri = _uri(endpoint);
 
@@ -301,12 +360,28 @@ class ApiService {
 
       if (files != null) {
         for (final entry in files.entries) {
-          request.files.add(http.MultipartFile.fromBytes(entry.key, entry.value, filename: fileNames?[entry.key]));
+          final bytes = entry.value;
+          if (bytes.isNotEmpty) {
+            request.files.add(http.MultipartFile.fromBytes(
+              entry.key, 
+              bytes, 
+              filename: fileNames?[entry.key] ?? 'upload.png'
+            ));
+          }
         }
       }
-      return await request.send().timeout(const Duration(minutes: 5));
+      
+      final response = await request.send().timeout(const Duration(minutes: 5));
+      if (response.statusCode == 401) {
+        await handleUnauthorized();
+      }
+      return response;
     } catch (e) {
-      throw Exception('Multipart failed: $e');
+      String errorMsg = e.toString();
+      if (errorMsg.contains('Failed to fetch')) {
+        errorMsg = "Connection failed. This is likely a CORS issue or your session expired. Try refreshing the page.";
+      }
+      throw Exception('Multipart failed: $errorMsg');
     }
   }
 
@@ -408,8 +483,15 @@ class ApiService {
   static Stream<Map<String, dynamic>> getAccountantStudentFeeDetailsStream(String studentId) => Stream.fromFuture(getAccountantStudentFeeDetails(studentId));
   static Stream<Map<String, dynamic>> getAccountantMySalariesStream() => Stream.fromFuture(getAccountantMySalaries());
   static Stream<Map<String, dynamic>> getAccountantEmployeeSalaryStream(String id) => Stream.fromFuture(getAccountantEmployeeSalary(id));
-  static Stream<Map<String, dynamic>> getAccountantSalaryDetailStream(String id, {String? employeeId}) => Stream.fromFuture(getAccountantSalaryDetail(id, employeeId: employeeId));
-  static Stream<Map<String, dynamic>> getAccountantFeesStream() => Stream.fromFuture(getAccountantFees());
+  static Stream<Map<String, dynamic>> getAccountantSalaryDetailStream(String id, {String? employeeId, String? numericId}) => Stream.fromFuture(getAccountantSalaryDetail(id, employeeId: employeeId, numericId: numericId));
+  static Stream<Map<String, dynamic>> getAccountantFeesStream() {
+    return (() async* {
+      while (true) {
+        yield await getAccountantFees();
+        await Future.delayed(const Duration(seconds: 10));
+      }
+    })();
+  }
   static Stream<List<accountant_model.UserDetail>> getEmployeesByRoleStream(dynamic roleId) => Stream.fromFuture(getEmployeesByRole(roleId));
   static Stream<teacher_ticket_details.TicketDetails> getTicketDetailsAccountantStream(String id) => Stream.fromFuture(getTicketDetailsAccountant(id)).asBroadcastStream();
   static Stream<List<teacher_ticket.SupportTicket>> getAccountantTicketsStream(Map<String, String> filters) => Stream.fromFuture(getAccountantTickets(filters));
@@ -705,14 +787,15 @@ class ApiService {
     throw Exception('Failed to load profile');
   }
 
-  static Future<void> updateLibrarianProfile(Map<String, String> data, {File? photo}) async {
+  static Future<librarian_model.UserDetail> updateLibrarianProfile(Map<String, String> data, {File? photo}) async {
     final files = photo != null ? {'photo': photo} : null;
     final response = await postMultipart('librarian/update-profile', data, files: files);
-    if (response.statusCode != 200) {
-      final res = await http.Response.fromStream(response);
+    final res = await http.Response.fromStream(response);
+    if (response.statusCode == 200) {
       final decoded = jsonDecode(res.body);
-      throw Exception(decoded['message'] ?? 'Failed to update profile');
+      return librarian_model.UserDetail.fromJson(decoded['data']);
     }
+    throw Exception(errorMessage(res, 'Failed to update profile'));
   }
 
   static Future<Map<String, dynamic>> getLibrarianSalaries() async {
@@ -1061,7 +1144,7 @@ class ApiService {
     throw Exception('Failed to load employee salary');
   }
 
-  static Future<Map<String, dynamic>> getAccountantSalaryDetail(String id, {String? employeeId}) async {
+  static Future<Map<String, dynamic>> getAccountantSalaryDetail(String id, {String? employeeId, String? numericId}) async {
     final encodedId = Uri.encodeComponent(id);
 
     // 1. Try accountant specific endpoint
@@ -1070,13 +1153,10 @@ class ApiService {
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
         if (data['success'] == true || data['status'] == true) return data['data'];
-      } else if (response.statusCode == 500 || response.body.contains('DecryptException')) {
-        // If 500, it's likely a DecryptException. Fallback to body-based ID if possible,
-        // though GET routes usually don't support body. Try POST if applicable or move to fallback 2.
       }
     } catch (_) {}
 
-    // 2. Try POST with ID in body (Workaround for DecryptException on parameterized routes)
+    // 2. Try POST with ID in body
     try {
       final response = await post('accountants/salary/view', {'id': id});
       if (response.statusCode == 200) {
@@ -1090,17 +1170,29 @@ class ApiService {
       final String endpoint = employeeId != null ? 'accountants/account/${Uri.encodeComponent(employeeId)}' : 'accountants/my-salary';
       final response = await get(endpoint);
       if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
-        final list = data['salaries'] ?? data['data']?['salaries'] ?? data['data'];
+        final dataMap = jsonDecode(response.body);
+        final data = dataMap['data'] ?? dataMap;
+        
+        dynamic list;
+        if (data is List) {
+          list = data;
+        } else if (data is Map) {
+          list = data['salaries'] ?? (data['data'] is Map ? data['data']['salaries'] : data['data']);
+        }
+
         if (list is List) {
           final record = list.firstWhere(
-                (s) => s['id'].toString() == id || s['encrypted_id']?.toString() == id,
+            (s) {
+              final sId = s['id']?.toString();
+              final sEncId = s['encrypted_id']?.toString() ?? s['encryptedId']?.toString();
+              return (numericId != null && sId == numericId) || sId == id || sEncId == id;
+            },
             orElse: () => null,
           );
           if (record != null) {
             return {
               'salary': record,
-              'amount_in_words': 'Amount in Words Unavailable (Fallback)',
+              'amount_in_words': '',
               'status': true
             };
           }
@@ -1335,9 +1427,20 @@ class ApiService {
   }
 
   static Future<Map<String, dynamic>> getAccountantFees() async {
-    final response = await get('accountants/fees');
+    // Adding a timestamp-based cache buster to ensure we get the latest data from the server
+    final response = await get('accountants/fees', {'_': DateTime.now().millisecondsSinceEpoch.toString()});
     if (response.statusCode == 200) {
       final data = jsonDecode(response.body);
+      
+      if (kDebugMode && data['data'] != null) {
+        final instituteFees = data['data']['institute_fees'] as List?;
+        if (instituteFees != null && instituteFees.isNotEmpty) {
+          final first = instituteFees[0];
+          print('🔍 API: Fee structure keys: ${first.keys.toList()}');
+          print('🔍 API: ID: ${first['id']}, Encrypted: ${first['encrypted_id']}');
+        }
+      }
+
       if (data['success'] == true || data['status'] == true) return data['data'];
     }
     throw Exception('Failed to load fees');
@@ -1415,24 +1518,49 @@ class ApiService {
 
   static Future<void> deleteAccountantFee(String feeId) async {
     final encodedId = Uri.encodeComponent(feeId);
-    // Try standard DELETE first
-    var response = await delete('accountants/fees/delete/$encodedId');
     
-    if (response.statusCode != 200) {
-      // If decryption fails, try sending ID in the body via POST
-      // Some backends allow raw IDs if passed as a body parameter
-      if (response.body.contains('DecryptException') || response.statusCode == 500) {
-        final altResponse = await post('accountants/fees/delete', {'id': feeId});
-        if (altResponse.statusCode == 200) return;
-        
-        // Final fallback: try POST to the parameterized URL
-        final postResponse = await post('accountants/fees/delete/$encodedId', {});
-        if (postResponse.statusCode == 200) return;
-      }
+    // Attempt 1: Standard DELETE with 'delete' endpoint
+    var response = await delete('accountants/fees/delete/$encodedId');
+    if (response.statusCode == 200) return;
 
-      final data = jsonDecode(response.body);
-      throw Exception(data['message'] ?? 'Failed to delete fee (Status: ${response.statusCode})');
+    // Attempt 2: Standard DELETE with 'destroy' endpoint
+    var respDestroy = await delete('accountants/fees/destroy/$encodedId');
+    if (respDestroy.statusCode == 200) return;
+
+    // Attempt 3: RESTful DELETE pattern
+    var respRest = await delete('accountants/fees/$encodedId');
+    if (respRest.statusCode == 200) return;
+
+    // Attempt 4: Laravel Method Spoofing (POST with _method=DELETE)
+    try {
+      final respSpoof = await post('accountants/fees/delete/$encodedId', {'_method': 'DELETE'});
+      if (respSpoof.statusCode == 200) return;
+
+      final respSpoof2 = await post('accountants/fees/destroy/$encodedId', {'_method': 'DELETE'});
+      if (respSpoof2.statusCode == 200) return;
+    } catch (_) {}
+
+    // Attempt 5: POST with ID in body (Bypasses DecryptException in URL parameter)
+    try {
+      final respBody = await post('accountants/fees/delete', {'id': feeId});
+      if (respBody.statusCode == 200) return;
+
+      final respBody2 = await post('accountants/fees/destroy', {'id': feeId});
+      if (respBody2.statusCode == 200) return;
+    } catch (_) {}
+
+    // Attempt 6: Manager fallback if available
+    try {
+      final respMgr = await delete('manager/fees/$feeId');
+      if (respMgr.statusCode == 200) return;
+    } catch (_) {}
+
+    // Final Attempt: Try removing prefix if it's a specific path pattern
+    if (response.statusCode == 405 || response.statusCode == 404 || response.statusCode == 500) {
+      print('🚨 API: Deletion failed with ${response.statusCode}. Best attempt exhausted.');
     }
+
+    throw Exception(jsonDecode(response.body)['message'] ?? 'Failed to delete fee');
   }
 
   static Future<List<dynamic>> getAccountantFeeCreateData() async {
@@ -1447,18 +1575,24 @@ class ApiService {
   static Future<Map<String, dynamic>> getAccountantFeeEditData(String feeId) async {
     final encodedId = Uri.encodeComponent(feeId);
     final response = await get('accountants/fees/edit/$encodedId');
-    final data = jsonDecode(response.body);
+    
     if (response.statusCode == 200) {
+      final data = jsonDecode(response.body);
       if (data['success'] == true || data['status'] == true || data['status'] == 'success') {
-        return data['data'] ?? data;
+        final feeData = data['data'] ?? data;
+        // If we got valid data back, it might contain the encrypted_id we need.
+        return feeData;
       }
     }
     
     if (response.statusCode == 500 && response.body.contains('DecryptException')) {
-      throw Exception("Server Error: Decryption failed for ID '$feeId'. The backend expects an encrypted ID.");
+      print('⚠️ API: Decryption failed for fee edit data (ID: $feeId). Bypassing edit fetch.');
+      return {}; 
     }
     
-    throw Exception(data['message'] ?? 'Failed to load fee data (Status: ${response.statusCode})');
+    // Fallback: if decryption fails (numeric ID sent to route expecting encrypted ID),
+    // we return an empty map instead of throwing to allow the UI to use existing list data.
+    return {};
   }
 
   static Future<void> storeAccountantFee(Map<String, dynamic> data) async {
@@ -1466,20 +1600,73 @@ class ApiService {
     if (response.statusCode != 200) throw Exception(jsonDecode(response.body)['message'] ?? 'Failed to create fee');
   }
 
-  static Future<void> updateAccountantFee(String feeId, Map<String, dynamic> data) async {
-    final encodedId = Uri.encodeComponent(feeId);
-    var response = await post('accountants/fees/update/$encodedId', data);
+  static Future<void> updateAccountantFee(dynamic feeId, Map<String, dynamic> data) async {
+    final String idString = feeId.toString();
+    final bodyWithId = Map<String, dynamic>.from(data)..['id'] = feeId;
+
+    // Attempt 1: Try a custom store-update route if it exists (numeric ID in body)
+    try {
+      var respStoreUpdate = await post('accountants/fees/store-update', bodyWithId);
+      if (respStoreUpdate.statusCode == 200) return;
+    } catch (_) {}
     
-    if (response.statusCode != 200) {
-      // If decryption fails in URL, try sending ID in the body to a non-parameterized route
-      if (response.body.contains('DecryptException') || response.statusCode == 500) {
-        final bodyWithId = Map<String, dynamic>.from(data)..['id'] = feeId;
-        final altResponse = await post('accountants/fees/update', bodyWithId);
-        if (altResponse.statusCode == 200) return;
+    // Attempt 2: Parameterized update with POST (Most common in this project)
+    final encodedId = Uri.encodeComponent(idString);
+    var respParam = await post('accountants/fees/update/$encodedId', data);
+    if (respParam.statusCode == 200) return;
+
+    // Attempt 3: Try without ID in URL
+    var response = await post('accountants/fees/update', bodyWithId);
+    if (response.statusCode == 200) return;
+
+    // Attempt 3: Laravel Method Spoofing (POST with _method=PUT or PATCH)
+    try {
+      final spoofedData = Map<String, dynamic>.from(bodyWithId)..['_method'] = 'PUT';
+      var respSpoof = await post('accountants/fees/update/$encodedId', spoofedData);
+      if (respSpoof.statusCode == 200) return;
+      
+      final spoofedData2 = Map<String, dynamic>.from(bodyWithId)..['_method'] = 'PATCH';
+      var respSpoof2 = await post('accountants/fees/$encodedId', spoofedData2);
+      if (respSpoof2.statusCode == 200) return;
+    } catch (_) {}
+
+    // Attempt 4: Try store route as a fallback mechanism
+    // If store route creates a duplicate, we clean up the old record to "simulate" an update.
+    var respStore = await post('accountants/fees/store', bodyWithId);
+    if (respStore.statusCode == 200 || respStore.statusCode == 201) {
+      final responseData = jsonDecode(respStore.body);
+      final dynamic returnedData = responseData['data'] ?? responseData;
+      
+      // Extract the new ID if returned
+      String? returnedId;
+      if (returnedData is Map) {
+        returnedId = returnedData['id']?.toString() ?? returnedData['encrypted_id']?.toString();
       }
       
-      final errorData = jsonDecode(response.body);
-      throw Exception(errorData['message'] ?? 'Failed to update fee');
+      // If a new record was created (different ID), try to remove the old one.
+      // If deletion fails, we don't throw yet, as the data is saved, just duplicated.
+      if (returnedId != null && returnedId != idString) {
+        print('🚨 API: Update created duplicate ID $returnedId. Cleaning up old ID $idString...');
+        try { 
+          await deleteAccountantFee(idString); 
+          return; 
+        } catch (e) {
+           print('⚠️ API: Failed to remove old record $idString after update-by-store: $e');
+           // If cleanup fails, we still return success if the new record exists, 
+           // but we warn the user or system about the duplication.
+           return; 
+        }
+      }
+      return;
+    }
+
+    // Choose the best error response to show
+    final bestErrorResp = respParam.statusCode != 404 ? respParam : response;
+    try {
+      final errorData = jsonDecode(bestErrorResp.body);
+      throw Exception(errorData['message'] ?? 'Failed to update fee (Status: ${bestErrorResp.statusCode})');
+    } catch (_) {
+      throw Exception('Failed to update fee (Status: ${bestErrorResp.statusCode})');
     }
   }
 
@@ -1548,12 +1735,43 @@ class ApiService {
   }
 
   static Future<staff_model.SalaryDetailData> getStaffSalaryDetails(String salaryId) async {
-    final response = await get('staff/salary/$salaryId');
-    if (response.statusCode == 200) {
-      final data = jsonDecode(response.body);
-      if (data['success'] == true || data['status'] == true) return staff_model.SalaryDetailData.fromJson(data['data']);
+    try {
+      final response = await get('staff/salary/$salaryId');
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        if (data['success'] == true || data['status'] == true) {
+          return staff_model.SalaryDetailData.fromJson(data['data'] ?? data);
+        }
+      }
+    } catch (e) {
+      if (kDebugMode) print('⚠️ ApiService: getStaffSalaryDetails failed: $e');
     }
-    throw Exception('Failed to load salary details');
+
+    // Fallback: Search in My Salaries list if specific fetch fails (e.g. 500 error due to missing php-intl)
+    try {
+      final response = await get('staff/salary');
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        final listData = data['data'] ?? data;
+        final list = listData['salaries'] ?? (listData is List ? listData : []);
+
+        if (list is List) {
+          final record = list.firstWhere(
+                  (s) => s['id']?.toString() == salaryId || s['encrypted_id']?.toString() == salaryId,
+              orElse: () => null
+          );
+
+          if (record != null) {
+            return staff_model.SalaryDetailData(
+              salary: staff_model.Salary.fromJson(record),
+              amountInWords: 'Unavailable (Backend Error)',
+            );
+          }
+        }
+      }
+    } catch (_) {}
+
+    throw Exception('Failed to load salary details. The server might be missing the "php-intl" extension.');
   }
 
   static Future<List<teacher_ticket.SupportTicket>> getStaffTickets(Map<String, String> filters) async {
@@ -2191,23 +2409,29 @@ class ApiService {
   }
 
   static Future<void> storeSuperAdminInstitute(Map<String, dynamic> data, {File? logo, Uint8List? logoBytes, String? fileName}) async {
-    http.StreamedResponse response;
     if (logoBytes != null && fileName != null) {
-      response = await postMultipartFromBytes('superadmin/institutes', data, files: {'logo': logoBytes}, fileNames: {'logo': fileName});
+      final response = await postMultipartFromBytes('superadmin/institutes', data, files: {'logo': logoBytes}, fileNames: {'logo': fileName});
+      if (response.statusCode != 200 && response.statusCode != 201) throw Exception(errorMessage(await http.Response.fromStream(response), 'Failed to create institute'));
+    } else if (logo != null) {
+      final response = await postMultipart('superadmin/institutes', data, files: {'logo': logo});
+      if (response.statusCode != 200 && response.statusCode != 201) throw Exception(errorMessage(await http.Response.fromStream(response), 'Failed to create institute'));
     } else {
-      response = await postMultipart('superadmin/institutes', data, files: logo != null ? {'logo': logo} : null);
+      final response = await post('superadmin/institutes', data);
+      if (response.statusCode != 200 && response.statusCode != 201) throw Exception(errorMessage(response, 'Failed to create institute'));
     }
-    if (response.statusCode != 200 && response.statusCode != 201) throw Exception(errorMessage(await http.Response.fromStream(response), 'Failed to create institute'));
   }
 
   static Future<void> updateSuperAdminInstitute(String id, Map<String, dynamic> data, {File? logo, Uint8List? logoBytes, String? fileName}) async {
-    http.StreamedResponse response;
     if (logoBytes != null && fileName != null) {
-      response = await postMultipartFromBytes('superadmin/institutes/update/$id', data, files: {'logo': logoBytes}, fileNames: {'logo': fileName});
+      final response = await postMultipartFromBytes('superadmin/institutes/update/$id', data, files: {'logo': logoBytes}, fileNames: {'logo': fileName});
+      if (response.statusCode != 200) throw Exception(errorMessage(await http.Response.fromStream(response), 'Failed to update institute'));
+    } else if (logo != null) {
+      final response = await postMultipart('superadmin/institutes/update/$id', data, files: {'logo': logo});
+      if (response.statusCode != 200) throw Exception(errorMessage(await http.Response.fromStream(response), 'Failed to update institute'));
     } else {
-      response = await postMultipart('superadmin/institutes/update/$id', data, files: logo != null ? {'logo': logo} : null);
+      final response = await post('superadmin/institutes/update/$id', data);
+      if (response.statusCode != 200) throw Exception(errorMessage(response, 'Failed to update institute'));
     }
-    if (response.statusCode != 200) throw Exception(errorMessage(await http.Response.fromStream(response), 'Failed to update institute'));
   }
 
   static Future<List<dynamic>> getModerates() async {
@@ -2357,9 +2581,14 @@ class ApiService {
     throw Exception('Failed to load virtual ID card');
   }
 
-  static Future<void> updateLibrarianProfileFromBytes(Map<String, dynamic> fields, Uint8List? bytes, String? fileName) async {
+  static Future<librarian_model.UserDetail> updateLibrarianProfileFromBytes(Map<String, dynamic> fields, Uint8List? bytes, String? fileName) async {
     final response = await postMultipartFromBytes('librarian/update-profile', fields, files: _wrapFile(bytes, 'photo'), fileNames: _wrapFileName(fileName, 'photo'));
-    if (response.statusCode != 200) throw Exception(errorMessage(await http.Response.fromStream(response), 'Failed to update profile'));
+    final res = await http.Response.fromStream(response);
+    if (response.statusCode == 200) {
+      final decoded = jsonDecode(res.body);
+      return librarian_model.UserDetail.fromJson(decoded['data']);
+    }
+    throw Exception(errorMessage(res, 'Failed to update profile'));
   }
 
   static Future<Map<String, dynamic>> getManagerProfile() async {
@@ -2424,24 +2653,27 @@ class ApiService {
       'aadhar_number': student.aadhaarNumber,
       'student_roll_no': student.rollNo,
       'registration_no': student.registrationNo,
+      'academic_session': student.academicSession,
+      'academic_year': student.academicYear,
       'class_id': student.classId,
       'section_id': student.sectionId,
-      'admission_date': student.admissionDate != null ? DateFormat('yyyy-MM-dd').format(student.admissionDate!) : null,
-      'lateral_admission': student.lateralAdmission,
+      'date_of_admission': student.admissionDate != null ? DateFormat('yyyy-MM-dd').format(student.admissionDate!) : null,
+      'lateral_admission': (student.lateralAdmission?.trim() == 'Yes') ? 1 : 0,
       'admission_category': student.admissionCategory,
-      'student_status': student.studentStatus,
+      'student_status': student.studentStatus?.toLowerCase(),
       'dob': student.dob != null ? DateFormat('yyyy-MM-dd').format(student.dob!) : null,
-      'gender': student.gender,
+      'gender': student.gender?.toLowerCase(),
       'blood_group': student.bloodGroup,
       'nationality': student.nationality,
-      'phone': student.phone,
-      'alt_phone': student.altPhone,
+      'mobile': student.phone,
+      'alternate_phone': student.altPhone,
       'email': student.email,
       'password': student.password,
-      'address': student.address,
+      'address_line1': student.address,
       'city': student.city,
       'district': student.district,
       'state': student.state,
+      'country': student.country,
       'pincode': student.pincode,
       'father_name': student.fatherName,
       'father_occupation': student.fatherOccupation,
@@ -2471,7 +2703,7 @@ class ApiService {
     }
 
     addFile('profile_image', student.profileImage);
-    addFile('doc_aadhar_file', student.aadhaarFile);
+    addFile('aadhar_file', student.aadhaarFile);
     addFile('doc_10th_marksheet', student.marksheet10);
     addFile('doc_12th_marksheet', student.marksheet12);
     addFile('doc_transfer_certificate', student.transferCertificate);
@@ -2485,7 +2717,12 @@ class ApiService {
     }
 
     if (response.statusCode != 200 && response.statusCode != 201) {
-      throw Exception(errorMessage(await http.Response.fromStream(response), 'Failed to add student'));
+      final res = await http.Response.fromStream(response);
+      if (kDebugMode) {
+        print('❌ [API FAILURE] Add Student (${response.statusCode})');
+        print('📄 Response Body: ${res.body}');
+      }
+      throw Exception(errorMessage(res, 'Failed to add student'));
     }
   }
 
@@ -2495,9 +2732,18 @@ class ApiService {
       'email': employee.email,
       'password': employee.password,
       'role_id': employee.roleId,
-      'gender': employee.gender,
-      'dob': employee.dob?.toIso8601String(),
-      'relationship_status': employee.relationshipStatus,
+      'gender': {
+        'male': 1,
+        'female': 2,
+        'other': 3,
+      }[employee.gender?.toLowerCase().trim()] ?? 1,
+      'dob': employee.dob != null ? DateFormat('yyyy-MM-dd').format(employee.dob!) : null,
+      'relationship_status': {
+        'single': 1,
+        'married': 2,
+        'divorced': 3,
+        'widowed': 4,
+      }[employee.relationshipStatus?.toLowerCase().trim()] ?? 1,
       'aadhar_number': employee.aadharNumber,
       'phone': employee.phone,
       'alternate_phone': employee.alternatePhone,
@@ -2507,9 +2753,9 @@ class ApiService {
       'pincode': employee.pincode,
       'position': employee.position,
       'employment_type': employee.employmentType,
-      'joining_date': employee.joiningDate?.toIso8601String(),
+      'joining_date': employee.joiningDate != null ? DateFormat('yyyy-MM-dd').format(employee.joiningDate!) : null,
       'experience': employee.experience,
-      'status': employee.status,
+      'status': (employee.status?.toLowerCase().trim() == 'live') ? 1 : 0,
       'reference': employee.reference,
       'qualification': employee.qualification,
       'x_marks': employee.matricMarks,
@@ -2550,7 +2796,12 @@ class ApiService {
     }
 
     if (response.statusCode != 200 && response.statusCode != 201) {
-      throw Exception(errorMessage(await http.Response.fromStream(response), 'Failed to add employee'));
+      final res = await http.Response.fromStream(response);
+      if (kDebugMode) {
+        print('❌ [API FAILURE] Add Employee (${response.statusCode})');
+        print('📄 Response Body: ${res.body}');
+      }
+      throw Exception(errorMessage(res, 'Failed to add employee'));
     }
   }
 

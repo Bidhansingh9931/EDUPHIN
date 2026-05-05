@@ -136,7 +136,7 @@ class _EnterMarksPageState extends State<EnterMarksPage> {
 
     try {
       final response = await ApiService.get(
-          'manager/registrations/${widget.examId}/${widget.classId}/${widget.sectionId}');
+          'manager/exams/${widget.examId}/registrations/${widget.classId}/${widget.sectionId}');
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body)['data'] as List;
         await CachingService.setCache('manager_marks_reg_${widget.examId}_${widget.classId}_${widget.sectionId}', data);
@@ -202,7 +202,7 @@ class _EnterMarksPageState extends State<EnterMarksPage> {
     setState(() => _isSaving = true);
 
     try {
-      final response = await ApiService.post('manager/marks/${widget.paperId}', {
+      final response = await ApiService.post('manager/exams/${widget.examId}/schedule/${widget.paperId}/marks', {
         'marks': marksPayload,
       });
 

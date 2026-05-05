@@ -52,7 +52,6 @@ class EmployeeDetailsProvider {
   Future<void> saveEmployeeDetails(EmployeeDetails details) async {
     try {
       final fields = details.toApiData();
-      fields['_method'] = 'PUT'; // Laravel method spoofing for multipart update
 
       http.StreamedResponse response;
       if (details.webImage != null) {

@@ -62,6 +62,7 @@ class _EmployeeDetailsPageState extends State<EmployeeDetailsPage> {
   @override
   void initState() {
     super.initState();
+    _detailsFuture = _provider.fetchEmployeeDetails(widget.employeeId);
     _loadInitialData();
   }
 
@@ -214,6 +215,7 @@ class _EmployeeDetailsPageState extends State<EmployeeDetailsPage> {
       profileImage: _profileImage,
       webImage: _webImage,
       imageName: _imageName,
+      instituteId: details.instituteId,
     );
 
     try {
@@ -329,7 +331,7 @@ class _EmployeeDetailsPageState extends State<EmployeeDetailsPage> {
                                 context: context,
                                 controller: _roleController,
                                 label: 'Role',
-                                items: ['Institute Manager', 'Counselors', 'Teacher', 'Student', 'Librarian', 'Accountant', 'Staff'],
+                                items: ['Moderator', 'Institute Manager', 'Counselors', 'Teachers', 'Students', 'Librarian', 'Accountants', 'Staff'],
                               ),
                               _buildDropdownField(
                                 context: context,

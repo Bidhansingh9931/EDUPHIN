@@ -32,13 +32,14 @@ class BookPagination {
       return 0;
     }
 
-    int total = _toInt(metaSource['total'] ?? metaSource['total_books'] ?? 257); // Fallback to 257 for testing
-    int perPage = _toInt(metaSource['per_page'] ?? metaSource['perPage'] ?? 10);
-    int currentPage = _toInt(metaSource['current_page'] ?? metaSource['currentPage'] ?? 1);
-    
-    // Explicitly calculate lastPage from total books
-    int lastPage = _toInt(metaSource['last_page'] ?? metaSource['lastPage'] ?? metaSource['total_pages']);
-    if (lastPage <= 1 && total > 0) {
+    // Try to find total/per_page/current_page in either metaSource or root json
+    int total = _toInt(metaSource['total'] ?? json['total'] ?? metaSource['total_books'] ?? 0);
+    int perPage = _toInt(metaSource['per_page'] ?? json['per_page'] ?? metaSource['perPage'] ?? 10);
+    int currentPage = _toInt(metaSource['current_page'] ?? json['current_page'] ?? metaSource['currentPage'] ?? 1);
+    int lastPage = _toInt(metaSource['last_page'] ?? json['last_page'] ?? metaSource['lastPage'] ?? 0);
+
+    // If lastPage is missing but we have total, calculate it
+    if (lastPage <= 0 && total > 0) {
       lastPage = (total / (perPage > 0 ? perPage : 10)).ceil();
     }
 

@@ -99,6 +99,9 @@ class _AllBooksPageState extends State<AllBooksPage> {
       body: StreamBuilder<teacher_library.BookPagination>(
         stream: _booksStream,
         builder: (context, snapshot) {
+          if (snapshot.hasData) {
+            _totalPages = snapshot.data!.lastPage;
+          }
           return LoadingWrapper<teacher_library.BookPagination>(
             snapshot: snapshot,
             skeleton: const GridSkeleton(),
@@ -315,20 +318,6 @@ class _AllBooksPageState extends State<AllBooksPage> {
             Row(
               mainAxisAlignment: MainAxisAlignment.end,
               children: [
-                IconButton.filledTonal(
-                  onPressed: () async {
-                    final result = await Navigator.push(
-                      context,
-                      MaterialPageRoute(builder: (_) => AddNewBookPage(book: book)),
-                    );
-                    if (result == true) _fetchBooks();
-                  },
-                  icon: Icon(Icons.edit_document, size: context.scale(18)),
-                  style: IconButton.styleFrom(
-                    backgroundColor: theme.colorScheme.secondaryContainer.withValues(alpha: 0.4),
-                  ),
-                ),
-                SizedBox(width: context.sm),
                 IconButton.filledTonal(
                   onPressed: () => _deleteBook(book.id),
                   icon: Icon(Icons.delete_sweep_outlined, size: context.scale(18)),

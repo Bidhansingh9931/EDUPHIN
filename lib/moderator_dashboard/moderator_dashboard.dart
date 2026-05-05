@@ -30,6 +30,7 @@ class _ModeratorDashboardPageState extends State<ModeratorDashboardPage> {
   @override
   void initState() {
     super.initState();
+    _dashboardDataFuture = _dataProvider.fetchDashboardData();
     _loadCacheAndFetch();
   }
 

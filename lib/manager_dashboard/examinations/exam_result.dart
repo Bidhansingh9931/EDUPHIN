@@ -6,7 +6,6 @@ import 'package:eduphin/services/responsive_helper.dart';
 import 'package:eduphin/teacher/dashboard/common_widgets.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
-import 'enter_marks_page.dart';
 
 class Exam {
   final int id;
@@ -362,26 +361,6 @@ class _ExamResultPageState extends State<ExamResultPage> {
             _buildInfoRow(context, "Venue", paper.venue ?? 'N/A', Icons.location_on_outlined),
             SizedBox(height: context.sm),
             _buildInfoRow(context, "Schedule", "$formattedDate • $formattedStartTime - $formattedEndTime", Icons.schedule_outlined),
-            const Spacer(),
-            buildActionButton(
-              context,
-              "Enter Marks",
-              () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => EnterMarksPage(
-                      paperId: paper.id,
-                      examId: paper.examId,
-                      classId: paper.classId,
-                      sectionId: paper.sectionId,
-                      subjectId: paper.subjectId,
-                      subjectName: paper.subjectName,
-                    ),
-                  ),
-                );
-              },
-            ),
           ],
         ),
       ),

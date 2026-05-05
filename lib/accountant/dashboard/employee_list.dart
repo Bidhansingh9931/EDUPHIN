@@ -1,3 +1,4 @@
+import 'package:eduphin/services/error_handler.dart';
 import 'package:eduphin/services/common_widgets.dart';
 import 'package:eduphin/services/responsive_helper.dart';
 import 'package:flutter/material.dart';
@@ -56,6 +57,7 @@ class _EmployeeListPageState extends State<EmployeeListPage> {
       }
     } catch (e) {
       debugPrint("Roles Fetch Error: $e");
+      if (mounted) ErrorHandler.showError(context, e);
     }
   }
 

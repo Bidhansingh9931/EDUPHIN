@@ -1,16 +1,6 @@
 import 'dart:math';
-
 import 'package:eduphin/login_logout/login.dart';
-import 'package:eduphin/manager_dashboard/manager_dashboard.dart';
-import 'package:eduphin/counselor/counselor_dashboard.dart';
-import 'package:eduphin/moderator_dashboard/moderator_dashboard.dart';
 import 'package:eduphin/services/responsive_helper.dart';
-import 'package:eduphin/student/student_dashboard.dart';
-import 'package:eduphin/teacher/dashboard/teacher_dashboard.dart';
-import 'package:eduphin/librarian/librarian_dashboard.dart';
-import 'package:eduphin/accountant/dashboard/accountant_dashbard.dart';
-import 'package:eduphin/staff/staff_dashboard/staff_dashboard.dart';
-import 'package:eduphin/superAdmin/super_admin_dashboard.dart';
 import 'package:eduphin/services/api_service.dart';
 import 'package:flutter/material.dart';
 
@@ -31,7 +21,7 @@ class _SplashScreenState extends State<SplashScreen>
   late Animation<double> textFade;
   late Animation<Offset> textSlide;
 
-  bool _navigated = false; // ✅ ADDED: prevents double navigation
+  bool _navigated = false;
 
   @override
   void initState() {
@@ -39,20 +29,20 @@ class _SplashScreenState extends State<SplashScreen>
 
     _controller = AnimationController(
       vsync: this,
-      duration: const Duration(seconds: 4),
+      duration: const Duration(milliseconds: 3500),
     );
 
     rotate = Tween<double>(begin: 0, end: pi / 4).animate(
       CurvedAnimation(
         parent: _controller,
-        curve: const Interval(0.35, 0.55, curve: Curves.easeInOut),
+        curve: const Interval(0.15, 0.45, curve: Curves.easeInOut),
       ),
     );
 
-    scale = Tween<double>(begin: 1.0, end: 30.0).animate(
+    scale = Tween<double>(begin: 1.0, end: 100.0).animate(
       CurvedAnimation(
         parent: _controller,
-        curve: const Interval(0.55, 1.0, curve: Curves.easeIn),
+        curve: const Interval(0.35, 0.65, curve: Curves.easeInOut),
       ),
     );
 
@@ -62,15 +52,14 @@ class _SplashScreenState extends State<SplashScreen>
     );
     textFade = Tween<double>(begin: 0.0, end: 1.0).animate(textCurve);
     textSlide =
-        Tween<Offset>(begin: const Offset(0, 1), end: Offset.zero)
+        Tween<Offset>(begin: const Offset(0, 0.5), end: Offset.zero)
             .animate(textCurve);
 
     _controller.forward();
 
-    // ✅ SAFE listener
     _controller.addStatusListener((status) {
       if (status == AnimationStatus.completed && !_navigated) {
-        _checkAuthStatusAndNavigate();
+        _navigateToNext();
       }
     });
   }
@@ -78,83 +67,42 @@ class _SplashScreenState extends State<SplashScreen>
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-
-    // Initialize moveUp here where context is available for scaling if needed, 
-    // but better to keep it in initState and use a fixed value or scale later.
-    // Actually, scaling the animation start value:
-    moveUp = Tween<double>(begin: context.scale(250), end: 0).animate(
+    // Start from below the screen and move to center (0 offset)
+    moveUp = Tween<double>(begin: context.screenHeight, end: 0).animate(
       CurvedAnimation(
         parent: _controller,
-        curve: const Interval(0.0, 0.35, curve: Curves.easeOut),
+        curve: const Interval(0.0, 0.25, curve: Curves.easeOut),
       ),
     );
-
-    // ✅ ADDED: Preload image to avoid asset crash
-    precacheImage(
-      const AssetImage("assets/images/eduphin_logo_bg.png"),
-      context,
-    );
+    precacheImage(const AssetImage("assets/images/eduphin_logo_bg.png"), context);
   }
 
-  /// ✅ FULLY SAFE AUTH CHECK (NO CRASH)
-  Future<void> _checkAuthStatusAndNavigate() async {
-    try {
-      _navigated = true;
+  Future<void> _navigateToNext() async {
+    if (_navigated) return;
+    _navigated = true;
 
-      final token = await ApiService.getToken()
-          .timeout(const Duration(seconds: 10));
+    if (!mounted) return;
 
-      if (!mounted) return;
+    final token = await ApiService.getToken();
+    final roleId = await ApiService.getRoleId();
 
-      if (token != null) {
-        final roleId = await ApiService.getRoleId();
-        
-        Widget nextScreen;
-        switch (roleId) {
-          case 1: nextScreen = const SuperAdminDashboard(); break;
-          case 2: nextScreen = const ModeratorDashboardPage(); break;
-          case 3: nextScreen = const ManagerDashboardPage(); break;
-          case 4: nextScreen = const CounselorDashboardPage(); break;
-          case 5: nextScreen = const TeacherDashboardPage(); break;
-          case 6: nextScreen = const StudentDashboard(); break;
-          case 7: nextScreen = const LibrarianDashboard(); break;
-          case 8: nextScreen = const AccountantDashboard(); break;
-          case 9: nextScreen = const StaffDashboard(); break;
-          default: nextScreen = const LoginPage(); break;
-        }
-
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(
-            builder: (context) => nextScreen,
-          ),
-        );
-      } else {
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(
-            builder: (context) => const LoginPage(),
-          ),
-        );
+    if (token != null && token.isNotEmpty && roleId != null) {
+      if (mounted) {
+        Navigator.of(context).pushNamedAndRemoveUntil('/dashboard', (route) => false);
+        return;
       }
-    } catch (e) {
-      // ✅ FAIL-SAFE: never crash on splash
-      debugPrint('Splash Screen Error: $e');
+    }
 
-      if (!mounted) return;
-
+    if (mounted) {
       Navigator.pushReplacement(
         context,
-        MaterialPageRoute(
-          builder: (context) => const LoginPage(),
-        ),
+        MaterialPageRoute(builder: (context) => const LoginPage()),
       );
     }
   }
 
   @override
   void dispose() {
-    _controller.removeStatusListener((_) {}); // ✅ extra safety
     _controller.dispose();
     super.dispose();
   }
@@ -170,6 +118,7 @@ class _SplashScreenState extends State<SplashScreen>
         builder: (context, child) {
           return Stack(
             children: [
+              // 1. Background Fill Animation
               Center(
                 child: Transform.translate(
                   offset: Offset(0, moveUp.value),
@@ -181,8 +130,19 @@ class _SplashScreenState extends State<SplashScreen>
                         height: context.scale(60),
                         width: context.scale(60),
                         decoration: BoxDecoration(
-                          color: theme.primaryColor,
+                          color: const Color(0xFF1A47B8), // More professional, less "neon" blue
                           borderRadius: BorderRadius.circular(context.scale(12)),
+                          border: Border.all(
+                            color: Colors.white.withValues(alpha: 0.3), 
+                            width: 2
+                          ),
+                          boxShadow: [
+                            BoxShadow(
+                              color: const Color(0xFF1A47B8).withValues(alpha: 0.4),
+                              blurRadius: 30,
+                              spreadRadius: 10,
+                            )
+                          ],
                         ),
                       ),
                     ),
@@ -190,6 +150,7 @@ class _SplashScreenState extends State<SplashScreen>
                 ),
               ),
 
+              // 2. Logo and Text Content
               Center(
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
@@ -201,8 +162,7 @@ class _SplashScreenState extends State<SplashScreen>
                         child: Image.asset(
                           "assets/images/eduphin_logo_bg.png",
                           height: context.scale(150),
-                          errorBuilder: (_, __, ___) =>
-                          SizedBox(height: context.scale(150)), // ✅ NO CRASH
+                          errorBuilder: (_, __, ___) => SizedBox(height: context.scale(150)),
                         ),
                       ),
                     ),

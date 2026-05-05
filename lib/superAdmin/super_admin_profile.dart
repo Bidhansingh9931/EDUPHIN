@@ -27,6 +27,7 @@ class _ManageProfileScreenState extends State<ManageProfileScreen> {
   Uint8List? _webImage;
   String? _fileName;
   String? _existingPhotoUrl;
+  String _cacheBuster = DateTime.now().millisecondsSinceEpoch.toString();
 
   Future<void> _pickImage() async {
     final pickedFile = await ImagePicker().pickImage(
@@ -59,14 +60,35 @@ class _ManageProfileScreenState extends State<ManageProfileScreen> {
   Future<void> _loadInitialData() async {
     final cachedData = await SuperAdminCacheService.load('super_admin_profile');
     if (cachedData != null && mounted) {
-      setState(() {
-        _nameController.text = cachedData['name'] ?? '';
-        _emailController.text = cachedData['email'] ?? '';
-        _existingPhotoUrl = cachedData['photo'];
-        _isLoading = false;
-      });
+      _processProfileData(cachedData);
     }
     _fetchProfile();
+  }
+
+  void _processProfileData(Map<String, dynamic> data) {
+    final userData = data['user'] ?? data;
+    setState(() {
+      _nameController.text = userData['name']?.toString() ?? userData['full_name']?.toString() ?? _nameController.text;
+      _emailController.text = userData['email']?.toString() ?? _emailController.text;
+      
+      // Handle various possible photo keys
+      String? rawPhoto = userData['photo']?.toString() ?? 
+                         userData['image']?.toString() ?? 
+                         userData['profile_photo']?.toString() ??
+                         userData['photo_url']?.toString();
+      
+      if (rawPhoto != null && rawPhoto.isNotEmpty && rawPhoto != "null") {
+        // Clean the path to avoid double slashes or redundant storage prefixes
+        if (rawPhoto.startsWith('/')) rawPhoto = rawPhoto.substring(1);
+        if (rawPhoto.contains('storage/')) {
+          rawPhoto = rawPhoto.split('storage/').last;
+        }
+        _existingPhotoUrl = rawPhoto;
+      }
+      
+      _cacheBuster = DateTime.now().millisecondsSinceEpoch.toString();
+      _isLoading = false;
+    });
   }
 
   Future<void> _fetchProfile() async {
@@ -75,16 +97,9 @@ class _ManageProfileScreenState extends State<ManageProfileScreen> {
     }
     try {
       final data = await ApiService.getSuperAdminProfile();
-      if (data != null) {
-        if (mounted) {
-          setState(() {
-            _nameController.text = data['name'] ?? '';
-            _emailController.text = data['email'] ?? '';
-            _existingPhotoUrl = data['photo'];
-            _isLoading = false;
-          });
-          await SuperAdminCacheService.save('super_admin_profile', data);
-        }
+      if (data != null && mounted) {
+        _processProfileData(data);
+        await SuperAdminCacheService.save('super_admin_profile', data);
       }
     } catch (e) {
       debugPrint("Error fetching profile: $e");
@@ -108,7 +123,12 @@ class _ManageProfileScreenState extends State<ManageProfileScreen> {
         await ApiService.updateSuperAdminProfile(data, photo: _imageFile);
       }
 
-      if (mounted) {
+      // Re-fetch to get the updated URL from server
+      final newData = await ApiService.getSuperAdminProfile();
+      if (newData != null && mounted) {
+        _processProfileData(newData);
+        await SuperAdminCacheService.save('super_admin_profile', newData);
+        
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text("Profile updated successfully")),
         );
@@ -117,7 +137,6 @@ class _ManageProfileScreenState extends State<ManageProfileScreen> {
           _webImage = null;
           _fileName = null;
         });
-        _fetchProfile();
       }
     } catch (e) {
       if (mounted) {
@@ -159,7 +178,10 @@ class _ManageProfileScreenState extends State<ManageProfileScreen> {
                           Row(
                             children: [
                             ProfileAvatar(
-                              imageUrl: ApiService.getStorageUrl(_existingPhotoUrl),
+                              key: ValueKey("$_existingPhotoUrl-$_cacheBuster"),
+                              imageUrl: _existingPhotoUrl != null && _existingPhotoUrl!.isNotEmpty
+                                  ? "${ApiService.getStorageUrl(_existingPhotoUrl)}?v=$_cacheBuster"
+                                  : null,
                               radius: context.scale(35),
                               localImage: _imageFile,
                               webImage: _webImage,

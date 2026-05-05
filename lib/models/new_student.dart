@@ -23,6 +23,8 @@ class NewStudent {
   String registrationNo = '';
   int? classId;
   int? sectionId;
+  String? academicSession;
+  String? academicYear;
   DateTime? admissionDate;
   String? lateralAdmission;
   String? admissionCategory;
@@ -39,6 +41,7 @@ class NewStudent {
   String city = '';
   String district = '';
   String state = '';
+  String country = 'India';
   String pincode = '';
   String fatherName = '';
   String fatherOccupation = '';

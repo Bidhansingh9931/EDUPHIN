@@ -23,20 +23,51 @@ class UserRole {
   });
 
   Map<String, dynamic> toJson() => {
-    'icon': icon.codePoint,
     'title': title,
     'count': count,
     'percent': percent,
-    'color': color.toARGB32(),
   };
 
-  factory UserRole.fromJson(Map<String, dynamic> json) => UserRole(
-    icon: IconData(json['icon'], fontFamily: 'MaterialIcons'),
-    title: json['title'],
-    count: json['count'],
-    percent: (json['percent'] as num).toDouble(),
-    color: Color(json['color']),
-  );
+  factory UserRole.fromJson(Map<String, dynamic> json) {
+    final title = json['title'] as String? ?? 'Unnamed Role';
+    return UserRole(
+      icon: getIconForRole(title),
+      title: title,
+      count: (json['count'] as num?)?.toInt() ?? 0,
+      percent: (json['percent'] as num?)?.toDouble() ?? 0.0,
+      color: getColorForRole(title),
+    );
+  }
+
+  static IconData getIconForRole(String roleName) {
+    switch (roleName) {
+      case 'Super Admin': return Icons.shield_rounded;
+      case 'Moderator': return Icons.gavel_rounded;
+      case 'Institute Manager': return Icons.business_rounded;
+      case 'Teachers': return Icons.school_rounded;
+      case 'Students': return Icons.person_rounded;
+      case 'Accountants': return Icons.account_balance_wallet_rounded;
+      case 'Staff': return Icons.badge_rounded;
+      case 'Counselors': return Icons.support_agent_rounded;
+      case 'Librarian': return Icons.local_library_rounded;
+      default: return Icons.groups_rounded;
+    }
+  }
+
+  static Color getColorForRole(String roleName) {
+    switch (roleName) {
+      case 'Super Admin': return Colors.blue;
+      case 'Moderator': return Colors.purple;
+      case 'Institute Manager': return Colors.orange;
+      case 'Teachers': return Colors.green;
+      case 'Students': return Colors.lightBlue;
+      case 'Accountants': return Colors.teal;
+      case 'Staff': return Colors.indigo;
+      case 'Counselors': return Colors.pink;
+      case 'Librarian': return Colors.brown;
+      default: return Colors.blueGrey;
+    }
+  }
 }
 
 // 2. Data Provider
@@ -59,11 +90,11 @@ class RoleDistributionProvider {
           final roleName = role['name'] as String? ?? 'Unnamed Role';
           final count = (role['users_count'] as num?)?.toInt() ?? 0;
           return UserRole(
-            icon: _getIconForRole(roleName),
+            icon: UserRole.getIconForRole(roleName),
             title: roleName,
             count: count,
             percent: totalUsers == 0 ? 0.0 : (count / totalUsers) * 100,
-            color: _getColorForRole(roleName),
+            color: UserRole.getColorForRole(roleName),
           );
         }).toList();
 
@@ -78,33 +109,9 @@ class RoleDistributionProvider {
   Future<List<UserRole>?> getCachedUserRoles() async {
     final cached = await CacheHelper.load(_cacheKey);
     if (cached != null) {
-      return (cached as List).map((e) => UserRole.fromJson(e)).toList();
+      return (cached as List).map((e) => UserRole.fromJson(e as Map<String, dynamic>)).toList();
     }
     return null;
-  }
-
-  IconData _getIconForRole(String roleName) {
-    switch (roleName) {
-      case 'Super Admin': return Icons.shield_rounded;
-      case 'Moderator': return Icons.gavel_rounded;
-      case 'Institute Manager': return Icons.business_rounded;
-      case 'Teachers': return Icons.school_rounded;
-      case 'Students': return Icons.person_rounded;
-      case 'Accountants': return Icons.account_balance_wallet_rounded;
-      default: return Icons.groups_rounded;
-    }
-  }
-
-  Color _getColorForRole(String roleName) {
-    const colors = {
-      'Super Admin': Colors.blue,
-      'Moderator': Colors.purple,
-      'Institute Manager': Colors.orange,
-      'Teachers': Colors.green,
-      'Students': Colors.lightBlue,
-      'Accountants': Colors.teal,
-    };
-    return colors[roleName] ?? Colors.blueGrey;
   }
 }
 

@@ -7,7 +7,6 @@ import 'package:eduphin/services/common_widgets.dart';
 import 'package:eduphin/services/responsive_helper.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
-import 'enter_marks_page.dart';
 
 class ExamPaper {
   final int id;
@@ -46,7 +45,7 @@ class ExamPaper {
       sectionId: int.tryParse(json['section_id']?.toString() ?? '') ?? 0,
       subjectId: int.tryParse(json['subject_id']?.toString() ?? '') ?? 0,
       className: json['class']?['name']?.toString() ?? 'N/A',
-      sectionName: json['section']?['name']?.toString() ?? 'N/A',
+      sectionName: (json['section']?['section_name'] ?? json['section']?['name'])?.toString() ?? 'N/A',
       subjectName: json['subject']?['name']?.toString() ?? 'N/A',
       venue: json['venue']?.toString() ?? '-',
       date: json['paper_date']?.toString(),
@@ -145,7 +144,9 @@ class _ManageSchedulePageState extends State<ManageSchedulePage> {
     if (confirmed != true) return;
 
     try {
-      final response = await ApiService.delete('manager/class-schedules/$paperId');
+      final response = await ApiService.post('manager/exams/${widget.examId}/schedule/$paperId', {
+        '_method': 'DELETE',
+      });
       if (response.statusCode == 200 || response.statusCode == 204) {
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
@@ -225,7 +226,7 @@ class _ManageSchedulePageState extends State<ManageSchedulePage> {
                         crossAxisCount: context.responsive(1, tablet: 2, desktop: 3),
                         crossAxisSpacing: context.spacing,
                         mainAxisSpacing: context.spacing,
-                        mainAxisExtent: context.scale(320),
+                        mainAxisExtent: context.scale(230),
                       ),
                       itemCount: _papers.length,
                       itemBuilder: (context, index) => _buildPaperItem(_papers[index]),
@@ -244,10 +245,10 @@ class _ManageSchedulePageState extends State<ManageSchedulePage> {
         crossAxisCount: context.responsive(1, tablet: 2, desktop: 3),
         crossAxisSpacing: context.spacing,
         mainAxisSpacing: context.spacing,
-        mainAxisExtent: context.scale(320),
+        mainAxisExtent: context.scale(230),
       ),
       itemCount: 6,
-      itemBuilder: (context, index) => SkeletonBox(height: context.scale(320), borderRadius: context.scale(16)),
+      itemBuilder: (context, index) => SkeletonBox(height: context.scale(230), borderRadius: context.scale(16)),
     );
   }
 
@@ -332,38 +333,6 @@ class _ManageSchedulePageState extends State<ManageSchedulePage> {
                     style: OutlinedButton.styleFrom(
                       foregroundColor: theme.colorScheme.primary,
                       side: BorderSide(color: theme.colorScheme.primary.withValues(alpha: 0.5)),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(context.scale(12))),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-            SizedBox(height: context.sm),
-            Row(
-              children: [
-                Expanded(
-                  child: FilledButton.icon(
-                    onPressed: () async {
-                      final result = await Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => EnterMarksPage(
-                            paperId: paper.id,
-                            examId: paper.examId,
-                            classId: paper.classId,
-                            sectionId: paper.sectionId,
-                            subjectId: paper.subjectId,
-                            subjectName: paper.subjectName,
-                          ),
-                        ),
-                      );
-                      if (result == true) {
-                        _refreshSchedule();
-                      }
-                    },
-                    icon: Icon(Icons.edit_note, size: context.scale(18)),
-                    label: const Text("Marks"),
-                    style: FilledButton.styleFrom(
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(context.scale(12))),
                     ),
                   ),

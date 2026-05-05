@@ -88,7 +88,12 @@ class _AddTeacherPageState extends State<AddTeacherPage> {
 
   Future<void> _pickImage() async {
     final picker = ImagePicker();
-    final pickedFile = await picker.pickImage(source: ImageSource.gallery);
+    final pickedFile = await picker.pickImage(
+      source: ImageSource.gallery,
+      maxWidth: 1024,
+      maxHeight: 1024,
+      imageQuality: 80,
+    );
     if (pickedFile != null) {
       final bytes = await pickedFile.readAsBytes();
       setState(() {
@@ -98,6 +103,29 @@ class _AddTeacherPageState extends State<AddTeacherPage> {
           path: kIsWeb ? null : pickedFile.path,
         );
       });
+    }
+  }
+
+  Future<void> _pickDocument(Function(AppFile) onFilePicked) async {
+    final picker = ImagePicker();
+    final pickedFile = await picker.pickImage(
+      source: ImageSource.gallery,
+      maxWidth: 1024,
+      maxHeight: 1024,
+      imageQuality: 80,
+    );
+
+    if (pickedFile != null) {
+      final bytes = await pickedFile.readAsBytes();
+      setState(() {
+        onFilePicked(AppFile(
+          name: pickedFile.name,
+          bytes: bytes,
+          path: kIsWeb ? null : pickedFile.path,
+        ));
+      });
+    } else {
+      await _pickFile(onFilePicked);
     }
   }
 
@@ -487,9 +515,9 @@ class _AddTeacherPageState extends State<AddTeacherPage> {
       _buildEditableInfoTile("Qualification", _qualificationController),
       _buildEditableInfoTile("Matriculation Marks (%)", _matriculationMarksController, keyboardType: TextInputType.number),
       _buildEditableInfoTile("Intermediate Marks (%)", _intermediateMarksController, keyboardType: TextInputType.number),
-      _buildFilePickerTile("Matriculation Marksheet", _matriculationMarksheet, () => _pickFile((file) => _matriculationMarksheet = file)),
-      _buildFilePickerTile("Intermediate Marksheet", _intermediateMarksheet, () => _pickFile((file) => _intermediateMarksheet = file)),
-      _buildFilePickerTile("Resume", _resume, () => _pickFile((file) => _resume = file)),
+      _buildFilePickerTile("Matriculation Marksheet", _matriculationMarksheet, () => _pickDocument((file) => _matriculationMarksheet = file)),
+      _buildFilePickerTile("Intermediate Marksheet", _intermediateMarksheet, () => _pickDocument((file) => _intermediateMarksheet = file)),
+      _buildFilePickerTile("Resume", _resume, () => _pickDocument((file) => _resume = file)),
     ];
   }
 

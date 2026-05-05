@@ -79,7 +79,7 @@ class _AddNewBookPageState extends State<AddNewBookPage> {
       'category': _categoryController.text,
       'language': _languageController.text,
       'format': selectedFormat,
-      'quantity': _quantityController.text,
+      'quantity': int.tryParse(_quantityController.text) ?? 1,
     };
 
     try {

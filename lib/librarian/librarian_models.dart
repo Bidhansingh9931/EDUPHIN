@@ -114,7 +114,7 @@ class UserDetail {
       state: json['state']?.toString(),
       pincode: json['pincode']?.toString(),
       alternatePhone: json['alternate_phone']?.toString(),
-      relationshipStatus: json['relationship_status']?.toString(),
+      relationshipStatus: (json['relationship_status'] ?? json['marital_status'])?.toString(),
       bankAccountNumber: json['bank_account_number']?.toString(),
       ifscCode: json['ifsc_code']?.toString(),
       bankName: json['bank_name']?.toString(),

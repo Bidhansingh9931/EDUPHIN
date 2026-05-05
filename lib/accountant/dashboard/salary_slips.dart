@@ -1,3 +1,4 @@
+import 'package:eduphin/services/error_handler.dart';
 import 'package:eduphin/services/responsive_helper.dart';
 import 'package:flutter/material.dart';
 import 'package:eduphin/services/api_service.dart';
@@ -459,7 +460,7 @@ class _SalarySlipsPageState extends State<SalarySlipsPage> {
                 ),
                 SizedBox(height: context.scale(24)),
                 StreamBuilder<Map<String, dynamic>>(
-                  stream: ApiService.getAccountantSalaryDetailStream(id, employeeId: widget.employeeId),
+                  stream: ApiService.getAccountantSalaryDetailStream(id, employeeId: widget.employeeId, numericId: salary.id.toString()),
                   builder: (context, snapshot) {
                     return LoadingWrapper<Map<String, dynamic>>(
                       snapshot: snapshot,
@@ -557,7 +558,7 @@ class _SalarySlipsPageState extends State<SalarySlipsPage> {
                                   _fetchSalaries();
                                 }
                               } catch (e) {
-                                scaffoldMessenger.showSnackBar(SnackBar(content: Text("Error: $e")));
+                                if (context.mounted) ErrorHandler.showError(context, e);
                               }
                             }
                           },
@@ -680,7 +681,7 @@ class _SalarySlipsPageState extends State<SalarySlipsPage> {
                    _fetchSalaries();
                 }
               } catch (e) {
-                if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Error: $e")));
+                if (context.mounted) ErrorHandler.showError(context, e);
               }
             },
             child: const Text("GENERATE"),

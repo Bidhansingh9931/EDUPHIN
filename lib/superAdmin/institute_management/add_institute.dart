@@ -80,17 +80,25 @@ class _AddInstituteScreenState extends State<AddInstituteScreen> {
 
     setState(() => _isSaving = true);
 
+    String website = _websiteController.text.trim();
+    if (website.isNotEmpty) {
+      // Ensure it doesn't end with a slash
+      while (website.endsWith('/')) {
+        website = website.substring(0, website.length - 1);
+      }
+    }
+
     final data = {
       'name': _nameController.text.trim(),
       'code': _codeController.text.trim(),
-      'established_year': _yearController.text.trim(),
+      'established_year': int.tryParse(_yearController.text.trim()) ?? 0,
       'address': _addressController.text.trim(),
       'city': _cityController.text.trim(),
       'state': _stateController.text.trim(),
       'pincode': _pincodeController.text.trim(),
       'contact_email': _emailController.text.trim(),
       'contact_phone': _phoneController.text.trim(),
-      'website': _websiteController.text.trim().isEmpty ? null : _websiteController.text.trim(),
+      'website': website.isEmpty ? null : website,
       'chairman_name': _chairmanController.text.trim(),
       'affiliation_details': _affiliationController.text.trim(),
       'gst_number': _gstController.text.trim(),
@@ -151,26 +159,31 @@ class _AddInstituteScreenState extends State<AddInstituteScreen> {
                         Icons.email,
                         _emailController,
                         keyboardType: TextInputType.emailAddress,
+                      ),
+                      _buildTextField(
+                        context, 
+                        "Contact Phone *", 
+                        "10-digit phone number", 
+                        Icons.phone, 
+                        _phoneController, 
+                        keyboardType: TextInputType.phone,
                         validator: (v) {
                           if (v == null || v.trim().isEmpty) return "Required";
-                          if (!RegExp(r"^[a-zA-Z0-9.a-zA-Z0-9.!#$%&'*+-/=?^_`{|}~]+@[a-zA-Z0-9]+\.[a-zA-Z]+")
-                              .hasMatch(v.trim())) {
-                            return "Invalid email format";
+                          if (!RegExp(r'^\d{10}$').hasMatch(v.trim())) {
+                            return "Must be exactly 10 digits";
                           }
                           return null;
                         },
                       ),
-                      _buildTextField(context, "Contact Phone *", "Phone", Icons.phone, _phoneController, keyboardType: TextInputType.phone),
                       _buildTextField(
                         context,
                         "Website",
-                        "URL (e.g., https://example.com)",
+                        "URL (e.g., example.com)",
                         Icons.language,
                         _websiteController,
                         validator: (v) {
-                          if (v != null && v.isNotEmpty && !v.trim().startsWith("http")) {
-                            return "URL must start with http:// or https://";
-                          }
+                          if (v == null || v.isEmpty) return null;
+                          // Allow URLs with or without http/https
                           return null;
                         },
                       ),
@@ -185,7 +198,21 @@ class _AddInstituteScreenState extends State<AddInstituteScreen> {
                           Expanded(child: _buildTextField(context, "State *", "State", Icons.map, _stateController)),
                         ],
                       ),
-                      _buildTextField(context, "Pincode *", "6-digit pincode", Icons.pin_drop, _pincodeController, keyboardType: TextInputType.number),
+                      _buildTextField(
+                        context, 
+                        "Pincode *", 
+                        "6-digit pincode", 
+                        Icons.pin_drop, 
+                        _pincodeController, 
+                        keyboardType: TextInputType.number,
+                        validator: (v) {
+                          if (v == null || v.trim().isEmpty) return "Required";
+                          if (!RegExp(r'^\d{6}$').hasMatch(v.trim())) {
+                            return "Must be exactly 6 digits";
+                          }
+                          return null;
+                        },
+                      ),
                     ]),
                     _buildSection(context, title: "Legal & Other", icon: Icons.gavel_outlined, children: [
                       _buildTextField(context, "GST Number *", "GST No.", Icons.description, _gstController),

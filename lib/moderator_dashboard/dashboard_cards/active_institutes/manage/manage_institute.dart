@@ -12,6 +12,7 @@ import 'employ_details.dart';
 
 const List<String> employeeRoles = [
   'All',
+  'Moderator',
   'Principal',
   'Institute Manager',
   'Counselors',

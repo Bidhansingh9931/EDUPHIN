@@ -10,7 +10,7 @@ import 'package:eduphin/services/responsive_helper.dart';
 import 'package:eduphin/services/caching_service.dart';
 import 'package:eduphin/services/api_service.dart';
 import 'package:file_picker/file_picker.dart';
-import 'package:http/http.dart' as http;
+import 'package:image_picker/image_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
@@ -96,6 +96,27 @@ class _AddNewStudentPageState extends State<AddNewStudentPage> {
           _isLoading = _academicData == null;
         });
       }
+    }
+  }
+
+  Future<void> _pickImage(void Function(AppFile file) onFilePicked, {bool compress = true}) async {
+    final ImagePicker picker = ImagePicker();
+    final XFile? image = await picker.pickImage(
+      source: ImageSource.gallery,
+      maxWidth: compress ? 1024 : null,
+      maxHeight: compress ? 1024 : null,
+      imageQuality: compress ? 80 : null,
+    );
+
+    if (image != null) {
+      final bytes = await image.readAsBytes();
+      setState(() {
+        onFilePicked(AppFile(
+          name: image.name,
+          path: kIsWeb ? null : image.path,
+          bytes: bytes,
+        ));
+      });
     }
   }
 
@@ -275,24 +296,24 @@ class _AddNewStudentPageState extends State<AddNewStudentPage> {
             isOptional: true),
         _buildTextField(theme, "Last Name", (val) => _newStudent.lastName = val),
         _buildFilePicker(theme, "Profile Image", _newStudent.profileImage,
-            (file) => setState(() => _newStudent.profileImage = file)),
+            (file) => setState(() => _newStudent.profileImage = file), isImage: true, isOptional: true),
         _buildTextField(
             theme, "Aadhaar Number", (val) => _newStudent.aadhaarNumber = val,
-            keyboardType: TextInputType.number),
+            keyboardType: TextInputType.number, isOptional: true),
         _buildFilePicker(theme, "Aadhaar File", _newStudent.aadhaarFile,
-            (file) => setState(() => _newStudent.aadhaarFile = file)),
+            (file) => setState(() => _newStudent.aadhaarFile = file), isImage: true, isOptional: true),
         _buildFilePicker(theme, "10th Marksheet", _newStudent.marksheet10,
-            (file) => setState(() => _newStudent.marksheet10 = file)),
+            (file) => setState(() => _newStudent.marksheet10 = file), isImage: true, isOptional: true),
         _buildFilePicker(
             theme, "12th Marksheet", _newStudent.marksheet12, (file) => setState(() => _newStudent.marksheet12 = file),
-            isOptional: true),
+            isOptional: true, isImage: true),
         _buildFilePicker(
             theme,
             "Transfer Certificate",
             _newStudent.transferCertificate,
-            (file) => setState(() => _newStudent.transferCertificate = file)),
+            (file) => setState(() => _newStudent.transferCertificate = file), isImage: true, isOptional: true),
         _buildFilePicker(theme, "ID Proof", _newStudent.idProof,
-            (file) => setState(() => _newStudent.idProof = file)),
+            (file) => setState(() => _newStudent.idProof = file), isImage: true, isOptional: true),
         _buildTextField(theme, "Roll No", (val) => _newStudent.rollNo = val),
         _buildTextField(
             theme, "Registration No", (val) => _newStudent.registrationNo = val),
@@ -317,8 +338,24 @@ class _AddNewStudentPageState extends State<AddNewStudentPage> {
             _newStudent.sectionId,
             _sectionsForSelectedClass,
             (val) => setState(() => _newStudent.sectionId = val)),
+        _buildDropdown<String>(
+            theme,
+            "Academic Session",
+            _newStudent.academicSession,
+            data.academicSessions
+                .map((e) => DropdownMenuItem(value: e, child: Text(e)))
+                .toList(),
+            (val) => setState(() => _newStudent.academicSession = val)),
+        _buildDropdown<String>(
+            theme,
+            "Academic Year",
+            _newStudent.academicYear,
+            data.academicYears
+                .map((e) => DropdownMenuItem(value: e, child: Text(e)))
+                .toList(),
+            (val) => setState(() => _newStudent.academicYear = val)),
         _buildDatePicker(theme, "Admission Date", _newStudent.admissionDate,
-            (date) => setState(() => _newStudent.admissionDate = date), isOptional: true),
+            (date) => setState(() => _newStudent.admissionDate = date)),
         _buildDropdown<String>(
             theme,
             "Lateral Admission",
@@ -326,7 +363,7 @@ class _AddNewStudentPageState extends State<AddNewStudentPage> {
             data.lateralAdmissionOptions
                 .map((e) => DropdownMenuItem(value: e, child: Text(e)))
                 .toList(),
-            (val) => setState(() => _newStudent.lateralAdmission = val)),
+            (val) => setState(() => _newStudent.lateralAdmission = val), isOptional: true),
         _buildDropdown<String>(
             theme,
             "Admission Category",
@@ -334,7 +371,7 @@ class _AddNewStudentPageState extends State<AddNewStudentPage> {
             data.admissionCategories
                 .map((e) => DropdownMenuItem(value: e, child: Text(e)))
                 .toList(),
-            (val) => setState(() => _newStudent.admissionCategory = val)),
+            (val) => setState(() => _newStudent.admissionCategory = val), isOptional: true),
         _buildDropdown<String>(
             theme,
             "Student Status",
@@ -370,9 +407,9 @@ class _AddNewStudentPageState extends State<AddNewStudentPage> {
               'O+',
               'O-'
             ].map((e) => DropdownMenuItem(value: e, child: Text(e))).toList(),
-            (val) => setState(() => _newStudent.bloodGroup = val)),
+            (val) => setState(() => _newStudent.bloodGroup = val), isOptional: true),
         _buildTextField(
-            theme, "Nationality", (val) => _newStudent.nationality = val),
+            theme, "Nationality", (val) => _newStudent.nationality = val, isOptional: true),
         _buildTextField(theme, "Phone", (val) => _newStudent.phone = val,
             keyboardType: TextInputType.phone),
         _buildTextField(
@@ -398,6 +435,7 @@ class _AddNewStudentPageState extends State<AddNewStudentPage> {
         _buildTextField(theme, "City", (val) => _newStudent.city = val),
         _buildTextField(theme, "District", (val) => _newStudent.district = val),
         _buildTextField(theme, "State", (val) => _newStudent.state = val),
+        _buildTextField(theme, "Country", (val) => _newStudent.country = val, initialValue: _newStudent.country),
         _buildTextField(theme, "Pincode", (val) => _newStudent.pincode = val,
             keyboardType: TextInputType.number),
       ];
@@ -406,17 +444,17 @@ class _AddNewStudentPageState extends State<AddNewStudentPage> {
         _buildTextField(
             theme, "Father's Name", (val) => _newStudent.fatherName = val),
         _buildTextField(theme, "Father's Occupation",
-            (val) => _newStudent.fatherOccupation = val),
+            (val) => _newStudent.fatherOccupation = val, isOptional: true),
         _buildTextField(
             theme, "Father's Phone", (val) => _newStudent.fatherPhone = val,
-            keyboardType: TextInputType.phone),
+            keyboardType: TextInputType.phone, isOptional: true),
         _buildTextField(
-            theme, "Mother's Name", (val) => _newStudent.motherName = val),
+            theme, "Mother's Name", (val) => _newStudent.motherName = val, isOptional: true),
         _buildTextField(theme, "Mother's Occupation",
-            (val) => _newStudent.motherOccupation = val),
+            (val) => _newStudent.motherOccupation = val, isOptional: true),
         _buildTextField(
             theme, "Mother's Phone", (val) => _newStudent.motherPhone = val,
-            keyboardType: TextInputType.phone),
+            keyboardType: TextInputType.phone, isOptional: true),
         _buildTextField(
             theme, "Guardian's Name", (val) => _newStudent.guardianName = val,
             isOptional: true),
@@ -436,7 +474,8 @@ class _AddNewStudentPageState extends State<AddNewStudentPage> {
       ];
 
   Widget _buildTextField(ThemeData theme, String label, ValueChanged<String> onChanged,
-      {String? Function(String?)? validator,
+      {String? initialValue,
+      String? Function(String?)? validator,
       bool isOptional = false,
       bool isPassword = false,
       int maxLines = 1,
@@ -444,9 +483,22 @@ class _AddNewStudentPageState extends State<AddNewStudentPage> {
     return Padding(
         padding: const EdgeInsets.only(bottom: 16.0),
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Text(label, style: theme.textTheme.labelLarge),
+          Text.rich(
+            TextSpan(
+              text: label,
+              style: theme.textTheme.labelLarge,
+              children: [
+                if (!isOptional)
+                  TextSpan(
+                    text: ' *',
+                    style: TextStyle(color: theme.colorScheme.error),
+                  ),
+              ],
+            ),
+          ),
           const SizedBox(height: 8),
           TextFormField(
+              initialValue: initialValue,
               onChanged: onChanged,
               maxLines: maxLines,
               keyboardType: keyboardType,
@@ -470,11 +522,23 @@ class _AddNewStudentPageState extends State<AddNewStudentPage> {
   }
 
   Widget _buildDropdown<T>(ThemeData theme, String label, T? value,
-      List<DropdownMenuItem<T>> items, ValueChanged<T?> onChanged) {
+      List<DropdownMenuItem<T>> items, ValueChanged<T?> onChanged, {bool isOptional = false}) {
     return Padding(
         padding: const EdgeInsets.only(bottom: 16.0),
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Text(label, style: theme.textTheme.labelLarge),
+          Text.rich(
+            TextSpan(
+              text: label,
+              style: theme.textTheme.labelLarge,
+              children: [
+                if (!isOptional)
+                  TextSpan(
+                    text: ' *',
+                    style: TextStyle(color: theme.colorScheme.error),
+                  ),
+              ],
+            ),
+          ),
           const SizedBox(height: 8),
           DropdownButtonFormField<T>(
               initialValue: value,
@@ -491,22 +555,23 @@ class _AddNewStudentPageState extends State<AddNewStudentPage> {
                     borderRadius: BorderRadius.circular(10),
                     borderSide: BorderSide(color: theme.dividerColor),
                   )),
-              validator: (val) => val == null ? 'Please select a $label' : null),
+              validator: isOptional ? null : (val) => val == null ? 'Please select a $label' : null),
         ]));
   }
 
   Widget _buildClassDropdown(ThemeData theme, String label, int? value,
-      List<Class> items, ValueChanged<int?> onChanged) {
+      List<Class> items, ValueChanged<int?> onChanged, {bool isOptional = false}) {
     return _buildDropdown<int>(
         theme,
         label,
         value,
         items.map((e) => DropdownMenuItem(value: e.id, child: Text(e.name))).toList(),
-        onChanged);
+        onChanged,
+        isOptional: isOptional);
   }
 
   Widget _buildSectionDropdown(ThemeData theme, String label, int? value,
-      List<Section> items, ValueChanged<int?> onChanged) {
+      List<Section> items, ValueChanged<int?> onChanged, {bool isOptional = false}) {
     return _buildDropdown<int>(
         theme,
         label,
@@ -514,7 +579,8 @@ class _AddNewStudentPageState extends State<AddNewStudentPage> {
         items
             .map((e) => DropdownMenuItem(value: e.id, child: Text(e.name)))
             .toList(),
-        onChanged);
+        onChanged,
+        isOptional: isOptional);
   }
 
   Widget _buildDatePicker(ThemeData theme, String label, DateTime? date,
@@ -522,7 +588,19 @@ class _AddNewStudentPageState extends State<AddNewStudentPage> {
     return Padding(
         padding: const EdgeInsets.only(bottom: 16.0),
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Text(label, style: theme.textTheme.labelLarge),
+          Text.rich(
+            TextSpan(
+              text: label,
+              style: theme.textTheme.labelLarge,
+              children: [
+                if (!isOptional)
+                  TextSpan(
+                    text: ' *',
+                    style: TextStyle(color: theme.colorScheme.error),
+                  ),
+              ],
+            ),
+          ),
           const SizedBox(height: 8),
           FormField<DateTime>(
               initialValue: date,
@@ -563,23 +641,35 @@ class _AddNewStudentPageState extends State<AddNewStudentPage> {
 
   Widget _buildFilePicker(ThemeData theme, String label, AppFile? file,
       ValueChanged<AppFile> onFilePicked,
-      {bool isOptional = false}) {
-    final controller = TextEditingController(text: file?.name ?? "No file chosen");
+      {bool isOptional = false, bool isImage = false}) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 16.0),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(label, style: theme.textTheme.labelLarge),
+          Text.rich(
+            TextSpan(
+              text: label,
+              style: theme.textTheme.labelLarge,
+              children: [
+                if (!isOptional)
+                  TextSpan(
+                    text: ' *',
+                    style: TextStyle(color: theme.colorScheme.error),
+                  ),
+              ],
+            ),
+          ),
           const SizedBox(height: 8),
           TextFormField(
+            key: ValueKey(file?.name ?? "none"),
+            initialValue: file?.name ?? "No file chosen",
             readOnly: true,
-            controller: controller,
             decoration: InputDecoration(
               filled: true,
               suffixIcon: IconButton(
                   icon: Icon(Icons.upload_file, color: theme.colorScheme.primary),
-                  onPressed: () => _pickFile(onFilePicked)),
+                  onPressed: () => isImage ? _pickImage(onFilePicked) : _pickFile(onFilePicked)),
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(10),
                 borderSide: BorderSide(color: theme.dividerColor),

@@ -11,6 +11,7 @@ import 'package:eduphin/student/student_dashboard.dart';
 import 'package:eduphin/teacher/dashboard/teacher_dashboard.dart';
 import 'package:eduphin/staff/staff_dashboard/staff_dashboard.dart';
 import 'package:eduphin/superAdmin/super_admin_dashboard.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class Roles {
   static const int superAdmin = 1;
@@ -40,6 +41,36 @@ class _LoginPageState extends State<LoginPage> {
   String _error = '';
 
   @override
+  void initState() {
+    super.initState();
+    _loadSavedCredentials();
+  }
+
+  Future<void> _loadSavedCredentials() async {
+    final prefs = await SharedPreferences.getInstance();
+    final savedEmail = prefs.getString('remember_email');
+    final rememberMe = prefs.getBool('remember_me') ?? false;
+
+    if (rememberMe && savedEmail != null) {
+      setState(() {
+        emailController.text = savedEmail;
+        isChecked = true;
+      });
+    }
+  }
+
+  Future<void> _saveCredentials() async {
+    final prefs = await SharedPreferences.getInstance();
+    if (isChecked) {
+      await prefs.setString('remember_email', emailController.text.trim());
+      await prefs.setBool('remember_me', true);
+    } else {
+      await prefs.remove('remember_email');
+      await prefs.setBool('remember_me', false);
+    }
+  }
+
+  @override
   void dispose() {
     emailController.dispose();
     passwordController.dispose();
@@ -55,6 +86,7 @@ class _LoginPageState extends State<LoginPage> {
 
     try {
       final roleId = await ApiService.login(emailController.text.trim(), passwordController.text.trim());
+      await _saveCredentials();
       if (!mounted) return;
       _navigateToDashboard(roleId);
     } catch (e) {

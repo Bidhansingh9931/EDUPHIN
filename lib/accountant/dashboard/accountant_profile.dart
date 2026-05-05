@@ -1,6 +1,7 @@
 import 'package:eduphin/login_logout/login.dart';
 import 'dart:io';
 import 'dart:typed_data';
+import 'package:eduphin/services/error_handler.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:eduphin/services/responsive_helper.dart';
 import 'package:eduphin/services/common_widgets.dart';
@@ -121,7 +122,7 @@ class _AccountantProfileState extends State<AccountantProfile> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Update failed: $e")));
+        ErrorHandler.showError(context, e);
       }
     } finally {
       if (mounted) setState(() => _isActionLoading = false);

@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:eduphin/services/error_handler.dart';
 import 'package:eduphin/services/common_widgets.dart';
 import 'package:eduphin/services/responsive_helper.dart';
 import 'package:flutter/material.dart';
@@ -600,7 +601,7 @@ class _StudentFeeDetailPageState extends State<StudentFeeDetailPage> {
                           });
                           _fetchStudentDetails(_selectedStudentId!);
                         } catch (e) {
-                          if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Error: $e")));
+                          if (mounted) ErrorHandler.showError(context, e);
                         } finally {
                           if (mounted) setState(() => _isProcessing = false);
                         }
@@ -648,7 +649,7 @@ class _StudentFeeDetailPageState extends State<StudentFeeDetailPage> {
                 });
                 _fetchStudentDetails(_selectedStudentId!);
               } catch (e) {
-                if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Error: $e")));
+                if (mounted) ErrorHandler.showError(context, e);
               } finally {
                 if (mounted) setState(() => _isProcessing = false);
               }
@@ -689,7 +690,7 @@ class _StudentFeeDetailPageState extends State<StudentFeeDetailPage> {
                 });
                 _fetchStudentDetails(_selectedStudentId!);
               } catch (e) {
-                if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Error: $e")));
+                if (mounted) ErrorHandler.showError(context, e);
               } finally {
                 if (mounted) setState(() => _isProcessing = false);
               }
@@ -707,7 +708,7 @@ class _StudentFeeDetailPageState extends State<StudentFeeDetailPage> {
       await ApiService.deleteFine(fineId);
       _fetchStudentDetails(_selectedStudentId!);
     } catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Error: $e")));
+      if (mounted) ErrorHandler.showError(context, e);
     } finally {
       if (mounted) setState(() => _isProcessing = false);
     }
