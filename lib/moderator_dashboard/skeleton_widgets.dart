@@ -1,3 +1,4 @@
+import 'package:eduphin/services/error_handler.dart';
 import 'package:flutter/material.dart';
 import 'package:shimmer/shimmer.dart';
 import 'package:eduphin/services/common_widgets.dart';
@@ -21,6 +22,8 @@ class ModeratorLoadingWrapper<T> extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
     if (snapshot.hasData) {
       return builder(snapshot.data as T);
     } else if (snapshot.hasError) {
@@ -28,13 +31,31 @@ class ModeratorLoadingWrapper<T> extends StatelessWidget {
         return builder(cachedData as T);
       }
       return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Text('Error: ${snapshot.error}'),
-            if (onRefresh != null)
-              ElevatedButton(onPressed: onRefresh, child: const Text('Retry')),
-          ],
+        child: Padding(
+          padding: context.pagePadding,
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(Icons.error_outline,
+                  color: theme.colorScheme.error, size: context.scale(48)),
+              SizedBox(height: context.scale(16)),
+              Text(
+                ErrorHandler.getMessage(snapshot.error),
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  color: theme.hintColor,
+                  fontSize: context.font(14),
+                ),
+              ),
+              if (onRefresh != null) ...[
+                SizedBox(height: context.scale(24)),
+                FilledButton.tonal(
+                  onPressed: onRefresh,
+                  child: const Text('Try Again'),
+                ),
+              ],
+            ],
+          ),
         ),
       );
     } else if (snapshot.connectionState == ConnectionState.waiting) {

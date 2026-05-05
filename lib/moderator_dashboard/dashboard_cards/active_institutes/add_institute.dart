@@ -1,3 +1,4 @@
+import 'package:eduphin/services/error_handler.dart';
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
@@ -133,57 +134,19 @@ class _AddInstitutePageState extends State<AddNewInstitutePage> {
         await CacheHelper.clear('institutes_list');
 
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Institute added successfully!'), backgroundColor: Colors.green));
+          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+              content: Text('Institute added successfully!'),
+              backgroundColor: Colors.green));
           Navigator.of(context).pop(true);
         }
       } else {
-        String errorMessage = 'Failed to add institute';
-        try {
-          final errorData = jsonDecode(responseBody);
-          if (errorData['errors'] != null) {
-            final errors = errorData['errors'] as Map<String, dynamic>;
-            errorMessage = errors.entries.map((e) {
-              final value = e.value;
-              if (value is List) {
-                return '${e.key.toUpperCase()}: ${value.join(', ')}';
-              }
-              return '${e.key.toUpperCase()}: $value';
-            }).join('\n');
-          } else if (errorData['message'] != null) {
-            errorMessage = errorData['message'];
-          } else if (errorData['error'] != null) {
-            errorMessage = errorData['error'];
-          }
-        } catch (_) {
-          if (response.statusCode == 422) {
-            errorMessage = 'Validation error. Please check your input.';
-          } else if (response.statusCode == 403) {
-            errorMessage = 'You don\'t have permission to perform this action.';
-          } else {
-            errorMessage = 'Server error: ${response.statusCode}';
-          }
-        }
-        if (mounted) {
-          showDialog(
-            context: context,
-            builder: (ctx) => AlertDialog(
-              title: const Row(
-                children: [
-                  Icon(Icons.error_outline, color: Colors.red),
-                  SizedBox(width: 8),
-                  Text('Registration Failed'),
-                ],
-              ),
-              content: Text(errorMessage),
-              actions: [
-                TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('OK')),
-              ],
-            ),
-          );
-        }
+        throw ApiException('Failed to add institute',
+            statusCode: response.statusCode);
       }
+    } on SocketException {
+      if (mounted) ErrorHandler.showError(context, NetworkException());
     } catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('An error occurred: $e'), backgroundColor: Colors.red));
+      if (mounted) ErrorHandler.showError(context, e);
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }

@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:eduphin/services/api_service.dart';
+import 'package:eduphin/services/error_handler.dart';
 import 'package:eduphin/services/caching_service.dart';
 import 'package:eduphin/services/common_widgets.dart';
 import 'package:eduphin/services/responsive_helper.dart';
@@ -72,6 +73,7 @@ class ShowSchedulePage extends StatefulWidget {
 class _ShowSchedulePageState extends State<ShowSchedulePage> {
   bool _isLoading = true;
   Map<String, List<Schedule>> _scheduleByDay = {};
+  Object? _error;
   String get _cacheKey => 'manager_schedule_${widget.classId}_${widget.sectionId}';
 
   @override
@@ -120,6 +122,7 @@ class _ShowSchedulePageState extends State<ShowSchedulePage> {
     if (_scheduleByDay.isEmpty) {
       setState(() {
         _isLoading = true;
+        _error = null;
       });
     }
 
@@ -135,17 +138,19 @@ class _ShowSchedulePageState extends State<ShowSchedulePage> {
         setState(() {
           _scheduleByDay = _processScheduleData(data);
           _isLoading = false;
+          _error = null;
         });
       } else {
         throw Exception('Failed to load schedule: ${response.body}');
       }
     } catch (e) {
       if (mounted) {
-        setState(() => _isLoading = false);
+        setState(() {
+          _isLoading = false;
+          _error = e;
+        });
         if (_scheduleByDay.isEmpty) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(e.toString().replaceFirst('Exception: ', ''))),
-          );
+          ErrorHandler.showError(context, e);
         }
       }
     }
@@ -176,10 +181,7 @@ class _ShowSchedulePageState extends State<ShowSchedulePage> {
               }
             } catch (e) {
               if (mounted) {
-                final theme = Theme.of(context);
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text(e.toString().replaceFirst('Exception: ', '')), backgroundColor: theme.colorScheme.error),
-                );
+                ErrorHandler.showError(context, e);
               }
             }
           },
@@ -207,6 +209,8 @@ class _ShowSchedulePageState extends State<ShowSchedulePage> {
       body: LoadingWrapper(
         isLoading: _isLoading,
         hasData: _scheduleByDay.isNotEmpty,
+        error: _error,
+        onRetry: _fetchSchedule,
         onRefresh: _fetchSchedule,
         skeleton: _buildSkeleton(),
         child: _scheduleByDay.isEmpty

@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:eduphin/services/api_service.dart';
 import 'package:eduphin/services/caching_service.dart';
 import 'package:eduphin/services/common_widgets.dart';
+import 'package:eduphin/services/error_handler.dart';
 import 'package:intl/intl.dart';
 
 class AttendanceReportPage extends StatefulWidget {
@@ -51,15 +52,7 @@ class _AttendanceReportPageState extends State<AttendanceReportPage> {
     } catch (e) {
       if (mounted) {
         setState(() => _isLoading = false);
-        if (_attendanceData == null) {
-          final theme = Theme.of(context);
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text("Error fetching attendance: $e"),
-              backgroundColor: theme.colorScheme.error,
-            ),
-          );
-        }
+        ErrorHandler.showError(context, e);
       }
     }
   }

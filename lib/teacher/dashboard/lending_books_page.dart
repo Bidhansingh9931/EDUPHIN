@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:eduphin/services/error_handler.dart';
 import 'package:eduphin/services/responsive_helper.dart';
 import 'package:eduphin/teacher/dashboard/teacher_cache_service.dart';
 import 'package:flutter/material.dart';
@@ -64,9 +65,12 @@ class _LendingBooksPageState extends State<LendingBooksPage> {
     } catch (e) {
       if (_data == null && mounted) {
         setState(() {
-          _error = e.toString();
+          _error = ErrorHandler.getMessage(e);
           _isLoading = false;
         });
+      } else if (mounted) {
+        ErrorHandler.showError(context, e);
+        setState(() => _isLoading = false);
       }
     }
   }

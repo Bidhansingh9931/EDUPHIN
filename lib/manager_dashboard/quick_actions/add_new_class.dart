@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:eduphin/services/api_service.dart';
 import 'package:eduphin/services/common_widgets.dart';
 import 'package:eduphin/services/caching_service.dart';
+import 'package:eduphin/services/error_handler.dart';
 import 'package:eduphin/services/responsive_helper.dart';
 import 'package:flutter/material.dart';
 
@@ -143,13 +144,7 @@ class _AddNewClassPageState extends State<AddNewClassPage> {
 
     } catch (e) {
       if (!mounted) return;
-      // Display specific error message from the exception
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(e.toString().replaceFirst("Exception: ", "")),
-          backgroundColor: Colors.red,
-        ),
-      );
+      ErrorHandler.showError(context, e);
     } finally {
       if (mounted) {
         setState(() {

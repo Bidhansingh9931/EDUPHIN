@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:eduphin/services/api_service.dart';
+import 'package:eduphin/services/error_handler.dart';
 import 'package:eduphin/services/responsive_helper.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
@@ -51,12 +52,7 @@ class _AddAssignmentPageState extends State<AddAssignmentPage> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(e.toString()),
-            backgroundColor: Theme.of(context).colorScheme.error,
-          ),
-        );
+        ErrorHandler.showError(context, e);
         setState(() => _isLoading = false);
       }
     }
@@ -73,12 +69,7 @@ class _AddAssignmentPageState extends State<AddAssignmentPage> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error picking file: ${e.toString()}'),
-            backgroundColor: Theme.of(context).colorScheme.error,
-          ),
-        );
+        ErrorHandler.showError(context, e);
       }
     }
   }
@@ -159,12 +150,7 @@ class _AddAssignmentPageState extends State<AddAssignmentPage> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(e.toString().replaceFirst('Exception: ', '')),
-            backgroundColor: theme.colorScheme.error,
-          ),
-        );
+        ErrorHandler.showError(context, e);
       }
     } finally {
       if (mounted) {

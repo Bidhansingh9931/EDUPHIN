@@ -1,3 +1,4 @@
+import 'package:eduphin/services/error_handler.dart';
 import 'package:flutter/material.dart';
 import 'package:eduphin/services/api_service.dart';
 import 'package:eduphin/services/responsive_helper.dart';
@@ -50,11 +51,7 @@ class _CreateSupportTicketPageState extends State<CreateSupportTicketPage> {
         Navigator.pop(context, true);
       }
     } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text("Error: $e"), backgroundColor: Color(0xFFEF4444)),
-        );
-      }
+      if (mounted) ErrorHandler.showError(context, e);
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }

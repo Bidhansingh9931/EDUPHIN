@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'package:eduphin/services/error_handler.dart';
 import 'package:eduphin/services/responsive_helper.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart';
@@ -92,7 +93,7 @@ class _UploadAssignmentPageState extends State<UploadAssignmentPage> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Upload failed: $e"), backgroundColor: const Color(0xFFEF4444)));
+        ErrorHandler.showError(context, e);
       }
     } finally {
       if (mounted) setState(() => _isUploading = false);

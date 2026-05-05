@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:eduphin/services/error_handler.dart';
 import 'package:eduphin/services/common_widgets.dart';
 import 'package:eduphin/services/caching_service.dart';
 import 'package:eduphin/services/api_service.dart';
@@ -149,6 +150,7 @@ class _EmployeesSalaryPageState extends State<EmployeesSalaryPage> {
         _error = e;
         _isLoading = _allEmployees.isEmpty;
       });
+      ErrorHandler.showError(context, e);
     }
   }
 

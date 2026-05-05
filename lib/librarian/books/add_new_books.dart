@@ -1,3 +1,4 @@
+import '../../services/error_handler.dart';
 import '../../services/responsive_helper.dart';
 import 'package:eduphin/teacher/dashboard/app_drawer.dart';
 import 'package:flutter/material.dart';
@@ -79,7 +80,7 @@ class _AddNewBookPageState extends State<AddNewBookPage> {
       'category': _categoryController.text,
       'language': _languageController.text,
       'format': selectedFormat,
-      'quantity': _quantityController.text,
+      'quantity': int.tryParse(_quantityController.text) ?? 1,
     };
 
     try {
@@ -92,7 +93,7 @@ class _AddNewBookPageState extends State<AddNewBookPage> {
       }
       if (mounted) Navigator.pop(context, true);
     } catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Error: $e")));
+      if (mounted) ErrorHandler.showError(context, e);
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }

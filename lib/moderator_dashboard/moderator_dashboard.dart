@@ -1,3 +1,4 @@
+import 'package:eduphin/services/error_handler.dart';
 import 'package:eduphin/moderator_dashboard/dashboard_cards/role_distribution.dart';
 import 'package:eduphin/moderator_dashboard/notification.dart';
 import 'package:eduphin/moderator_dashboard/profile.dart';
@@ -30,6 +31,7 @@ class _ModeratorDashboardPageState extends State<ModeratorDashboardPage> {
   @override
   void initState() {
     super.initState();
+    _dashboardDataFuture = _dataProvider.fetchDashboardData();
     _loadCacheAndFetch();
   }
 
@@ -47,7 +49,13 @@ class _ModeratorDashboardPageState extends State<ModeratorDashboardPage> {
     setState(() {
       _dashboardDataFuture = _dataProvider.fetchDashboardData(bypassCache: true);
     });
-    await _dashboardDataFuture;
+    try {
+      await _dashboardDataFuture;
+    } catch (e) {
+      if (mounted) {
+        ErrorHandler.showError(context, e);
+      }
+    }
   }
 
   @override

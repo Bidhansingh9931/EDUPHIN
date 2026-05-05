@@ -1,3 +1,4 @@
+import 'package:eduphin/services/error_handler.dart';
 import 'dart:io';
 import 'package:eduphin/login_logout/login.dart';
 import 'package:eduphin/services/responsive_helper.dart';
@@ -66,6 +67,7 @@ class _ModeratorProfilePageState extends State<ModeratorProfilePage> {
   @override
   void initState() {
     super.initState();
+    _profileDataFuture = _profileProvider.fetchProfileData();
     _loadCacheAndFetch();
   }
 
@@ -75,7 +77,6 @@ class _ModeratorProfilePageState extends State<ModeratorProfilePage> {
       setState(() {
         _cachedData = cached;
         if (cached != null) _initializeControllers(cached);
-        _profileDataFuture = _profileProvider.fetchProfileData();
       });
       _profileDataFuture.then((data) {
         if (mounted) _initializeControllers(data);
@@ -158,7 +159,7 @@ class _ModeratorProfilePageState extends State<ModeratorProfilePage> {
         });
       }
     } catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Failed to save changes: $e"), backgroundColor: Colors.red));
+      if (mounted) ErrorHandler.showError(context, e);
     } finally {
       if (mounted) setState(() => _isSaving = false);
     }
@@ -184,7 +185,7 @@ class _ModeratorProfilePageState extends State<ModeratorProfilePage> {
           Navigator.of(context).pushAndRemoveUntil(MaterialPageRoute(builder: (context) => const LoginPage()), (route) => false);
         }
       } catch (e) {
-        if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Logout failed: $e"), backgroundColor: Colors.red));
+        if (mounted) ErrorHandler.showError(context, e);
       }
     }
   }
@@ -209,7 +210,13 @@ class _ModeratorProfilePageState extends State<ModeratorProfilePage> {
         if (mounted) _initializeControllers(data);
       });
     });
-    await _profileDataFuture;
+    try {
+      await _profileDataFuture;
+    } catch (e) {
+      if (mounted) {
+        ErrorHandler.showError(context, e);
+      }
+    }
   }
 
   @override

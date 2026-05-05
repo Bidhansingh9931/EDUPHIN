@@ -85,6 +85,7 @@ class _EmployeeListPageState extends State<EmployeeListPage> {
                             return LoadingWrapper<List<UserDetail>>(
                               snapshot: snapshot,
                               skeleton: _buildSkeleton(context),
+                              onRetry: _fetchEmployees,
                               builder: (employees) {
                                 final filtered = employees.where((emp) {
                                   final name = emp.user?.name.toLowerCase() ?? '';

@@ -3,6 +3,7 @@ import 'dart:typed_data';
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:eduphin/services/api_service.dart';
+import 'package:eduphin/services/error_handler.dart';
 import 'package:eduphin/services/responsive_helper.dart';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
@@ -108,7 +109,8 @@ class LoadingWrapper<T> extends StatelessWidget {
     final hasError = error != null || (snapshot != null && snapshot!.hasError && !snapshot!.hasData);
     if (hasError) {
       final theme = context.theme;
-      final errorMessage = error?.toString() ?? snapshot!.error.toString();
+      final errorMessage = ErrorHandler.getMessage(error ?? snapshot!.error);
+      
       return Center(
         child: Padding(
           padding: context.pagePadding,
@@ -118,7 +120,7 @@ class LoadingWrapper<T> extends StatelessWidget {
               Icon(Icons.error_outline, color: theme.colorScheme.error, size: context.scale(48)),
               SizedBox(height: context.scale(16)),
               Text(
-                errorMessage.replaceFirst('Exception: ', ''),
+                errorMessage,
                 textAlign: TextAlign.center,
                 style: TextStyle(color: theme.hintColor),
               ),
@@ -218,22 +220,30 @@ class ProfileSection extends StatelessWidget {
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Row(
-                  children: [
-                    Icon(
-                      icon,
-                      size: context.scale(20),
-                      color: theme.colorScheme.primary,
-                    ),
-                    SizedBox(width: context.scale(8)),
-                    Text(
-                      title,
-                      style: theme.textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.bold,
+                Expanded(
+                  child: Row(
+                    children: [
+                      Icon(
+                        icon,
+                        size: context.scale(20),
+                        color: theme.colorScheme.primary,
                       ),
-                    ),
-                  ],
+                      SizedBox(width: context.scale(8)),
+                      Expanded(
+                        child: Text(
+                          title,
+                          style: theme.textTheme.titleMedium?.copyWith(
+                            fontWeight: FontWeight.bold,
+                            fontSize: context.font(16),
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
+                if (status != null) SizedBox(width: context.scale(8)),
                 if (status != null)
                   Container(
                     padding: EdgeInsets.symmetric(
@@ -525,10 +535,14 @@ class _ProfileAvatarState extends State<ProfileAvatar> {
       });
     }
 
+    final bool isStorageUrl = widget.imageUrl!.contains('/storage/');
+
     try {
       final response = await http.get(
         Uri.parse(widget.imageUrl!),
-        headers: _token != null ? {'Authorization': 'Bearer $_token'} : null,
+        headers: (isStorageUrl || _token == null)
+            ? null
+            : {'Authorization': 'Bearer $_token'},
       );
 
       if (response.statusCode == 200) {
@@ -564,22 +578,20 @@ class _ProfileAvatarState extends State<ProfileAvatar> {
     final theme = context.theme;
     ImageProvider? provider;
 
+    final bool hasValidImageUrl = widget.imageUrl != null &&
+        widget.imageUrl!.isNotEmpty &&
+        !widget.imageUrl!.contains("null") &&
+        !_errorLoadingImage;
+
     if (kIsWeb && widget.webImage != null) {
       provider = MemoryImage(widget.webImage!);
     } else if (kIsWeb && _networkImageBytes != null) {
       provider = MemoryImage(_networkImageBytes!);
-    } else if (kIsWeb && widget.imageUrl != null && widget.imageUrl!.isNotEmpty && !widget.imageUrl!.contains("null") && !_errorLoadingImage) {
-      // For Web, use NetworkImage directly. 
-      // Since CORS is now configured on the server, the browser can handle it.
+    } else if (kIsWeb && hasValidImageUrl) {
       provider = NetworkImage(widget.imageUrl!);
     } else if (!kIsWeb && widget.localImage != null) {
       provider = FileImage(widget.localImage!);
-    } else if (!kIsWeb &&
-        widget.imageUrl != null &&
-        widget.imageUrl!.isNotEmpty &&
-        !widget.imageUrl!.contains("null") &&
-        !_errorLoadingImage) {
-      // Don't send any custom headers for public storage URLs as it can cause 403 Forbidden
+    } else if (!kIsWeb && hasValidImageUrl) {
       final bool isStorageUrl = widget.imageUrl!.contains('/storage/');
       provider = NetworkImage(
         widget.imageUrl!,
@@ -593,6 +605,11 @@ class _ProfileAvatarState extends State<ProfileAvatar> {
                     'image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8',
               },
       );
+    }
+
+    // Use our custom placeholder if no provider is available
+    if (provider == null) {
+      provider = const AssetImage('assets/images/random_boy.jpg');
     }
 
     return Stack(
@@ -612,29 +629,19 @@ class _ProfileAvatarState extends State<ProfileAvatar> {
             radius: widget.radius,
             backgroundColor: theme.colorScheme.surfaceContainerHighest,
             backgroundImage: provider,
-            child: provider == null
-                ? Icon(
-                    Icons.person_rounded,
-                    size: widget.radius,
-                    color:
-                        theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.5),
-                  )
-                : null,
-            onBackgroundImageError: provider != null
-                ? (exception, stackTrace) {
-                    debugPrint(
-                        'ProfileAvatar: Error loading image ${widget.imageUrl}: $exception');
-                    if (mounted) {
-                      WidgetsBinding.instance.addPostFrameCallback((_) {
-                        if (mounted) {
-                          setState(() {
-                            _errorLoadingImage = true;
-                          });
-                        }
-                      });
-                    }
+            onBackgroundImageError: (exception, stackTrace) {
+              debugPrint(
+                  'ProfileAvatar: Error loading image ${widget.imageUrl}: $exception');
+              if (mounted) {
+                WidgetsBinding.instance.addPostFrameCallback((_) {
+                  if (mounted) {
+                    setState(() {
+                      _errorLoadingImage = true;
+                    });
                   }
-                : null,
+                });
+              }
+            },
           ),
         ),
         if (widget.onCameraTap != null)
@@ -764,20 +771,23 @@ class QuickActionItem extends StatelessWidget {
         ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
+          mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Container(
-              padding: EdgeInsets.all(context.scale(8)),
-              decoration: BoxDecoration(
-                color: effectiveColor.withValues(alpha: 0.1),
-                shape: BoxShape.circle,
-              ),
-              child: Icon(
-                icon,
-                size: context.scale(20),
-                color: effectiveColor,
+            Flexible(
+              child: Container(
+                padding: EdgeInsets.all(context.scale(4)),
+                decoration: BoxDecoration(
+                  color: effectiveColor.withValues(alpha: 0.1),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(
+                  icon,
+                  size: context.scale(20),
+                  color: effectiveColor,
+                ),
               ),
             ),
-            SizedBox(height: context.scale(8)),
+            SizedBox(height: context.scale(4)),
             Text(
               label,
               style: TextStyle(

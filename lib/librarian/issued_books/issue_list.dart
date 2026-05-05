@@ -1,3 +1,4 @@
+import 'package:eduphin/services/error_handler.dart';
 import 'package:eduphin/librarian/librarian_skeleton_widgets.dart';
 import 'package:eduphin/services/common_widgets.dart';
 import '../../services/responsive_helper.dart';
@@ -364,20 +365,7 @@ class _IssuedBooksListPageState extends State<IssuedBooksListPage> {
           ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Book returned successfully")));
         }
       } catch (e) {
-        if (mounted) {
-          final theme = context.theme;
-          String errorMsg = e.toString().replaceFirst('Exception: ', '');
-          ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-            content: Text(errorMsg),
-            backgroundColor: theme.colorScheme.error,
-            duration: const Duration(seconds: 5),
-            action: SnackBarAction(
-              label: "Retry",
-              textColor: theme.colorScheme.onError,
-              onPressed: () => _confirmReturn(ib),
-            ),
-          ));
-        }
+        if (mounted) ErrorHandler.showError(context, e);
       }
     }
   }
@@ -425,15 +413,7 @@ class _IssuedBooksListPageState extends State<IssuedBooksListPage> {
         await ApiService.deleteIssuedBook(id.toString());
         _fetchIssuedBooks();
       } catch (e) {
-        if (mounted) {
-          final theme = context.theme;
-          String errorMsg = e.toString().replaceFirst('Exception: ', '');
-          ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-            content: Text(errorMsg),
-            backgroundColor: theme.colorScheme.error,
-            duration: const Duration(seconds: 5),
-          ));
-        }
+        if (mounted) ErrorHandler.showError(context, e);
       }
     }
   }

@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:eduphin/services/error_handler.dart';
 import 'package:eduphin/services/common_widgets.dart';
 import 'package:eduphin/services/responsive_helper.dart';
 import 'package:flutter/material.dart';
@@ -36,14 +37,18 @@ class _StudentFeeDetailPageState extends State<StudentFeeDetailPage> {
       final Map<String, String> query = {};
       if (_selectedClassId != null) query['class_filter'] = _selectedClassId.toString();
       if (_selectedSectionId != null) query['section_filter'] = _selectedSectionId.toString();
-      _studentsStream = ApiService.getAccountantStudentsStream(query);
+      _studentsStream = ApiService.getAccountantStudentsStream(query)..handleError((error) {
+        if (mounted) ErrorHandler.showError(context, error);
+      });
     });
   }
 
   void _fetchStudentDetails(String studentId) {
     setState(() {
       _selectedStudentId = studentId;
-      _studentDetailsStream = ApiService.getAccountantStudentFeeDetailsStream(studentId);
+      _studentDetailsStream = ApiService.getAccountantStudentFeeDetailsStream(studentId)..handleError((error) {
+        if (mounted) ErrorHandler.showError(context, error);
+      });
     });
   }
 
@@ -205,11 +210,10 @@ class _StudentFeeDetailPageState extends State<StudentFeeDetailPage> {
           children: [
             Text("Filter Students", style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
             SizedBox(height: context.spacing),
-            Row(
+            AdaptiveFieldRow(
               children: [
-                Expanded(child: _buildDropdownField(context, _classes, _selectedClassId, "All Classes", (val) => setState(() => _selectedClassId = val))),
-                SizedBox(width: context.spacing / 2),
-                Expanded(child: _buildDropdownField(context, _sections, _selectedSectionId, "All Sections", (val) => setState(() => _selectedSectionId = val), isSection: true)),
+                _buildDropdownField(context, _classes, _selectedClassId, "All Classes", (val) => setState(() => _selectedClassId = val)),
+                _buildDropdownField(context, _sections, _selectedSectionId, "All Sections", (val) => setState(() => _selectedSectionId = val), isSection: true),
               ],
             ),
             SizedBox(height: context.spacing),
@@ -346,9 +350,7 @@ class _StudentFeeDetailPageState extends State<StudentFeeDetailPage> {
   }
 
   Widget _buildDetailGrid(BuildContext context, dynamic info) {
-    return Wrap(
-      spacing: context.spacing,
-      runSpacing: context.scale(12),
+    return AdaptiveFieldRow(
       children: [
         _infoItem(context, "Roll No", info['roll_no']?.toString() ?? 'N/A'),
         _infoItem(context, "Class", "${info['class']?['name'] ?? 'N/A'} - ${info['section']?['section_name'] ?? info['section']?['name'] ?? 'N/A'}"),
@@ -362,7 +364,7 @@ class _StudentFeeDetailPageState extends State<StudentFeeDetailPage> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(label, style: TextStyle(color: context.theme.hintColor, fontSize: context.font(10), fontWeight: FontWeight.bold)),
-        Text(value, style: TextStyle(fontWeight: FontWeight.w500, fontSize: context.font(13))),
+        Text(value, style: TextStyle(fontWeight: FontWeight.w500, fontSize: context.font(13)), maxLines: 2, overflow: TextOverflow.ellipsis),
       ],
     );
   }
@@ -373,7 +375,8 @@ class _StudentFeeDetailPageState extends State<StudentFeeDetailPage> {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(label, style: TextStyle(fontSize: context.font(13))),
+          Expanded(child: Text(label, style: TextStyle(fontSize: context.font(13)), maxLines: 1, overflow: TextOverflow.ellipsis)),
+          SizedBox(width: context.spacing),
           Text(value, style: TextStyle(color: color, fontSize: context.font(15), fontWeight: isBold ? FontWeight.bold : FontWeight.w500)),
         ],
       ),
@@ -600,7 +603,7 @@ class _StudentFeeDetailPageState extends State<StudentFeeDetailPage> {
                           });
                           _fetchStudentDetails(_selectedStudentId!);
                         } catch (e) {
-                          if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Error: $e")));
+                          if (mounted) ErrorHandler.showError(context, e);
                         } finally {
                           if (mounted) setState(() => _isProcessing = false);
                         }
@@ -648,7 +651,7 @@ class _StudentFeeDetailPageState extends State<StudentFeeDetailPage> {
                 });
                 _fetchStudentDetails(_selectedStudentId!);
               } catch (e) {
-                if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Error: $e")));
+                if (mounted) ErrorHandler.showError(context, e);
               } finally {
                 if (mounted) setState(() => _isProcessing = false);
               }
@@ -689,7 +692,7 @@ class _StudentFeeDetailPageState extends State<StudentFeeDetailPage> {
                 });
                 _fetchStudentDetails(_selectedStudentId!);
               } catch (e) {
-                if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Error: $e")));
+                if (mounted) ErrorHandler.showError(context, e);
               } finally {
                 if (mounted) setState(() => _isProcessing = false);
               }
@@ -707,7 +710,7 @@ class _StudentFeeDetailPageState extends State<StudentFeeDetailPage> {
       await ApiService.deleteFine(fineId);
       _fetchStudentDetails(_selectedStudentId!);
     } catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Error: $e")));
+      if (mounted) ErrorHandler.showError(context, e);
     } finally {
       if (mounted) setState(() => _isProcessing = false);
     }

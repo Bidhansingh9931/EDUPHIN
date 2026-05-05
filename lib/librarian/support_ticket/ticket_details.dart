@@ -1,3 +1,4 @@
+import 'package:eduphin/services/error_handler.dart';
 import 'package:flutter/material.dart';
 import '../../services/api_service.dart';
 import '../../teacher/dashboard/ticket_details_models.dart';
@@ -42,7 +43,7 @@ class _LibrarianTicketDetailsPageState extends State<LibrarianTicketDetailsPage>
       _loadDetails();
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Reply sent successfully")));
     } catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Error: $e")));
+      if (mounted) ErrorHandler.showError(context, e);
     } finally {
       if (mounted) setState(() => _isSubmitting = false);
     }

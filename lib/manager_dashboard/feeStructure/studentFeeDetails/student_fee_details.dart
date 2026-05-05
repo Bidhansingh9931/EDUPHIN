@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'package:eduphin/services/api_service.dart';
+import 'package:eduphin/services/error_handler.dart';
 import 'package:eduphin/services/caching_service.dart';
 import 'package:eduphin/services/responsive_helper.dart';
 import 'package:eduphin/services/common_widgets.dart';
@@ -67,19 +68,31 @@ class StudentFeeInfo {
   });
 
   factory StudentFeeInfo.fromJson(Map<String, dynamic> json) {
-    final studentData = json['student'] is Map<String, dynamic> ? json['student'] : {};
-    final classData = json['class'] is Map<String, dynamic> ? json['class'] : {};
-    final sectionData = json['section'] is Map<String, dynamic> ? json['section'] : {};
+    // Handle both flat (direct) and nested (json['student']) structures
+    final bool isNested = json.containsKey('student') && json['student'] is Map;
+    final Map<String, dynamic> student = isNested ? json['student'] : json;
+    final Map<String, dynamic> classInfo = (json['class'] is Map) ? json['class'] : {};
+    final Map<String, dynamic> sectionInfo = (json['section'] is Map) ? json['section'] : {};
 
-    String rawImageUrl = studentData['profile_image']?.toString() ?? '';
+    // Handle name construction
+    String name = student['name']?.toString() ?? '';
+    if (name.isEmpty) {
+      final fName = student['first_name']?.toString() ?? '';
+      final mName = student['middle_name']?.toString() ?? '';
+      final lName = student['last_name']?.toString() ?? '';
+      name = [fName, mName, lName].where((s) => s.isNotEmpty).join(' ').trim();
+    }
+    if (name.isEmpty) name = 'N/A';
+
+    String rawImageUrl = student['profile_image']?.toString() ?? '';
     return StudentFeeInfo(
-      id: json['student_id'] ?? 0,
-      name: studentData['name']?.toString() ?? 'N/A',
-      regNo: studentData['registration_no']?.toString() ?? 'N/A',
-      className: classData['name']?.toString() ?? 'N/A',
-      sectionName: sectionData['section_name']?.toString() ?? 'N/A',
-      status: studentData['status']?.toString() ?? 'Inactive',
-      imageUrl: rawImageUrl.isNotEmpty ? '${ApiService.baseImageUrl}/storage/$rawImageUrl' : 'assets/images/random_boy.jpg',
+      id: student['id'] ?? json['student_id'] ?? 0,
+      name: name,
+      regNo: student['registration_no']?.toString() ?? student['student_roll_no']?.toString() ?? 'N/A',
+      className: classInfo['name']?.toString() ?? 'N/A',
+      sectionName: sectionInfo['section_name']?.toString() ?? 'N/A',
+      status: student['student_status']?.toString() ?? student['status']?.toString() ?? 'Inactive',
+      imageUrl: rawImageUrl.isNotEmpty ? ApiService.getStorageUrl(rawImageUrl) : '',
     );
   }
 }
@@ -199,6 +212,7 @@ class _StudentFeeDetailsPageState extends State<StudentFeeDetailsPage> {
     } catch (e) {
       if (mounted) {
         setState(() => _error = e);
+        ErrorHandler.showError(context, e);
       }
     } finally {
       if (mounted) {
@@ -218,7 +232,7 @@ class _StudentFeeDetailsPageState extends State<StudentFeeDetailsPage> {
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
-        final List<dynamic> studentData = data['students'] as List? ?? [];
+        final List<dynamic> studentData = (data['data'] ?? data['students']) as List? ?? [];
         
         await CacheService.setCache('students_fee_${_selectedClassId}_$_selectedSectionId', studentData);
 
@@ -233,7 +247,7 @@ class _StudentFeeDetailsPageState extends State<StudentFeeDetailsPage> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString())));
+        ErrorHandler.showError(context, e);
       }
     } finally {
       if (mounted) {

@@ -1,9 +1,12 @@
 import 'dart:io';
 import 'package:eduphin/services/caching_service.dart';
 import 'package:eduphin/services/common_widgets.dart';
+import 'package:eduphin/services/error_handler.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:eduphin/services/responsive_helper.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
+import 'dart:typed_data';
 import 'package:eduphin/services/api_service.dart';
 import 'package:eduphin/teacher/dashboard/ticket_details_models.dart';
 import 'package:eduphin/teacher/dashboard/ticket_models.dart';
@@ -23,6 +26,8 @@ class _StudentTicketDetailsPageState extends State<StudentTicketDetailsPage> {
   bool _isLoading = true;
   final TextEditingController _replyController = TextEditingController();
   File? _selectedFile;
+  Uint8List? _selectedFileBytes;
+  String? _fileName;
   bool _isSending = false;
 
   String get _cacheKey => 'student_support_ticket_${widget.ticketId}';
@@ -60,23 +65,20 @@ class _StudentTicketDetailsPageState extends State<StudentTicketDetailsPage> {
     } catch (e) {
       if (mounted) {
         setState(() => _isLoading = false);
-        if (_details == null) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text("Error fetching ticket details: $e"),
-              backgroundColor: context.theme.colorScheme.error,
-            ),
-          );
-        }
+        ErrorHandler.showError(context, e);
       }
     }
   }
 
   Future<void> _pickFile() async {
-    FilePickerResult? result = await FilePicker.platform.pickFiles();
+    FilePickerResult? result = await FilePicker.platform.pickFiles(withData: kIsWeb);
     if (result != null) {
       setState(() {
-        _selectedFile = File(result.files.single.path!);
+        if (!kIsWeb && result.files.single.path != null) {
+          _selectedFile = File(result.files.single.path!);
+        }
+        _selectedFileBytes = result.files.single.bytes;
+        _fileName = result.files.single.name;
       });
     }
   }
@@ -90,22 +92,21 @@ class _StudentTicketDetailsPageState extends State<StudentTicketDetailsPage> {
         widget.ticketId,
         _replyController.text.trim(),
         attachment: _selectedFile,
+        attachmentBytes: _selectedFileBytes,
+        fileName: _fileName,
       );
       _replyController.clear();
       setState(() {
         _selectedFile = null;
+        _selectedFileBytes = null;
+        _fileName = null;
         _isSending = false;
       });
       _fetchDetails();
     } catch (e) {
       setState(() => _isSending = false);
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text("Failed to send reply: $e"),
-          backgroundColor: context.theme.colorScheme.error,
-        ),
-      );
+      ErrorHandler.showError(context, e);
     }
   }
 
@@ -396,7 +397,7 @@ class _StudentTicketDetailsPageState extends State<StudentTicketDetailsPage> {
           constraints: const BoxConstraints(maxWidth: 1000),
           child: Column(
             children: [
-              if (_selectedFile != null)
+              if (_selectedFile != null || _selectedFileBytes != null)
                 Container(
                   margin: EdgeInsets.only(bottom: context.md),
                   padding: EdgeInsets.symmetric(horizontal: context.scale(12), vertical: context.scale(10)),
@@ -411,14 +412,18 @@ class _StudentTicketDetailsPageState extends State<StudentTicketDetailsPage> {
                       SizedBox(width: context.md),
                       Expanded(
                         child: Text(
-                          _selectedFile!.path.split('/').last,
+                          _fileName ?? (_selectedFile != null ? _selectedFile!.path.split('/').last : "Attached File"),
                           style: TextStyle(color: colorScheme.onSurface, fontSize: context.font(13)),
                           overflow: TextOverflow.ellipsis,
                         ),
                       ),
                       IconButton(
                         icon: Icon(Icons.cancel, color: colorScheme.error, size: context.scale(20)),
-                        onPressed: () => setState(() => _selectedFile = null),
+                        onPressed: () => setState(() {
+                          _selectedFile = null;
+                          _selectedFileBytes = null;
+                          _fileName = null;
+                        }),
                         padding: EdgeInsets.zero,
                         constraints: const BoxConstraints(),
                       ),

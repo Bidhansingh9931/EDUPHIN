@@ -172,8 +172,9 @@ class SalarySkeleton extends StatelessWidget {
                       const Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          LibrarianSkeleton(width: 100, height: 16),
-                          LibrarianSkeleton(width: 140, height: 16),
+                          Flexible(child: LibrarianSkeleton(width: 100, height: 16)),
+                          SizedBox(width: 12),
+                          Flexible(child: LibrarianSkeleton(width: 140, height: 16)),
                         ],
                       ),
                       SizedBox(height: context.md),

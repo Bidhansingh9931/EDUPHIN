@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:eduphin/services/error_handler.dart';
 import 'package:eduphin/manager_dashboard/library/add_book.dart';
 import 'package:eduphin/services/api_service.dart';
 import 'package:eduphin/services/caching_service.dart';
@@ -75,6 +76,7 @@ class _AvailableBooksScreenState extends State<AvailableBooksScreen> {
           _error = e;
           _isLoading = false;
         });
+        ErrorHandler.showError(context, e);
       }
     }
   }

@@ -7,6 +7,7 @@ import 'package:eduphin/student/faculty_remark.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:eduphin/services/error_handler.dart';
 
 import 'package:eduphin/services/caching_service.dart';
 
@@ -62,9 +63,12 @@ class _StudentProfilePageState extends State<StudentProfilePage> {
     } catch (e) {
       if (mounted) {
         setState(() {
-          errorMessage = profileData == null ? e.toString() : null;
+          errorMessage = profileData == null ? ErrorHandler.getMessage(e) : null;
           isLoading = false;
         });
+        if (profileData != null) {
+          ErrorHandler.showError(context, e);
+        }
       }
     }
   }
@@ -140,12 +144,7 @@ class _StudentProfilePageState extends State<StudentProfilePage> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Update failed: $e'),
-            backgroundColor: context.theme.colorScheme.error,
-          ),
-        );
+        ErrorHandler.showError(context, e);
       }
     } finally {
       if (mounted) setState(() => isUpdating = false);
@@ -206,14 +205,18 @@ class _StudentProfilePageState extends State<StudentProfilePage> {
                         borderRadius: BorderRadius.circular(context.scale(12)),
                         border: Border.all(color: context.theme.colorScheme.outlineVariant.withValues(alpha: 0.5)),
                       ),
-                      child: Row(
-                        children: [
-                          _tabButton("PERSONAL", 0),
-                          _tabButton("ADDRESS", 1),
-                          _tabButton("FAMILY", 2),
-                          _tabButton("HEALTH", 3),
-                          _tabButton("SECURITY", 4),
-                        ],
+                      child: SingleChildScrollView(
+                        scrollDirection: Axis.horizontal,
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            _tabButton("PERSONAL", 0),
+                            _tabButton("ADDRESS", 1),
+                            _tabButton("FAMILY", 2),
+                            _tabButton("HEALTH", 3),
+                            _tabButton("SECURITY", 4),
+                          ],
+                        ),
                       ),
                     ),
 
@@ -488,24 +491,22 @@ class _StudentProfilePageState extends State<StudentProfilePage> {
 
   Widget _tabButton(String title, int index) {
     bool isSelected = selectedTabIndex == index;
-    return Expanded(
-      child: InkWell(
-        onTap: () => setState(() => selectedTabIndex = index),
-        borderRadius: BorderRadius.circular(context.scale(12)),
-        child: Container(
-          padding: EdgeInsets.symmetric(vertical: context.scale(16)),
-          decoration: BoxDecoration(
-            color: isSelected ? context.theme.colorScheme.primary : Colors.transparent,
-            borderRadius: BorderRadius.circular(context.scale(12)),
-          ),
-          child: Text(
-            title,
-            textAlign: TextAlign.center,
-            style: TextStyle(
-                color: isSelected ? context.theme.colorScheme.onPrimary : context.theme.colorScheme.onSurfaceVariant,
-                fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-                fontSize: context.font(10)),
-          ),
+    return InkWell(
+      onTap: () => setState(() => selectedTabIndex = index),
+      borderRadius: BorderRadius.circular(context.scale(12)),
+      child: Container(
+        padding: EdgeInsets.symmetric(vertical: context.scale(16), horizontal: context.scale(16)),
+        decoration: BoxDecoration(
+          color: isSelected ? context.theme.colorScheme.primary : Colors.transparent,
+          borderRadius: BorderRadius.circular(context.scale(12)),
+        ),
+        child: Text(
+          title,
+          textAlign: TextAlign.center,
+          style: TextStyle(
+              color: isSelected ? context.theme.colorScheme.onPrimary : context.theme.colorScheme.onSurfaceVariant,
+              fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+              fontSize: context.font(10)),
         ),
       ),
     );

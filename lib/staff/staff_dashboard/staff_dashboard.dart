@@ -1,3 +1,4 @@
+import 'package:eduphin/services/error_handler.dart';
 import 'package:eduphin/services/api_service.dart';
 import 'package:eduphin/services/common_widgets.dart';
 import 'package:flutter/material.dart';
@@ -55,13 +56,17 @@ class _StaffDashboardState extends State<StaffDashboard> {
     );
 
     if (confirmed == true) {
-      await ApiService.logout();
-      if (mounted) {
-        Navigator.pushAndRemoveUntil(
-          context,
-          MaterialPageRoute(builder: (context) => const LoginPage()),
-          (route) => false,
-        );
+      try {
+        await ApiService.logout();
+        if (mounted) {
+          Navigator.pushAndRemoveUntil(
+            context,
+            MaterialPageRoute(builder: (context) => const LoginPage()),
+            (route) => false,
+          );
+        }
+      } catch (e) {
+        if (mounted) ErrorHandler.showError(context, e);
       }
     }
   }
@@ -139,7 +144,6 @@ class _StaffDashboardState extends State<StaffDashboard> {
 
   Widget _buildContent(BuildContext context, StaffDashboardData data) {
     final theme = context.theme;
-    final colorScheme = theme.colorScheme;
 
     final userDetail = data.userDetail;
     final user = userDetail?.user;

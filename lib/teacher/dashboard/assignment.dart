@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'package:eduphin/services/error_handler.dart';
 import 'package:eduphin/services/api_service.dart';
 import 'package:eduphin/services/responsive_helper.dart';
 import 'package:eduphin/teacher/dashboard/teacher_cache_service.dart';
@@ -77,9 +78,12 @@ class _AssignmentPageState extends State<AssignmentPage> {
     } catch (e) {
       if (_data == null && mounted) {
         setState(() {
-          _error = e.toString();
+          _error = ErrorHandler.getMessage(e);
           _isLoading = false;
         });
+      } else if (mounted) {
+        ErrorHandler.showError(context, e);
+        setState(() => _isLoading = false);
       }
     }
   }
@@ -146,12 +150,7 @@ class _AssignmentPageState extends State<AssignmentPage> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text("Could not open file: $e"),
-            backgroundColor: const Color(0xFFEF4444), // Red
-          ),
-        );
+        ErrorHandler.showError(context, e);
       }
     }
   }
@@ -408,7 +407,7 @@ class _AssignmentPageState extends State<AssignmentPage> {
           _loadData();
         }
       } catch (e) {
-        if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Error: $e")));
+        if (mounted) ErrorHandler.showError(context, e);
       }
     }
   }

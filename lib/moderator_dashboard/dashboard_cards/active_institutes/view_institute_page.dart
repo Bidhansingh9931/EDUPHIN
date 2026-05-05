@@ -1,4 +1,6 @@
+import 'package:eduphin/services/error_handler.dart';
 import 'dart:async';
+import 'dart:io';
 import 'package:eduphin/moderator_dashboard/cache_helper.dart';
 import 'package:eduphin/moderator_dashboard/skeleton_widgets.dart';
 import 'package:eduphin/services/api_service.dart';
@@ -14,13 +16,20 @@ class InstituteDetailProvider {
   static const String _cacheKeyPrefix = 'institute_detail_';
 
   Future<Institute> fetchInstituteDetails(String instituteId, {bool bypassCache = false}) async {
-    if (!bypassCache) {
-      final cached = await getCachedInstituteDetails(instituteId);
-      if (cached != null) return cached;
+    try {
+      if (!bypassCache) {
+        final cached = await getCachedInstituteDetails(instituteId);
+        if (cached != null) return cached;
+      }
+      final data = await ApiService.getInstituteDetails(instituteId);
+      await CacheHelper.save(_cacheKeyPrefix + instituteId, data.toJson());
+      return data;
+    } on SocketException {
+      throw NetworkException();
+    } catch (e) {
+      if (e is NetworkException) rethrow;
+      throw Exception('Failed to fetch institute details: $e');
     }
-    final data = await ApiService.getInstituteDetails(instituteId);
-    await CacheHelper.save(_cacheKeyPrefix + instituteId, data.toJson());
-    return data;
   }
 
   Future<Institute?> getCachedInstituteDetails(String instituteId) async {
@@ -62,10 +71,17 @@ class _ViewInstitutePageState extends State<ViewInstitutePage> {
     }
   }
 
-  void _refreshData({bool bypassCache = false}) {
+  Future<void> _refreshData({bool bypassCache = false}) async {
     setState(() {
       _instituteFuture = _provider.fetchInstituteDetails(widget.instituteId, bypassCache: bypassCache);
     });
+    try {
+      await _instituteFuture;
+    } catch (e) {
+      if (mounted) {
+        ErrorHandler.showError(context, e);
+      }
+    }
   }
 
   @override

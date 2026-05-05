@@ -1,3 +1,4 @@
+import 'package:eduphin/services/error_handler.dart';
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
@@ -84,85 +85,11 @@ class _AddEditTestimonialPageState extends State<AddEditTestimonialPage> {
       return;
     }
 
-    setState(() => _isLoading = true);
-
     try {
-      final endpoint = _isEditMode
-          ? 'moderator/testimonials/${widget.testimonial!.id}/update'
-          : 'moderator/testimonials';
-
-      final Map<String, String> body = {
-        'name': _nameController.text,
-        'designation': _designationController.text,
-        'message': _messageController.text,
-        'status': (widget.testimonial?.status ?? 1).toString(),
-      };
-
-      if (_isEditMode) {
-        body['_method'] = 'PUT';
-      }
-
-      debugPrint("Submitting Testimonial to endpoint: $endpoint");
-
-      http.Response response;
-
-      final hasNewImage = (kIsWeb && _webImage != null) || (!kIsWeb && _image != null);
-
-      if (hasNewImage) {
-        // Multipart flow
-        http.StreamedResponse streamedResponse;
-        if (kIsWeb) {
-          streamedResponse = await ApiService.postMultipartFromBytes(
-            endpoint,
-            body,
-            files: {'image': _webImage!},
-            fileNames: {'image': _imageName ?? 'image.jpg'},
-            forceMultipart: true,
-          );
-        } else {
-          streamedResponse = await ApiService.postMultipart(
-            endpoint,
-            body,
-            files: {'image': _image!},
-          );
-        }
-        response = await http.Response.fromStream(streamedResponse);
-      } else {
-        // Standard JSON flow
-        response = await ApiService.post(endpoint, body);
-      }
-
-      final responseBody = response.body;
-      final decodedBody = jsonDecode(responseBody);
-
-      if (response.statusCode == 200 || response.statusCode == 201) {
-        debugPrint("Submission successful: $responseBody");
-        await CacheHelper.clear('moderator_testimonials_list');
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(decodedBody['message'] ?? 'Success!'), backgroundColor: Colors.green),
-          );
-          Navigator.pop(context, true); // Return true to signal a refresh
-        }
-      } else {
-        debugPrint("Submission failed with status ${response.statusCode}: $responseBody");
-        String errorMessage = decodedBody['message'] ?? 'An unknown error occurred.';
-        if (decodedBody['errors'] != null && decodedBody['errors'] is Map) {
-            Map<String, dynamic> errors = decodedBody['errors'];
-            errorMessage = errors.values.first[0] ?? errorMessage;
-        }
-        throw Exception(errorMessage);
-      }
+      await _submitForm();
     } catch (e) {
-      debugPrint("An exception occurred: $e");
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to submit: $e'), backgroundColor: Colors.red),
-        );
-      }
-    } finally {
-      if (mounted) {
-        setState(() => _isLoading = false);
+        ErrorHandler.showError(context, e);
       }
     }
   }

@@ -1,5 +1,7 @@
 import 'dart:convert';
+import 'dart:io';
 import 'package:eduphin/services/api_service.dart';
+import 'package:eduphin/services/error_handler.dart';
 import 'package:flutter/foundation.dart';
 import 'dashboard_models.dart';
 import 'cache_helper.dart';
@@ -11,8 +13,6 @@ class DashboardDataProvider {
     final cached = await CacheHelper.load(_cacheKey);
     if (cached != null) {
       try {
-        // The cached data should already be the 'data' part + profile if we saved it that way,
-        // but let's check how we save it.
         return DashboardData.fromJson(cached['dashboard'], profileJson: cached['profile']);
       } catch (e) {
         if (kDebugMode) print('Error parsing cached dashboard data: $e');
@@ -40,7 +40,6 @@ class DashboardDataProvider {
         }
 
         if (dashboardBody['success'] == true && dashboardBody['data'] != null) {
-          // Save to cache
           await CacheHelper.save(_cacheKey, {
             'dashboard': dashboardBody['data'],
             'profile': profileBody,
@@ -48,16 +47,17 @@ class DashboardDataProvider {
           
           return DashboardData.fromJson(dashboardBody['data'], profileJson: profileBody);
         } else {
-          throw Exception('Dashboard API call successful but returned no data or indicated failure.');
+          throw ApiException(dashboardBody['message'] ?? 'Failed to load dashboard data');
         }
       } else {
-        throw Exception('Failed to load dashboard data.');
+        throw ApiException('Failed to load dashboard data', statusCode: dashboardResponse.statusCode);
       }
+    } on SocketException {
+      throw NetworkException();
     } catch (e) {
-      if (kDebugMode) {
-        print('An error occurred while fetching dashboard data: $e');
-      }
-      throw Exception('An error occurred: $e');
+      if (e is ApiException || e is NetworkException) rethrow;
+      throw Exception('An unexpected error occurred: $e');
     }
   }
 }
+

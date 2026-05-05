@@ -1,3 +1,4 @@
+import 'package:eduphin/services/error_handler.dart';
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
@@ -52,14 +53,17 @@ class ProfileProvider {
 
           return ProfileData.fromMap(combinedData);
         } else {
-          throw Exception("Profile data from server has an unexpected format.");
+          throw ApiException("Received invalid data from server.");
         }
       } else {
-        throw Exception("Failed to load profile data. Status: ${response.statusCode}");
+        throw ApiException("Failed to load profile data", statusCode: response.statusCode);
       }
+    } on SocketException {
+      throw NetworkException();
     } catch (e) {
+      if (e is ApiException || e is NetworkException) rethrow;
       debugPrint("An error occurred fetching profile: $e");
-      rethrow;
+      throw Exception('An unexpected error occurred: $e');
     }
   }
 
@@ -85,25 +89,25 @@ class ProfileProvider {
               errorMessage = responseBody['message'] ?? errorMessage;
             }
           } catch (_) {}
-          throw Exception(errorMessage);
+          throw ApiException(errorMessage, statusCode: response.statusCode);
         }
       }
       // Invalidate cache on success so the next fetch gets fresh data
       await CacheHelper.clear(_cacheKey);
+    } on SocketException {
+      throw NetworkException();
     } catch (e) {
+      if (e is ApiException || e is NetworkException) rethrow;
       debugPrint("An error occurred saving profile: $e");
-      rethrow;
+      throw Exception('An unexpected error occurred: $e');
     }
   }
 
   Future<String> downloadProfileData() async {
     try {
-      if (Platform.isAndroid) {
-        final status = await Permission.storage.request();
-        if (status != PermissionStatus.granted) {
-          throw Exception("Storage permission not granted.");
-        }
-      }
+      // Permission.storage is removed for Play Store compliance.
+      // On modern Android, the app may not need this for internal storage 
+      // or can use the Photo Picker for media.
 
       final profileData = await fetchProfileData();
       const jsonEncoder = JsonEncoder.withIndent('  ');

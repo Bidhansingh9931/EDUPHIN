@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:eduphin/services/api_service.dart';
 import 'package:eduphin/services/caching_service.dart';
 import 'package:eduphin/services/common_widgets.dart';
+import 'package:eduphin/services/error_handler.dart';
 
 class TimetablePage extends StatefulWidget {
   const TimetablePage({super.key});
@@ -51,7 +52,8 @@ class _TimetablePageState extends State<TimetablePage> {
       if (mounted) {
         setState(() {
           _isLoading = false;
-          if (_schedules.isEmpty) _errorMessage = e.toString();
+          ErrorHandler.showError(context, e);
+          if (_schedules.isEmpty) _errorMessage = ErrorHandler.getMessage(e);
         });
       }
     }
@@ -182,7 +184,7 @@ class _TimetablePageState extends State<TimetablePage> {
             child: Row(
               children: [
                 Container(
-                  width: 80,
+                  width: context.scale(80),
                   padding: EdgeInsets.symmetric(vertical: context.xs),
                   decoration: BoxDecoration(
                     color: colorScheme.surfaceContainerHighest,
@@ -294,17 +296,19 @@ class _TimetablePageState extends State<TimetablePage> {
   Widget _buildDetailRow(IconData icon, String label, String value) {
     final theme = context.theme;
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8.0),
+      padding: EdgeInsets.symmetric(vertical: context.scale(8.0)),
       child: Row(
         children: [
-          Icon(icon, size: 20, color: theme.colorScheme.primary),
-          const SizedBox(width: 12),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(label, style: theme.textTheme.labelSmall?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
-              Text(value, style: theme.textTheme.bodyLarge),
-            ],
+          Icon(icon, size: context.scale(20), color: theme.colorScheme.primary),
+          SizedBox(width: context.scale(12)),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(label, style: theme.textTheme.labelSmall?.copyWith(color: theme.colorScheme.onSurfaceVariant, fontSize: context.font(11))),
+                Text(value, style: theme.textTheme.bodyLarge?.copyWith(fontSize: context.font(14))),
+              ],
+            ),
           ),
         ],
       ),

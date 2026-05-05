@@ -1,3 +1,4 @@
+import 'package:eduphin/services/error_handler.dart';
 import 'dart:async';
 import 'dart:io';
 import 'dart:typed_data';
@@ -169,12 +170,7 @@ class _AddEmployeePageState extends State<AddEmployeePage> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Failed to add employee: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
+        ErrorHandler.showError(context, e);
       }
     } finally {
       if (mounted) {
@@ -222,7 +218,7 @@ class _AddEmployeePageState extends State<AddEmployeePage> {
                   children: [
                     _buildTextField(context: context, controller: fullNameController, label: "Full Name", icon: Icons.person_outline_sharp),
                     _buildTextField(context: context, controller: emailController, label: "Email", icon: Icons.email_outlined),
-                    _buildDropdown(context: context, title: "Select Role", value: selectedRole, hint: "Assign a Role", items: ["Institute Manager", "Counselors", "Teacher", "Student", "Librarian", "Accountant", "Staff"], onChanged: (value) => setState(() => selectedRole = value)),
+                    _buildDropdown(context: context, title: "Select Role", value: selectedRole, hint: "Assign a Role", items: ["Moderator", "Institute Manager", "Counselors", "Teachers", "Students", "Librarian", "Accountants", "Staff"], onChanged: (value) => setState(() => selectedRole = value)),
                     _buildDropdown(context: context, title: "Select Gender", value: selectedGender, hint: "Select Gender", items: ["Male", "Female", "Other"], onChanged: (value) => setState(() => selectedGender = value ?? "Male")),
                     _buildDatePickerField(context: context, hint: 'Select birth date', title: "Date of Birth", currentValue: selectedBirthDate, onConfirm: (date) => setState(() => selectedBirthDate = date)),
                     _buildDropdown(context: context, title: "Relationship Status", value: selectedRelationshipStatus, hint: "Select Relationship Status", items: ["Single", "Married", "Divorced", "Widowed"], onChanged: (value) => setState(() => selectedRelationshipStatus = value)),

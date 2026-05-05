@@ -1,4 +1,5 @@
 import 'package:eduphin/services/common_widgets.dart';
+import 'package:eduphin/services/error_handler.dart';
 import 'package:eduphin/services/responsive_helper.dart';
 import 'package:flutter/material.dart';
 
@@ -40,7 +41,13 @@ class _AllReviewsPageState extends State<AllReviewsPage> {
     setState(() {
       _reviewsFuture = _provider.fetchAllReviews(bypassCache: true);
     });
-    await _reviewsFuture;
+    try {
+      await _reviewsFuture;
+    } catch (e) {
+      if (mounted) {
+        ErrorHandler.showError(context, e);
+      }
+    }
   }
 
   @override

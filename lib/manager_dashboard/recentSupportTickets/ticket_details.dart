@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 
 import 'package:eduphin/services/api_service.dart';
+import 'package:eduphin/services/error_handler.dart';
 import 'package:eduphin/services/common_widgets.dart';
 import 'package:eduphin/services/caching_service.dart';
 import 'package:eduphin/services/responsive_helper.dart';
@@ -213,11 +214,7 @@ class _TicketDetailsPageState extends State<TicketDetailsPage> {
           _isLoading = false;
           _error = e;
         });
-        if (_ticketDetails != null) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Error updating details: ${e.toString()}')),
-          );
-        }
+        ErrorHandler.showError(context, e);
       }
     } finally {
       if (mounted) {
@@ -253,9 +250,7 @@ class _TicketDetailsPageState extends State<TicketDetailsPage> {
         setState(() {
           _sessionMessages.remove(userMessage);
         });
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(e.toString().replaceFirst('Exception: ', ''))),
-        );
+        ErrorHandler.showError(context, e);
       }
     } finally {
       if (mounted) {

@@ -1,6 +1,5 @@
 import 'dart:io';
-import 'dart:convert';
-import 'package:flutter/foundation.dart';
+import 'package:eduphin/services/error_handler.dart';
 import 'package:eduphin/services/responsive_helper.dart';
 import 'package:flutter/material.dart';
 import 'package:eduphin/services/api_service.dart';
@@ -55,7 +54,9 @@ class _TicketDetailsPageState extends State<TicketDetailsPage> {
         await TeacherCacheService.save('ticket_details_${widget.ticketId}', data.toJson());
       }
     } catch (e) {
-      debugPrint("Error fetching ticket details: $e");
+      if (mounted) {
+        ErrorHandler.showError(context, e);
+      }
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
@@ -79,7 +80,7 @@ class _TicketDetailsPageState extends State<TicketDetailsPage> {
       _replyController.clear();
       _fetchDetails();
     } catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Error: $e")));
+      if (mounted) ErrorHandler.showError(context, e);
     } finally {
       if (mounted) setState(() => _isSending = false);
     }

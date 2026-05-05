@@ -1,6 +1,5 @@
 import 'dart:convert';
-import 'package:eduphin/manager_dashboard/studyMaterial/add_note.dart';
-import 'package:eduphin/manager_dashboard/studyMaterial/edit_note.dart';
+import 'package:eduphin/services/error_handler.dart';
 import 'package:eduphin/services/api_service.dart';
 import 'package:eduphin/services/common_widgets.dart';
 import 'package:eduphin/services/caching_service.dart';
@@ -139,6 +138,7 @@ class _NotesPageState extends State<NotesPage> {
           isLoading = allMaterials.isEmpty;
           _error = e;
         });
+        ErrorHandler.showError(context, e);
       }
     }
   }
@@ -179,39 +179,6 @@ class _NotesPageState extends State<NotesPage> {
     });
   }
 
-  Future<void> _deleteNote(int noteId) async {
-    final confirm = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Delete Note'),
-        content: const Text('Are you sure you want to delete this note?'),
-        actions: [
-          TextButton(onPressed: () => Navigator.of(context).pop(false), child: const Text('Cancel')),
-          TextButton(onPressed: () => Navigator.of(context).pop(true), child: const Text('Delete')),
-        ],
-      ),
-    );
-
-    if (confirm == true) {
-      try {
-        final response = await ApiService.delete('manager/study/notes/$noteId');
-        if (response.statusCode == 200) {
-          if(mounted){
-            final theme = Theme.of(context);
-            ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: const Text('Note deleted successfully'), backgroundColor: theme.colorScheme.primary));
-            _fetchData(); // Refresh list
-          }
-        } else {
-          throw Exception('Failed to delete note');
-        }
-      } catch (e) {
-        if(mounted){
-           ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString())));
-        }
-      }
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     final theme = context.theme;
@@ -220,16 +187,6 @@ class _NotesPageState extends State<NotesPage> {
       appBar: AppBar(
         leading: const BackButton(),
         title: const Text("Study Material List"),
-      ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: () async {
-          final result = await Navigator.push(context, MaterialPageRoute(builder: (context) => const AddNotePage()));
-          if (result == true) {
-            _fetchData(); // Refresh list
-          }
-        },
-        label: const Text('Create New'),
-        icon: const Icon(Icons.add),
       ),
       body: LoadingWrapper(
         isLoading: isLoading,
@@ -361,12 +318,7 @@ class _NotesPageState extends State<NotesPage> {
             padding: const EdgeInsets.only(bottom: 80), // Adjusted for FAB
             itemCount: filteredMaterials.length,
             separatorBuilder: (context, index) => SizedBox(height: context.sm),
-            itemBuilder: (context, index) => _StudyMaterialCard(material: filteredMaterials[index], onDelete: () => _deleteNote(filteredMaterials[index].id), onEdit: () async {
-                 final result = await Navigator.push(context, MaterialPageRoute(builder: (context) => EditNotePage(material: filteredMaterials[index])));
-                 if(result == true) {
-                    _fetchData();
-                 }
-            }),
+            itemBuilder: (context, index) => _StudyMaterialCard(material: filteredMaterials[index]),
           )
         : const Center(
             child: Text("No study material found for the selected filters."),
@@ -384,12 +336,7 @@ class _NotesPageState extends State<NotesPage> {
               childAspectRatio: 1.8, // Adjust this for card height
             ),
             itemCount: filteredMaterials.length,
-            itemBuilder: (context, index) => _StudyMaterialCard(material: filteredMaterials[index], onDelete: () => _deleteNote(filteredMaterials[index].id), onEdit: () async {
-                final result = await Navigator.push(context, MaterialPageRoute(builder: (context) => EditNotePage(material: filteredMaterials[index])));
-                 if(result == true) {
-                    _fetchData();
-                 }
-            }),
+            itemBuilder: (context, index) => _StudyMaterialCard(material: filteredMaterials[index]),
           )
         : const Center(
             child: Text("No study material found for the selected filters."),
@@ -399,10 +346,8 @@ class _NotesPageState extends State<NotesPage> {
 
 class _StudyMaterialCard extends StatelessWidget {
   final StudyMaterial material;
-  final VoidCallback onEdit;
-  final VoidCallback onDelete;
 
-  const _StudyMaterialCard({required this.material, required this.onEdit, required this.onDelete});
+  const _StudyMaterialCard({required this.material});
 
   @override
   Widget build(BuildContext context) {
@@ -418,31 +363,22 @@ class _StudyMaterialCard extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                decoration: BoxDecoration(
-                  color: theme.colorScheme.secondaryContainer,
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                child: Text(
-                  "${material.className} - ${material.section}",
-                  style: theme.textTheme.labelSmall?.copyWith(
-                    color: theme.colorScheme.onSecondaryContainer,
-                    fontWeight: FontWeight.bold,
-                  ),
+          Align(
+            alignment: Alignment.centerLeft,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+              decoration: BoxDecoration(
+                color: theme.colorScheme.secondaryContainer,
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: Text(
+                "${material.className} - ${material.section}",
+                style: theme.textTheme.labelSmall?.copyWith(
+                  color: theme.colorScheme.onSecondaryContainer,
+                  fontWeight: FontWeight.bold,
                 ),
               ),
-              Row(
-                children: [
-                  IconButton(icon: Icon(Icons.edit, size: 20, color: theme.colorScheme.onSurface.withValues(alpha: 0.6)), onPressed: onEdit, constraints: const BoxConstraints()),
-                  IconButton(icon: Icon(Icons.delete, size: 20, color: theme.colorScheme.error), onPressed: onDelete, constraints: const BoxConstraints()),
-                ],
-              ),
-            ],
+            ),
           ),
           SizedBox(height: context.xs),
           Text(

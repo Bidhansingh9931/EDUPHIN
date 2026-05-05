@@ -1,4 +1,6 @@
+import 'package:eduphin/services/error_handler.dart';
 import 'dart:async';
+import 'dart:io';
 import 'package:eduphin/moderator_dashboard/cache_helper.dart';
 import 'package:eduphin/moderator_dashboard/skeleton_widgets.dart';
 import 'package:eduphin/services/api_service.dart';
@@ -61,10 +63,11 @@ class EventProvider {
       final data = await ApiService.getModeratorEvents();
       await CacheHelper.save(_cacheKey, data);
       return data.map((e) => Event.fromJson(e)).toList();
+    } on SocketException {
+      throw NetworkException();
     } catch (e) {
-      debugPrint("Error fetching events: $e");
-      // Return empty list instead of throwing to allow "Coming Soon" state
-      return [];
+      if (e is NetworkException) rethrow;
+      throw Exception('Failed to fetch events: $e');
     }
   }
 
@@ -105,6 +108,13 @@ class _EventsPageState extends State<EventsPage> {
     setState(() {
       _eventsFuture = _provider.fetchEvents(bypassCache: bypassCache);
     });
+    try {
+      await _eventsFuture;
+    } catch (e) {
+      if (mounted) {
+        ErrorHandler.showError(context, e);
+      }
+    }
   }
 
   @override

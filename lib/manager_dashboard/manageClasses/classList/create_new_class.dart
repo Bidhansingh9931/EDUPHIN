@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'package:eduphin/manager_dashboard/manageClasses/classList/class_list.dart';
 import 'package:eduphin/services/api_service.dart';
+import 'package:eduphin/services/error_handler.dart';
 import 'package:eduphin/services/responsive_helper.dart';
 import 'package:flutter/material.dart';
 
@@ -71,34 +72,10 @@ class _CreateNewClassPageState extends State<CreateNewClassPage> {
           throw Exception(responseData['message'] ?? 'Failed to process request.');
         }
       }
-    } on TimeoutException {
-      if (!mounted) return;
-      final theme = context.theme;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: const Text('The connection timed out. Please check your network and try again.'),
-          backgroundColor: theme.colorScheme.error,
-        ),
-      );
-    } on Exception catch (e) {
-      if (!mounted) return;
-      final theme = context.theme;
-      final message = e.toString().replaceFirst('Exception: ', '');
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(message),
-          backgroundColor: theme.colorScheme.error,
-        ),
-      );
     } catch (e) {
-      if (!mounted) return;
-      final theme = context.theme;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('An unexpected error occurred: $e'),
-          backgroundColor: theme.colorScheme.error,
-        ),
-      );
+      if (mounted) {
+        ErrorHandler.showError(context, e);
+      }
     } finally {
       if (mounted) {
         setState(() {

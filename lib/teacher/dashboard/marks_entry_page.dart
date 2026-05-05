@@ -1,3 +1,4 @@
+import 'package:eduphin/services/error_handler.dart';
 import 'package:eduphin/services/responsive_helper.dart';
 import 'package:eduphin/teacher/dashboard/marks_entry_detail_page.dart';
 import 'package:eduphin/teacher/dashboard/teacher_cache_service.dart';
@@ -51,9 +52,12 @@ class _MarksEntryPageState extends State<MarksEntryPage> {
     } catch (e) {
       if (mounted) {
         setState(() {
-          _error = e.toString();
+          _error = ErrorHandler.getMessage(e);
           _isLoading = false;
         });
+        if (_papers != null) {
+          ErrorHandler.showError(context, e);
+        }
       }
     }
   }

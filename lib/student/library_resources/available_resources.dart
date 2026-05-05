@@ -3,6 +3,7 @@ import 'package:eduphin/services/api_service.dart';
 import 'package:eduphin/services/responsive_helper.dart';
 import 'package:eduphin/services/caching_service.dart';
 import 'package:eduphin/services/common_widgets.dart';
+import 'package:eduphin/services/error_handler.dart';
 
 class LibraryBooksPage extends StatefulWidget {
   const LibraryBooksPage({super.key});
@@ -97,12 +98,9 @@ class _LibraryBooksPageState extends State<LibraryBooksPage> {
       if (mounted) {
         setState(() {
           _isLoading = false;
+          ErrorHandler.showError(context, e);
           if (_books.isEmpty) {
-            _errorMessage = e.toString();
-          } else {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text("Failed to refresh: ${e.toString()}")),
-            );
+            _errorMessage = ErrorHandler.getMessage(e);
           }
         });
       }

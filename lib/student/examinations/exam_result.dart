@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:eduphin/services/api_service.dart';
 import 'package:eduphin/services/caching_service.dart';
 import 'package:eduphin/services/common_widgets.dart';
+import 'package:eduphin/services/error_handler.dart';
 import 'package:eduphin/services/responsive_helper.dart';
 import 'package:eduphin/services/pdf_service.dart';
 import 'package:intl/intl.dart';
@@ -60,14 +61,7 @@ class _ExamResultPageState extends State<ExamResultPage> {
     } catch (e) {
       if (mounted) {
         setState(() => _isLoading = false);
-        if (_examResults.isEmpty) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text("Error fetching results: $e"),
-              backgroundColor: context.theme.colorScheme.error,
-            ),
-          );
-        }
+        ErrorHandler.showError(context, e);
       }
     }
   }
@@ -89,9 +83,7 @@ class _ExamResultPageState extends State<ExamResultPage> {
       
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text("Could not load report card: $e")),
-        );
+        ErrorHandler.showError(context, e);
       }
     }
   }
@@ -324,7 +316,7 @@ class _ExamResultPageState extends State<ExamResultPage> {
                       ],
                     ),
                     SizedBox(height: context.scale(16)),
-      
+
                     /// TABLE
                     Container(
                       decoration: BoxDecoration(
@@ -348,14 +340,14 @@ class _ExamResultPageState extends State<ExamResultPage> {
                               ],
                             ),
                           ),
-      
+
                           /// TABLE ROWS
                           ...results.map((res) {
                             final subject = res['subject']?['name'] ?? 'N/A';
                             final marks = res['marks']?.toString() ?? 'N/A';
                             final grade = res['grade'] ?? '-';
                             final isPass = res['status']?.toString().toLowerCase() == 'pass';
-      
+
                             return Container(
                               padding: EdgeInsets.symmetric(horizontal: context.scale(12), vertical: context.scale(14)),
                               decoration: BoxDecoration(
@@ -381,9 +373,9 @@ class _ExamResultPageState extends State<ExamResultPage> {
                         ],
                       ),
                     ),
-      
+
                     SizedBox(height: context.scale(24)),
-      
+
                     /// REPORT BUTTON
                     SizedBox(
                       width: double.infinity,

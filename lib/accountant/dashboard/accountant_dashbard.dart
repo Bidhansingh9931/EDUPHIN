@@ -17,6 +17,7 @@ import 'create_ticket.dart';
 import 'event_list.dart';
 import 'exam_list.dart';
 import 'accountant_dashboard_model.dart' as accountant_model;
+import '../../services/error_handler.dart';
 
 class AccountantDashboard extends StatefulWidget {
   const AccountantDashboard({super.key});
@@ -36,7 +37,9 @@ class _AccountantDashboardState extends State<AccountantDashboard> {
 
   void _refreshData() {
     setState(() {
-      _dashboardStream = ApiService.getAccountantDashboardStream().asBroadcastStream();
+      _dashboardStream = ApiService.getAccountantDashboardStream().asBroadcastStream()..handleError((error) {
+        if (mounted) ErrorHandler.showError(context, error);
+      });
     });
   }
 
@@ -51,26 +54,35 @@ class _AccountantDashboardState extends State<AccountantDashboard> {
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
-        title: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              "Financial Overview & Management",
-              style: TextStyle(
-                fontSize: context.font(16),
-                fontWeight: FontWeight.bold,
-                color: isDark ? Colors.white : Colors.black,
+        titleSpacing: 0,
+        title: Padding(
+          padding: const EdgeInsets.only(left: 12.0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                "Financial Overview",
+                style: TextStyle(
+                  fontSize: context.font(16),
+                  fontWeight: FontWeight.bold,
+                  color: isDark ? Colors.white : Colors.black,
+                ),
+                overflow: TextOverflow.ellipsis,
+                maxLines: 1,
               ),
-            ),
-            Text(
-              "Dashboard",
-              style: TextStyle(
-                color: isDark ? Colors.white70 : colorScheme.secondary,
-                fontSize: context.font(12),
-                fontWeight: FontWeight.w500,
+              Text(
+                "Dashboard",
+                style: TextStyle(
+                  color: isDark ? Colors.white70 : colorScheme.secondary,
+                  fontSize: context.font(12),
+                  fontWeight: FontWeight.w500,
+                ),
+                overflow: TextOverflow.ellipsis,
+                maxLines: 1,
               ),
-            ),
-          ],
+            ],
+          ),
         ),
         actions: [
           IconButton(
@@ -80,12 +92,16 @@ class _AccountantDashboardState extends State<AccountantDashboard> {
           IconButton(
             icon: Icon(Icons.logout, color: isDark ? Colors.white : Colors.black),
             onPressed: () async {
-              await ApiService.logout();
-              if (context.mounted) {
-                Navigator.of(context).pushAndRemoveUntil(
-                  MaterialPageRoute(builder: (context) => const LoginPage()),
-                      (route) => false,
-                );
+              try {
+                await ApiService.logout();
+                if (context.mounted) {
+                  Navigator.of(context).pushAndRemoveUntil(
+                    MaterialPageRoute(builder: (context) => const LoginPage()),
+                        (route) => false,
+                  );
+                }
+              } catch (e) {
+                if (context.mounted) ErrorHandler.showError(context, e);
               }
             },
           ),
@@ -191,7 +207,7 @@ class _AccountantDashboardState extends State<AccountantDashboard> {
             crossAxisCount: context.isMobile ? 2 : 4,
             crossAxisSpacing: context.sm,
             mainAxisSpacing: context.sm,
-            childAspectRatio: context.isMobile ? 1.5 : 1.3,
+            childAspectRatio: context.isMobile ? 1.1 : 1.4,
             children: List.generate(4, (index) => const Skeleton(borderRadius: 16)),
           ),
           SizedBox(height: context.md),
@@ -215,7 +231,10 @@ class _AccountantDashboardState extends State<AccountantDashboard> {
       child: ElevatedButton.icon(
         onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (context) => const GenerateVirtualCard())),
         icon: const Icon(Icons.credit_card_rounded, size: 20),
-        label: const Text("GENERATE VIRTUAL ID CARD"),
+        label: FittedBox(
+          fit: BoxFit.scaleDown,
+          child: const Text("GENERATE VIRTUAL ID CARD"),
+        ),
         style: ElevatedButton.styleFrom(
           backgroundColor: isDark ? const Color(0xFF2C3550) : theme.colorScheme.surface,
           foregroundColor: isDark ? Colors.white : theme.colorScheme.primary,
@@ -235,10 +254,10 @@ class _AccountantDashboardState extends State<AccountantDashboard> {
     return GridView.count(
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
-      crossAxisCount: context.isMobile ? 2 : (context.isTablet ? 4 : 4),
+      crossAxisCount: context.responsive(2, tablet: 4, desktop: 4),
       crossAxisSpacing: context.sm,
       mainAxisSpacing: context.sm,
-      childAspectRatio: context.isMobile ? 1.5 : 1.3,
+      childAspectRatio: context.responsive(1.1, tablet: 1.3, desktop: 1.5),
       children: [
         _buildStatCard(
           context,
@@ -290,14 +309,32 @@ class _AccountantDashboardState extends State<AccountantDashboard> {
         onTap: onTap,
         borderRadius: BorderRadius.circular(16),
         child: Padding(
-          padding: context.pagePadding,
+          padding: EdgeInsets.all(context.sm),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Icon(icon, color: color, size: context.scale(22)),
+              Icon(icon, color: color, size: context.scale(20)),
               const Spacer(),
-              FittedBox(child: Text(value, style: TextStyle(fontSize: context.font(18), fontWeight: FontWeight.bold, color: isDark ? Colors.white : Colors.black))),
-              Text(label, style: TextStyle(color: isDark ? Colors.white70 : Theme.of(context).hintColor, fontSize: context.font(12))),
+              Flexible(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    FittedBox(
+                      fit: BoxFit.scaleDown,
+                      alignment: Alignment.centerLeft,
+                      child: Text(value, style: TextStyle(fontSize: context.font(16), fontWeight: FontWeight.bold, color: isDark ? Colors.white : Colors.black)),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      label,
+                      style: TextStyle(color: isDark ? Colors.white70 : theme.hintColor, fontSize: context.font(11)),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
+                ),
+              ),
             ],
           ),
         ),
@@ -324,7 +361,12 @@ class _AccountantDashboardState extends State<AccountantDashboard> {
               children: [
                 Icon(Icons.bolt_rounded, color: isDark ? Colors.amberAccent : theme.colorScheme.primary, size: context.scale(18)),
                 SizedBox(width: context.sm),
-                Text("Quick Actions", style: TextStyle(fontSize: context.font(16), fontWeight: FontWeight.bold, color: isDark ? Colors.white : Colors.black)),
+                Expanded(
+                  child: Text("Quick Actions",
+                    style: TextStyle(fontSize: context.font(16), fontWeight: FontWeight.bold, color: isDark ? Colors.white : Colors.black),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
               ],
             ),
             SizedBox(height: context.md),
@@ -347,7 +389,10 @@ class _AccountantDashboardState extends State<AccountantDashboard> {
       child: ElevatedButton.icon(
         onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (context) => page)),
         icon: Icon(icon, size: 18),
-        label: Text(label, style: TextStyle(fontSize: context.font(13), fontWeight: FontWeight.w700)),
+        label: FittedBox(
+          fit: BoxFit.scaleDown,
+          child: Text(label, style: TextStyle(fontSize: context.font(13), fontWeight: FontWeight.w700)),
+        ),
         style: ElevatedButton.styleFrom(
           backgroundColor: isDark ? Colors.white.withValues(alpha: 0.05) : theme.colorScheme.onSurface.withValues(alpha: 0.05),
           foregroundColor: isDark ? Colors.white : theme.colorScheme.onSurface,
@@ -377,23 +422,30 @@ class _AccountantDashboardState extends State<AccountantDashboard> {
               children: [
                 Icon(Icons.person_outline_rounded, color: isDark ? Colors.blueAccent : theme.colorScheme.primary, size: context.scale(18)),
                 SizedBox(width: context.sm),
-                Text("Profile Overview", style: TextStyle(fontSize: context.font(16), fontWeight: FontWeight.bold, color: isDark ? Colors.white : Colors.black)),
-                const Spacer(),
-                GestureDetector(
-                  onTap: () => Navigator.push(context, MaterialPageRoute(builder: (context) => const AccountantProfile())),
-                  child: Icon(Icons.edit_note_rounded, color: isDark ? Colors.blueAccent : theme.colorScheme.primary, size: context.scale(24)),
+                Expanded(
+                  child: Text("Profile Overview",
+                    style: TextStyle(fontSize: context.font(16), fontWeight: FontWeight.bold, color: isDark ? Colors.white : Colors.black),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+                IconButton(
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(),
+                  onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (context) => const AccountantProfile())),
+                  icon: Icon(Icons.edit_note_rounded, color: isDark ? Colors.blueAccent : theme.colorScheme.primary, size: context.scale(24)),
                 ),
               ],
             ),
             SizedBox(height: context.md),
-            CircleAvatar(
+            ProfileAvatar(
               radius: context.scale(36),
-              backgroundColor: isDark ? Colors.white10 : theme.colorScheme.primary.withValues(alpha: 0.1),
-              backgroundImage: user.photo != null ? NetworkImage("${ApiService.baseUrl}/storage/${user.photo}") : null,
-              child: user.photo == null ? Icon(Icons.person, size: context.scale(40), color: isDark ? Colors.white54 : theme.colorScheme.primary) : null,
+              imageUrl: user.photo != null ? "${ApiService.baseUrl}/storage/${user.photo}" : null,
             ),
             SizedBox(height: context.sm),
-            Text(user.name, style: TextStyle(fontSize: context.font(18), fontWeight: FontWeight.bold, color: isDark ? Colors.white : Colors.black)),
+            FittedBox(
+              fit: BoxFit.scaleDown,
+              child: Text(user.name, style: TextStyle(fontSize: context.font(18), fontWeight: FontWeight.bold, color: isDark ? Colors.white : Colors.black)),
+            ),
             Text(user.position ?? "Senior Accountant", style: TextStyle(color: isDark ? Colors.white70 : theme.colorScheme.secondary, fontSize: context.font(13))),
             SizedBox(height: context.md),
             _buildProfileDetail(context, Icons.badge_outlined, "Employee ID", user.userId.toString()),
@@ -410,14 +462,29 @@ class _AccountantDashboardState extends State<AccountantDashboard> {
   Widget _buildProfileDetail(BuildContext context, IconData icon, String label, String value) {
     final theme = Theme.of(context);
     final isDark = context.isDarkMode;
-    return Row(
-      children: [
-        Icon(icon, color: isDark ? Colors.white54 : theme.hintColor, size: 18),
-        SizedBox(width: context.sm),
-        Text(label, style: TextStyle(color: isDark ? Colors.white54 : theme.hintColor, fontSize: context.font(14))),
-        const Spacer(),
-        Text(value, style: TextStyle(fontSize: context.font(14), fontWeight: FontWeight.w500, color: isDark ? Colors.white : Colors.black)),
-      ],
+    return Padding(
+      padding: EdgeInsets.symmetric(vertical: context.scale(4)),
+      child: Row(
+        children: [
+          Icon(icon, color: isDark ? Colors.white54 : theme.hintColor, size: 18),
+          SizedBox(width: context.sm),
+          Flexible(
+            child: Text(label,
+              style: TextStyle(color: isDark ? Colors.white54 : theme.hintColor, fontSize: context.font(14)),
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(value,
+              textAlign: TextAlign.right,
+              style: TextStyle(fontSize: context.font(14), fontWeight: FontWeight.w500, color: isDark ? Colors.white : Colors.black),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -440,11 +507,17 @@ class _AccountantDashboardState extends State<AccountantDashboard> {
               children: [
                 Icon(Icons.account_balance_wallet_outlined, color: isDark ? Colors.greenAccent : theme.colorScheme.primary, size: context.scale(18)),
                 SizedBox(width: context.sm),
-                Text("My Salary", style: TextStyle(fontSize: context.font(16), fontWeight: FontWeight.bold, color: isDark ? Colors.white : Colors.black)),
-                const Spacer(),
-                GestureDetector(
-                  onTap: () => Navigator.push(context, MaterialPageRoute(builder: (context) => const SalarySlipsPage())),
-                  child: Icon(Icons.launch_rounded, color: isDark ? Colors.white54 : theme.hintColor, size: 18),
+                Expanded(
+                  child: Text("My Salary",
+                    style: TextStyle(fontSize: context.font(16), fontWeight: FontWeight.bold, color: isDark ? Colors.white : Colors.black),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+                IconButton(
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(),
+                  onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (context) => const SalarySlipsPage())),
+                  icon: Icon(Icons.launch_rounded, color: isDark ? Colors.white54 : theme.hintColor, size: 18),
                 ),
               ],
             ),
@@ -452,17 +525,27 @@ class _AccountantDashboardState extends State<AccountantDashboard> {
             Center(
               child: Column(
                 children: [
-                  Text("₹${lastSalary != null ? NumberFormat('#,##,###').format(double.parse(lastSalary.amount)) : '0.00'}",
-                      style: TextStyle(fontSize: context.font(28), fontWeight: FontWeight.bold, color: isDark ? Colors.white : Colors.black)),
-                  Text("Last paid: ${lastSalary?.month ?? 'N/A'}", style: TextStyle(color: isDark ? Colors.white70 : theme.hintColor, fontSize: context.font(14))),
+                  FittedBox(
+                    fit: BoxFit.scaleDown,
+                    child: Text("₹${lastSalary != null ? NumberFormat('#,##,###').format(double.parse(lastSalary.amount)) : '0.00'}",
+                        style: TextStyle(fontSize: context.font(28), fontWeight: FontWeight.bold, color: isDark ? Colors.white : Colors.black)),
+                  ),
+                  Text("Last paid: ${lastSalary?.month ?? 'N/A'}", 
+                    style: TextStyle(color: isDark ? Colors.white70 : theme.hintColor, fontSize: context.font(14)),
+                    overflow: TextOverflow.ellipsis,
+                  ),
                 ],
               ),
             ),
             SizedBox(height: context.md),
             Row(
               children: [
-                Text("Status", style: TextStyle(color: isDark ? Colors.white70 : theme.hintColor, fontSize: context.font(14))),
-                const Spacer(),
+                Expanded(
+                  child: Text("Status",
+                    style: TextStyle(color: isDark ? Colors.white70 : theme.hintColor, fontSize: context.font(14)),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                   decoration: BoxDecoration(color: Colors.green.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(6)),
@@ -473,9 +556,19 @@ class _AccountantDashboardState extends State<AccountantDashboard> {
             SizedBox(height: context.sm),
             Row(
               children: [
-                Text("Payment Date", style: TextStyle(color: isDark ? Colors.white70 : theme.hintColor, fontSize: context.font(14))),
-                const Spacer(),
-                Text(lastSalary?.paymentDate ?? "N/A", style: TextStyle(fontSize: context.font(14), fontWeight: FontWeight.w500, color: isDark ? Colors.white : Colors.black)),
+                Expanded(
+                  child: Text("Payment Date",
+                    style: TextStyle(color: isDark ? Colors.white70 : theme.hintColor, fontSize: context.font(14)),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+                Flexible(
+                  child: Text(lastSalary?.paymentDate ?? "N/A", 
+                    style: TextStyle(fontSize: context.font(14), fontWeight: FontWeight.w500, color: isDark ? Colors.white : Colors.black),
+                    textAlign: TextAlign.right,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
               ],
             ),
           ],
@@ -518,12 +611,13 @@ class _AccountantDashboardState extends State<AccountantDashboard> {
 
     return LayoutBuilder(
       builder: (context, constraints) {
-        if (constraints.maxWidth > 600) {
+        if (constraints.maxWidth > 700) {
+          final double itemWidth = (constraints.maxWidth - context.md) / 2;
           return Wrap(
             spacing: context.md,
             runSpacing: context.md,
             children: sections.map((s) => SizedBox(
-              width: (constraints.maxWidth - context.md) / 2,
+              width: itemWidth,
               child: s,
             )).toList(),
           );
@@ -557,7 +651,12 @@ class _AccountantDashboardState extends State<AccountantDashboard> {
               children: [
                 Icon(headerIcon, color: isDark ? Colors.white70 : theme.colorScheme.primary, size: 20),
                 const SizedBox(width: 12),
-                Text(title, style: TextStyle(fontSize: context.font(15), fontWeight: FontWeight.bold, color: isDark ? Colors.white : Colors.black)),
+                Expanded(
+                  child: Text(title,
+                    style: TextStyle(fontSize: context.font(15), fontWeight: FontWeight.bold, color: isDark ? Colors.white : Colors.black),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
               ],
             ),
           ),
@@ -567,12 +666,41 @@ class _AccountantDashboardState extends State<AccountantDashboard> {
             final item = entry.value;
             return Column(
               children: [
-                ListTile(
-                  onTap: () => Navigator.push(context, MaterialPageRoute(builder: (context) => item.page)),
-                  title: Text(item.title, style: TextStyle(fontSize: context.font(14), color: isDark ? Colors.white : Colors.black87)),
-                  trailing: Icon(item.trailing, color: isDark ? Colors.white38 : theme.hintColor, size: 18),
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                  dense: true,
+                LayoutBuilder(
+                  builder: (context, tileConstraints) {
+                    // ListTile crashes if width is too small.
+                    if (tileConstraints.maxWidth < 150) {
+                      return InkWell(
+                        onTap: () => Navigator.push(context, MaterialPageRoute(builder: (context) => item.page)),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                          child: Row(
+                            children: [
+                              Expanded(
+                                child: Text(item.title,
+                                  style: TextStyle(fontSize: context.font(14), color: isDark ? Colors.white : Colors.black87),
+                                  overflow: TextOverflow.ellipsis,
+                                  maxLines: 1,
+                                ),
+                              ),
+                              Icon(item.trailing, color: isDark ? Colors.white38 : theme.hintColor, size: 18),
+                            ],
+                          ),
+                        ),
+                      );
+                    }
+                    return ListTile(
+                      onTap: () => Navigator.push(context, MaterialPageRoute(builder: (context) => item.page)),
+                      title: Text(item.title,
+                        style: TextStyle(fontSize: context.font(14), color: isDark ? Colors.white : Colors.black87),
+                        overflow: TextOverflow.ellipsis,
+                        maxLines: 1,
+                      ),
+                      trailing: Icon(item.trailing, color: isDark ? Colors.white38 : theme.hintColor, size: 18),
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                      dense: true,
+                    );
+                  },
                 ),
                 if (index != items.length - 1)
                   Divider(height: 1, color: isDark ? Colors.white10 : Colors.grey.withValues(alpha: 0.1), indent: 16, endIndent: 16),
@@ -612,8 +740,12 @@ class _AccountantDashboardState extends State<AccountantDashboard> {
                 children: [
                   Icon(icon, color: isDark ? Colors.white70 : theme.colorScheme.primary, size: 18),
                   const SizedBox(width: 8),
-                  Text(title, style: TextStyle(fontSize: context.font(16), fontWeight: FontWeight.bold, color: isDark ? Colors.white : Colors.black)),
-                  const Spacer(),
+                  Expanded(
+                    child: Text(title,
+                      style: TextStyle(fontSize: context.font(16), fontWeight: FontWeight.bold, color: isDark ? Colors.white : Colors.black),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
                   Icon(Icons.chevron_right, color: isDark ? Colors.white38 : theme.hintColor, size: 18),
                 ],
               ),
@@ -660,7 +792,13 @@ class _AccountantDashboardState extends State<AccountantDashboard> {
                               ],
                             ),
                           ),
-                          Text(amount, style: TextStyle(fontSize: context.font(14), fontWeight: FontWeight.bold, color: isDark ? Colors.white : Colors.black)),
+                          Flexible(
+                            child: Text(amount,
+                              style: TextStyle(fontSize: context.font(14), fontWeight: FontWeight.bold, color: isDark ? Colors.white : Colors.black),
+                              overflow: TextOverflow.ellipsis,
+                              maxLines: 1,
+                            ),
+                          ),
                         ],
                       ),
                     ),

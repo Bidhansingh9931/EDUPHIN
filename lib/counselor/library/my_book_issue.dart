@@ -3,6 +3,7 @@ import 'package:eduphin/services/responsive_helper.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../../services/api_service.dart';
+import '../../services/error_handler.dart';
 import '../../services/caching_service.dart';
 import '../../services/common_widgets.dart';
 import '../counselor_models.dart';
@@ -78,17 +79,19 @@ class _MyBookIssuePageState extends State<MyBookIssuePage> {
       } else {
         if (mounted && _issuedBooks.isEmpty) {
           setState(() {
-            _errorMessage = ApiService.errorMessage(response, "Failed to load lending history");
+            _errorMessage = ErrorHandler.getMessage("Failed to load lending history. Status: ${response.statusCode}");
             _isLoading = false;
           });
+          ErrorHandler.showError(context, _errorMessage);
         }
       }
     } catch (e) {
       if (mounted && _issuedBooks.isEmpty) {
         setState(() {
-          _errorMessage = e.toString().replaceFirst("Exception: ", "");
+          _errorMessage = ErrorHandler.getMessage(e);
           _isLoading = false;
         });
+        ErrorHandler.showError(context, e);
       }
     }
   }

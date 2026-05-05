@@ -13,6 +13,7 @@ import 'package:eduphin/librarian/support_ticket/my_ticket.dart';
 import 'package:eduphin/librarian/overdue_books.dart';
 import 'package:eduphin/librarian/salary.dart';
 import 'package:eduphin/librarian/librarian_models.dart';
+import 'package:eduphin/services/error_handler.dart';
 import 'package:eduphin/services/api_service.dart';
 import 'package:eduphin/services/responsive_helper.dart';
 import 'package:eduphin/services/common_widgets.dart';
@@ -303,8 +304,8 @@ class _LibrarianDashboardState extends State<LibrarianDashboard> {
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceAround,
                   children: [
-                    _buildProfileInfoItem(Icons.badge_outlined, user.employeeId ?? "N/A", "ID"),
-                    _buildProfileInfoItem(Icons.phone_outlined, user.phone ?? "N/A", "Phone"),
+                    Expanded(child: _buildProfileInfoItem(Icons.badge_outlined, user.employeeId ?? "N/A", "ID")),
+                    Expanded(child: _buildProfileInfoItem(Icons.phone_outlined, user.phone ?? "N/A", "Phone")),
                   ],
                 ),
               ),
@@ -328,11 +329,24 @@ class _LibrarianDashboardState extends State<LibrarianDashboard> {
   Widget _buildProfileInfoItem(IconData icon, String value, String label) {
     final theme = Theme.of(context);
     return Column(
+      mainAxisSize: MainAxisSize.min,
       children: [
         Icon(icon, size: context.scale(18), color: theme.colorScheme.primary),
         SizedBox(height: context.xs),
-        Text(value, style: theme.textTheme.bodySmall?.copyWith(fontWeight: FontWeight.bold, fontSize: context.font(12))),
-        Text(label, style: theme.textTheme.labelSmall?.copyWith(color: theme.colorScheme.outline, fontSize: context.font(10))),
+        Text(
+          value,
+          style: theme.textTheme.bodySmall?.copyWith(fontWeight: FontWeight.bold, fontSize: context.font(12)),
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          textAlign: TextAlign.center,
+        ),
+        Text(
+          label,
+          style: theme.textTheme.labelSmall?.copyWith(color: theme.colorScheme.outline, fontSize: context.font(10)),
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          textAlign: TextAlign.center,
+        ),
       ],
     );
   }
@@ -434,8 +448,9 @@ class _LibrarianDashboardState extends State<LibrarianDashboard> {
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      _buildSalaryInfoRow("Status", "Paid", Colors.green),
-                      _buildSalaryInfoRow("Date", salary.paymentDate != null ? DateFormat('dd MMM yyyy').format(DateTime.parse(salary.paymentDate!)) : "N/A", theme.colorScheme.onSurface),
+                      Flexible(child: _buildSalaryInfoRow("Status", "Paid", Colors.green)),
+                      SizedBox(width: context.scale(8)),
+                      Flexible(child: _buildSalaryInfoRow("Date", salary.paymentDate != null ? DateFormat('dd MMM yyyy').format(DateTime.parse(salary.paymentDate!)) : "N/A", theme.colorScheme.onSurface)),
                     ],
                   ),
                 )

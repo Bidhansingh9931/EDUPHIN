@@ -1,4 +1,5 @@
 import 'package:eduphin/services/common_widgets.dart';
+import 'package:eduphin/services/error_handler.dart';
 import 'package:flutter/material.dart';
 import 'package:eduphin/services/api_service.dart';
 import 'package:intl/intl.dart';
@@ -59,14 +60,7 @@ class _RemarksPageState extends State<RemarksPage> {
     } catch (e) {
       if (mounted) {
         setState(() => _isLoading = false);
-        if (_allRemarks.isEmpty) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text("Error: $e"),
-              backgroundColor: Theme.of(context).colorScheme.error,
-            ),
-          );
-        }
+        ErrorHandler.showError(context, e);
       }
     }
   }

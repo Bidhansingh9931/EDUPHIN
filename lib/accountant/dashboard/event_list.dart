@@ -1,3 +1,4 @@
+import 'package:eduphin/services/error_handler.dart';
 import 'package:eduphin/services/common_widgets.dart';
 import 'package:eduphin/services/responsive_helper.dart';
 import 'package:flutter/material.dart';
@@ -53,11 +54,15 @@ class _EventListPageState extends State<EventListPage> with SingleTickerProvider
       _eventsStream = ApiService.getAccountantEventsStream(
         status: _exploreStatus == 'All Events' ? null : _exploreStatus.toLowerCase(),
         type: _exploreType == 'All types' ? null : _exploreType.toLowerCase(),
-      );
+      )..handleError((error) {
+        if (mounted) ErrorHandler.showError(context, error);
+      });
       _registeredStream = ApiService.getAccountantRegisteredEventsStream(
         status: _registeredStatus == 'All Status' ? null : _registeredStatus.toLowerCase(),
         type: _registeredType == 'All types' ? null : _registeredType.toLowerCase(),
-      );
+      )..handleError((error) {
+        if (mounted) ErrorHandler.showError(context, error);
+      });
     });
   }
 
@@ -77,7 +82,7 @@ class _EventListPageState extends State<EventListPage> with SingleTickerProvider
         _fetchData();
       }
     } catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Error: $e")));
+      if (mounted) ErrorHandler.showError(context, e);
     }
   }
 
@@ -114,7 +119,7 @@ class _EventListPageState extends State<EventListPage> with SingleTickerProvider
         }
       } catch (e) {
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Error: $e")));
+          ErrorHandler.showError(context, e);
         }
       }
     }
@@ -154,7 +159,7 @@ class _EventListPageState extends State<EventListPage> with SingleTickerProvider
                 }
               } catch (e) {
                 if (mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Error: $e")));
+                  ErrorHandler.showError(context, e);
                 }
               }
             },
@@ -270,17 +275,24 @@ class _EventListPageState extends State<EventListPage> with SingleTickerProvider
             return Center(
               child: ConstrainedBox(
                 constraints: BoxConstraints(maxWidth: context.scale(1200)),
-                child: GridView.builder(
-                  padding: context.pagePadding,
-                  gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                    crossAxisCount: context.isDesktop ? 3 : (context.isTablet ? 2 : 1),
-                    mainAxisExtent: context.scale(360),
-                    crossAxisSpacing: context.spacing,
-                    mainAxisSpacing: context.spacing,
-                  ),
-                  itemCount: events.length,
-                  itemBuilder: (context, index) => _buildEventItem(events[index]),
-                ),
+                child: context.isMobile
+                    ? ListView.separated(
+                        padding: context.pagePadding,
+                        itemCount: events.length,
+                        separatorBuilder: (context, index) => SizedBox(height: context.spacing),
+                        itemBuilder: (context, index) => _buildEventItem(events[index]),
+                      )
+                    : GridView.builder(
+                        padding: context.pagePadding,
+                        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                          crossAxisCount: context.responsive(1, tablet: 2, desktop: 3),
+                          mainAxisExtent: context.font(400),
+                          crossAxisSpacing: context.spacing,
+                          mainAxisSpacing: context.spacing,
+                        ),
+                        itemCount: events.length,
+                        itemBuilder: (context, index) => _buildEventItem(events[index]),
+                      ),
               ),
             );
           },
@@ -322,8 +334,8 @@ class _EventListPageState extends State<EventListPage> with SingleTickerProvider
       padding: context.pagePadding,
       physics: const NeverScrollableScrollPhysics(),
       gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: context.isDesktop ? 3 : (context.isTablet ? 2 : 1),
-        mainAxisExtent: context.scale(360),
+        crossAxisCount: context.responsive(1, tablet: 2, desktop: 3),
+        mainAxisExtent: context.font(400),
         crossAxisSpacing: context.spacing,
         mainAxisSpacing: context.spacing,
       ),

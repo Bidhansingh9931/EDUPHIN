@@ -1,3 +1,4 @@
+import 'package:eduphin/services/error_handler.dart';
 import 'dart:io';
 import 'package:eduphin/moderator_dashboard/skeleton_widgets.dart';
 import 'package:eduphin/moderator_dashboard/cache_helper.dart';
@@ -62,6 +63,7 @@ class _EmployeeDetailsPageState extends State<EmployeeDetailsPage> {
   @override
   void initState() {
     super.initState();
+    _detailsFuture = _provider.fetchEmployeeDetails(widget.employeeId);
     _loadInitialData();
   }
 
@@ -81,6 +83,10 @@ class _EmployeeDetailsPageState extends State<EmployeeDetailsPage> {
         if (mounted && data != null) {
           debugPrint('DEBUG: Received data for: ${data.fullName} (ID: ${data.id})');
           _populateControllers(data);
+        }
+      }).catchError((e) {
+        if (mounted) {
+          ErrorHandler.showError(context, e);
         }
       });
     });
@@ -214,6 +220,7 @@ class _EmployeeDetailsPageState extends State<EmployeeDetailsPage> {
       profileImage: _profileImage,
       webImage: _webImage,
       imageName: _imageName,
+      instituteId: details.instituteId,
     );
 
     try {
@@ -236,12 +243,7 @@ class _EmployeeDetailsPageState extends State<EmployeeDetailsPage> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Failed to save changes: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
+        ErrorHandler.showError(context, e);
       }
     } finally {
       if (mounted) {
@@ -329,7 +331,7 @@ class _EmployeeDetailsPageState extends State<EmployeeDetailsPage> {
                                 context: context,
                                 controller: _roleController,
                                 label: 'Role',
-                                items: ['Institute Manager', 'Counselors', 'Teacher', 'Student', 'Librarian', 'Accountant', 'Staff'],
+                                items: ['Moderator', 'Institute Manager', 'Counselors', 'Teachers', 'Students', 'Librarian', 'Accountants', 'Staff'],
                               ),
                               _buildDropdownField(
                                 context: context,

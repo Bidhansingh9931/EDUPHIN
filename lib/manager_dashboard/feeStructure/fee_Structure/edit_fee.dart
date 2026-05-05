@@ -1,3 +1,4 @@
+import 'package:eduphin/services/error_handler.dart';
 import 'dart:convert';
 import 'package:eduphin/services/api_service.dart';
 import 'package:eduphin/services/responsive_helper.dart';
@@ -99,9 +100,10 @@ class _EditFeePageState extends State<EditFeePage> {
     } catch (e) {
       if (!mounted) return;
       setState(() {
-        _error = e.toString().replaceFirst('Exception: ', '');
+        _error = ErrorHandler.getMessage(e);
         _isLoadingClasses = false;
       });
+      ErrorHandler.showError(context, e);
     }
   }
 
@@ -151,9 +153,7 @@ class _EditFeePageState extends State<EditFeePage> {
       }
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(e.toString().replaceFirst('Exception: ', ''))),
-      );
+      ErrorHandler.showError(context, e);
     } finally {
       if (mounted) setState(() => _isSaving = false);
     }

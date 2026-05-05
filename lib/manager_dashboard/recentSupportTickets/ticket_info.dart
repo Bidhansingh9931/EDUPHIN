@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:eduphin/services/error_handler.dart';
 import 'package:eduphin/services/api_service.dart';
 import 'package:eduphin/services/caching_service.dart';
 import 'package:eduphin/services/common_widgets.dart';
@@ -209,11 +210,7 @@ class _TicketInfoPageState extends State<TicketInfoPage> {
           _isLoading = false;
           _error = e;
         });
-        if (_tickets.isNotEmpty) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Error updating tickets: ${e.toString()}')),
-          );
-        }
+        ErrorHandler.showError(context, e);
       }
     }
   }
@@ -421,7 +418,7 @@ class _TicketCardState extends State<TicketCard> {
       }
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString())));
+      ErrorHandler.showError(context, e);
     }
   }
 
@@ -440,7 +437,7 @@ class _TicketCardState extends State<TicketCard> {
       }
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString())));
+      ErrorHandler.showError(context, e);
     }
   }
 

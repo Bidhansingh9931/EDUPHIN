@@ -5,6 +5,7 @@ import 'package:intl/intl.dart';
 import 'package:eduphin/services/api_service.dart';
 import 'package:eduphin/services/caching_service.dart';
 import 'package:eduphin/services/common_widgets.dart';
+import 'package:eduphin/services/error_handler.dart';
 
 class ClassSchedulePage extends StatefulWidget {
   const ClassSchedulePage({super.key});
@@ -63,12 +64,9 @@ class _ClassSchedulePageState extends State<ClassSchedulePage> {
       if (mounted) {
         setState(() {
           _isLoading = false;
+          ErrorHandler.showError(context, e);
           if (_scheduleData == null) {
-            _errorMessage = e.toString();
-          } else {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text("Failed to refresh: ${e.toString()}")),
-            );
+            _errorMessage = ErrorHandler.getMessage(e);
           }
         });
       }
@@ -484,19 +482,22 @@ class _ClassSchedulePageState extends State<ClassSchedulePage> {
   Widget _buildDetailRow(IconData icon, String label, String value) {
     final theme = context.theme;
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8.0),
+      padding: EdgeInsets.symmetric(vertical: context.scale(8.0)),
       child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(icon, size: 20, color: theme.colorScheme.primary),
-          const SizedBox(width: 12),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(label,
-                  style: theme.textTheme.labelSmall
-                      ?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
-              Text(value, style: theme.textTheme.bodyLarge),
-            ],
+          Icon(icon, size: context.scale(20), color: theme.colorScheme.primary),
+          SizedBox(width: context.scale(12)),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(label,
+                    style: theme.textTheme.labelSmall
+                        ?.copyWith(color: theme.colorScheme.onSurfaceVariant, fontSize: context.font(11))),
+                Text(value, style: theme.textTheme.bodyLarge?.copyWith(fontSize: context.font(14))),
+              ],
+            ),
           ),
         ],
       ),

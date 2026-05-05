@@ -1,5 +1,6 @@
 import 'package:eduphin/services/responsive_helper.dart';
 import 'package:eduphin/services/theme_service.dart';
+import 'package:eduphin/services/error_handler.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_widget_from_html/flutter_widget_from_html.dart';
 import '../services/api_service.dart';
@@ -52,6 +53,7 @@ class _CancellationPolicyScreenState extends State<CancellationPolicyScreen> {
       }
     } catch (e) {
       debugPrint("Error fetching Cancellation Policy: $e");
+      if (mounted) ErrorHandler.showError(context, e);
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
@@ -69,9 +71,7 @@ class _CancellationPolicyScreenState extends State<CancellationPolicyScreen> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text("Update failed: $e")),
-        );
+        ErrorHandler.showError(context, e);
       }
     } finally {
       if (mounted) setState(() => _isSaving = false);

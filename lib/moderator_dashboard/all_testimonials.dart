@@ -1,4 +1,5 @@
 import 'package:eduphin/services/common_widgets.dart';
+import 'package:eduphin/services/error_handler.dart';
 import 'package:eduphin/services/responsive_helper.dart';
 import 'package:flutter/material.dart';
 import 'dashboard_data_provider.dart';
@@ -37,7 +38,13 @@ class _AllTestimonialsPageState extends State<AllTestimonialsPage> {
     setState(() {
       _dashboardDataFuture = _provider.fetchDashboardData(bypassCache: true);
     });
-    await _dashboardDataFuture;
+    try {
+      await _dashboardDataFuture;
+    } catch (e) {
+      if (mounted) {
+        ErrorHandler.showError(context, e);
+      }
+    }
   }
 
   @override

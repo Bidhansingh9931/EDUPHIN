@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:eduphin/services/error_handler.dart';
 import 'package:eduphin/services/api_service.dart';
 import 'package:eduphin/services/responsive_helper.dart';
 import 'package:flutter/material.dart';
@@ -137,9 +138,7 @@ class _AccountDetailsPageState extends State<AccountDetailsPage> {
       }
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error: ${e.toString()}')),
-      );
+      ErrorHandler.showError(context, e);
     } finally {
       if(mounted) {
         setState(() => _isLoading = false);
@@ -183,16 +182,7 @@ class _AccountDetailsPageState extends State<AccountDetailsPage> {
       }
     } catch (e) {
       if (!mounted) return;
-      String errorMessage = e.toString().replaceFirst("Exception: ", "");
-      if (errorMessage.contains("1062") && errorMessage.contains("user_details_bank_account_number_unique")) {
-        errorMessage = "Error: This bank account number is already in use by another user.";
-      }
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(errorMessage),
-          backgroundColor: Colors.red,
-        ),
-      );
+      ErrorHandler.showError(context, e);
     } finally {
       if (mounted) {
         setState(() => _isSaving = false);

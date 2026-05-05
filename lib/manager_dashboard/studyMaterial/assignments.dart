@@ -6,6 +6,7 @@ import 'package:eduphin/manager_dashboard/studyMaterial/edit_assignment.dart';
 import 'package:eduphin/services/api_service.dart';
 import 'package:eduphin/services/responsive_helper.dart';
 import 'package:intl/intl.dart';
+import 'package:eduphin/services/error_handler.dart';
 import 'package:eduphin/manager_dashboard/studyMaterial/submission_assignment.dart';
 import 'package:flutter/material.dart';
 
@@ -181,6 +182,7 @@ class _AssignmentsPageState extends State<AssignmentsPage> {
           _error = e;
           isLoading = allAssignments.isEmpty;
         });
+        ErrorHandler.showError(context, e);
       }
     }
   }
@@ -240,11 +242,8 @@ class _AssignmentsPageState extends State<AssignmentsPage> {
           throw Exception('Failed to delete assignment');
         }
       } catch (e) {
-        if(mounted){
-           ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-             content: Text(e.toString()),
-             backgroundColor: theme.colorScheme.error,
-           ));
+        if (mounted) {
+          ErrorHandler.showError(context, e);
         }
       }
     }
@@ -310,18 +309,20 @@ class _AssignmentsPageState extends State<AssignmentsPage> {
   Widget _buildSkeleton() {
     return Padding(
       padding: context.pagePadding,
-      child: Column(
-        children: [
-          SkeletonBox(height: context.scale(100), borderRadius: context.scale(20)),
-          SizedBox(height: context.md),
-          ...List.generate(
-            3,
-            (index) => Padding(
-              padding: EdgeInsets.only(bottom: context.md),
-              child: SkeletonBox(height: context.scale(200), borderRadius: context.scale(18)),
+      child: SingleChildScrollView(
+        child: Column(
+          children: [
+            SkeletonBox(height: context.scale(100), borderRadius: context.scale(20)),
+            SizedBox(height: context.md),
+            ...List.generate(
+              3,
+              (index) => Padding(
+                padding: EdgeInsets.only(bottom: context.md),
+                child: SkeletonBox(height: context.scale(200), borderRadius: context.scale(18)),
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

@@ -1,5 +1,6 @@
 import 'package:eduphin/services/common_widgets.dart';
 import 'package:eduphin/services/responsive_helper.dart';
+import 'package:eduphin/services/error_handler.dart';
 
 import 'package:flutter/material.dart';
 import '../services/api_service.dart';
@@ -28,6 +29,7 @@ class SuperAdminDashboard extends StatefulWidget {
 
 class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
   Map<String, dynamic>? _dashboardData;
+  Map<String, dynamic>? _profileData;
   bool _isLoading = true;
 
   @override
@@ -37,14 +39,30 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
   }
 
   Future<void> _loadInitialData() async {
-    final cachedData = await SuperAdminCacheService.load('dashboard');
-    if (cachedData != null && mounted) {
+    final cachedDash = await SuperAdminCacheService.load('dashboard');
+    final cachedProfile = await SuperAdminCacheService.load('super_admin_profile');
+    
+    if (mounted) {
       setState(() {
-        _dashboardData = cachedData;
-        _isLoading = false;
+        if (cachedDash != null) _dashboardData = cachedDash;
+        if (cachedProfile != null) _profileData = cachedProfile;
+        if (_dashboardData != null) _isLoading = false;
       });
     }
     _fetchDashboard();
+    _fetchProfile();
+  }
+
+  Future<void> _fetchProfile() async {
+    try {
+      final data = await ApiService.getSuperAdminProfile();
+      if (mounted) {
+        setState(() => _profileData = data);
+        await SuperAdminCacheService.save('super_admin_profile', data);
+      }
+    } catch (e) {
+      debugPrint("Error fetching profile in dashboard: $e");
+    }
   }
 
   Future<void> _fetchDashboard() async {
@@ -64,7 +82,7 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
     } catch (e) {
       if (mounted) {
         setState(() => _isLoading = false);
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Error: $e")));
+        ErrorHandler.showError(context, e);
       }
     }
   }
@@ -408,6 +426,10 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
 
   Widget _buildProfileOverview(BuildContext context) {
     final theme = context.theme;
+    final userData = _profileData?['user'] ?? _profileData;
+    final name = userData?['name'] ?? userData?['full_name'] ?? "Super Admin";
+    final photo = userData?['photo'] ?? userData?['image'] ?? userData?['profile_photo'];
+
     return Container(
       width: double.infinity,
       decoration: BoxDecoration(
@@ -440,6 +462,7 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
                 Row(
                   children: [
                     ProfileAvatar(
+                      imageUrl: ApiService.getStorageUrl(photo?.toString()),
                       radius: context.scale(35),
                     ),
                     SizedBox(width: context.scale(20)),
@@ -448,7 +471,7 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            "Super Admin",
+                            name.toString(),
                             style: TextStyle(
                               color: theme.colorScheme.onPrimary,
                               fontSize: context.font(22),
@@ -691,7 +714,13 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
             else
               ...activities.take(3).map((activity) => Column(
                   children: [
-                    _buildActivityItem(context, activity['event'] ?? "Activity", activity['created_at'] ?? "N/A", activity['user']?['name'] ?? "User"),
+                    _buildActivityItem(
+                      context,
+                      activity['event'] ?? "Activity",
+                      activity['created_at'] ?? "N/A",
+                      activity['user']?['name'] ?? "User",
+                      photo: activity['user']?['photo'] ?? activity['user']?['image'],
+                    ),
                     Divider(height: context.scale(24)),
                   ],
                 )),
@@ -701,11 +730,14 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard> {
     );
   }
 
-  Widget _buildActivityItem(BuildContext context, String label, String time, String user) {
+  Widget _buildActivityItem(BuildContext context, String label, String time, String user, {String? photo}) {
     final theme = context.theme;
     return Row(
       children: [
-        ProfileAvatar(radius: context.scale(18)),
+        ProfileAvatar(
+          imageUrl: ApiService.getStorageUrl(photo),
+          radius: context.scale(18),
+        ),
         SizedBox(width: context.scale(12)),
         Expanded(
           child: Column(

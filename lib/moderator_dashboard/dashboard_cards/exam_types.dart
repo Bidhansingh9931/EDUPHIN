@@ -1,4 +1,6 @@
+import 'package:eduphin/services/error_handler.dart';
 import 'dart:async';
+import 'dart:io';
 import 'package:eduphin/moderator_dashboard/cache_helper.dart';
 import 'package:eduphin/moderator_dashboard/skeleton_widgets.dart';
 import 'package:eduphin/services/responsive_helper.dart';
@@ -34,22 +36,30 @@ class ExamTypeProvider {
   static const String _cacheKey = 'moderator_exam_types_list';
 
   Future<List<ExamType>> fetchExamTypes({bool bypassCache = false}) async {
-    if (!bypassCache) {
-      final cached = await CacheHelper.load(_cacheKey);
-      if (cached != null && cached is List) {
-        return (cached as List).map((e) => ExamType.fromJson(e)).toList();
+    try {
+      if (!bypassCache) {
+        final cached = await CacheHelper.load(_cacheKey);
+        if (cached != null && cached is List) {
+          return (cached as List).map((e) => ExamType.fromJson(e)).toList();
+        }
       }
+      // Placeholder logic for now, but adding error handling structure
+      await Future.delayed(const Duration(seconds: 2));
+      final data = List.generate(
+        15,
+        (index) => ExamType(
+          name: 'Exam Type ${index + 1}',
+          description: 'Description for exam type ${index + 1}',
+        ),
+      );
+      await CacheHelper.save(_cacheKey, data.map((e) => e.toJson()).toList());
+      return data;
+    } on SocketException {
+      throw NetworkException();
+    } catch (e) {
+      if (e is NetworkException) rethrow;
+      throw Exception('Failed to fetch exam types: $e');
     }
-    await Future.delayed(const Duration(seconds: 2));
-    final data = List.generate(
-      15,
-      (index) => ExamType(
-        name: 'Exam Type ${index + 1}',
-        description: 'Description for exam type ${index + 1}',
-      ),
-    );
-    await CacheHelper.save(_cacheKey, data.map((e) => e.toJson()).toList());
-    return data;
   }
 }
 
@@ -82,10 +92,17 @@ class _ExamTypesPageState extends State<ExamTypesPage> {
     }
   }
 
-  void _refreshData({bool bypassCache = false}) {
+  Future<void> _refreshData({bool bypassCache = false}) async {
     setState(() {
       _examTypesFuture = _provider.fetchExamTypes(bypassCache: bypassCache);
     });
+    try {
+      await _examTypesFuture;
+    } catch (e) {
+      if (mounted) {
+        ErrorHandler.showError(context, e);
+      }
+    }
   }
 
   @override

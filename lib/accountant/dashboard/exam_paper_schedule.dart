@@ -1,4 +1,5 @@
 import 'package:eduphin/services/responsive_helper.dart';
+import 'package:eduphin/services/error_handler.dart';
 import 'package:eduphin/services/common_widgets.dart';
 import 'package:flutter/material.dart';
 import 'package:eduphin/services/api_service.dart';
@@ -19,12 +20,14 @@ class _ExamPaperSchedulePageState extends State<ExamPaperSchedulePage> {
   @override
   void initState() {
     super.initState();
-    _scheduleStream = ApiService.getAccountantExamScheduleStream(widget.examId);
+    _refresh();
   }
 
   void _refresh() {
     setState(() {
-      _scheduleStream = ApiService.getAccountantExamScheduleStream(widget.examId);
+      _scheduleStream = ApiService.getAccountantExamScheduleStream(widget.examId)..handleError((error) {
+        if (mounted) ErrorHandler.showError(context, error);
+      });
     });
   }
 

@@ -5,6 +5,7 @@ import 'dart:ui';
 import 'package:eduphin/manager_dashboard/manageClasses/classList/section/create_new_section.dart';
 import 'package:eduphin/manager_dashboard/manageClasses/classList/section/edit_section.dart';
 import 'package:eduphin/manager_dashboard/manageClasses/classList/section/studentList/student_list.dart';
+import 'package:eduphin/services/error_handler.dart';
 import 'package:eduphin/services/api_service.dart';
 import 'package:eduphin/services/caching_service.dart';
 import 'package:eduphin/services/common_widgets.dart';
@@ -115,6 +116,7 @@ class _SectionsPageState extends State<SectionsPage> {
           _error = e;
           _isLoading = false;
         });
+        ErrorHandler.showError(context, e);
       }
     }
   }
@@ -467,9 +469,7 @@ class _DeleteSectionDialogState extends State<DeleteSectionDialog> {
     } catch (e) {
       if (mounted) {
         Navigator.pop(context);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: $e')),
-        );
+        ErrorHandler.showError(context, e);
       }
     } finally {
       if (mounted) {

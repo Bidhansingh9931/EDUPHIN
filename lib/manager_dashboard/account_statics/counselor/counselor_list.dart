@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:csv/csv.dart';
+import 'package:eduphin/services/error_handler.dart';
 import 'package:eduphin/manager_dashboard/account_statics/counselor/add_counselor.dart';
 import 'package:eduphin/services/api_service.dart';
 import 'package:eduphin/services/common_widgets.dart';
@@ -136,6 +137,7 @@ class _CounselorListPageState extends State<CounselorListPage> {
           _error = e;
           _isLoading = false;
         });
+        ErrorHandler.showError(context, e);
       }
     }
   }
@@ -171,6 +173,7 @@ class _CounselorListPageState extends State<CounselorListPage> {
           _error = e;
           _isLoading = false;
         });
+        ErrorHandler.showError(context, e);
       }
     }
   }

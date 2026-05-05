@@ -3,6 +3,7 @@ import 'package:eduphin/services/pdf_service.dart';
 import 'package:eduphin/services/responsive_helper.dart';
 import 'package:flutter/material.dart';
 import '../services/api_service.dart';
+import '../services/error_handler.dart';
 import '../services/caching_service.dart';
 import 'package:eduphin/services/common_widgets.dart';
 import 'counselor_models.dart';
@@ -63,19 +64,25 @@ class _SalaryDetailPageState extends State<SalaryDetailPage> {
           });
         }
       } else {
-        if (mounted && _salary == null) {
-          setState(() {
-            _errorMessage = ApiService.errorMessage(response, 'Failed to load salary details');
-            _isLoading = false;
-          });
+        if (mounted) {
+          if (_salary == null) {
+            setState(() {
+              _errorMessage = ErrorHandler.getMessage("Status: ${response.statusCode}");
+              _isLoading = false;
+            });
+          }
+          ErrorHandler.showError(context, "Status: ${response.statusCode}");
         }
       }
     } catch (e) {
-      if (mounted && _salary == null) {
-        setState(() {
-          _errorMessage = e.toString().replaceFirst('Exception: ', '');
-          _isLoading = false;
-        });
+      if (mounted) {
+        if (_salary == null) {
+          setState(() {
+            _errorMessage = ErrorHandler.getMessage(e);
+            _isLoading = false;
+          });
+        }
+        ErrorHandler.showError(context, e);
       }
     }
   }
@@ -139,32 +146,10 @@ class _SalaryDetailPageState extends State<SalaryDetailPage> {
       body: LoadingWrapper(
         isLoading: _isLoading,
         hasData: _salary != null,
+        error: _errorMessage,
         skeleton: _buildSkeleton(),
-        child: _errorMessage != null && _salary == null
-            ? Center(
-                child: Padding(
-                  padding: context.pagePadding,
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(Icons.error_outline, color: theme.colorScheme.error, size: context.scale(48)),
-                      SizedBox(height: context.md),
-                      Text(
-                        _errorMessage!,
-                        textAlign: TextAlign.center,
-                        style: TextStyle(color: theme.colorScheme.error, fontSize: context.font(14)),
-                      ),
-                      SizedBox(height: context.lg),
-                      FilledButton.icon(
-                        onPressed: _fetchDetails,
-                        icon: const Icon(Icons.refresh),
-                        label: const Text("Retry"),
-                      )
-                    ],
-                  ),
-                ),
-              )
-            : _salary == null
+        onRetry: _fetchDetails,
+        child: _salary == null
                 ? const Center(child: Text("Salary details not found"))
                 : SingleChildScrollView(
                     padding: context.pagePadding,
@@ -268,9 +253,22 @@ class _SalaryDetailPageState extends State<SalaryDetailPage> {
       padding: EdgeInsets.symmetric(vertical: context.scale(8)),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(label, style: TextStyle(color: context.theme.hintColor, fontSize: context.font(14))),
-          Text(value, style: TextStyle(fontWeight: FontWeight.bold, fontSize: context.font(14))),
+          Expanded(
+            child: Text(
+              label,
+              style: TextStyle(color: context.theme.hintColor, fontSize: context.font(14)),
+            ),
+          ),
+          SizedBox(width: context.scale(8)),
+          Flexible(
+            child: Text(
+              value,
+              textAlign: TextAlign.end,
+              style: TextStyle(fontWeight: FontWeight.bold, fontSize: context.font(14)),
+            ),
+          ),
         ],
       ),
     );

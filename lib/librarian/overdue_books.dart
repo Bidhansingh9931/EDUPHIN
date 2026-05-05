@@ -1,3 +1,4 @@
+import 'package:eduphin/services/error_handler.dart';
 import 'package:eduphin/services/common_widgets.dart';
 import 'package:eduphin/librarian/librarian_skeleton_widgets.dart';
 import 'package:eduphin/services/responsive_helper.dart';
@@ -392,7 +393,7 @@ class _OverdueBooksPageState extends State<OverdueBooksPage> {
             _refreshStream();
             if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Book returned successfully")));
           } catch (e) {
-            if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Error: $e")));
+            if (context.mounted) ErrorHandler.showError(context, e);
           }
         },
       )),

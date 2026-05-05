@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:eduphin/services/common_widgets.dart';
 import '../../services/api_service.dart';
+import '../../services/error_handler.dart';
 import '../../services/caching_service.dart';
 import '../../services/responsive_helper.dart';
 import '../counselor_models.dart';
@@ -63,18 +64,20 @@ class _AssignedTicketsPageState extends State<AssignedTicketsPage> {
       } else {
         if (mounted && _tickets.isEmpty) {
           setState(() {
-            _errorMessage = ApiService.errorMessage(response, "Failed to load assigned tickets");
+            _errorMessage = ErrorHandler.getMessage("Failed to load assigned tickets. Status: ${response.statusCode}");
             _isLoading = false;
           });
+          ErrorHandler.showError(context, _errorMessage);
         }
       }
     } catch (e) {
       debugPrint("Error: $e");
       if (mounted && _tickets.isEmpty) {
         setState(() {
-          _errorMessage = e.toString().replaceFirst("Exception: ", "");
+          _errorMessage = ErrorHandler.getMessage(e);
           _isLoading = false;
         });
+        ErrorHandler.showError(context, e);
       }
     }
   }
@@ -255,20 +258,33 @@ class _AssignedTicketsPageState extends State<AssignedTicketsPage> {
                   ),
                 ),
                 SizedBox(height: context.scale(12)),
-                Row(
+                Wrap(
+                  spacing: context.scale(12),
+                  runSpacing: context.scale(8),
+                  alignment: WrapAlignment.spaceBetween,
+                  crossAxisAlignment: WrapCrossAlignment.center,
                   children: [
-                    Icon(Icons.priority_high_rounded, size: context.scale(14), color: colorScheme.onSurfaceVariant),
-                    SizedBox(width: context.scale(6)),
-                    Text(
-                      "Priority: ${t.priority?.toUpperCase() ?? 'LOW'}",
-                      style: TextStyle(color: colorScheme.onSurfaceVariant, fontSize: context.font(12)),
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.priority_high_rounded, size: context.scale(14), color: colorScheme.onSurfaceVariant),
+                        SizedBox(width: context.scale(6)),
+                        Text(
+                          "Priority: ${t.priority?.toUpperCase() ?? 'LOW'}",
+                          style: TextStyle(color: colorScheme.onSurfaceVariant, fontSize: context.font(12)),
+                        ),
+                      ],
                     ),
-                    const Spacer(),
-                    Icon(Icons.calendar_today_rounded, size: context.scale(14), color: colorScheme.onSurfaceVariant),
-                    SizedBox(width: context.scale(6)),
-                    Text(
-                      t.createdAt?.split('T')[0] ?? "-",
-                      style: TextStyle(color: colorScheme.onSurfaceVariant, fontSize: context.font(12)),
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.calendar_today_rounded, size: context.scale(14), color: colorScheme.onSurfaceVariant),
+                        SizedBox(width: context.scale(6)),
+                        Text(
+                          t.createdAt?.split('T')[0] ?? "-",
+                          style: TextStyle(color: colorScheme.onSurfaceVariant, fontSize: context.font(12)),
+                        ),
+                      ],
                     ),
                   ],
                 ),

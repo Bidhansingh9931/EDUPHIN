@@ -6,6 +6,7 @@ import 'package:eduphin/teacher/dashboard/ticket_models.dart';
 import 'package:eduphin/teacher/dashboard/common_widgets.dart';
 import 'create_ticket.dart';
 import 'ticket_details.dart';
+import '../../services/error_handler.dart';
 
 class SupportTicketsPage extends StatefulWidget {
   final bool isAssigned;
@@ -33,9 +34,12 @@ class _SupportTicketsPageState extends State<SupportTicketsPage> {
       'priority': _selectedPriority,
       'status': _selectedStatus,
     };
-    _ticketsStream = widget.isAssigned 
+    _ticketsStream = (widget.isAssigned 
         ? ApiService.getAccountantAssignedTicketsStream(filters)
-        : ApiService.getAccountantTicketsStream(filters);
+        : ApiService.getAccountantTicketsStream(filters))
+      ..handleError((error) {
+        if (mounted) ErrorHandler.showError(context, error);
+      });
   }
 
   @override
@@ -127,8 +131,8 @@ class _SupportTicketsPageState extends State<SupportTicketsPage> {
                 physics: const NeverScrollableScrollPhysics(),
                 padding: EdgeInsets.symmetric(horizontal: context.pagePadding.left),
                 gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                  crossAxisCount: context.isDesktop ? 3 : (context.isTablet ? 2 : 1),
-                  mainAxisExtent: context.scale(180),
+                  crossAxisCount: context.responsive(1, tablet: 2, desktop: 3),
+                  mainAxisExtent: context.font(180),
                   crossAxisSpacing: context.spacing,
                   mainAxisSpacing: context.spacing,
                 ),
@@ -230,30 +234,22 @@ class _SupportTicketsPageState extends State<SupportTicketsPage> {
           ),
         ]),
         SizedBox(height: context.spacing * 1.5),
-        Row(
-          children: [
-            Expanded(
-              flex: 2,
-              child: buildActionButton(context, "APPLY FILTERS", () => setState(() => _updateStream())),
-            ),
-            SizedBox(width: context.spacing),
-            Expanded(
-              child: buildActionButton(
-                context, 
-                "RESET", 
-                () {
-                  _searchController.clear();
-                  setState(() {
-                    _selectedPriority = 'all';
-                    _selectedStatus = 'all';
-                    _updateStream();
-                  });
-                },
-                isPrimary: false,
-              ),
-            ),
-          ],
-        ),
+        buildResponsiveRow(context, [
+          buildActionButton(context, "APPLY FILTERS", () => setState(() => _updateStream())),
+          buildActionButton(
+            context, 
+            "RESET", 
+            () {
+              _searchController.clear();
+              setState(() {
+                _selectedPriority = 'all';
+                _selectedStatus = 'all';
+                _updateStream();
+              });
+            },
+            isPrimary: false,
+          ),
+        ]),
       ],
     );
   }
@@ -264,95 +260,104 @@ class _SupportTicketsPageState extends State<SupportTicketsPage> {
       opacity: isRefreshing ? 0.6 : 1.0,
       child: Padding(
         padding: EdgeInsets.symmetric(horizontal: context.pagePadding.left),
-        child: GridView.builder(
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-            crossAxisCount: context.isDesktop ? 3 : (context.isTablet ? 2 : 1),
-            mainAxisExtent: context.scale(180),
-            crossAxisSpacing: context.spacing,
-            mainAxisSpacing: context.spacing,
-          ),
-          itemCount: tickets.length,
-          itemBuilder: (context, index) {
-            final ticket = tickets[index];
-            final priorityColor = _getPriorityColor(ticket.priority);
-            final statusColor = _getStatusColor(ticket.status);
-
-            return Card(
-              elevation: 0,
-              color: theme.colorScheme.surfaceContainerLow,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(context.scale(16)),
-                side: BorderSide(color: theme.colorScheme.outlineVariant, width: 0.5),
-              ),
-              child: InkWell(
-                onTap: () => Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                        builder: (context) => TicketDetailsPage(ticketId: ticket.encryptedId ?? ticket.id.toString()))).then((_) => setState(() => _updateStream())),
-                borderRadius: BorderRadius.circular(context.scale(16)),
-                child: Padding(
-                  padding: EdgeInsets.all(context.spacing),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          Container(
-                            padding: EdgeInsets.symmetric(horizontal: context.scale(10), vertical: context.scale(5)),
-                            decoration: BoxDecoration(
-                              color: theme.colorScheme.primaryContainer,
-                              borderRadius: BorderRadius.circular(context.scale(8)),
-                            ),
-                            child: Text(
-                              "#${ticket.id}",
-                              style: theme.textTheme.labelSmall?.copyWith(
-                                color: theme.colorScheme.onPrimaryContainer,
-                                fontWeight: FontWeight.bold,
-                                fontSize: context.font(11),
-                              ),
-                            ),
-                          ),
-                          const Spacer(),
-                          Icon(Icons.chevron_right, size: context.scale(20), color: theme.colorScheme.onSurfaceVariant),
-                        ],
-                      ),
-                      SizedBox(height: context.spacing),
-                      Text(
-                        ticket.title,
-                        style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold, fontSize: context.font(15)),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                      const Spacer(),
-                      Row(
-                        children: [
-                          _buildBadge(context, ticket.priority.toUpperCase(), priorityColor),
-                          SizedBox(width: context.scale(8)),
-                          _buildBadge(context, ticket.status.toUpperCase(), statusColor),
-                        ],
-                      ),
-                      SizedBox(height: context.spacing / 2),
-                      Row(
-                        children: [
-                          Icon(Icons.access_time, size: context.scale(12), color: theme.colorScheme.onSurfaceVariant),
-                          SizedBox(width: context.scale(4)),
-                          Text(
-                            ticket.createdAt,
-                            style: theme.textTheme.labelSmall?.copyWith(
-                              color: theme.colorScheme.onSurfaceVariant,
-                              fontSize: context.font(11),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
+        child: context.isMobile
+            ? ListView.separated(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                itemCount: tickets.length,
+                separatorBuilder: (context, index) => SizedBox(height: context.spacing),
+                itemBuilder: (context, index) => _buildTicketCard(context, tickets[index]),
+              )
+            : GridView.builder(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: context.responsive(1, tablet: 2, desktop: 3),
+                  mainAxisExtent: context.font(180),
+                  crossAxisSpacing: context.spacing,
+                  mainAxisSpacing: context.spacing,
                 ),
+                itemCount: tickets.length,
+                itemBuilder: (context, index) => _buildTicketCard(context, tickets[index]),
               ),
-            );
-          },
+      ),
+    );
+  }
+
+  Widget _buildTicketCard(BuildContext context, SupportTicket ticket) {
+    final theme = context.theme;
+    final priorityColor = _getPriorityColor(ticket.priority);
+    final statusColor = _getStatusColor(ticket.status);
+    return Card(
+      elevation: 0,
+      color: theme.colorScheme.surfaceContainerLow,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(context.scale(16)),
+        side: BorderSide(color: theme.colorScheme.outlineVariant, width: 0.5),
+      ),
+      child: InkWell(
+        onTap: () => Navigator.push(
+            context,
+            MaterialPageRoute(
+                builder: (context) => TicketDetailsPage(ticketId: ticket.encryptedId ?? ticket.id.toString()))).then((_) => setState(() => _updateStream())),
+        borderRadius: BorderRadius.circular(context.scale(16)),
+        child: Padding(
+          padding: EdgeInsets.all(context.spacing),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    padding: EdgeInsets.symmetric(horizontal: context.scale(10), vertical: context.scale(5)),
+                    decoration: BoxDecoration(
+                      color: theme.colorScheme.primaryContainer,
+                      borderRadius: BorderRadius.circular(context.scale(8)),
+                    ),
+                    child: Text(
+                      "#${ticket.id}",
+                      style: theme.textTheme.labelSmall?.copyWith(
+                        color: theme.colorScheme.onPrimaryContainer,
+                        fontWeight: FontWeight.bold,
+                        fontSize: context.font(11),
+                      ),
+                    ),
+                  ),
+                  const Spacer(),
+                  Icon(Icons.chevron_right, size: context.scale(20), color: theme.colorScheme.onSurfaceVariant),
+                ],
+              ),
+              SizedBox(height: context.spacing),
+              Text(
+                ticket.title,
+                style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold, fontSize: context.font(15)),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+              const Spacer(),
+              Row(
+                children: [
+                  Flexible(child: _buildBadge(context, ticket.priority.toUpperCase(), priorityColor)),
+                  SizedBox(width: context.scale(8)),
+                  Flexible(child: _buildBadge(context, ticket.status.toUpperCase(), statusColor)),
+                ],
+              ),
+              SizedBox(height: context.spacing / 2),
+              Row(
+                children: [
+                  Icon(Icons.access_time, size: context.scale(12), color: theme.colorScheme.onSurfaceVariant),
+                  SizedBox(width: context.scale(4)),
+                  Text(
+                    ticket.createdAt,
+                    style: theme.textTheme.labelSmall?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
+                      fontSize: context.font(11),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
         ),
       ),
     );

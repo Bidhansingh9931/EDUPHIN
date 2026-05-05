@@ -1,4 +1,6 @@
+import 'package:eduphin/services/error_handler.dart';
 import 'dart:async';
+import 'dart:io';
 import 'package:eduphin/moderator_dashboard/cache_helper.dart';
 import 'package:eduphin/moderator_dashboard/skeleton_widgets.dart';
 import 'package:eduphin/services/api_service.dart';
@@ -16,13 +18,20 @@ class InstituteProvider {
   static const String _cacheKey = 'institutes_list';
 
   Future<List<Institute>> fetchInstitutes({bool bypassCache = false}) async {
-    if (!bypassCache) {
-      final cached = await getCachedInstitutes();
-      if (cached != null) return cached;
+    try {
+      if (!bypassCache) {
+        final cached = await getCachedInstitutes();
+        if (cached != null) return cached;
+      }
+      final data = await ApiService.getInstitutes();
+      await CacheHelper.save(_cacheKey, data.map((e) => e.toJson()).toList());
+      return data;
+    } on SocketException {
+      throw NetworkException();
+    } catch (e) {
+      if (e is NetworkException) rethrow;
+      throw Exception('Failed to fetch institutes: $e');
     }
-    final data = await ApiService.getInstitutes();
-    await CacheHelper.save(_cacheKey, data.map((e) => e.toJson()).toList());
-    return data;
   }
 
   Future<List<Institute>?> getCachedInstitutes() async {
@@ -52,6 +61,7 @@ class _InstitutesPageState extends State<InstitutesPage> {
   @override
   void initState() {
     super.initState();
+    _institutesFuture = _provider.fetchInstitutes();
     _loadInitialData();
     _searchController.addListener(_filterInstitutes);
   }
@@ -63,9 +73,7 @@ class _InstitutesPageState extends State<InstitutesPage> {
       _filteredInstitutes = _cachedInstitutes!;
     }
     if (mounted) {
-      setState(() {
-        _institutesFuture = _provider.fetchInstitutes();
-      });
+      setState(() {});
     }
   }
 
@@ -73,7 +81,13 @@ class _InstitutesPageState extends State<InstitutesPage> {
     setState(() {
       _institutesFuture = _provider.fetchInstitutes(bypassCache: bypassCache);
     });
-    await _institutesFuture;
+    try {
+      await _institutesFuture;
+    } catch (e) {
+      if (mounted) {
+        ErrorHandler.showError(context, e);
+      }
+    }
   }
 
   @override

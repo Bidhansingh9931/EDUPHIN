@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:eduphin/services/responsive_helper.dart';
 import 'package:flutter/material.dart';
 import '../services/api_service.dart';
+import '../services/error_handler.dart';
 import '../services/caching_service.dart';
 import '../services/common_widgets.dart';
 import 'counselor_models.dart';
@@ -18,6 +19,7 @@ class _SalaryBankPageState extends State<SalaryBankPage> {
   bool _isLoading = true;
   UserDetail? _userDetail;
   List<Salary> _salaryHistory = [];
+  String? _errorMessage;
   final String _cacheKey = 'counselor_salary_bank_data';
 
   @override
@@ -45,7 +47,10 @@ class _SalaryBankPageState extends State<SalaryBankPage> {
 
   Future<void> _fetchSalaryData() async {
     if (_salaryHistory.isEmpty && _userDetail == null) {
-      setState(() => _isLoading = true);
+      setState(() {
+        _isLoading = true;
+        _errorMessage = null;
+      });
     }
     try {
       final response = await ApiService.get('counselor/salaries');
@@ -62,13 +67,30 @@ class _SalaryBankPageState extends State<SalaryBankPage> {
               _salaryHistory = (salaryData['salaries'] as List).map((json) => Salary.fromJson(json)).toList();
             }
             _isLoading = false;
+            _errorMessage = null;
           });
         }
       } else {
-        if (mounted) setState(() => _isLoading = false);
+        if (mounted) {
+          if (_salaryHistory.isEmpty && _userDetail == null) {
+            setState(() {
+              _errorMessage = ErrorHandler.getMessage("Status: ${response.statusCode}");
+              _isLoading = false;
+            });
+          }
+          ErrorHandler.showError(context, "Status: ${response.statusCode}");
+        }
       }
     } catch (e) {
-      if (mounted) setState(() => _isLoading = false);
+      if (mounted) {
+        if (_salaryHistory.isEmpty && _userDetail == null) {
+          setState(() {
+            _errorMessage = ErrorHandler.getMessage(e);
+            _isLoading = false;
+          });
+        }
+        ErrorHandler.showError(context, e);
+      }
     }
   }
 
@@ -167,7 +189,9 @@ class _SalaryBankPageState extends State<SalaryBankPage> {
         child: LoadingWrapper(
           isLoading: _isLoading,
           hasData: _salaryHistory.isNotEmpty || _userDetail != null,
+          error: _errorMessage,
           skeleton: _buildSkeleton(),
+          onRetry: _fetchSalaryData,
           child: SingleChildScrollView(
             physics: const AlwaysScrollableScrollPhysics(),
             padding: context.pagePadding,

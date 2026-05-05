@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:eduphin/services/responsive_helper.dart';
 import 'package:eduphin/services/api_service.dart';
+import 'package:eduphin/services/error_handler.dart';
 
 class CreateSupportTicketPage extends StatefulWidget {
   const CreateSupportTicketPage({super.key});
@@ -47,12 +48,7 @@ class _CreateSupportTicketPageState extends State<CreateSupportTicketPage> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text("Error creating ticket: $e"),
-            backgroundColor: theme.colorScheme.error,
-          ),
-        );
+        ErrorHandler.showError(context, e);
       }
     } finally {
       if (mounted) setState(() => _isLoading = false);

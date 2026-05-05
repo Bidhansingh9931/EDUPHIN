@@ -1,7 +1,7 @@
-import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../services/api_service.dart';
+import '../../services/error_handler.dart';
 import '../../services/responsive_helper.dart';
 
 class CreateSupportTicketPage extends StatefulWidget {
@@ -43,13 +43,12 @@ class _CreateSupportTicketPageState extends State<CreateSupportTicketPage> {
         }
       } else {
         if (mounted) {
-          final error = jsonDecode(response.body)['message'] ?? "Failed to submit ticket";
-          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(error)));
+          ErrorHandler.showError(context, "Failed to submit ticket. Status: ${response.statusCode}");
         }
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Error: $e")));
+        ErrorHandler.showError(context, e);
       }
     } finally {
       if (mounted) setState(() => _isSubmitting = false);
@@ -121,40 +120,25 @@ class _CreateSupportTicketPageState extends State<CreateSupportTicketPage> {
                       SizedBox(height: context.scale(32)),
 
                       /// 🔹 Buttons Row
-                      Row(
-                        children: [
-                          Expanded(
-                            child: SizedBox(
-                              height: context.scale(50),
-                              child: FilledButton(
-                                onPressed: _isSubmitting ? null : _submitTicket,
-                                style: FilledButton.styleFrom(
-                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(context.scale(12))),
-                                ),
-                                child: _isSubmitting
-                                    ? SizedBox(
-                                        height: context.scale(20),
-                                        width: context.scale(20),
-                                        child: CircularProgressIndicator(strokeWidth: 2, color: colorScheme.onPrimary),
-                                      )
-                                    : Text("SUBMIT TICKET", style: TextStyle(fontWeight: FontWeight.bold, fontSize: context.font(14))),
-                              ),
-                            ),
-                          ),
-                          SizedBox(width: context.scale(16)),
-                          Expanded(
-                            child: SizedBox(
-                              height: context.scale(50),
-                              child: OutlinedButton(
-                                onPressed: () => Navigator.pop(context),
-                                style: OutlinedButton.styleFrom(
-                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(context.scale(12))),
-                                ),
-                                child: Text("BACK", style: TextStyle(fontWeight: FontWeight.bold, fontSize: context.font(14))),
-                              ),
-                            ),
-                          ),
-                        ],
+                      LayoutBuilder(
+                        builder: (context, constraints) {
+                          if (constraints.maxWidth < 300) {
+                            return Column(
+                              children: [
+                                _buildSubmitButton(colorScheme),
+                                SizedBox(height: context.scale(12)),
+                                _buildBackButton(),
+                              ],
+                            );
+                          }
+                          return Row(
+                            children: [
+                              Expanded(child: _buildSubmitButton(colorScheme)),
+                              SizedBox(width: context.scale(16)),
+                              Expanded(child: _buildBackButton()),
+                            ],
+                          );
+                        }
                       )
                     ],
                   ),
@@ -163,6 +147,38 @@ class _CreateSupportTicketPageState extends State<CreateSupportTicketPage> {
             ),
           ),
         ),
+      ),
+    );
+  }
+
+  Widget _buildSubmitButton(ColorScheme colorScheme) {
+    return SizedBox(
+      height: context.scale(50),
+      child: FilledButton(
+        onPressed: _isSubmitting ? null : _submitTicket,
+        style: FilledButton.styleFrom(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(context.scale(12))),
+        ),
+        child: _isSubmitting
+            ? SizedBox(
+                height: context.scale(20),
+                width: context.scale(20),
+                child: CircularProgressIndicator(strokeWidth: 2, color: colorScheme.onPrimary),
+              )
+            : FittedBox(child: Text("SUBMIT TICKET", style: TextStyle(fontWeight: FontWeight.bold, fontSize: context.font(14)))),
+      ),
+    );
+  }
+
+  Widget _buildBackButton() {
+    return SizedBox(
+      height: context.scale(50),
+      child: OutlinedButton(
+        onPressed: () => Navigator.pop(context),
+        style: OutlinedButton.styleFrom(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(context.scale(12))),
+        ),
+        child: FittedBox(child: Text("BACK", style: TextStyle(fontWeight: FontWeight.bold, fontSize: context.font(14)))),
       ),
     );
   }

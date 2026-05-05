@@ -1,3 +1,4 @@
+import 'package:eduphin/services/error_handler.dart';
 import 'package:eduphin/services/responsive_helper.dart';
 import 'package:flutter/material.dart';
 
@@ -37,7 +38,13 @@ class _NotificationPageState extends State<NotificationPage> {
     setState(() {
       _messagesFuture = _provider.fetchMessages(bypassCache: true);
     });
-    await _messagesFuture;
+    try {
+      await _messagesFuture;
+    } catch (e) {
+      if (mounted) {
+        ErrorHandler.showError(context, e);
+      }
+    }
   }
 
   @override

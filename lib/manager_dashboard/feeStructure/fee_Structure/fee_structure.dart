@@ -1,3 +1,4 @@
+import 'package:eduphin/services/error_handler.dart';
 import 'dart:convert';
 import 'dart:ui';
 import 'package:eduphin/services/common_widgets.dart';
@@ -153,6 +154,7 @@ class _FeeStructurePageState extends State<FeeStructurePage> {
     } catch (e) {
       if (mounted) {
         setState(() => _error = e);
+        ErrorHandler.showError(context, e);
       }
     } finally {
       if (mounted) {
@@ -179,11 +181,7 @@ class _FeeStructurePageState extends State<FeeStructurePage> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-              content: Text(e.toString()),
-              backgroundColor: context.theme.colorScheme.error),
-        );
+        ErrorHandler.showError(context, e);
       }
     }
   }

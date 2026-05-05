@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:eduphin/services/error_handler.dart';
 import 'package:eduphin/services/api_service.dart';
 import 'package:eduphin/services/caching_service.dart';
 import 'package:eduphin/services/common_widgets.dart';
@@ -202,6 +203,7 @@ class _EventManagementPageState extends State<EventManagementPage> {
           _isLoading = _upcomingEvents.isEmpty && _pastEvents.isEmpty;
           _error = e;
         });
+        ErrorHandler.showError(context, e);
       }
     }
   }

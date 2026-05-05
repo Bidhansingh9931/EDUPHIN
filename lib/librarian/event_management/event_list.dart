@@ -1,3 +1,4 @@
+import 'package:eduphin/services/error_handler.dart';
 import 'package:eduphin/librarian/librarian_skeleton_widgets.dart';
 import 'package:eduphin/services/responsive_helper.dart';
 import 'package:flutter/material.dart';
@@ -40,7 +41,7 @@ class _ExploreEventsPageState extends State<ExploreEventsPage> {
       _updateStream();
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Registration failed: $e")));
+      ErrorHandler.showError(context, e);
     }
   }
 

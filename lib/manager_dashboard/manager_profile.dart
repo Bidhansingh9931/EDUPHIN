@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
 import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:eduphin/services/error_handler.dart';
 import 'package:eduphin/login_logout/login.dart';
 import 'package:eduphin/services/api_service.dart';
 import 'package:eduphin/services/caching_service.dart';
@@ -223,6 +224,7 @@ class _ManagerProfilePageState extends State<ManagerProfilePage> {
         _isLoading = _profileData == null;
         _error = e;
       });
+      ErrorHandler.showError(context, e);
     }
   }
 
@@ -330,9 +332,7 @@ class _ManagerProfilePageState extends State<ManagerProfilePage> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(e.toString().replaceFirst('Exception: ', ''))),
-        );
+        ErrorHandler.showError(context, e);
       }
     } finally {
       if (mounted) {

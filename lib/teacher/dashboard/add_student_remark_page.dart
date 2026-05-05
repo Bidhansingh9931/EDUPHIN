@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'package:eduphin/services/error_handler.dart';
 import 'package:eduphin/services/responsive_helper.dart';
 import 'package:flutter/material.dart';
 import 'package:eduphin/services/api_service.dart';
@@ -74,7 +75,7 @@ class _AddStudentRemarkPageState extends State<AddStudentRemarkPage> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString().replaceFirst('Exception: ', ''))));
+        ErrorHandler.showError(context, e);
       }
     } finally {
       if (mounted) setState(() => _isSaving = false);

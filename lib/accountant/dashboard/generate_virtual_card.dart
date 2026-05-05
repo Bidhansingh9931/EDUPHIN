@@ -1,4 +1,5 @@
 import 'package:eduphin/services/common_widgets.dart';
+import 'package:eduphin/services/error_handler.dart';
 import 'package:flutter/material.dart';
 import 'package:eduphin/services/api_service.dart';
 import 'package:eduphin/services/responsive_helper.dart';
@@ -23,7 +24,9 @@ class _GenerateVirtualCardState extends State<GenerateVirtualCard> {
   @override
   void initState() {
     super.initState();
-    _cardStream = ApiService.getAccountantVirtualIdCardStream();
+    _cardStream = ApiService.getAccountantVirtualIdCardStream()..handleError((error) {
+      if (mounted) ErrorHandler.showError(context, error);
+    });
   }
 
   @override
@@ -234,16 +237,18 @@ class _GenerateVirtualCardState extends State<GenerateVirtualCard> {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    _buildInfoItem("Position", data.position ?? 'N/A'),
-                    _buildInfoItem("Employee ID", data.employeeId ?? 'N/A'),
+                    Expanded(child: _buildInfoItem("Position", data.position ?? 'N/A')),
+                    SizedBox(width: context.scale(8)),
+                    Expanded(child: _buildInfoItem("Employee ID", data.employeeId ?? 'N/A', isRight: true)),
                   ],
                 ),
                 SizedBox(height: context.scale(15)),
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    _buildInfoItem("Employment", data.employmentType ?? 'N/A'),
-                    _buildInfoItem("Joining", data.joiningDate ?? 'N/A'),
+                    Expanded(child: _buildInfoItem("Employment", data.employmentType ?? 'N/A')),
+                    SizedBox(width: context.scale(8)),
+                    Expanded(child: _buildInfoItem("Joining", data.joiningDate ?? 'N/A', isRight: true)),
                   ],
                 ),
               ],
@@ -348,9 +353,9 @@ class _GenerateVirtualCardState extends State<GenerateVirtualCard> {
     );
   }
 
-  Widget _buildInfoItem(String label, String value) {
+  Widget _buildInfoItem(String label, String value, {bool isRight = false}) {
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+      crossAxisAlignment: isRight ? CrossAxisAlignment.end : CrossAxisAlignment.start,
       children: [
         Text(
           label,
@@ -358,6 +363,8 @@ class _GenerateVirtualCardState extends State<GenerateVirtualCard> {
               color: Colors.white70,
               fontSize: context.font(11),
               fontWeight: FontWeight.w500),
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
         ),
         SizedBox(height: context.scale(4)),
         Text(
@@ -366,6 +373,9 @@ class _GenerateVirtualCardState extends State<GenerateVirtualCard> {
               color: Colors.white,
               fontSize: context.font(13),
               fontWeight: FontWeight.bold),
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          textAlign: isRight ? TextAlign.right : TextAlign.left,
         ),
       ],
     );

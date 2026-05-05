@@ -1,5 +1,7 @@
+import 'package:eduphin/services/error_handler.dart';
 import 'dart:async';
 import 'dart:convert';
+import 'dart:io';
 import 'package:eduphin/moderator_dashboard/cache_helper.dart';
 import 'package:eduphin/moderator_dashboard/skeleton_widgets.dart';
 import 'package:eduphin/services/api_service.dart';
@@ -54,13 +56,16 @@ class StudentProvider {
           final List<dynamic> studentsJson = data['students'];
           return studentsJson.map((json) => Student.fromJson(json)).toList();
         } else {
-          throw Exception(data['message'] ?? 'Failed to load students.');
+          throw ApiException(data['message'] ?? 'Failed to load students');
         }
       } else {
-        throw Exception('Failed to load students. Status Code: ${response.statusCode}');
+        throw ApiException('Failed to load students', statusCode: response.statusCode);
       }
+    } on SocketException {
+      throw NetworkException();
     } catch (e) {
-      throw Exception('Failed to fetch students: $e');
+      if (e is ApiException || e is NetworkException) rethrow;
+      throw Exception('An unexpected error occurred: $e');
     }
   }
 
@@ -99,11 +104,18 @@ class _StudentsPageState extends State<StudentsPage> {
     _fetchStudents();
   }
 
-  void _fetchStudents({bool bypassCache = false}) {
+  Future<void> _fetchStudents({bool bypassCache = false}) async {
     if (mounted) {
       setState(() {
         _studentsFuture = _provider.fetchStudents(widget.instituteId, bypassCache: bypassCache);
       });
+      try {
+        await _studentsFuture;
+      } catch (e) {
+        if (mounted) {
+          ErrorHandler.showError(context, e);
+        }
+      }
     }
   }
 

@@ -49,6 +49,7 @@ class _StaffFeeStructurePageState extends State<StaffFeeStructurePage> {
                   return LoadingWrapper<List<Fee>>(
                     snapshot: snapshot,
                     skeleton: _buildSkeleton(context),
+                    onRetry: _loadFees,
                     builder: (fees) {
                       if (fees.isEmpty) {
                         return Padding(

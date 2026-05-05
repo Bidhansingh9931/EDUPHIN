@@ -1,3 +1,4 @@
+import 'package:eduphin/services/error_handler.dart';
 import 'package:eduphin/services/responsive_helper.dart';
 import 'package:flutter/material.dart';
 import 'package:eduphin/services/api_service.dart';
@@ -27,9 +28,17 @@ class _SalarySlipsPageState extends State<SalarySlipsPage> {
   void _fetchSalaries() {
     setState(() {
       if (widget.employeeId != null) {
-        _salaryStream = ApiService.getAccountantEmployeeSalaryStream(widget.employeeId!);
+        _salaryStream = ApiService.getAccountantEmployeeSalaryStream(widget.employeeId!)
+          ..handleError((error) {
+            if (!mounted) return;
+            ErrorHandler.showError(context, error);
+          });
       } else {
-        _salaryStream = ApiService.getAccountantMySalariesStream();
+        _salaryStream = ApiService.getAccountantMySalariesStream()
+          ..handleError((error) {
+            if (!mounted) return;
+            ErrorHandler.showError(context, error);
+          });
       }
     });
   }
@@ -316,34 +325,39 @@ class _SalarySlipsPageState extends State<SalarySlipsPage> {
                   ],
                 ),
               ),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: [
-                  Text(
-                    "₹${salary.amount}",
-                    style: theme.textTheme.titleMedium?.copyWith(
-                      color: theme.colorScheme.primary,
-                      fontWeight: FontWeight.bold,
-                      fontSize: context.font(16),
-                    ),
-                  ),
-                  SizedBox(height: context.scale(4)),
-                  Container(
-                    padding: EdgeInsets.symmetric(horizontal: context.scale(8), vertical: context.scale(2)),
-                    decoration: BoxDecoration(
-                      color: (isPaid ? Colors.green : Colors.orange).withValues(alpha: 0.1),
-                      borderRadius: BorderRadius.circular(context.scale(4)),
-                    ),
-                    child: Text(
-                      salary.status.toUpperCase(),
-                      style: TextStyle(
-                        color: isPaid ? Colors.green : Colors.orange,
-                        fontSize: context.font(10),
-                        fontWeight: FontWeight.bold,
+              Flexible(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    FittedBox(
+                      fit: BoxFit.scaleDown,
+                      child: Text(
+                        "₹${salary.amount}",
+                        style: theme.textTheme.titleMedium?.copyWith(
+                          color: theme.colorScheme.primary,
+                          fontWeight: FontWeight.bold,
+                          fontSize: context.font(16),
+                        ),
                       ),
                     ),
-                  ),
-                ],
+                    SizedBox(height: context.scale(4)),
+                    Container(
+                      padding: EdgeInsets.symmetric(horizontal: context.scale(8), vertical: context.scale(2)),
+                      decoration: BoxDecoration(
+                        color: (isPaid ? Colors.green : Colors.orange).withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(context.scale(4)),
+                      ),
+                      child: Text(
+                        salary.status.toUpperCase(),
+                        style: TextStyle(
+                          color: isPaid ? Colors.green : Colors.orange,
+                          fontSize: context.font(10),
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ],
           ),
@@ -396,7 +410,8 @@ class _SalarySlipsPageState extends State<SalarySlipsPage> {
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           Text(label, style: context.theme.textTheme.bodySmall?.copyWith(color: context.theme.hintColor)),
-          Text(value, style: context.theme.textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w600)),
+          SizedBox(width: context.spacing),
+          Expanded(child: Text(value, textAlign: TextAlign.right, style: context.theme.textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w600))),
         ],
       ),
     );
@@ -423,7 +438,6 @@ class _SalarySlipsPageState extends State<SalarySlipsPage> {
 
   void _showSalaryDetail(accountant_model.Salary salary) {
     final theme = context.theme;
-    final scaffoldMessenger = ScaffoldMessenger.of(context);
     final id = salary.encryptedId ?? salary.id.toString();
 
     showModalBottomSheet(
@@ -437,11 +451,12 @@ class _SalarySlipsPageState extends State<SalarySlipsPage> {
             borderRadius: BorderRadius.vertical(top: Radius.circular(context.scale(24))),
           ),
           padding: EdgeInsets.fromLTRB(context.scale(24), context.scale(12), context.scale(24), context.scale(24)),
-          child: ConstrainedBox(
-            constraints: BoxConstraints(maxWidth: context.scale(600)),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
+          child: SingleChildScrollView(
+            child: ConstrainedBox(
+              constraints: BoxConstraints(maxWidth: context.scale(600)),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
                 Container(
                   width: context.scale(40),
                   height: context.scale(4),
@@ -459,7 +474,11 @@ class _SalarySlipsPageState extends State<SalarySlipsPage> {
                 ),
                 SizedBox(height: context.scale(24)),
                 StreamBuilder<Map<String, dynamic>>(
-                  stream: ApiService.getAccountantSalaryDetailStream(id, employeeId: widget.employeeId),
+                  stream: ApiService.getAccountantSalaryDetailStream(id, employeeId: widget.employeeId, numericId: salary.id.toString())
+                    ..handleError((error) {
+                      if (!context.mounted) return;
+                      ErrorHandler.showError(context, error);
+                    }),
                   builder: (context, snapshot) {
                     return LoadingWrapper<Map<String, dynamic>>(
                       snapshot: snapshot,
@@ -557,7 +576,7 @@ class _SalarySlipsPageState extends State<SalarySlipsPage> {
                                   _fetchSalaries();
                                 }
                               } catch (e) {
-                                scaffoldMessenger.showSnackBar(SnackBar(content: Text("Error: $e")));
+                                if (context.mounted) ErrorHandler.showError(context, e);
                               }
                             }
                           },
@@ -587,6 +606,7 @@ class _SalarySlipsPageState extends State<SalarySlipsPage> {
               ],
             ),
           ),
+        ),
         );
       },
     );
@@ -608,11 +628,15 @@ class _SalarySlipsPageState extends State<SalarySlipsPage> {
               color: theme.colorScheme.onSurfaceVariant,
             ),
           ),
-          Text(
-            value,
-            style: theme.textTheme.bodyMedium?.copyWith(
-              fontWeight: isBold ? FontWeight.bold : FontWeight.w600,
-              color: isBold ? theme.colorScheme.primary : theme.colorScheme.onSurface,
+          SizedBox(width: context.spacing),
+          Expanded(
+            child: Text(
+              value,
+              textAlign: TextAlign.right,
+              style: theme.textTheme.bodyMedium?.copyWith(
+                fontWeight: isBold ? FontWeight.bold : FontWeight.w600,
+                color: isBold ? theme.colorScheme.primary : theme.colorScheme.onSurface,
+              ),
             ),
           ),
         ],
@@ -680,7 +704,7 @@ class _SalarySlipsPageState extends State<SalarySlipsPage> {
                    _fetchSalaries();
                 }
               } catch (e) {
-                if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Error: $e")));
+                if (context.mounted) ErrorHandler.showError(context, e);
               }
             },
             child: const Text("GENERATE"),

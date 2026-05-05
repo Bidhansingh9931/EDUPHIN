@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:eduphin/services/api_service.dart';
 import 'package:eduphin/teacher/dashboard/library_models.dart';
 import 'package:eduphin/teacher/dashboard/common_widgets.dart';
+import '../../services/error_handler.dart';
 
 class LibraryBooksPage extends StatefulWidget {
   const LibraryBooksPage({super.key});
@@ -47,7 +48,9 @@ class _LibraryBooksPageState extends State<LibraryBooksPage> {
     };
     setState(() {
       _currentPage = page;
-      _booksStream = ApiService.getAccountantLibraryBooksStream(filters, page);
+      _booksStream = ApiService.getAccountantLibraryBooksStream(filters, page)..handleError((error) {
+        if (mounted) ErrorHandler.showError(context, error);
+      });
     });
   }
 
@@ -171,31 +174,23 @@ class _LibraryBooksPageState extends State<LibraryBooksPage> {
           ),
         ]),
         SizedBox(height: context.spacing * 1.5),
-        Row(
-          children: [
-            Expanded(
-              flex: 2,
-              child: buildActionButton(context, "SEARCH BOOKS", () => _fetchBooks()),
-            ),
-            SizedBox(width: context.spacing),
-            Expanded(
-              child: buildActionButton(
-                context,
-                "RESET",
-                () {
-                  _titleController.clear();
-                  _authorController.clear();
-                  setState(() {
-                    _selectedCategory = 'All';
-                    _selectedLanguage = 'All';
-                  });
-                  _fetchBooks();
-                },
-                isPrimary: false,
-              ),
-            ),
-          ],
-        ),
+        buildResponsiveRow(context, [
+          buildActionButton(context, "SEARCH BOOKS", () => _fetchBooks()),
+          buildActionButton(
+            context,
+            "RESET",
+            () {
+              _titleController.clear();
+              _authorController.clear();
+              setState(() {
+                _selectedCategory = 'All';
+                _selectedLanguage = 'All';
+              });
+              _fetchBooks();
+            },
+            isPrimary: false,
+          ),
+        ]),
       ],
     );
   }
@@ -223,8 +218,8 @@ class _LibraryBooksPageState extends State<LibraryBooksPage> {
         shrinkWrap: true,
         physics: const NeverScrollableScrollPhysics(),
         gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-          crossAxisCount: context.isDesktop ? 3 : (context.isTablet ? 2 : 1),
-          mainAxisExtent: context.scale(180),
+          crossAxisCount: context.responsive(1, tablet: 2, desktop: 3),
+          mainAxisExtent: context.font(200),
           crossAxisSpacing: context.spacing,
           mainAxisSpacing: context.spacing,
         ),

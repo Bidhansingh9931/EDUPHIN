@@ -1,4 +1,5 @@
 import 'package:eduphin/services/responsive_helper.dart';
+import 'package:eduphin/services/error_handler.dart';
 import 'package:flutter/material.dart';
 import 'package:eduphin/services/api_service.dart';
 import 'package:eduphin/teacher/dashboard/library_models.dart' as teacher_library;
@@ -49,7 +50,9 @@ class _LibraryLendingPageState extends State<LibraryLendingPage> {
       if (_selectedStatus != 'all') 'returned_status': _selectedStatus,
     };
     setState(() {
-      _lendingStream = ApiService.getAccountantLendingBooksStream(filters, page);
+      _lendingStream = ApiService.getAccountantLendingBooksStream(filters, page)..handleError((error) {
+        if (mounted) ErrorHandler.showError(context, error);
+      });
     });
   }
 

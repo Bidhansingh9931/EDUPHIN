@@ -49,6 +49,7 @@ class _StaffExaminationsPageState extends State<StaffExaminationsPage> {
                   return LoadingWrapper<List<Exam>>(
                     snapshot: snapshot,
                     skeleton: _buildSkeleton(context),
+                    onRetry: _loadExams,
                     builder: (exams) {
                       if (exams.isEmpty) return _buildEmptyState(context);
 

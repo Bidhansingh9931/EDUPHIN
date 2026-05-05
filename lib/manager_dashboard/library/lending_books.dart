@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:eduphin/services/api_service.dart';
 import 'package:eduphin/services/caching_service.dart';
 import 'package:eduphin/services/common_widgets.dart';
+import 'package:eduphin/services/error_handler.dart';
 import 'package:eduphin/services/responsive_helper.dart';
 import 'package:eduphin/teacher/dashboard/library_models.dart';
 import 'package:flutter/material.dart';
@@ -43,7 +44,7 @@ class _LendingBooksScreenState extends State<LendingBooksScreen> {
       });
     }
     try {
-      final response = await ApiService.get('manager/books/issued');
+      final response = await ApiService.get('manager/lending');
 
       if (response.statusCode == 200) {
         final body = json.decode(response.body);
@@ -68,6 +69,7 @@ class _LendingBooksScreenState extends State<LendingBooksScreen> {
           _error = e;
           _isLoading = false;
         });
+        ErrorHandler.showError(context, e);
       }
     }
   }
@@ -220,6 +222,8 @@ class _LendingCard extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(issuedBook.book.title, style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold, fontSize: context.font(16))),
+                      if (issuedBook.lenderName != null)
+                        Text("Issued to: ${issuedBook.lenderName}", style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.primary, fontWeight: FontWeight.w500)),
                       Text("Issue No: ${issuedBook.issueNo}", style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
                     ],
                   ),

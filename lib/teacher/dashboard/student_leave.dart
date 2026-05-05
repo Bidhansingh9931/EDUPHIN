@@ -1,3 +1,4 @@
+import 'package:eduphin/services/error_handler.dart';
 import 'package:eduphin/services/responsive_helper.dart';
 import 'package:eduphin/teacher/dashboard/teacher_cache_service.dart';
 import 'package:flutter/material.dart';
@@ -68,6 +69,7 @@ class _StudentLeaveScreenState extends State<StudentLeaveScreen> {
     } catch (e) {
       if (mounted) {
         setState(() => _isLoading = false);
+        ErrorHandler.showError(context, e);
       }
     }
   }
@@ -361,12 +363,7 @@ class _StudentLeaveScreenState extends State<StudentLeaveScreen> {
                     }
                   } catch (e) {
                     if (mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Text('Error: $e'),
-                          backgroundColor: const Color(0xFFEF4444), // Red
-                        ),
-                      );
+                      ErrorHandler.showError(context, e);
                     }
                   }
                 },

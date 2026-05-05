@@ -1,7 +1,9 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:io';
 
 import 'package:eduphin/services/api_service.dart';
+import 'package:eduphin/services/error_handler.dart';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'notification_model.dart';
@@ -23,7 +25,7 @@ class NotificationProvider {
   Future<List<Message>> fetchMessages({bool bypassCache = false}) async {
     final String? token = await ApiService.getToken();
     if (token == null) {
-      throw Exception("Authentication token not found.");
+      throw ApiException("Session expired. Please log in again.", statusCode: 401);
     }
 
     final headers = {
@@ -42,31 +44,29 @@ class NotificationProvider {
         debugPrint("Notifications API Response received.");
         final dynamic decodedBody = jsonDecode(response.body);
 
-        // Handle cases where the list is nested under a key like 'data' or 'notifications'
         List<dynamic> jsonList;
         if (decodedBody is List) {
           jsonList = decodedBody;
         } else if (decodedBody is Map<String, dynamic>) {
           jsonList = decodedBody['notifications'] ?? decodedBody['data'] ?? [];
         } else {
-          throw Exception("Unexpected response format.");
+          throw ApiException("Received invalid data from server.");
         }
 
-        // Save to cache
         await CacheHelper.save(_cacheKey, jsonList);
 
         return jsonList.map((json) => Message.fromJson(json)).toList();
       } else {
-        debugPrint(
-            "Failed to load notifications. Status: ${response.statusCode}, Body: ${response.body}");
-        return []; // Return empty list instead of throwing to avoid UI crash
+        throw ApiException("Failed to load notifications", statusCode: response.statusCode);
       }
+    } on SocketException {
+      throw NetworkException();
     } on TimeoutException {
-      debugPrint("Notification fetch timed out.");
-      return [];
+      throw ApiException("Request timed out. Please try again.");
     } catch (e) {
-      debugPrint("An error occurred fetching notifications: $e");
-      return [];
+      if (e is ApiException || e is NetworkException) rethrow;
+      throw Exception('An unexpected error occurred: $e');
     }
   }
 }
+

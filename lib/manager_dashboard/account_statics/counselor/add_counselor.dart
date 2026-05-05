@@ -2,6 +2,7 @@ import 'package:eduphin/manager_dashboard/manager_dashboard.dart';
 import 'package:eduphin/models/new_employee.dart';
 import 'package:eduphin/models/new_student.dart';
 import 'package:eduphin/services/api_service.dart';
+import 'package:eduphin/services/error_handler.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -113,9 +114,7 @@ class _AddCounselorPageState extends State<AddCounselorPage> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error picking file: $e')),
-        );
+        ErrorHandler.showError(context, e);
       }
     }
   }
@@ -168,9 +167,7 @@ class _AddCounselorPageState extends State<AddCounselorPage> {
       Navigator.pop(context, true);
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(e.toString().replaceFirst('Exception: ', '')), backgroundColor: Colors.red),
-        );
+        ErrorHandler.showError(context, e);
       }
     } finally {
       if (mounted) setState(() => _isLoading = false);

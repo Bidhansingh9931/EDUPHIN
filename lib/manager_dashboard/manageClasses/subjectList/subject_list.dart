@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:ui';
+import 'package:eduphin/services/error_handler.dart';
 import 'package:eduphin/manager_dashboard/manageClasses/subjectList/create_new_subject.dart';
 import 'package:eduphin/manager_dashboard/manageClasses/subjectList/edit_suject.dart';
 import 'package:eduphin/services/api_service.dart';
@@ -104,6 +105,7 @@ class _SubjectListPageState extends State<SubjectListPage> {
           _isLoading = false;
           _error = e;
         });
+        ErrorHandler.showError(context, e);
       }
     }
   }
@@ -124,9 +126,7 @@ class _SubjectListPageState extends State<SubjectListPage> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(e.toString())),
-        );
+        ErrorHandler.showError(context, e);
       }
     }
   }

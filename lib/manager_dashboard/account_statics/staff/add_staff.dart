@@ -1,3 +1,4 @@
+import 'package:eduphin/services/error_handler.dart';
 import 'package:eduphin/manager_dashboard/manager_dashboard.dart';
 import 'package:eduphin/models/new_employee.dart';
 import 'package:eduphin/models/new_student.dart';
@@ -85,7 +86,12 @@ class _AddStaffPageState extends State<AddStaffPage> {
 
   Future<void> _pickImage() async {
     final picker = ImagePicker();
-    final pickedFile = await picker.pickImage(source: ImageSource.gallery);
+    final pickedFile = await picker.pickImage(
+      source: ImageSource.gallery,
+      maxWidth: 1024,
+      maxHeight: 1024,
+      imageQuality: 80,
+    );
     if (pickedFile != null) {
       final bytes = await pickedFile.readAsBytes();
       setState(() {
@@ -95,6 +101,29 @@ class _AddStaffPageState extends State<AddStaffPage> {
           path: kIsWeb ? null : pickedFile.path,
         );
       });
+    }
+  }
+
+  Future<void> _pickDocument(Function(AppFile) onFilePicked) async {
+    final picker = ImagePicker();
+    final pickedFile = await picker.pickImage(
+      source: ImageSource.gallery,
+      maxWidth: 1024,
+      maxHeight: 1024,
+      imageQuality: 80,
+    );
+
+    if (pickedFile != null) {
+      final bytes = await pickedFile.readAsBytes();
+      setState(() {
+        onFilePicked(AppFile(
+          name: pickedFile.name,
+          bytes: bytes,
+          path: kIsWeb ? null : pickedFile.path,
+        ));
+      });
+    } else {
+      await _pickFile(onFilePicked);
     }
   }
 
@@ -113,9 +142,7 @@ class _AddStaffPageState extends State<AddStaffPage> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error picking file: $e')),
-        );
+        ErrorHandler.showError(context, e);
       }
     }
   }
@@ -168,9 +195,7 @@ class _AddStaffPageState extends State<AddStaffPage> {
       Navigator.pop(context, true);
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(e.toString().replaceFirst('Exception: ', '')), backgroundColor: Colors.red),
-        );
+        ErrorHandler.showError(context, e);
       }
     } finally {
       if (mounted) setState(() => _isLoading = false);
@@ -453,9 +478,9 @@ class _AddStaffPageState extends State<AddStaffPage> {
       _buildEditableInfoTile("Qualification", _qualificationController),
       _buildEditableInfoTile("Matriculation Marks (%)", _matriculationMarksController, keyboardType: TextInputType.number),
       _buildEditableInfoTile("Intermediate Marks (%)", _intermediateMarksController, keyboardType: TextInputType.number),
-      _buildFilePickerTile("Matriculation Marksheet", _matriculationMarksheet, () => _pickFile((file) => _matriculationMarksheet = file)),
-      _buildFilePickerTile("Intermediate Marksheet", _intermediateMarksheet, () => _pickFile((file) => _intermediateMarksheet = file)),
-      _buildFilePickerTile("Resume", _resume, () => _pickFile((file) => _resume = file)),
+      _buildFilePickerTile("Matriculation Marksheet", _matriculationMarksheet, () => _pickDocument((file) => _matriculationMarksheet = file)),
+      _buildFilePickerTile("Intermediate Marksheet", _intermediateMarksheet, () => _pickDocument((file) => _intermediateMarksheet = file)),
+      _buildFilePickerTile("Resume", _resume, () => _pickDocument((file) => _resume = file)),
     ];
   }
 

@@ -1,5 +1,6 @@
 import 'package:eduphin/services/caching_service.dart';
 import 'package:eduphin/services/common_widgets.dart';
+import 'package:eduphin/services/error_handler.dart';
 import 'package:eduphin/services/responsive_helper.dart';
 import 'package:flutter/material.dart';
 import 'package:eduphin/services/api_service.dart';
@@ -61,14 +62,7 @@ class _NotesPageState extends State<NotesPage> {
     } catch (e) {
       if (mounted) {
         setState(() => _isLoading = false);
-        if (_notes.isEmpty) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text("Error fetching notes: $e"),
-              backgroundColor: Theme.of(context).colorScheme.error,
-            ),
-          );
-        }
+        ErrorHandler.showError(context, e);
       }
     }
   }
@@ -221,9 +215,13 @@ class _NotesPageState extends State<NotesPage> {
             children: [
               Icon(Icons.person, color: theme.colorScheme.onSurfaceVariant, size: context.scale(14)),
               SizedBox(width: context.xs),
-              Text(
-                "By: ${note['uploaded_by_name'] ?? 'N/A'}",
-                style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: context.font(12)),
+              Expanded(
+                child: Text(
+                  "By: ${note['uploaded_by_name'] ?? 'N/A'}",
+                  style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: context.font(12)),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
               )
             ],
           ),

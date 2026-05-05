@@ -1,4 +1,5 @@
 import 'package:eduphin/services/responsive_helper.dart';
+import 'package:eduphin/services/error_handler.dart';
 import 'package:eduphin/teacher/dashboard/teacher_cache_service.dart';
 import 'package:eduphin/teacher/dashboard/tickets.dart';
 import 'package:flutter/material.dart';
@@ -63,9 +64,10 @@ class _AssignedTicketsPageState extends State<AssignedTicketsPage> {
     } catch (e) {
       if (mounted) {
         setState(() {
-          _error = 'Failed to load assigned tickets: $e';
+          _error = ErrorHandler.getMessage(e);
           _isLoading = false;
         });
+        ErrorHandler.showError(context, e);
       }
     }
   }

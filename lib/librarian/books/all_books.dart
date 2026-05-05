@@ -1,3 +1,4 @@
+import 'package:eduphin/services/error_handler.dart';
 import 'package:eduphin/librarian/librarian_skeleton_widgets.dart';
 import 'package:eduphin/services/common_widgets.dart';
 import '../../services/responsive_helper.dart';
@@ -69,7 +70,7 @@ class _AllBooksPageState extends State<AllBooksPage> {
         if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Book deleted successfully")));
         _fetchBooks();
       } catch (e) {
-        if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Error: $e")));
+        if (mounted) ErrorHandler.showError(context, e);
       }
     }
   }
@@ -99,6 +100,9 @@ class _AllBooksPageState extends State<AllBooksPage> {
       body: StreamBuilder<teacher_library.BookPagination>(
         stream: _booksStream,
         builder: (context, snapshot) {
+          if (snapshot.hasData) {
+            _totalPages = snapshot.data!.lastPage;
+          }
           return LoadingWrapper<teacher_library.BookPagination>(
             snapshot: snapshot,
             skeleton: const GridSkeleton(),
@@ -316,20 +320,6 @@ class _AllBooksPageState extends State<AllBooksPage> {
               mainAxisAlignment: MainAxisAlignment.end,
               children: [
                 IconButton.filledTonal(
-                  onPressed: () async {
-                    final result = await Navigator.push(
-                      context,
-                      MaterialPageRoute(builder: (_) => AddNewBookPage(book: book)),
-                    );
-                    if (result == true) _fetchBooks();
-                  },
-                  icon: Icon(Icons.edit_document, size: context.scale(18)),
-                  style: IconButton.styleFrom(
-                    backgroundColor: theme.colorScheme.secondaryContainer.withValues(alpha: 0.4),
-                  ),
-                ),
-                SizedBox(width: context.sm),
-                IconButton.filledTonal(
                   onPressed: () => _deleteBook(book.id),
                   icon: Icon(Icons.delete_sweep_outlined, size: context.scale(18)),
                   style: IconButton.styleFrom(
@@ -374,9 +364,15 @@ class _AllBooksPageState extends State<AllBooksPage> {
           label,
           style: context.theme.textTheme.labelSmall?.copyWith(color: context.theme.colorScheme.onSurfaceVariant, fontWeight: FontWeight.w600),
         ),
-        Text(
-          value,
-          style: context.theme.textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w800, color: context.theme.colorScheme.onSurface),
+        SizedBox(width: context.xs),
+        Flexible(
+          child: Text(
+            value,
+            textAlign: TextAlign.end,
+            style: context.theme.textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w800, color: context.theme.colorScheme.onSurface),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
         ),
       ],
     );

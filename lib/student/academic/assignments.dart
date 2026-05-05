@@ -2,10 +2,14 @@ import 'package:eduphin/services/responsive_helper.dart';
 import 'dart:io';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
+import 'dart:typed_data';
 import 'package:eduphin/services/api_service.dart';
 import 'package:eduphin/services/caching_service.dart';
 import 'package:eduphin/services/common_widgets.dart';
+import 'package:eduphin/services/error_handler.dart';
 import 'package:intl/intl.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 class AssignmentsPage extends StatefulWidget {
   const AssignmentsPage({super.key});
@@ -69,14 +73,7 @@ class _AssignmentsPageState extends State<AssignmentsPage> {
     } catch (e) {
       if (mounted) {
         setState(() => _isLoading = false);
-        if (_assignments.isEmpty) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text("Error fetching assignments: $e"),
-              backgroundColor: Theme.of(context).colorScheme.error,
-            ),
-          );
-        }
+        ErrorHandler.showError(context, e);
       }
     }
   }
@@ -85,6 +82,7 @@ class _AssignmentsPageState extends State<AssignmentsPage> {
     final theme = context.theme;
     final TextEditingController textController = TextEditingController();
     File? selectedFile;
+    Uint8List? selectedFileBytes;
     String? fileName;
 
     final bool? confirmed = await showDialog<bool>(
@@ -132,10 +130,14 @@ class _AssignmentsPageState extends State<AssignmentsPage> {
                         FilePickerResult? result = await FilePicker.platform.pickFiles(
                           type: FileType.custom,
                           allowedExtensions: ['pdf', 'doc', 'docx', 'txt'],
+                          withData: kIsWeb,
                         );
                         if (result != null) {
                           setDialogState(() {
-                            selectedFile = File(result.files.single.path!);
+                            if (!kIsWeb && result.files.single.path != null) {
+                              selectedFile = File(result.files.single.path!);
+                            }
+                            selectedFileBytes = result.files.single.bytes;
                             fileName = result.files.single.name;
                           });
                         }
@@ -174,13 +176,16 @@ class _AssignmentsPageState extends State<AssignmentsPage> {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Uploading submission...")));
       
       try {
-        final String? assignmentId = assignment['id']?.toString();
+        final String? assignmentId = (assignment['encrypted_id'] ?? assignment['id'])?.toString();
         if (assignmentId == null) throw Exception("Assignment ID missing");
 
         await ApiService.submitStudentAssignment(
           assignmentId,
           file: selectedFile,
+          fileBytes: selectedFileBytes,
+          fileName: fileName,
           text: textController.text.isNotEmpty ? textController.text : null,
+          subjectId: assignment['subject_id']?.toString(),
         );
 
         if (mounted) {
@@ -189,15 +194,77 @@ class _AssignmentsPageState extends State<AssignmentsPage> {
         }
       } catch (e) {
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text("Submission failed: $e"),
-              backgroundColor: theme.colorScheme.error,
-            ),
-          );
+          ErrorHandler.showError(context, e);
         }
       }
     }
+  }
+
+  void _viewFile(String? path) async {
+    if (path == null || path.isEmpty) return;
+    final url = path.startsWith('http') ? path : '${ApiService.baseUrl}/storage/$path';
+    final uri = Uri.parse(url);
+    try {
+      if (await canLaunchUrl(uri)) {
+        await launchUrl(uri, mode: LaunchMode.externalApplication);
+      } else {
+        if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Could not open file")));
+      }
+    } catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Error opening file: $e")));
+    }
+  }
+
+  void _viewSubmission(dynamic assignment) {
+    final theme = context.theme;
+    final submission = assignment['submission'];
+    if (submission == null) return;
+
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: theme.colorScheme.surfaceContainerLow,
+        title: Text("Submission: ${assignment['title']}", style: TextStyle(fontSize: context.font(18), fontWeight: FontWeight.bold)),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              if (submission['submitted_text'] != null && submission['submitted_text'].toString().isNotEmpty) ...[
+                Text("Your Note:", style: TextStyle(fontWeight: FontWeight.bold, color: theme.colorScheme.onSurfaceVariant, fontSize: context.font(14))),
+                SizedBox(height: context.xs),
+                Container(
+                  width: double.infinity,
+                  padding: EdgeInsets.all(context.sm),
+                  decoration: BoxDecoration(
+                    color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
+                    borderRadius: BorderRadius.circular(context.sm),
+                  ),
+                  child: Text(submission['submitted_text'], style: TextStyle(color: theme.colorScheme.onSurface)),
+                ),
+                SizedBox(height: context.md),
+              ],
+              if (submission['submitted_file'] != null) ...[
+                Text("Attachment:", style: TextStyle(fontWeight: FontWeight.bold, color: theme.colorScheme.onSurfaceVariant, fontSize: context.font(14))),
+                SizedBox(height: context.xs),
+                OutlinedButton.icon(
+                  onPressed: () => _viewFile(submission['submitted_file']),
+                  icon: Icon(Icons.description, size: context.scale(18)),
+                  label: const Text("View Submitted File"),
+                  style: OutlinedButton.styleFrom(
+                    minimumSize: Size(double.infinity, context.scale(45)),
+                  ),
+                ),
+              ] else if (submission['submitted_text'] == null || submission['submitted_text'].toString().isEmpty)
+                Text("No submission content found.", style: TextStyle(fontStyle: FontStyle.italic, color: theme.colorScheme.onSurfaceVariant)),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text("CLOSE")),
+        ],
+      ),
+    );
   }
 
   @override
@@ -206,7 +273,7 @@ class _AssignmentsPageState extends State<AssignmentsPage> {
     final colorScheme = theme.colorScheme;
     Map<String, List<dynamic>> groupedAssignments = {};
     for (var assignment in _assignments) {
-      final subjectName = assignment['subject']?['name'] ?? 'General';
+      final subjectName = assignment['subject']?['name'] ?? assignment['subject_name'] ?? 'General';
       if (!groupedAssignments.containsKey(subjectName)) {
         groupedAssignments[subjectName] = [];
       }
@@ -372,12 +439,25 @@ class _AssignmentsPageState extends State<AssignmentsPage> {
               overflow: TextOverflow.ellipsis,
             ),
           ],
+          if (assignment['attachment'] != null) ...[
+            SizedBox(height: context.sm),
+            TextButton.icon(
+              onPressed: () => _viewFile(assignment['attachment']),
+              icon: Icon(Icons.download, size: context.scale(16), color: theme.colorScheme.primary),
+              label: Text("Assignment File", style: TextStyle(fontSize: context.font(13), color: theme.colorScheme.primary)),
+              style: TextButton.styleFrom(
+                padding: EdgeInsets.zero,
+                minimumSize: Size.zero,
+                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              ),
+            ),
+          ],
           SizedBox(height: context.md),
           SizedBox(
             width: double.infinity,
             height: context.scale(40),
             child: ElevatedButton(
-              onPressed: isSubmitted ? null : () => _submitAssignment(assignment),
+              onPressed: isSubmitted ? () => _viewSubmission(assignment) : () => _submitAssignment(assignment),
               style: ElevatedButton.styleFrom(
                 backgroundColor: isSubmitted ? theme.colorScheme.outlineVariant.withValues(alpha: 0.2) : theme.colorScheme.primary,
                 foregroundColor: isSubmitted ? theme.colorScheme.onSurfaceVariant : theme.colorScheme.onPrimary,

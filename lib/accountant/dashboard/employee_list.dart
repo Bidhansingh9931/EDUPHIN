@@ -1,3 +1,4 @@
+import 'package:eduphin/services/error_handler.dart';
 import 'package:eduphin/services/common_widgets.dart';
 import 'package:eduphin/services/responsive_helper.dart';
 import 'package:flutter/material.dart';
@@ -36,7 +37,7 @@ class _EmployeeListPageState extends State<EmployeeListPage> {
     } else {
       _selectedRoleId = _roles.keys.first;
     }
-    _employeeStream = ApiService.getEmployeesByRoleStream(_selectedRoleId);
+    _fetchEmployees();
     
     _initializeData();
   }
@@ -50,18 +51,21 @@ class _EmployeeListPageState extends State<EmployeeListPage> {
           // If the roleId wasn't passed via constructor, update selection to the first dynamic role
           if (widget.roleId == null || widget.roleId.toString().isEmpty) {
             _selectedRoleId = _roles.keys.first;
-            _employeeStream = ApiService.getEmployeesByRoleStream(_selectedRoleId);
+            _fetchEmployees();
           }
         });
       }
     } catch (e) {
       debugPrint("Roles Fetch Error: $e");
+      if (mounted) ErrorHandler.showError(context, e);
     }
   }
 
   void _fetchEmployees() {
     setState(() {
-      _employeeStream = ApiService.getEmployeesByRoleStream(_selectedRoleId);
+      _employeeStream = ApiService.getEmployeesByRoleStream(_selectedRoleId)..handleError((error) {
+        if (mounted) ErrorHandler.showError(context, error);
+      });
     });
   }
 
@@ -170,8 +174,8 @@ class _EmployeeListPageState extends State<EmployeeListPage> {
                                           crossAxisAlignment: CrossAxisAlignment.start,
                                           children: [
                                             SizedBox(height: context.scale(4)),
-                                            Text(employee.email ?? "No Email", style: TextStyle(color: theme.colorScheme.secondary, fontSize: context.font(12))),
-                                            Text(employee.phone ?? "No Phone", style: TextStyle(color: theme.hintColor, fontSize: context.font(12))),
+                                            Text(employee.email ?? "No Email", style: TextStyle(color: theme.colorScheme.secondary, fontSize: context.font(12)), maxLines: 1, overflow: TextOverflow.ellipsis),
+                                            Text(employee.phone ?? "No Phone", style: TextStyle(color: theme.hintColor, fontSize: context.font(12)), maxLines: 1, overflow: TextOverflow.ellipsis),
                                           ],
                                         ),
                                         trailing: Icon(Icons.chevron_right, size: context.scale(20)),

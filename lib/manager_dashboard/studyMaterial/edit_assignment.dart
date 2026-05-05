@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'package:eduphin/services/api_service.dart';
+import 'package:eduphin/services/error_handler.dart';
 import 'package:eduphin/services/responsive_helper.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart';
@@ -93,8 +94,7 @@ class _EditAssignmentPageState extends State<EditAssignmentPage> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text(e.toString())));
+        ErrorHandler.showError(context, e);
         setState(() => _isLoading = false);
       }
     }
@@ -186,11 +186,7 @@ class _EditAssignmentPageState extends State<EditAssignmentPage> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-              content: Text(e.toString().replaceFirst('Exception: ', '')),
-              backgroundColor: Colors.red),
-        );
+        ErrorHandler.showError(context, e);
       }
     } finally {
       if (mounted) {

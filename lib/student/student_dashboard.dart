@@ -25,6 +25,7 @@ import 'package:eduphin/student/library_resources/available_resources.dart';
 import 'package:eduphin/student/library_resources/borrowed_books.dart';
 import 'package:eduphin/student/event_management/registed_event.dart';
 import 'package:eduphin/services/common_widgets.dart';
+import 'package:eduphin/services/error_handler.dart';
 
 import 'package:eduphin/services/caching_service.dart';
 
@@ -71,9 +72,12 @@ class _StudentDashboardState extends State<StudentDashboard> {
     } catch (e) {
       if (mounted) {
         setState(() {
-          errorMessage = dashboardData == null ? e.toString().replaceFirst('Exception: ', '') : null;
+          errorMessage = dashboardData == null ? ErrorHandler.getMessage(e) : null;
           isLoading = false;
         });
+        if (dashboardData != null) {
+          ErrorHandler.showError(context, e);
+        }
       }
     }
   }

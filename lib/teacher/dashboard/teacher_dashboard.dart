@@ -18,6 +18,7 @@ import 'lending_books_page.dart';
 import 'my_registered_event.dart';
 import 'package:eduphin/services/common_widgets.dart';
 import 'package:eduphin/teacher/dashboard/common_widgets.dart';
+import 'package:eduphin/services/error_handler.dart';
 
 class TeacherDashboardPage extends StatefulWidget {
   const TeacherDashboardPage({super.key});
@@ -29,6 +30,7 @@ class TeacherDashboardPage extends StatefulWidget {
 class _TeacherDashboardPageState extends State<TeacherDashboardPage> {
   TeacherDashboardData? _dashboardData;
   bool _isLoading = true;
+  String? _errorMessage;
 
   @override
   void initState() {
@@ -50,7 +52,10 @@ class _TeacherDashboardPageState extends State<TeacherDashboardPage> {
   Future<void> _fetchDashboard() async {
     if (!mounted) return;
     if (_dashboardData == null) {
-      setState(() => _isLoading = true);
+      setState(() {
+        _isLoading = true;
+        _errorMessage = null;
+      });
     }
     try {
       final data = await ApiService.getTeacherDashboard();
@@ -58,13 +63,20 @@ class _TeacherDashboardPageState extends State<TeacherDashboardPage> {
         setState(() {
           _dashboardData = data;
           _isLoading = false;
+          _errorMessage = null;
         });
         await TeacherCacheService.save('dashboard', data.toJson());
       }
     } catch (e) {
       if (mounted) {
-        setState(() => _isLoading = false);
-        // Error handling if needed
+        final errorMsg = ErrorHandler.getMessage(e);
+        setState(() {
+          _isLoading = false;
+          if (_dashboardData == null) {
+            _errorMessage = errorMsg;
+          }
+        });
+        ErrorHandler.showError(context, e);
       }
     }
   }
@@ -164,7 +176,9 @@ class _TeacherDashboardPageState extends State<TeacherDashboardPage> {
         skeleton: _buildSkeleton(context),
         child: _dashboardData != null 
           ? _buildDashboardContent(context, _dashboardData!)
-          : const Center(child: Text("No data available")),
+          : (_errorMessage != null 
+              ? _buildErrorWidget(_errorMessage!) 
+              : const Center(child: Text("No data available"))),
       ),
     );
   }

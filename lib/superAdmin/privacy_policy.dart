@@ -1,4 +1,5 @@
 import 'package:eduphin/services/responsive_helper.dart';
+import 'package:eduphin/services/error_handler.dart';
 import 'package:flutter/material.dart';
 import '../services/api_service.dart';
 import 'cache_service.dart';
@@ -49,6 +50,7 @@ class _PrivacyPolicyScreenState extends State<PrivacyPolicyScreen> {
       }
     } catch (e) {
       debugPrint("Error fetching Privacy Policy: $e");
+      if (mounted) ErrorHandler.showError(context, e);
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
@@ -66,9 +68,7 @@ class _PrivacyPolicyScreenState extends State<PrivacyPolicyScreen> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text("Update failed: $e")),
-        );
+        ErrorHandler.showError(context, e);
       }
     } finally {
       if (mounted) setState(() => _isSaving = false);

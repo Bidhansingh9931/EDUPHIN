@@ -1,3 +1,4 @@
+import 'package:eduphin/services/error_handler.dart';
 import 'package:eduphin/services/common_widgets.dart';
 import 'package:eduphin/services/responsive_helper.dart';
 import 'package:flutter/material.dart';
@@ -17,12 +18,14 @@ class _FeeStructurePageState extends State<FeeStructurePage> {
   @override
   void initState() {
     super.initState();
-    _feesStream = ApiService.getAccountantFeesStream();
+    _refreshFees();
   }
 
   void _refreshFees() {
     setState(() {
-      _feesStream = ApiService.getAccountantFeesStream();
+      _feesStream = ApiService.getAccountantFeesStream()..handleError((error) {
+        if (mounted) ErrorHandler.showError(context, error);
+      });
     });
   }
 
@@ -52,7 +55,7 @@ class _FeeStructurePageState extends State<FeeStructurePage> {
           _refreshFees();
         }
       } catch (e) {
-        if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Error: $e")));
+        if (mounted) ErrorHandler.showError(context, e);
       }
     }
   }
@@ -187,12 +190,21 @@ class _FeeStructurePageState extends State<FeeStructurePage> {
   }
 
   Widget _buildResponsiveGrid(List<Fee> fees, bool isInstitute) {
+    if (context.isMobile) {
+      return ListView.separated(
+        shrinkWrap: true,
+        physics: const NeverScrollableScrollPhysics(),
+        itemCount: fees.length,
+        separatorBuilder: (context, index) => const SizedBox(height: 16),
+        itemBuilder: (context, index) => _buildFeeCard(fees[index], isInstitute),
+      );
+    }
     return GridView.builder(
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
       gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: context.isTablet ? 2 : 1,
-        mainAxisExtent: 200, // Increased from 180 to prevent overflow
+        crossAxisCount: context.responsive(1, tablet: 2, desktop: 3),
+        mainAxisExtent: context.font(200), 
         crossAxisSpacing: 16,
         mainAxisSpacing: 16,
       ),
@@ -217,9 +229,11 @@ class _FeeStructurePageState extends State<FeeStructurePage> {
                   child: Icon(isInstitute ? Icons.account_balance : Icons.school, color: theme.colorScheme.primary, size: 20),
                 ),
                 Flexible(
-                  child: Text("₹${fee.amount}", 
-                    style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
-                    overflow: TextOverflow.ellipsis,
+                  child: FittedBox(
+                    fit: BoxFit.scaleDown,
+                    child: Text("₹${fee.amount}", 
+                      style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
+                    ),
                   ),
                 ),
               ],
@@ -298,14 +312,28 @@ class _FeeStructurePageState extends State<FeeStructurePage> {
         );
       }
     } catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Error: $e")));
+      if (mounted) ErrorHandler.showError(context, e);
     }
   }
 
   void _showEditFeeDialog(Fee fee) async {
     try {
-      // Bypassing getAccountantFeeEditData as it currently fails with 500 DecryptException on some IDs.
-      // We already have the fee details, we just need the classes for the dropdown.
+      // Use the edit route to see if we can get a valid encrypted_id for the fee.
+      final feeId = fee.encryptedId ?? fee.id.toString();
+      final editData = await ApiService.getAccountantFeeEditData(feeId);
+      
+      // Update our local fee object if we got back an encrypted ID
+      final updatedFee = Fee(
+        id: fee.id,
+        feeName: fee.feeName,
+        amount: fee.amount,
+        description: fee.description,
+        isOptional: fee.isOptional,
+        classId: fee.classId,
+        className: fee.className,
+        encryptedId: editData['encrypted_id']?.toString() ?? fee.encryptedId,
+      );
+
       final classes = await ApiService.getAccountantFeeCreateData();
       if (mounted) {
         showModalBottomSheet(
@@ -316,13 +344,13 @@ class _FeeStructurePageState extends State<FeeStructurePage> {
             title: "Update Fee Structure",
             buttonLabel: "UPDATE STRUCTURE",
             classes: classes,
-            fee: fee,
+            fee: updatedFee,
             onSuccess: _refreshFees,
           ),
         );
       }
     } catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Error: $e")));
+      if (mounted) ErrorHandler.showError(context, e);
     }
   }
 }
@@ -378,31 +406,30 @@ class _FeeFormDialogState extends State<FeeFormDialog> {
     try {
       final targetId = widget.fee?.encryptedId ?? widget.fee?.id.toString();
       
-      final data = {
+      final Map<String, dynamic> data = {
         'fee_name': _feeNameController.text,
         'amount': _amountController.text,
         'description': _descController.text,
-        'class_id': _selectedClassId?.toString(),
+        'class_id': _selectedClassId, // Keep as int or null
+        'is_optional': _isOptional ? 1 : 0, // Send as int 1/0
       };
       
-      if (targetId != null) {
-        data['id'] = targetId;
-      }
-      
-      if (_isOptional) data['is_optional'] = '1';
-
       if (widget.fee == null) {
         await ApiService.storeAccountantFee(data);
+        if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Fee structure created successfully")));
       } else {
         await ApiService.updateAccountantFee(targetId!, data);
+        if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Fee structure updated successfully")));
       }
 
       if (mounted) {
+        // Wait briefly for server-side sync before refreshing
+        await Future.delayed(const Duration(milliseconds: 800));
         widget.onSuccess();
         Navigator.pop(context);
       }
     } catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Error: $e")));
+      if (mounted) ErrorHandler.showError(context, e);
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }

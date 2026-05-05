@@ -48,6 +48,7 @@ class _StaffStudentFeeDetailPageState extends State<StaffStudentFeeDetailPage> {
                       return LoadingWrapper<StudentFeeDetail>(
                         snapshot: snapshot,
                         skeleton: _buildSkeleton(context),
+                        onRetry: _fetchDetail,
                         builder: (detail) => Column(
                           children: [
                             _buildStudentInfo(context, detail),

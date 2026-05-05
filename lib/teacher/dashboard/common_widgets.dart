@@ -199,7 +199,8 @@ Widget buildDropdown<T>(
     disabledHint: Text(isLoading ? "Loading..." : (items.isEmpty ? "No items available" : hint)),
     dropdownColor: theme.colorScheme.surfaceContainerHigh,
     items: isLoading ? null : uniqueItems.map((item) {
-      String displayValue = itemBuilder != null ? itemBuilder(item) : item.toString();
+      final builderResult = itemBuilder != null ? itemBuilder(item) : item.toString();
+      String displayValue = builderResult?.toString() ?? 'N/A';
       return DropdownMenuItem<T>(
         value: item,
         child: Text(displayValue, style: theme.textTheme.bodyMedium?.copyWith(fontSize: context.font(14))),

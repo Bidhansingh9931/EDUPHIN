@@ -1,3 +1,4 @@
+import 'package:eduphin/services/error_handler.dart';
 import 'librarian_skeleton_widgets.dart';
 import '../services/common_widgets.dart';
 import '../services/responsive_helper.dart';
@@ -227,7 +228,7 @@ class _SalaryBankDetailsPageState extends State<SalaryBankDetailsPage> {
     } catch (e) {
       if (mounted) {
         Navigator.pop(context);
-        _showError(e.toString());
+        ErrorHandler.showError(context, e);
       }
     }
   }
@@ -239,14 +240,17 @@ class _SalaryBankDetailsPageState extends State<SalaryBankDetailsPage> {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(
-            label,
-            style: TextStyle(
-              fontSize: context.font(14),
-              fontWeight: isBold ? FontWeight.w800 : FontWeight.w500,
-              color: isBold ? colorScheme.onSurface : colorScheme.onSurface.withValues(alpha: 0.6),
+          Expanded(
+            child: Text(
+              label,
+              style: TextStyle(
+                fontSize: context.font(14),
+                fontWeight: isBold ? FontWeight.w800 : FontWeight.w500,
+                color: isBold ? colorScheme.onSurface : colorScheme.onSurface.withValues(alpha: 0.6),
+              ),
             ),
           ),
+          SizedBox(width: context.sm),
           Text(
             isNegative ? "- $value" : value,
             style: TextStyle(
@@ -323,7 +327,10 @@ class _SalaryBankDetailsPageState extends State<SalaryBankDetailsPage> {
   }
 
   Widget _buildBankCard(BuildContext context, ColorScheme colorScheme, Map<String, dynamic>? salaryData) {
-    final user = salaryData?['userDetail'] ?? {};
+    final user = salaryData?['account'] ?? {};
+    final salaries = salaryData?['salaries'] as List? ?? [];
+    final lastSalary = salaries.isNotEmpty ? salaries.first : null;
+
     final fullName = user['first_name'] != null
         ? "${user['first_name']} ${user['last_name'] ?? ''}".trim()
         : (user['name'] ?? "N/A");
@@ -359,7 +366,7 @@ class _SalaryBankDetailsPageState extends State<SalaryBankDetailsPage> {
             _buildDetailRow(
               context,
               "Current Salary",
-              "₹${salaryData?['lastSalary']?['net_salary'] ?? user['salary'] ?? '0.00'}",
+              "₹${lastSalary?['net_salary'] ?? user['salary'] ?? '0.00'}",
               isLast: true,
               isPrimary: true,
             ),

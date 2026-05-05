@@ -1,4 +1,4 @@
-package com.bidha.eduphin
+package com.octopyder.eduphin
 
 import io.flutter.embedding.android.FlutterActivity
 

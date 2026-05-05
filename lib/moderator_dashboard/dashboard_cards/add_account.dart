@@ -1,3 +1,4 @@
+import 'package:eduphin/services/error_handler.dart';
 import 'dart:convert';
 import 'dart:io';
 import 'package:eduphin/moderator_dashboard/cache_helper.dart';
@@ -97,21 +98,21 @@ class _AddAccountPageState extends State<AddAccountPage> {
 
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Account created successfully')),
+          const SnackBar(
+            content: Text('Account created successfully'),
+            backgroundColor: Colors.green,
+          ),
         );
         Navigator.pop(context, true); // Go back and indicate success
       } else {
-        if (!mounted) return;
         final error = jsonDecode(responseBody);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to create account: ${error['message']}')),
-        );
+        throw ApiException(error['message'] ?? 'Failed to create account',
+            statusCode: response.statusCode);
       }
+    } on SocketException {
+      if (mounted) ErrorHandler.showError(context, NetworkException());
     } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('An error occurred: $e')),
-      );
+      if (mounted) ErrorHandler.showError(context, e);
     }
   }
 

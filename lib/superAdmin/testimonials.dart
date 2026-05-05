@@ -3,6 +3,7 @@ import 'dart:typed_data';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:eduphin/services/responsive_helper.dart';
 import 'package:eduphin/services/common_widgets.dart';
+import 'package:eduphin/services/error_handler.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
@@ -55,7 +56,7 @@ class _TestimonialsManagementScreenState extends State<TestimonialsManagementScr
     } catch (e) {
       if (mounted) {
         setState(() => _isLoading = false);
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Error: $e")));
+        ErrorHandler.showError(context, e);
       }
     }
   }
@@ -81,7 +82,7 @@ class _TestimonialsManagementScreenState extends State<TestimonialsManagementScr
         _fetchTestimonials();
         if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Deleted successfully")));
       } catch (e) {
-        if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Error: $e")));
+        if (mounted) ErrorHandler.showError(context, e);
       }
     }
   }
@@ -349,7 +350,7 @@ class _AddTestimonialScreenState extends State<AddTestimonialScreen> {
         Navigator.pop(context, true);
       }
     } catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Error: $e")));
+      if (mounted) ErrorHandler.showError(context, e);
     } finally {
       if (mounted) setState(() => _isSaving = false);
     }

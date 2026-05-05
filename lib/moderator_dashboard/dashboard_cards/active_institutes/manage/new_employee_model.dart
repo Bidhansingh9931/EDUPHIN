@@ -72,6 +72,8 @@ class NewEmployee {
   int? _getRoleId(String? role) {
     if (role == null) return null;
     switch (role.toLowerCase()) {
+      case "moderator":
+        return 2;
       case "institute manager":
         return 3;
       case "counselors":

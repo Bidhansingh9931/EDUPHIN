@@ -88,7 +88,7 @@ class EmployeeDetails {
       id: (json['encrypted_id'] ?? json['id'])?.toString(),
       fullName: json['name'] as String?,
       email: json['email'] as String?,
-      role: json['role'] as String?,
+      role: json['role'] as String? ?? _getRoleNameFromId(json['role_id']),
       gender: json['gender'] as String?,
       dateOfBirth: (json['dob'] ?? json['date_of_birth'])?.toString(),
       relationshipStatus: json['relationship_status'] as String?,
@@ -168,6 +168,8 @@ class EmployeeDetails {
   int? _getRoleId(String? roleName) {
     if (roleName == null) return null;
     switch (roleName.toLowerCase()) {
+      case "moderator":
+        return 2;
       case "institute manager":
         return 3;
       case "counselors":
@@ -197,5 +199,30 @@ class EmployeeDetails {
     if (s == 'active' || s == 'live') return 'live';
     if (s == 'inactive' || s == 'expired') return 'expired';
     return s;
+  }
+
+  static String? _getRoleNameFromId(dynamic roleId) {
+    if (roleId == null) return null;
+    final id = int.tryParse(roleId.toString());
+    switch (id) {
+      case 2:
+        return "Moderator";
+      case 3:
+        return "Institute Manager";
+      case 4:
+        return "Counselors";
+      case 5:
+        return "Teachers";
+      case 6:
+        return "Students";
+      case 7:
+        return "Librarian";
+      case 8:
+        return "Accountants";
+      case 9:
+        return "Staff";
+      default:
+        return null;
+    }
   }
 }

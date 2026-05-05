@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:eduphin/services/api_service.dart';
+import 'package:eduphin/services/error_handler.dart';
 import 'package:eduphin/services/responsive_helper.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
@@ -116,9 +117,7 @@ class _AssignmentSubmissionsScreenState
         setState(() {
           _isLoading = false;
         });
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: $e'), backgroundColor: Theme.of(context).colorScheme.error),
-        );
+        ErrorHandler.showError(context, e);
       }
     }
   }
@@ -222,13 +221,8 @@ class _AssignmentSubmissionsScreenState
         throw Exception("Failed to download file (Status: ${response.statusCode})");
       }
     } catch (e) {
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text("Could not open file: $e"),
-            backgroundColor: Theme.of(context).colorScheme.error,
-          ),
-        );
+      if (mounted) {
+        ErrorHandler.showError(context, e);
       }
     }
   }
@@ -478,9 +472,7 @@ class _GradingDialogState extends State<_GradingDialog> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: $e')),
-        );
+        ErrorHandler.showError(context, e);
       }
     } finally {
       if (mounted) setState(() => _isSaving = false);

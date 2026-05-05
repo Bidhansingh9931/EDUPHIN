@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:eduphin/services/api_service.dart';
 import 'package:eduphin/teacher/dashboard/salary_models.dart';
 import 'package:eduphin/staff/staff_dashboard/staff_models.dart' as staff_model;
+import 'package:eduphin/services/error_handler.dart';
 import 'package:intl/intl.dart';
 import 'package:eduphin/services/responsive_helper.dart';
 import 'package:eduphin/services/pdf_service.dart';
@@ -56,14 +57,12 @@ class _SalaryBankDetailsPageState extends State<SalaryBankDetailsPage> {
       if (mounted) {
         if (_salaryData == null) {
           setState(() {
-            _error = e.toString();
+            _error = ErrorHandler.getMessage(e);
             _isLoading = false;
           });
         } else {
           // If we have cached data, just show a snackbar for the background fetch error
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text("Failed to update salary details: $e")),
-          );
+          ErrorHandler.showError(context, e);
           setState(() {
             _isLoading = false;
           });
@@ -399,7 +398,7 @@ class _SalaryBankDetailsPageState extends State<SalaryBankDetailsPage> {
         },
       );
     } catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
+      if (mounted) ErrorHandler.showError(context, e);
     }
   }
 

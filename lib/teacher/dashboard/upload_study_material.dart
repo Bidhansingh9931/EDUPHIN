@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:io';
+import 'package:eduphin/services/error_handler.dart';
 import 'package:eduphin/services/api_service.dart';
 import 'package:eduphin/services/responsive_helper.dart';
 import 'package:file_picker/file_picker.dart';
@@ -46,9 +47,7 @@ class _UploadAssignmentPageState extends State<Uploadstudymaterial> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text("Error fetching schedules: $e")),
-        );
+        ErrorHandler.showError(context, e);
       }
       setState(() => isFetchingSchedules = false);
     }
@@ -115,9 +114,7 @@ class _UploadAssignmentPageState extends State<Uploadstudymaterial> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text("Upload failed: $e"), backgroundColor: Colors.red),
-        );
+        ErrorHandler.showError(context, e);
       }
     } finally {
       if (mounted) setState(() => isLoading = false);

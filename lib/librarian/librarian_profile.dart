@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'dart:async';
+import 'package:eduphin/services/error_handler.dart';
 import 'package:eduphin/librarian/librarian_skeleton_widgets.dart';
 import 'package:eduphin/services/common_widgets.dart';
 import 'package:eduphin/login_logout/login.dart';
@@ -19,7 +20,6 @@ class LibrarianProfilePage extends StatefulWidget {
 
 class _LibrarianProfilePageState extends State<LibrarianProfilePage> {
   bool _isLoading = false;
-  UserDetail? _profile;
   late Stream<UserDetail> _profileStream;
   StreamSubscription<UserDetail>? _profileSubscription;
   File? _imageFile;
@@ -77,7 +77,6 @@ class _LibrarianProfilePageState extends State<LibrarianProfilePage> {
     _profileSubscription = _profileStream.listen((profile) {
       if (mounted) {
         setState(() {
-          _profile = profile;
           _addressController.text = profile.address ?? "";
           _cityController.text = profile.city ?? "";
           _stateController.text = profile.state ?? "";
@@ -167,24 +166,43 @@ class _LibrarianProfilePageState extends State<LibrarianProfilePage> {
         fields["password"] = _passwordController.text;
       }
 
+      final UserDetail updatedProfile;
       if (kIsWeb && _webImage != null) {
-        await ApiService.updateLibrarianProfileFromBytes(fields, _webImage!, _fileName);
+        updatedProfile = await ApiService.updateLibrarianProfileFromBytes(fields, _webImage!, _fileName);
       } else {
-        await ApiService.updateLibrarianProfile(fields, photo: _imageFile);
+        updatedProfile = await ApiService.updateLibrarianProfile(fields, photo: _imageFile);
       }
 
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Profile updated successfully!")));
-      _fetchProfile();
+      
       setState(() {
+        _addressController.text = updatedProfile.address ?? "";
+        _cityController.text = updatedProfile.city ?? "";
+        _stateController.text = updatedProfile.state ?? "";
+        _pincodeController.text = updatedProfile.pincode ?? "";
+        _phoneController.text = updatedProfile.phone ?? "";
+        _altPhoneController.text = updatedProfile.alternatePhone ?? "";
+        _bankAccController.text = updatedProfile.bankAccountNumber ?? "";
+        _ifscController.text = updatedProfile.ifscCode ?? "";
+        _bankNameController.text = updatedProfile.bankName ?? "";
+        _branchNameController.text = updatedProfile.branchName ?? "";
+        _emergencyNameController.text = updatedProfile.emergencyContactName ?? "";
+        _emergencyPhoneController.text = updatedProfile.emergencyContactNumber ?? "";
+        _selectedGender = updatedProfile.gender ?? "Male";
+        _selectedDob = updatedProfile.dob ?? "";
+        _selectedStatus = updatedProfile.relationshipStatus ?? "Single";
         _passwordController.clear();
         _confirmPasswordController.clear();
       });
+
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Profile updated successfully!")));
+      _fetchProfile();
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Update failed: $e")));
-        setState(() => _isLoading = false);
+        ErrorHandler.showError(context, e);
       }
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 
@@ -360,9 +378,13 @@ class _LibrarianProfilePageState extends State<LibrarianProfilePage> {
                               ),
                             );
                             if (confirmed == true) {
-                              await ApiService.logout();
-                              if (context.mounted) {
-                                Navigator.pushAndRemoveUntil(context, MaterialPageRoute(builder: (c) => const LoginPage()), (r) => false);
+                              try {
+                                await ApiService.logout();
+                                if (context.mounted) {
+                                  Navigator.pushAndRemoveUntil(context, MaterialPageRoute(builder: (c) => const LoginPage()), (r) => false);
+                                }
+                              } catch (e) {
+                                if (context.mounted) ErrorHandler.showError(context, e);
                               }
                             }
                           },
@@ -467,7 +489,7 @@ class _LibrarianProfilePageState extends State<LibrarianProfilePage> {
   List<Widget> _buildProfileInfo(BuildContext context, ThemeData theme, UserDetail profile) {
     return [
       Text(
-        profile.fullName ?? "N/A",
+        profile.fullName,
         textAlign: context.isMobile ? TextAlign.center : TextAlign.start,
         style: theme.textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold, color: theme.colorScheme.onSurface),
       ),

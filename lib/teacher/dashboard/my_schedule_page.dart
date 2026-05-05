@@ -1,3 +1,4 @@
+import 'package:eduphin/services/error_handler.dart';
 import 'package:eduphin/services/responsive_helper.dart';
 import 'package:eduphin/teacher/dashboard/common_widgets.dart';
 import 'package:eduphin/teacher/dashboard/teacher_cache_service.dart';
@@ -58,13 +59,11 @@ class _MySchedulePageState extends State<MySchedulePage> {
       if (mounted) {
         if (_schedules == null) {
           setState(() {
-            _error = e.toString();
+            _error = ErrorHandler.getMessage(e);
             _isLoading = false;
           });
         } else {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text("Failed to update schedule: $e")),
-          );
+          ErrorHandler.showError(context, e);
           setState(() {
             _isLoading = false;
           });

@@ -1,4 +1,5 @@
 import 'package:eduphin/services/api_service.dart';
+import 'package:eduphin/services/error_handler.dart';
 import 'package:eduphin/services/responsive_helper.dart';
 import 'package:eduphin/teacher/dashboard/study_material_model.dart';
 import 'package:eduphin/teacher/dashboard/teacher_cache_service.dart';
@@ -71,9 +72,11 @@ class _StudentMaterialPageState extends State<StudentMaterialPage> {
     } catch (e) {
       if (_data == null && mounted) {
         setState(() {
-          _error = e.toString();
+          _error = ErrorHandler.getMessage(e);
           _isLoading = false;
         });
+      } else if (mounted) {
+        ErrorHandler.showError(context, e);
       }
     }
   }
@@ -202,11 +205,7 @@ class _StudentMaterialPageState extends State<StudentMaterialPage> {
                       } catch (e) {
                         if (mounted) {
                           Navigator.of(context).pop();
-                          if (context.mounted) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(content: Text('Upload failed: $e'), backgroundColor: colorScheme.error),
-                            );
-                          }
+                          ErrorHandler.showError(context, e);
                         }
                       }
                     } else {
@@ -457,7 +456,7 @@ class _StudentMaterialPageState extends State<StudentMaterialPage> {
         await ApiService.deleteStudyMaterial(id);
         _loadData();
       } catch (e) {
-        if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
+        if (mounted) ErrorHandler.showError(context, e);
       }
     }
   }

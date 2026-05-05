@@ -1,3 +1,4 @@
+import 'package:eduphin/services/error_handler.dart';
 import 'package:eduphin/manager_dashboard/manager_dashboard.dart';
 import 'package:eduphin/models/new_employee.dart';
 import 'package:eduphin/models/new_student.dart';
@@ -168,9 +169,7 @@ class _AddLibrarianPageState extends State<AddLibrarianPage> {
       Navigator.pop(context, true);
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(e.toString().replaceFirst('Exception: ', '')), backgroundColor: Colors.red),
-        );
+        ErrorHandler.showError(context, e);
       }
     } finally {
       if (mounted) setState(() => _isLoading = false);

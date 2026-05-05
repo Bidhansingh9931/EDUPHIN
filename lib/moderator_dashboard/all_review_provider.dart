@@ -1,5 +1,7 @@
 import 'dart:convert';
+import 'dart:io';
 import 'package:eduphin/services/api_service.dart';
+import 'package:eduphin/services/error_handler.dart';
 import 'cache_helper.dart';
 import 'all_review_model.dart';
 
@@ -15,18 +17,25 @@ class AllReviewProvider {
   }
 
   Future<List<ReviewDetail>> fetchAllReviews({bool bypassCache = false}) async {
-    final response = await ApiService.get('moderator/dashboard');
-    
-    if (response.statusCode == 200) {
-      final data = jsonDecode(response.body)['data'];
-      final reviewsJson = data['testimonials'] as List? ?? [];
+    try {
+      final response = await ApiService.get('moderator/dashboard');
       
-      // Save to cache
-      await CacheHelper.save(_cacheKey, reviewsJson);
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body)['data'];
+        final reviewsJson = data['testimonials'] as List? ?? [];
+        
+        await CacheHelper.save(_cacheKey, reviewsJson);
 
-      return reviewsJson.map((json) => ReviewDetail.fromJson(json)).toList();
-    } else {
-      throw Exception('Failed to load reviews');
+        return reviewsJson.map((json) => ReviewDetail.fromJson(json)).toList();
+      } else {
+        throw ApiException('Failed to load reviews', statusCode: response.statusCode);
+      }
+    } on SocketException {
+      throw NetworkException();
+    } catch (e) {
+      if (e is ApiException || e is NetworkException) rethrow;
+      throw Exception('An unexpected error occurred: $e');
     }
   }
 }
+

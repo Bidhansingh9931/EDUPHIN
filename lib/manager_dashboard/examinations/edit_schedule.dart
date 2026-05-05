@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:eduphin/services/error_handler.dart';
 import 'package:eduphin/services/api_service.dart';
 import 'package:eduphin/services/responsive_helper.dart';
 import 'package:eduphin/teacher/dashboard/common_widgets.dart';
@@ -40,9 +41,9 @@ class _EditScheduleScreenState extends State<EditScheduleScreen> {
   late final TextEditingController _startTimeController;
   late final TextEditingController _endTimeController;
 
-  int? _selectedClassId;
-  int? _selectedSectionId;
-  int? _selectedSubjectId;
+  dynamic _selectedClassId;
+  dynamic _selectedSectionId;
+  dynamic _selectedSubjectId;
 
   TimeOfDay? _selectedStartTime;
   TimeOfDay? _selectedEndTime;
@@ -73,7 +74,9 @@ class _EditScheduleScreenState extends State<EditScheduleScreen> {
         final time = DateFormat('HH:mm:ss').parse(widget.initialStartTime!);
         _selectedStartTime = TimeOfDay.fromDateTime(time);
         _startTimeController.text = _selectedStartTime!.format(context);
-      } catch (e) {}
+      } catch (e) {
+        debugPrint('Error parsing start time: $e');
+      }
     }
 
     if (widget.initialEndTime != null && widget.initialEndTime!.isNotEmpty) {
@@ -81,7 +84,9 @@ class _EditScheduleScreenState extends State<EditScheduleScreen> {
         final time = DateFormat('HH:mm:ss').parse(widget.initialEndTime!);
         _selectedEndTime = TimeOfDay.fromDateTime(time);
         _endTimeController.text = _selectedEndTime!.format(context);
-      } catch (e) {}
+      } catch (e) {
+        debugPrint('Error parsing start time: $e');
+      }
     }
 
     _loadData();
@@ -104,48 +109,113 @@ class _EditScheduleScreenState extends State<EditScheduleScreen> {
       final response = await ApiService.get('manager/classes');
       if (response.statusCode == 200) {
         if (!mounted) return;
+        final decoded = json.decode(response.body);
         setState(() {
-          _classes = json.decode(response.body)['data'];
-        });
-      }
-    } catch (e) {}
-  }
-
-  Future<void> _fetchSections(int classId) async {
-    setState(() => _isSectionsLoading = true);
-    try {
-      final response = await ApiService.get('manager/classes/$classId/sections');
-      if (response.statusCode == 200) {
-        if (!mounted) return;
-        setState(() {
-          _sections = json.decode(response.body)['data'];
+          _classes = (decoded is List) ? decoded : (decoded['data'] ?? []);
         });
       }
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Failed to load sections: $e')),
-      );
+      ErrorHandler.showError(context, e);
+    }
+  }
+
+  Future<void> _fetchSections(dynamic classId) async {
+    setState(() => _isSectionsLoading = true);
+    try {
+      final response = await ApiService.get('manager/classes/$classId/sections');
+      bool found = false;
+      if (response.statusCode == 200) {
+        if (!mounted) return;
+        final decoded = json.decode(response.body);
+        var data = (decoded is Map) ? (decoded['data'] ?? decoded) : decoded;
+        List list = [];
+        if (data is Map && data.containsKey('sections')) {
+          list = data['sections'] as List;
+        } else if (data is List) {
+          list = data;
+        }
+        if (list.isNotEmpty) {
+          setState(() => _sections = list);
+          found = true;
+        }
+      }
+      
+      if (!found) {
+        // Fallback: If class-specific route fails or returns empty, try getting sections from the class object
+        final selectedClass = _classes.firstWhere(
+          (c) => c['id'].toString() == classId.toString(), 
+          orElse: () => null
+        );
+        if (selectedClass != null && selectedClass['sections'] != null) {
+          setState(() {
+            _sections = selectedClass['sections'] is List ? selectedClass['sections'] : [];
+          });
+        }
+      }
+    } catch (e) {
+      debugPrint('Error fetching sections: $e');
     } finally {
       if (mounted) setState(() => _isSectionsLoading = false);
     }
   }
 
-  Future<void> _fetchSubjects(int classId) async {
+  Future<void> _fetchSubjects(dynamic classId) async {
     setState(() => _isSubjectsLoading = true);
     try {
-      final response = await ApiService.get('manager/classes/$classId/subjects');
+      // Try class-specific subjects first
+      var response = await ApiService.get('manager/classes/$classId/subjects');
+      bool found = false;
+      
       if (response.statusCode == 200) {
-        if (!mounted) return;
-        setState(() {
-          _subjects = json.decode(response.body)['data'];
-        });
+        final decoded = json.decode(response.body);
+        var data = (decoded is Map) ? (decoded['data'] ?? decoded) : decoded;
+        List list = [];
+        if (data is Map && data.containsKey('subjects')) {
+          list = data['subjects'] as List;
+        } else if (data is List) {
+          list = data;
+        }
+        if (list.isNotEmpty) {
+          setState(() => _subjects = list);
+          found = true;
+        }
+      }
+
+      if (!found) {
+        // Fallback 1: Try getting subjects from the class object if available
+        final selectedClass = _classes.firstWhere(
+          (c) => c['id'].toString() == classId.toString(), 
+          orElse: () => null
+        );
+        if (selectedClass != null && selectedClass['subjects'] != null) {
+          setState(() {
+            _subjects = selectedClass['subjects'] is List ? selectedClass['subjects'] : [];
+          });
+          if (_subjects.isNotEmpty) found = true;
+        }
+      }
+
+      // Fallback 2: Try the general subjects endpoint
+      if (!found) {
+        response = await ApiService.get('manager/subjects');
+        if (response.statusCode == 200) {
+          if (!mounted) return;
+          final decoded = json.decode(response.body);
+          setState(() {
+            var data = (decoded is Map) ? (decoded['data'] ?? decoded) : decoded;
+            if (data is Map && data.containsKey('subjects')) {
+              _subjects = data['subjects'] as List;
+            } else if (data is List) {
+              _subjects = data;
+            } else {
+              _subjects = [];
+            }
+          });
+        }
       }
     } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Failed to load subjects: $e')),
-      );
+      debugPrint('Error fetching subjects: $e');
     } finally {
       if (mounted) setState(() => _isSubjectsLoading = false);
     }
@@ -176,13 +246,25 @@ class _EditScheduleScreenState extends State<EditScheduleScreen> {
       setState(() => _isLoading = true);
 
       try {
+        String formattedDate = _dateController.text;
+        if (formattedDate.isNotEmpty) {
+          try {
+            // Convert from DD-MM-YYYY to YYYY-MM-DD for MySQL
+            final date = DateFormat('dd-MM-yyyy').parse(formattedDate);
+            formattedDate = DateFormat('yyyy-MM-dd').format(date);
+          } catch (e) {
+            // If already in yyyy-MM-dd or other format, keep as is or let backend handle
+            debugPrint('Date parsing error: $e');
+          }
+        }
+
         final body = {
-          '_method': 'PUT',
+          'id': widget.paperId.toString(),
           'exam_id': widget.examId.toString(),
           'class_id': _selectedClassId.toString(),
           'section_id': _selectedSectionId.toString(),
           'subject_id': _selectedSubjectId.toString(),
-          'paper_date': _dateController.text,
+          'date': formattedDate,
           'start_time': _selectedStartTime != null 
               ? "${_selectedStartTime!.hour.toString().padLeft(2, '0')}:${_selectedStartTime!.minute.toString().padLeft(2, '0')}:00" 
               : '',
@@ -192,8 +274,8 @@ class _EditScheduleScreenState extends State<EditScheduleScreen> {
           'venue': _venueController.text,
         };
         
-        // Using POST with _method spoofing for consistency
-        final response = await ApiService.post('manager/exam-papers/${widget.paperId}', body);
+        // Changed method from PUT to POST and removed the paperId from the URL to match your working route
+        final response = await ApiService.post('manager/exams/${widget.examId}/schedule', body);
 
         if (!mounted) return;
 
@@ -203,16 +285,12 @@ class _EditScheduleScreenState extends State<EditScheduleScreen> {
           );
           Navigator.pop(context, true);
         } else {
-          final error = json.decode(response.body)['message'] ?? 'Failed to update schedule.';
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Error: $error')),
-          );
+          final responseData = json.decode(response.body);
+          throw Exception(responseData['message'] ?? 'Failed to update schedule.');
         }
       } catch (e) {
         if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('An error occurred: $e')),
-        );
+        ErrorHandler.showError(context, e);
       } finally {
         if (mounted) setState(() => _isLoading = false);
       }
@@ -259,9 +337,9 @@ class _EditScheduleScreenState extends State<EditScheduleScreen> {
                     context,
                     children: [
                       buildLabel(context, "Select Class"),
-                      buildDropdown<int>(
+                      buildDropdown<dynamic>(
                         context,
-                        _classes.map((c) => c['id'] as int).toList(),
+                        _classes.map((c) => c['id']).toList(),
                         _selectedClassId,
                         (value) {
                           setState(() {
@@ -277,29 +355,46 @@ class _EditScheduleScreenState extends State<EditScheduleScreen> {
                           });
                         },
                         hint: "Select Class",
-                        itemBuilder: (id) => _classes.firstWhere((c) => c['id'] == id)['name'] ?? 'N/A',
+                        itemBuilder: (id) {
+                          final cls = _classes.firstWhere(
+                            (c) => c['id'].toString() == id.toString(),
+                            orElse: () => null,
+                          );
+                          return cls != null ? (cls['name'] ?? 'N/A').toString() : 'N/A';
+                        },
                       ),
 
                       buildLabel(context, "Select Section"),
-                      buildDropdown<int>(
+                      buildDropdown<dynamic>(
                         context,
-                        _sections.map((s) => s['id'] as int).toList(),
+                        _sections.map((s) => s['id']).toList(),
                         _selectedSectionId,
                         (value) => setState(() => _selectedSectionId = value),
                         hint: "Select Section",
-                        itemBuilder: (id) => _sections.firstWhere((s) => s['id'] == id)['name'] ?? 'N/A',
+                        itemBuilder: (id) {
+                          final section = _sections.firstWhere(
+                            (s) => s['id'].toString() == id.toString(),
+                            orElse: () => null,
+                          );
+                          return section != null ? (section['section_name'] ?? section['name']).toString() : 'N/A';
+                        },
                         isLoading: _isSectionsLoading,
-                        validator: (value) => value == null ? 'Please select a section' : null,
                       ),
 
                       buildLabel(context, "Select Subject"),
-                      buildDropdown<int>(
+                      buildDropdown<dynamic>(
                         context,
-                        _subjects.map((s) => s['id'] as int).toList(),
+                        _subjects.map((s) => s['id']).toList(),
                         _selectedSubjectId,
                         (value) => setState(() => _selectedSubjectId = value),
                         hint: "Select Subject",
-                        itemBuilder: (id) => _subjects.firstWhere((s) => s['id'] == id)['name'] ?? 'N/A',
+                        itemBuilder: (id) {
+                          final subject = _subjects.firstWhere(
+                            (s) => s['id'].toString() == id.toString(),
+                            orElse: () => null,
+                          );
+                          return subject != null ? (subject['name'] ?? 'N/A').toString() : 'N/A';
+                        },
                         isLoading: _isSubjectsLoading,
                         validator: (value) => value == null ? 'Please select a subject' : null,
                       ),

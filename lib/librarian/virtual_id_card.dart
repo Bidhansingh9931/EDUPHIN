@@ -1,3 +1,4 @@
+import 'package:eduphin/services/error_handler.dart';
 import 'package:eduphin/librarian/librarian_skeleton_widgets.dart';
 import 'package:eduphin/services/pdf_service.dart';
 import 'package:eduphin/services/common_widgets.dart';
@@ -363,7 +364,13 @@ class _LibrarianVirtualIdCardPageState extends State<LibrarianVirtualIdCardPage>
         SizedBox(
           width: double.infinity,
           child: ElevatedButton.icon(
-            onPressed: () => PdfService.generateAndPrintIdCard(data),
+            onPressed: () async {
+              try {
+                await PdfService.generateAndPrintIdCard(data);
+              } catch (e) {
+                if (context.mounted) ErrorHandler.showError(context, e);
+              }
+            },
             icon: Icon(Icons.download, size: context.scale(20)),
             label: Text("DOWNLOAD ID", style: TextStyle(fontSize: context.font(14))),
             style: ElevatedButton.styleFrom(

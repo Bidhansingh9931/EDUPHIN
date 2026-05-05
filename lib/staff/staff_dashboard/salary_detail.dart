@@ -45,6 +45,7 @@ class _StaffSalaryDetailPageState extends State<StaffSalaryDetailPage> {
             return LoadingWrapper<SalaryPageData>(
               snapshot: snapshot,
               skeleton: _buildSkeleton(context),
+              onRetry: _loadData,
               builder: (data) {
                 return SingleChildScrollView(
                   physics: const AlwaysScrollableScrollPhysics(),

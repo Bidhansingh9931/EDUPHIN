@@ -1,5 +1,6 @@
 import 'package:eduphin/services/caching_service.dart';
 import 'package:eduphin/services/common_widgets.dart';
+import 'package:eduphin/services/error_handler.dart';
 import 'package:flutter/material.dart';
 import 'package:eduphin/services/api_service.dart';
 import 'package:eduphin/services/responsive_helper.dart';
@@ -75,14 +76,7 @@ class _ExamRegistrationPageState extends State<ExamRegistrationPage> {
     } catch (e) {
       if (mounted) {
         setState(() => _isLoading = false);
-        if (_exams.isEmpty) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text("Error fetching exams: $e"),
-              backgroundColor: context.theme.colorScheme.error,
-            ),
-          );
-        }
+        ErrorHandler.showError(context, e);
       }
     }
   }
@@ -104,13 +98,7 @@ class _ExamRegistrationPageState extends State<ExamRegistrationPage> {
       }
     } catch (e) {
       if (mounted) {
-        String errorMessage = e.toString().replaceFirst("Exception: ", "");
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(errorMessage),
-            backgroundColor: context.theme.colorScheme.error,
-          ),
-        );
+        ErrorHandler.showError(context, e);
       }
     }
   }
@@ -181,6 +169,19 @@ class _ExamRegistrationPageState extends State<ExamRegistrationPage> {
   }
 
   Widget _buildExamGrid() {
+    if (context.isMobile) {
+      return ListView.separated(
+        padding: context.pagePadding,
+        itemCount: _exams.length,
+        separatorBuilder: (context, index) => SizedBox(height: context.md),
+        itemBuilder: (context, index) {
+          final exam = _exams[index];
+          final bool isRegistered = _registeredExamIds.contains(exam['id']);
+          final bool isOpen = _expandedExams[exam['id']] ?? false;
+          return _buildExamCard(exam, isRegistered, isOpen);
+        },
+      );
+    }
     return GridView.builder(
       padding: context.pagePadding,
       gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(

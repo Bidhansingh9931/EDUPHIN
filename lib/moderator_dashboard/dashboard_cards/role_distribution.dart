@@ -1,4 +1,6 @@
+import 'package:eduphin/services/error_handler.dart';
 import 'dart:convert';
+import 'dart:io';
 import 'package:eduphin/moderator_dashboard/cache_helper.dart';
 import 'package:eduphin/moderator_dashboard/skeleton_widgets.dart';
 import 'package:eduphin/services/api_service.dart';
@@ -23,67 +25,23 @@ class UserRole {
   });
 
   Map<String, dynamic> toJson() => {
-    'icon': icon.codePoint,
     'title': title,
     'count': count,
     'percent': percent,
-    'color': color.toARGB32(),
   };
 
-  factory UserRole.fromJson(Map<String, dynamic> json) => UserRole(
-    icon: IconData(json['icon'], fontFamily: 'MaterialIcons'),
-    title: json['title'],
-    count: json['count'],
-    percent: (json['percent'] as num).toDouble(),
-    color: Color(json['color']),
-  );
-}
-
-// 2. Data Provider
-class RoleDistributionProvider {
-  static const String _cacheKey = 'role_distribution';
-
-  Future<List<UserRole>> fetchUserRoles({bool bypassCache = false}) async {
-    final response = await ApiService.get('moderator/dashboard');
-
-    if (response.statusCode == 200) {
-      final responseBody = json.decode(response.body);
-      if (responseBody['success'] == true && responseBody['data'] != null) {
-        final rolesData = (responseBody['data']['roles'] as List<dynamic>? ?? []).cast<Map<String, dynamic>>();
-
-        if (rolesData.isEmpty) return [];
-
-        final totalUsers = rolesData.fold<int>(0, (sum, role) => sum + ((role['users_count'] as num?)?.toInt() ?? 0));
-
-        final roles = rolesData.map((role) {
-          final roleName = role['name'] as String? ?? 'Unnamed Role';
-          final count = (role['users_count'] as num?)?.toInt() ?? 0;
-          return UserRole(
-            icon: _getIconForRole(roleName),
-            title: roleName,
-            count: count,
-            percent: totalUsers == 0 ? 0.0 : (count / totalUsers) * 100,
-            color: _getColorForRole(roleName),
-          );
-        }).toList();
-
-        await CacheHelper.save(_cacheKey, roles.map((e) => e.toJson()).toList());
-        return roles;
-      }
-      throw Exception('Failed to load data from API.');
-    }
-    throw Exception('Failed to load user roles.');
+  factory UserRole.fromJson(Map<String, dynamic> json) {
+    final title = json['title'] as String? ?? 'Unnamed Role';
+    return UserRole(
+      icon: getIconForRole(title),
+      title: title,
+      count: (json['count'] as num?)?.toInt() ?? 0,
+      percent: (json['percent'] as num?)?.toDouble() ?? 0.0,
+      color: getColorForRole(title),
+    );
   }
 
-  Future<List<UserRole>?> getCachedUserRoles() async {
-    final cached = await CacheHelper.load(_cacheKey);
-    if (cached != null) {
-      return (cached as List).map((e) => UserRole.fromJson(e)).toList();
-    }
-    return null;
-  }
-
-  IconData _getIconForRole(String roleName) {
+  static IconData getIconForRole(String roleName) {
     switch (roleName) {
       case 'Super Admin': return Icons.shield_rounded;
       case 'Moderator': return Icons.gavel_rounded;
@@ -91,20 +49,79 @@ class RoleDistributionProvider {
       case 'Teachers': return Icons.school_rounded;
       case 'Students': return Icons.person_rounded;
       case 'Accountants': return Icons.account_balance_wallet_rounded;
+      case 'Staff': return Icons.badge_rounded;
+      case 'Counselors': return Icons.support_agent_rounded;
+      case 'Librarian': return Icons.local_library_rounded;
       default: return Icons.groups_rounded;
     }
   }
 
-  Color _getColorForRole(String roleName) {
-    const colors = {
-      'Super Admin': Colors.blue,
-      'Moderator': Colors.purple,
-      'Institute Manager': Colors.orange,
-      'Teachers': Colors.green,
-      'Students': Colors.lightBlue,
-      'Accountants': Colors.teal,
-    };
-    return colors[roleName] ?? Colors.blueGrey;
+  static Color getColorForRole(String roleName) {
+    switch (roleName) {
+      case 'Super Admin': return Colors.blue;
+      case 'Moderator': return Colors.purple;
+      case 'Institute Manager': return Colors.orange;
+      case 'Teachers': return Colors.green;
+      case 'Students': return Colors.lightBlue;
+      case 'Accountants': return Colors.teal;
+      case 'Staff': return Colors.indigo;
+      case 'Counselors': return Colors.pink;
+      case 'Librarian': return Colors.brown;
+      default: return Colors.blueGrey;
+    }
+  }
+}
+
+// 2. Data Provider
+class RoleDistributionProvider {
+  static const String _cacheKey = 'role_distribution';
+
+  Future<List<UserRole>> fetchUserRoles({bool bypassCache = false}) async {
+    try {
+      final response = await ApiService.get('moderator/dashboard');
+
+      if (response.statusCode == 200) {
+        final responseBody = json.decode(response.body);
+        if (responseBody['success'] == true && responseBody['data'] != null) {
+          final rolesData = (responseBody['data']['roles'] as List<dynamic>? ?? []).cast<Map<String, dynamic>>();
+
+          if (rolesData.isEmpty) return [];
+
+          final totalUsers = rolesData.fold<int>(0, (sum, role) => sum + ((role['users_count'] as num?)?.toInt() ?? 0));
+
+          final roles = rolesData.map((role) {
+            final roleName = role['name'] as String? ?? 'Unnamed Role';
+            final count = (role['users_count'] as num?)?.toInt() ?? 0;
+            return UserRole(
+              icon: UserRole.getIconForRole(roleName),
+              title: roleName,
+              count: count,
+              percent: totalUsers == 0 ? 0.0 : (count / totalUsers) * 100,
+              color: UserRole.getColorForRole(roleName),
+            );
+          }).toList();
+
+          await CacheHelper.save(_cacheKey, roles.map((e) => e.toJson()).toList());
+          return roles;
+        }
+        throw ApiException(responseBody['message'] ?? 'Failed to load data from API.');
+      }
+      throw ApiException('Failed to load user roles', statusCode: response.statusCode);
+    } on SocketException {
+      throw NetworkException();
+    } catch (e) {
+      if (e is ApiException || e is NetworkException) rethrow;
+      throw Exception('An unexpected error occurred: $e');
+    }
+  }
+
+
+  Future<List<UserRole>?> getCachedUserRoles() async {
+    final cached = await CacheHelper.load(_cacheKey);
+    if (cached != null) {
+      return (cached as List).map((e) => UserRole.fromJson(e as Map<String, dynamic>)).toList();
+    }
+    return null;
   }
 }
 
@@ -135,10 +152,17 @@ class _RoleDistributionPageState extends State<RoleDistributionPage> {
     }
   }
 
-  void _refreshData() {
+  Future<void> _refreshData() async {
     setState(() {
       _userRolesFuture = _provider.fetchUserRoles(bypassCache: true);
     });
+    try {
+      await _userRolesFuture;
+    } catch (e) {
+      if (mounted) {
+        ErrorHandler.showError(context, e);
+      }
+    }
   }
 
   @override

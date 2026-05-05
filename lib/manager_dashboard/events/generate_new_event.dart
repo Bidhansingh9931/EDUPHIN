@@ -4,6 +4,7 @@ import 'dart:typed_data';
 
 import 'package:dotted_border/dotted_border.dart';
 import 'package:eduphin/services/api_service.dart';
+import 'package:eduphin/services/error_handler.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
@@ -160,13 +161,7 @@ class _GenerateNewEventState extends State<GenerateNewEvent> {
       );
       Navigator.pop(context, true);
     } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(e.toString().replaceFirst('Exception: ', '')),
-          backgroundColor: Theme.of(context).colorScheme.error,
-        ),
-      );
+      ErrorHandler.showError(context, e);
     } finally {
       if (mounted) {
         setState(() {

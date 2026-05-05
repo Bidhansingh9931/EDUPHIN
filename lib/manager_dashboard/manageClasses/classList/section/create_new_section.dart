@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:eduphin/services/error_handler.dart';
 import 'package:eduphin/services/api_service.dart';
 import 'package:eduphin/services/responsive_helper.dart';
 import 'package:flutter/material.dart';
@@ -58,21 +59,12 @@ class _CreateNewSectionPageState extends State<CreateNewSectionPage> {
             _mentors = processedMentors;
           });
         } else {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(responseData['message'] ?? 'Failed to load mentors.'),
-              backgroundColor: theme.colorScheme.error,
-            ),
-          );
+          throw Exception(responseData['message'] ?? 'Failed to load mentors.');
         }
       }
     } catch (e) {
       if (mounted) {
-        final theme = context.theme;
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-              content: Text('An error occurred while fetching mentors: $e'), backgroundColor: theme.colorScheme.error),
-        );
+        ErrorHandler.showError(context, e);
       }
     } finally {
       if (mounted) {
@@ -114,21 +106,12 @@ class _CreateNewSectionPageState extends State<CreateNewSectionPage> {
           );
           Navigator.pop(context, true);
         } else {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content:
-                  Text(responseData['message'] ?? 'Failed to create section.'),
-              backgroundColor: theme.colorScheme.error,
-            ),
-          );
+          throw Exception(responseData['message'] ?? 'Failed to create section.');
         }
       }
     } catch (e) {
       if (mounted) {
-        final theme = context.theme;
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('An error occurred: $e'), backgroundColor: theme.colorScheme.error),
-        );
+        ErrorHandler.showError(context, e);
       }
     } finally {
       if (mounted) {

@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:eduphin/services/responsive_helper.dart';
 import 'package:flutter/material.dart';
 import '../../services/api_service.dart';
+import '../../services/error_handler.dart';
 import '../../services/caching_service.dart';
 import '../../services/common_widgets.dart';
 import '../counselor_models.dart';
@@ -112,10 +113,16 @@ class _BookCatelogPageState extends State<BookCatelogPage> {
           });
         }
       } else {
-        setState(() => _isLoading = false);
+        if (mounted) {
+          ErrorHandler.showError(context, "Failed to load books. Status: ${response.statusCode}");
+          setState(() => _isLoading = false);
+        }
       }
     } catch (e) {
-      if (mounted) setState(() => _isLoading = false);
+      if (mounted) {
+        ErrorHandler.showError(context, e);
+        setState(() => _isLoading = false);
+      }
     }
   }
 

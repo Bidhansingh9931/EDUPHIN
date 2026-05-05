@@ -9,6 +9,7 @@ import 'profile.dart';
 import 'virtual_id.dart';
 import 'salary_inforamation.dart';
 import 'examination_information.dart';
+import '../services/error_handler.dart';
 
 import 'manage_account/manager.dart';
 import 'manage_account/counselor.dart';
@@ -64,7 +65,10 @@ class _CounselorDashboardPageState extends State<CounselorDashboardPage> {
   Future<void> _fetchDashboardData() async {
     if (!mounted) return;
     if (_dashboardData == null) {
-      setState(() => _isLoading = true);
+      setState(() {
+        _isLoading = true;
+        _errorMessage = null;
+      });
     }
     try {
       final response = await ApiService.get('counselor/dashboard');
@@ -76,10 +80,11 @@ class _CounselorDashboardPageState extends State<CounselorDashboardPage> {
             setState(() {
               _dashboardData = CounselorDashboardData.fromJson(data);
               _isLoading = false;
+              _errorMessage = null;
             });
           }
         } else {
-          if (mounted) {
+          if (mounted && _dashboardData == null) {
             setState(() {
               _errorMessage = data['message'] ?? "Failed to load dashboard";
               _isLoading = false;
@@ -87,7 +92,7 @@ class _CounselorDashboardPageState extends State<CounselorDashboardPage> {
           }
         }
       } else {
-        if (mounted) {
+        if (mounted && _dashboardData == null) {
           setState(() {
             _errorMessage = ApiService.errorMessage(response, "Failed to load dashboard");
             _isLoading = false;
@@ -96,10 +101,13 @@ class _CounselorDashboardPageState extends State<CounselorDashboardPage> {
       }
     } catch (e) {
       if (mounted) {
-        setState(() {
-          _errorMessage = "Error: $e";
-          _isLoading = false;
-        });
+        if (_dashboardData == null) {
+          setState(() {
+            _errorMessage = ErrorHandler.getMessage(e);
+            _isLoading = false;
+          });
+        }
+        ErrorHandler.showError(context, e);
       }
     }
   }
@@ -107,30 +115,6 @@ class _CounselorDashboardPageState extends State<CounselorDashboardPage> {
   @override
   Widget build(BuildContext context) {
     final theme = context.theme;
-
-    if (_errorMessage != null && _dashboardData == null) {
-      return Scaffold(
-        backgroundColor: theme.colorScheme.surface,
-        body: Center(
-          child: Padding(
-            padding: EdgeInsets.all(context.spacing * 1.5),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(Icons.error_outline, size: context.scale(60), color: theme.colorScheme.error),
-                SizedBox(height: context.spacing),
-                Text(_errorMessage!, textAlign: TextAlign.center, style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
-                SizedBox(height: context.spacing * 1.5),
-                ElevatedButton(
-                  onPressed: _fetchDashboardData,
-                  child: const Text("Retry"),
-                ),
-              ],
-            ),
-          ),
-        ),
-      );
-    }
 
     return Scaffold(
       backgroundColor: theme.colorScheme.surface,
@@ -170,7 +154,9 @@ class _CounselorDashboardPageState extends State<CounselorDashboardPage> {
       body: LoadingWrapper(
         isLoading: _isLoading,
         hasData: _dashboardData != null,
+        error: _errorMessage,
         skeleton: _buildSkeleton(context),
+        onRetry: _fetchDashboardData,
         onRefresh: _fetchDashboardData,
         child: SingleChildScrollView(
           physics: const AlwaysScrollableScrollPhysics(),
@@ -281,12 +267,25 @@ class _CounselorDashboardPageState extends State<CounselorDashboardPage> {
 
   Widget _buildQuickStats(BuildContext context) {
     final theme = context.theme;
-    return Row(
-      children: [
-        Expanded(child: _buildStatItem(context, "Active Classes", "${_dashboardData?.sections.length ?? 0}", Icons.class_rounded, theme.colorScheme.primary)),
-        SizedBox(width: context.spacing),
-        Expanded(child: _buildStatItem(context, "Open Tickets", "${_dashboardData?.tickets.where((t) => t.status != 'closed').length ?? 0}", Icons.confirmation_number_rounded, theme.colorScheme.error)),
-      ],
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        if (constraints.maxWidth < 350) {
+          return Column(
+            children: [
+              _buildStatItem(context, "Active Classes", "${_dashboardData?.sections.length ?? 0}", Icons.class_rounded, theme.colorScheme.primary),
+              SizedBox(height: context.spacing),
+              _buildStatItem(context, "Open Tickets", "${_dashboardData?.tickets.where((t) => t.status != 'closed').length ?? 0}", Icons.confirmation_number_rounded, theme.colorScheme.error),
+            ],
+          );
+        }
+        return Row(
+          children: [
+            Expanded(child: _buildStatItem(context, "Active Classes", "${_dashboardData?.sections.length ?? 0}", Icons.class_rounded, theme.colorScheme.primary)),
+            SizedBox(width: context.spacing),
+            Expanded(child: _buildStatItem(context, "Open Tickets", "${_dashboardData?.tickets.where((t) => t.status != 'closed').length ?? 0}", Icons.confirmation_number_rounded, theme.colorScheme.error)),
+          ],
+        );
+      }
     );
   }
 
@@ -374,37 +373,76 @@ class _CounselorDashboardPageState extends State<CounselorDashboardPage> {
               ],
             ),
             SizedBox(height: context.scale(24)),
-            Row(
-              children: [
-                Expanded(
-                  child: FilledButton.tonalIcon(
-                    onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const VirtualIdCardPage())),
-                    icon: Icon(Icons.vignette_outlined, size: context.scale(18)),
-                    label: Text("VIRTUAL ID", style: TextStyle(fontSize: context.font(12), fontWeight: FontWeight.bold)),
-                    style: FilledButton.styleFrom(
-                      backgroundColor: colorScheme.primary.withValues(alpha: 0.1),
-                      foregroundColor: colorScheme.primary,
-                      padding: EdgeInsets.symmetric(vertical: context.scale(12)),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(context.scale(12))),
-                    ),
-                  ),
-                ),
-                SizedBox(width: context.scale(12)),
-                Expanded(
-                  child: FilledButton.icon(
-                    onPressed: () => Navigator.push(
-                      context,
-                      MaterialPageRoute(builder: (_) => const CounselorProfilePage()),
-                    ).then((_) => _fetchDashboardData()),
-                    icon: Icon(Icons.person_outline, size: context.scale(18)),
-                    label: Text("PROFILE", style: TextStyle(fontSize: context.font(12), fontWeight: FontWeight.bold)),
-                    style: FilledButton.styleFrom(
-                      padding: EdgeInsets.symmetric(vertical: context.scale(12)),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(context.scale(12))),
-                    ),
-                  ),
-                ),
-              ],
+            LayoutBuilder(
+              builder: (context, constraints) {
+                final bool isNarrow = constraints.maxWidth < 300;
+                return Flex(
+                  direction: isNarrow ? Axis.vertical : Axis.horizontal,
+                  children: [
+                    if (isNarrow)
+                      SizedBox(
+                        width: double.infinity,
+                        child: FilledButton.tonalIcon(
+                          onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const VirtualIdCardPage())),
+                          icon: Icon(Icons.vignette_outlined, size: context.scale(18)),
+                          label: const Text("VIRTUAL ID", style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                          style: FilledButton.styleFrom(
+                            backgroundColor: colorScheme.primary.withValues(alpha: 0.1),
+                            foregroundColor: colorScheme.primary,
+                            padding: EdgeInsets.symmetric(vertical: context.scale(12)),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(context.scale(12))),
+                          ),
+                        ),
+                      )
+                    else
+                      Expanded(
+                        child: FilledButton.tonalIcon(
+                          onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const VirtualIdCardPage())),
+                          icon: Icon(Icons.vignette_outlined, size: context.scale(18)),
+                          label: FittedBox(child: Text("VIRTUAL ID", style: TextStyle(fontSize: context.font(12), fontWeight: FontWeight.bold))),
+                          style: FilledButton.styleFrom(
+                            backgroundColor: colorScheme.primary.withValues(alpha: 0.1),
+                            foregroundColor: colorScheme.primary,
+                            padding: EdgeInsets.symmetric(vertical: context.scale(12)),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(context.scale(12))),
+                          ),
+                        ),
+                      ),
+                    SizedBox(width: isNarrow ? 0 : context.scale(12), height: isNarrow ? context.scale(12) : 0),
+                    if (isNarrow)
+                      SizedBox(
+                        width: double.infinity,
+                        child: FilledButton.icon(
+                          onPressed: () => Navigator.push(
+                            context,
+                            MaterialPageRoute(builder: (_) => const CounselorProfilePage()),
+                          ).then((_) => _fetchDashboardData()),
+                          icon: Icon(Icons.person_outline, size: context.scale(18)),
+                          label: const Text("PROFILE", style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                          style: FilledButton.styleFrom(
+                            padding: EdgeInsets.symmetric(vertical: context.scale(12)),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(context.scale(12))),
+                          ),
+                        ),
+                      )
+                    else
+                      Expanded(
+                        child: FilledButton.icon(
+                          onPressed: () => Navigator.push(
+                            context,
+                            MaterialPageRoute(builder: (_) => const CounselorProfilePage()),
+                          ).then((_) => _fetchDashboardData()),
+                          icon: Icon(Icons.person_outline, size: context.scale(18)),
+                          label: FittedBox(child: Text("PROFILE", style: TextStyle(fontSize: context.font(12), fontWeight: FontWeight.bold))),
+                          style: FilledButton.styleFrom(
+                            padding: EdgeInsets.symmetric(vertical: context.scale(12)),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(context.scale(12))),
+                          ),
+                        ),
+                      ),
+                  ],
+                );
+              }
             )
           ],
         ),
@@ -514,12 +552,26 @@ class _CounselorDashboardPageState extends State<CounselorDashboardPage> {
       children: [
         _buildSupportItem(context, "My Tickets", Icons.confirmation_num_outlined, const SupportTicketsPage(), theme.colorScheme.primary),
         SizedBox(height: context.spacing),
-        Row(
-          children: [
-            Expanded(child: _buildSupportItem(context, "Create New", Icons.add_comment_outlined, const CreateSupportTicketPage(), theme.colorScheme.secondary)),
-            SizedBox(width: context.spacing),
-            Expanded(child: _buildSupportItem(context, "Assigned", Icons.assignment_ind_outlined, const AssignedTicketsPage(), theme.colorScheme.tertiary)),
-          ],
+        LayoutBuilder(
+          builder: (context, constraints) {
+            final bool useVertical = constraints.maxWidth < 400;
+            if (useVertical) {
+              return Column(
+                children: [
+                  _buildSupportItem(context, "Create New", Icons.add_comment_outlined, const CreateSupportTicketPage(), theme.colorScheme.secondary),
+                  SizedBox(height: context.spacing),
+                  _buildSupportItem(context, "Assigned", Icons.assignment_ind_outlined, const AssignedTicketsPage(), theme.colorScheme.tertiary),
+                ],
+              );
+            }
+            return Row(
+              children: [
+                Expanded(child: _buildSupportItem(context, "Create New", Icons.add_comment_outlined, const CreateSupportTicketPage(), theme.colorScheme.secondary)),
+                SizedBox(width: context.spacing),
+                Expanded(child: _buildSupportItem(context, "Assigned", Icons.assignment_ind_outlined, const AssignedTicketsPage(), theme.colorScheme.tertiary)),
+              ],
+            );
+          }
         )
       ],
     );

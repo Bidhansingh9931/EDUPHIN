@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:ui';
+import 'package:eduphin/services/error_handler.dart';
 import 'package:eduphin/services/responsive_helper.dart';
 import 'package:eduphin/teacher/dashboard/common_widgets.dart';
 import 'package:eduphin/teacher/dashboard/teacher_cache_service.dart';
@@ -130,7 +131,7 @@ class _StudentRemarksPageState extends State<StudentRemarksPage> {
       }
     } on Exception catch (e) {
       if (mounted) {
-        _error = e.toString().replaceFirst('Exception: ', '');
+        _error = ErrorHandler.getMessage(e);
         _isLoading = false;
       }
     } finally {
@@ -265,21 +266,12 @@ class _RemarkTile extends StatelessWidget {
         if (response.statusCode == 200) {
           onDeleted();
         } else {
-          String errorMessage = "Failed to delete remark";
-          try {
-            final data = jsonDecode(response.body);
-            errorMessage = data['message'] ?? errorMessage;
-          } catch (_) {}
-          throw Exception(errorMessage);
+          final data = jsonDecode(response.body);
+          throw Exception(data['message'] ?? "Failed to delete remark");
         }
       } catch (e) {
         if (context.mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(e.toString().replaceFirst('Exception: ', '')),
-              backgroundColor: Colors.red,
-            ),
-          );
+          ErrorHandler.showError(context, e);
         }
       }
     }

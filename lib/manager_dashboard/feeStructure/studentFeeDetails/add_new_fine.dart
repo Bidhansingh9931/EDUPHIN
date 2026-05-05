@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'package:eduphin/services/api_service.dart';
+import 'package:eduphin/services/error_handler.dart';
 import 'package:eduphin/services/responsive_helper.dart';
 import 'package:flutter/material.dart';
 
@@ -72,10 +73,7 @@ class _AddNewFineState extends State<AddNewFine> {
       }
     } catch (e) {
       if (mounted) {
-        final theme = context.theme;
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(e.toString().replaceFirst("Exception: ", "")), backgroundColor: theme.colorScheme.error),
-        );
+        ErrorHandler.showError(context, e);
       }
     } finally {
       if (mounted) {

@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import '../../services/api_service.dart';
+import '../../services/error_handler.dart';
 import '../../services/responsive_helper.dart';
 import '../counselor_models.dart';
 
@@ -39,9 +40,17 @@ class _TicketDetailsPageState extends State<TicketDetailsPage> {
           _replies = repliesData.map((e) => TicketReply.fromJson(e)).toList();
           _isLoading = false;
         });
+      } else {
+        if (mounted) {
+          ErrorHandler.showError(context, "Failed to load replies. Status: ${response.statusCode}");
+          setState(() => _isLoading = false);
+        }
       }
     } catch (e) {
-      setState(() => _isLoading = false);
+      if (mounted) {
+        ErrorHandler.showError(context, e);
+        setState(() => _isLoading = false);
+      }
     }
   }
 
@@ -53,9 +62,15 @@ class _TicketDetailsPageState extends State<TicketDetailsPage> {
       if (response.statusCode == 200) {
         setState(() => _currentStatus = newStatus.toLowerCase());
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Status updated to $newStatus")));
+      } else {
+        if (mounted) {
+          ErrorHandler.showError(context, "Failed to update status. Status: ${response.statusCode}");
+        }
       }
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Failed to update status")));
+      if (mounted) {
+        ErrorHandler.showError(context, e);
+      }
     }
   }
 
@@ -84,9 +99,15 @@ class _TicketDetailsPageState extends State<TicketDetailsPage> {
         _replyController.clear();
         setState(() => _attachment = null);
         _fetchReplies();
+      } else {
+        if (mounted) {
+          ErrorHandler.showError(context, "Failed to send reply. Status: ${response.statusCode}");
+        }
       }
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Error sending reply")));
+      if (mounted) {
+        ErrorHandler.showError(context, e);
+      }
     } finally {
       setState(() => _isSending = false);
     }

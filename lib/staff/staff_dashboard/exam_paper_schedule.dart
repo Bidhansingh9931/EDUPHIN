@@ -43,6 +43,7 @@ class _StaffExamPaperSchedulePageState extends State<StaffExamPaperSchedulePage>
           return LoadingWrapper<Map<String, dynamic>>(
             snapshot: snapshot,
             skeleton: _buildSkeleton(context),
+            onRetry: _loadSchedule,
             builder: (data) {
               final schedules = (data['schedules'] as List).map((s) => ExamPaperSchedule.fromJson(s)).toList();
 

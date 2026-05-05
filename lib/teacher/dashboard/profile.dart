@@ -4,6 +4,7 @@ import 'package:eduphin/services/responsive_helper.dart';
 import 'package:eduphin/services/common_widgets.dart';
 import 'package:eduphin/teacher/dashboard/teacher_profile_model.dart';
 import 'package:eduphin/teacher/dashboard/teacher_cache_service.dart';
+import 'package:eduphin/services/error_handler.dart';
 import 'package:shimmer/shimmer.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:flutter/foundation.dart';
@@ -78,7 +79,7 @@ class _ProfilePageState extends State<ProfilePage> {
     } catch (e) {
       if (_profile == null) {
         setState(() {
-          _error = e.toString();
+          _error = ErrorHandler.getMessage(e);
           _isLoading = false;
         });
       }
@@ -130,7 +131,7 @@ class _ProfilePageState extends State<ProfilePage> {
     if (_profile == null) return;
 
     if (_passwordController.text.isNotEmpty && _passwordController.text != _confirmPasswordController.text) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Passwords do not match")));
+      ErrorHandler.showError(context, "Passwords do not match");
       return;
     }
 
@@ -165,7 +166,7 @@ class _ProfilePageState extends State<ProfilePage> {
         _loadProfile();
       }
     } catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Error: $e")));
+      if (mounted) ErrorHandler.showError(context, e);
     } finally {
       if (mounted) setState(() => _isSaving = false);
     }

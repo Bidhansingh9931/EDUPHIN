@@ -1,5 +1,6 @@
 import 'package:eduphin/services/responsive_helper.dart';
 import 'package:eduphin/login_logout/login.dart';
+import 'package:eduphin/login_logout/privacy_policy.dart';
 import 'package:eduphin/services/api_service.dart';
 import 'package:eduphin/services/common_widgets.dart';
 import 'package:flutter/material.dart';
@@ -414,6 +415,9 @@ class _AppDrawerState extends State<AppDrawer> {
                 ),
 
                 const Divider(),
+                _drawerItem(context, Icons.privacy_tip_outlined, "Privacy Policy", () {
+                  Navigator.push(context, MaterialPageRoute(builder: (_) => const PrivacyPolicyPage()));
+                }),
                 _drawerItem(context, Icons.logout, "Logout", () async {
                   final navigator = Navigator.of(context);
                   try {

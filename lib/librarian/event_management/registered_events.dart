@@ -1,3 +1,4 @@
+import 'package:eduphin/services/error_handler.dart';
 import 'package:eduphin/librarian/librarian_skeleton_widgets.dart';
 import 'package:eduphin/services/responsive_helper.dart';
 import 'package:flutter/material.dart';
@@ -317,7 +318,7 @@ class _MyRegisteredEventsPageState extends State<MyRegisteredEventsPage> {
             ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Registration cancelled")));
           } catch (e) {
             if (!mounted) return;
-            ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Error: $e")));
+            ErrorHandler.showError(context, e);
           }
         },
         child: Text(registration.status == 'cancelled' ? "CANCELLED" : "CANCEL",

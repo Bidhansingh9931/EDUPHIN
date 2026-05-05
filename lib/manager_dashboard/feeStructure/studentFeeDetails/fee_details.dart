@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import 'package:eduphin/manager_dashboard/feeStructure/studentFeeDetails/edit_fine.dart';
 import 'package:eduphin/services/api_service.dart';
+import 'package:eduphin/services/error_handler.dart';
 import 'package:eduphin/services/common_widgets.dart';
 import 'package:eduphin/services/caching_service.dart';
 import 'package:eduphin/services/responsive_helper.dart';
@@ -30,12 +31,21 @@ class StudentInfo {
   });
 
   factory StudentInfo.fromJson(Map<String, dynamic> json) {
+    String fullName = json['name']?.toString() ?? '';
+    if (fullName.isEmpty || fullName == 'null') {
+      final fName = json['first_name']?.toString() ?? '';
+      final mName = json['middle_name']?.toString() ?? '';
+      final lName = json['last_name']?.toString() ?? '';
+      fullName = [fName, mName, lName].where((s) => s.isNotEmpty && s != 'null').join(' ').trim();
+    }
+    if (fullName.isEmpty) fullName = 'N/A';
+
     return StudentInfo(
-      name: json['name'] ?? 'N/A',
-      roll: json['student_roll_no'] ?? 'N/A',
-      classes: '${json['class']?['name'] ?? ''}-${json['section']?['section_name'] ?? ''}',
-      email: json['email'] ?? 'N/A',
-      feeFrequency: json['fee_frequency'] ?? 'N/A', // Assuming this field exists
+      name: fullName,
+      roll: json['student_roll_no']?.toString() ?? 'N/A',
+      classes: json['class']?['name']?.toString() ?? 'N/A',
+      email: json['email']?.toString() ?? 'N/A',
+      feeFrequency: json['fee_frequency']?.toString() ?? 'N/A',
     );
   }
 }
@@ -56,12 +66,17 @@ class FinancialSummary {
   });
 
   factory FinancialSummary.fromJson(Map<String, dynamic> json) {
+    final double f = double.tryParse(json['total_fee']?.toString() ?? json['total_fees']?.toString() ?? '0') ?? 0.0;
+    final double fn = double.tryParse(json['total_fine']?.toString() ?? json['total_fines']?.toString() ?? '0') ?? 0.0;
+    final double p = double.tryParse(json['total_paid']?.toString() ?? '0') ?? 0.0;
+    final double d = double.tryParse(json['due']?.toString() ?? json['total_due']?.toString() ?? '0') ?? 0.0;
+
     return FinancialSummary(
-      totalFee: double.tryParse(json['total_fees'].toString()) ?? 0.0,
-      totalFine: double.tryParse(json['total_fines'].toString()) ?? 0.0,
-      totalPayable: double.tryParse(json['total_payable'].toString()) ?? 0.0,
-      paid: double.tryParse(json['total_paid'].toString()) ?? 0.0,
-      due: double.tryParse(json['total_due'].toString()) ?? 0.0,
+      totalFee: f,
+      totalFine: fn,
+      totalPayable: f + fn,
+      paid: p,
+      due: d,
     );
   }
 }
@@ -76,9 +91,9 @@ class FeeDetailItem {
 
   factory FeeDetailItem.fromJson(Map<String, dynamic> json) {
     return FeeDetailItem(
-      title: json['fees_type'] ?? 'N/A',
-      amount: double.tryParse(json['amount'].toString()) ?? 0.0,
-      type: json['type'] ?? 'N/A',
+      title: json['fee_name'] ?? json['fees_type'] ?? 'N/A',
+      amount: double.tryParse(json['amount']?.toString() ?? '0') ?? 0.0,
+      type: json['type'] ?? (json['is_optional'] == true ? 'Optional' : 'Compulsory'),
       details: json['description'] ?? 'No details available',
     );
   }
@@ -94,11 +109,14 @@ class FineDetailItem {
   FineDetailItem({required this.id, required this.title, required this.amount, required this.issuedBy, required this.remark});
 
   factory FineDetailItem.fromJson(Map<String, dynamic> json) {
+    final createdAt = json['created_at'] != null ? DateTime.tryParse(json['created_at']) : null;
+    final dateStr = createdAt != null ? DateFormat('dd/MM/yyyy').format(createdAt) : 'N/A';
+    
     return FineDetailItem(
       id: json['id'] ?? 0,
       title: json['fine_type'] ?? 'N/A',
-      amount: double.tryParse(json['amount'].toString()) ?? 0.0,
-      issuedBy: '${json['issued_by']?['name'] ?? 'N/A'} on ${DateFormat('dd/MM/yyyy').format(DateTime.tryParse(json['created_at'] ?? '') ?? DateTime.now())}',
+      amount: double.tryParse(json['amount']?.toString() ?? '0') ?? 0.0,
+      issuedBy: '${json['issued_by']?['name'] ?? 'N/A'} on $dateStr',
       remark: json['remarks'] ?? 'No remarks',
     );
   }
@@ -114,11 +132,14 @@ class PaymentHistoryItem {
   PaymentHistoryItem({required this.amount, required this.date, required this.mode, required this.submittedBy, required this.remark});
 
   factory PaymentHistoryItem.fromJson(Map<String, dynamic> json) {
+    final paymentDate = json['payment_date'] != null ? DateTime.tryParse(json['payment_date']) : null;
+    final dateStr = paymentDate != null ? DateFormat('dd/MM/yyyy').format(paymentDate) : 'N/A';
+
     return PaymentHistoryItem(
-      amount: double.tryParse(json['paid_amount'].toString()) ?? 0.0,
-      date: DateFormat('dd/MM/yyyy').format(DateTime.tryParse(json['payment_date'] ?? '') ?? DateTime.now()),
+      amount: double.tryParse(json['paid_amount']?.toString() ?? '0') ?? 0.0,
+      date: dateStr,
       mode: json['payment_mode'] ?? 'N/A',
-      submittedBy: json['student']?['name'] ?? 'N/A', // Assuming student submits
+      submittedBy: json['student']?['name'] ?? 'N/A',
       remark: json['remarks'] ?? 'No remarks',
     );
   }
@@ -142,7 +163,7 @@ class StudentFeeDetails {
   factory StudentFeeDetails.fromJson(Map<String, dynamic> json) {
     return StudentFeeDetails(
       studentInfo: StudentInfo.fromJson(json['student'] ?? {}),
-      financialSummary: FinancialSummary.fromJson(json['summary'] ?? {}),
+      financialSummary: FinancialSummary.fromJson(json),
       feeDetails: (json['fees'] as List? ?? []).map((i) => FeeDetailItem.fromJson(i)).toList(),
       fineDetails: (json['fines'] as List? ?? []).map((i) => FineDetailItem.fromJson(i)).toList(),
       paymentHistory: (json['payments'] as List? ?? []).map((i) => PaymentHistoryItem.fromJson(i)).toList(),
@@ -213,6 +234,7 @@ class _FeeDetailsPageState extends State<FeeDetailsPage> {
           _isLoading = false;
           _error = e;
         });
+        ErrorHandler.showError(context, e);
       }
     }
   }
@@ -287,6 +309,7 @@ class _FeeDetailsPageState extends State<FeeDetailsPage> {
 
   Widget _buildNarrowLayout(StudentFeeDetails data) {
     return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         CustomStudentInfoFeeDetailContainerBox(studentInfo: data.studentInfo),
         SizedBox(height: context.spacing),
@@ -309,6 +332,7 @@ class _FeeDetailsPageState extends State<FeeDetailsPage> {
         Expanded(
           flex: 2,
           child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               CustomStudentInfoFeeDetailContainerBox(studentInfo: data.studentInfo),
               SizedBox(height: context.spacing),
@@ -321,6 +345,7 @@ class _FeeDetailsPageState extends State<FeeDetailsPage> {
         Expanded(
           flex: 1,
           child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               CustomFinancialSummaryFeeDetailContainerBox(summary: data.financialSummary),
               SizedBox(height: context.spacing),
@@ -359,7 +384,7 @@ class CustomStudentInfoFeeDetailContainerBox extends StatelessWidget {
       child: Padding(
         padding: EdgeInsets.all(context.scale(16)),
         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Text("Student Info", style: TextStyle(fontSize: context.font(18), fontWeight: FontWeight.bold, color: theme.colorScheme.primary)),
             SizedBox(height: context.scale(12)),
@@ -423,7 +448,7 @@ class CustomFinancialSummaryFeeDetailContainerBox extends StatelessWidget {
       child: Padding(
         padding: EdgeInsets.all(context.scale(16)),
         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Text("Financial Summary", style: TextStyle(fontSize: context.font(18), fontWeight: FontWeight.bold, color: theme.colorScheme.primary)),
             SizedBox(height: context.scale(12)),
@@ -473,7 +498,7 @@ class CustomFeeDetailsContainerBox extends StatelessWidget {
       child: Padding(
         padding: EdgeInsets.all(context.scale(16)),
         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Text("Fee Details", style: TextStyle(fontSize: context.font(18), fontWeight: FontWeight.bold, color: theme.colorScheme.primary)),
             SizedBox(height: context.scale(16)),
@@ -499,7 +524,7 @@ class CustomFeeDetailsContainerBox extends StatelessWidget {
   Widget _buildFeeItem(BuildContext context, String title, double amount, String type, String details, Color typeColor) {
     final theme = context.theme;
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -549,25 +574,38 @@ class CustomFineDetailsContainerBox extends StatelessWidget {
       child: Padding(
         padding: EdgeInsets.all(context.scale(16)),
         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Expanded(child: Text("Fine Details", style: TextStyle(fontSize: context.font(18), fontWeight: FontWeight.bold, color: theme.colorScheme.primary))),
-                ElevatedButton.icon(
-                  onPressed: () {
-                    Navigator.push(context, MaterialPageRoute(builder: (context) => AddNewFine(studentId: studentId)));
-                  },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: theme.colorScheme.secondary,
-                    foregroundColor: theme.colorScheme.onSecondary,
-                    elevation: 0,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(context.scale(10))),
-                    padding: EdgeInsets.symmetric(horizontal: context.scale(12), vertical: context.scale(8)),
+                Expanded(
+                  child: Text(
+                    "Fine Details",
+                    style: TextStyle(
+                      fontSize: context.font(18),
+                      fontWeight: FontWeight.bold,
+                      color: theme.colorScheme.primary,
+                    ),
                   ),
-                  icon: Icon(Icons.add, size: context.scale(16)),
-                  label: Text("Add Fine", style: TextStyle(fontSize: context.font(12), fontWeight: FontWeight.bold)),
+                ),
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: ElevatedButton.icon(
+                    onPressed: () {
+                      Navigator.push(context, MaterialPageRoute(builder: (context) => AddNewFine(studentId: studentId)));
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: theme.colorScheme.secondary,
+                      foregroundColor: theme.colorScheme.onSecondary,
+                      elevation: 0,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(context.scale(10))),
+                      padding: EdgeInsets.symmetric(horizontal: context.scale(12), vertical: context.scale(8)),
+                      minimumSize: Size(0, context.scale(36)),
+                    ),
+                    icon: Icon(Icons.add, size: context.scale(16)),
+                    label: Text("Add Fine", style: TextStyle(fontSize: context.font(12), fontWeight: FontWeight.bold)),
+                  ),
                 ),
               ],
             ),
@@ -583,7 +621,7 @@ class CustomFineDetailsContainerBox extends StatelessWidget {
                 itemBuilder: (context, index) {
                   final item = fineDetails[index];
                   return Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -606,8 +644,8 @@ class CustomFineDetailsContainerBox extends StatelessWidget {
                       SizedBox(height: context.scale(8)),
                       Text("Remark: ${item.remark}", style: TextStyle(fontSize: context.font(13), color: theme.colorScheme.onSurfaceVariant)),
                       Divider(color: theme.colorScheme.outlineVariant, height: context.scale(24)),
-                      SizedBox(
-                        width: double.infinity,
+                      Align(
+                        alignment: Alignment.centerLeft,
                         child: ElevatedButton.icon(
                           onPressed: () {
                             Navigator.push(context, MaterialPageRoute(builder: (context) => EditFinePage(fineId: item.id, reason: item.title, amount: item.amount.toString(), remarks: item.remark)));
@@ -619,6 +657,7 @@ class CustomFineDetailsContainerBox extends StatelessWidget {
                             foregroundColor: theme.colorScheme.secondary,
                             elevation: 0,
                             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(context.scale(10))),
+                            minimumSize: Size(0, context.scale(36)),
                           ),
                         ),
                       ),
@@ -651,7 +690,7 @@ class CustomPaymentHistoryContainerBox extends StatelessWidget {
       child: Padding(
         padding: EdgeInsets.all(context.scale(16)),
         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Text("Payment History", style: TextStyle(fontSize: context.font(18), fontWeight: FontWeight.bold, color: theme.colorScheme.primary)),
             SizedBox(height: context.scale(16)),
@@ -666,7 +705,7 @@ class CustomPaymentHistoryContainerBox extends StatelessWidget {
                 itemBuilder: (context, index) {
                   final item = paymentHistory[index];
                   return Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
                       _buildInfoRow(context, "Payment Received", "₹${NumberFormat('#,##,##0.00').format(item.amount)}", valueColor: Colors.green),
                       SizedBox(height: context.scale(8)),
@@ -706,4 +745,3 @@ class CustomPaymentHistoryContainerBox extends StatelessWidget {
     );
   }
 }
-

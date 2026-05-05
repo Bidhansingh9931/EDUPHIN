@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'package:eduphin/services/api_service.dart';
+import 'package:eduphin/services/error_handler.dart';
 import 'package:eduphin/services/responsive_helper.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart';
@@ -56,7 +57,7 @@ class _AddNotePageState extends State<AddNotePage> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString())));
+        ErrorHandler.showError(context, e);
         setState(() => _isLoading = false);
       }
     }
@@ -123,10 +124,7 @@ class _AddNotePageState extends State<AddNotePage> {
       }
     } catch (e) {
       if (mounted) {
-        final theme = Theme.of(context);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(e.toString().replaceFirst('Exception: ', '')), backgroundColor: theme.colorScheme.error),
-        );
+        ErrorHandler.showError(context, e);
       }
     } finally {
       if (mounted) {

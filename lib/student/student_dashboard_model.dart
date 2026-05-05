@@ -332,12 +332,14 @@ class StudyMaterial {
 
 class Assignment {
   final int id;
+  final String? encryptedId;
   final String title;
   final String? description;
   final String? dueDate;
 
   Assignment({
     required this.id,
+    this.encryptedId,
     required this.title,
     this.description,
     this.dueDate,
@@ -346,6 +348,7 @@ class Assignment {
   factory Assignment.fromJson(Map<String, dynamic> json) {
     return Assignment(
       id: _toInt(json['id']),
+      encryptedId: json['encrypted_id']?.toString(),
       title: json['title'] ?? '',
       description: json['description'],
       dueDate: json['due_date'],
@@ -355,6 +358,7 @@ class Assignment {
   Map<String, dynamic> toJson() {
     return {
       'id': id,
+      'encrypted_id': encryptedId,
       'title': title,
       'description': description,
       'due_date': dueDate,

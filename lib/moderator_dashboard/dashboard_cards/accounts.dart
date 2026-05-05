@@ -1,5 +1,7 @@
+import 'package:eduphin/services/error_handler.dart';
 import 'dart:async';
 import 'dart:convert';
+import 'dart:io';
 import 'package:eduphin/moderator_dashboard/cache_helper.dart';
 import 'package:eduphin/moderator_dashboard/dashboard_cards/add_account.dart';
 import 'package:eduphin/moderator_dashboard/dashboard_cards/active_institutes/manage/employ_details.dart';
@@ -52,13 +54,16 @@ class AccountProvider {
           final List<dynamic> accountsJson = data['accounts'];
           return accountsJson.map((json) => Account.fromJson(json)).toList();
         } else {
-          throw Exception(data['message'] ?? 'Failed to load accounts.');
+          throw ApiException(data['message'] ?? 'Failed to load accounts');
         }
       } else {
-        throw Exception('Failed to load accounts. Status Code: ${response.statusCode}');
+        throw ApiException('Failed to load accounts', statusCode: response.statusCode);
       }
+    } on SocketException {
+      throw NetworkException();
     } catch (e) {
-      throw Exception('Failed to fetch accounts: $e');
+      if (e is ApiException || e is NetworkException) rethrow;
+      throw Exception('An unexpected error occurred: $e');
     }
   }
 
@@ -116,10 +121,8 @@ class _AccountsPageState extends State<AccountsPage> {
           });
         }
       }).catchError((error) {
-        if (mounted && _allAccounts.isEmpty) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Error fetching accounts: $error')),
-          );
+        if (mounted) {
+          ErrorHandler.showError(context, error);
         }
       });
     });

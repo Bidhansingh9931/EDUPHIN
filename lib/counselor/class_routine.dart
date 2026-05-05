@@ -3,6 +3,7 @@ import 'package:eduphin/services/common_widgets.dart';
 import 'package:eduphin/services/responsive_helper.dart';
 import 'package:flutter/material.dart';
 import '../services/api_service.dart';
+import '../services/error_handler.dart';
 import '../services/caching_service.dart';
 import 'counselor_models.dart';
 
@@ -61,22 +62,29 @@ class _CounselorClassRoutinePageState extends State<CounselorClassRoutinePage> {
 
             _schedules = rawList.map((json) => ClassSchedule.fromJson(json)).toList();
             _isLoading = false;
+            _errorMessage = null;
           });
         }
       } else {
         if (mounted) {
-          setState(() {
-            _errorMessage = ApiService.errorMessage(response, "Failed to load schedules");
-            _isLoading = false;
-          });
+          if (_schedules.isEmpty) {
+            setState(() {
+              _errorMessage = ApiService.errorMessage(response, "Failed to load schedules");
+              _isLoading = false;
+            });
+          }
+          ErrorHandler.showError(context, "Status: ${response.statusCode}");
         }
       }
     } catch (e) {
       if (mounted) {
-        setState(() {
-          _errorMessage = e.toString().replaceFirst("Exception: ", "");
-          _isLoading = false;
-        });
+        if (_schedules.isEmpty) {
+          setState(() {
+            _errorMessage = ErrorHandler.getMessage(e);
+            _isLoading = false;
+          });
+        }
+        ErrorHandler.showError(context, e);
       }
     }
   }
@@ -96,25 +104,11 @@ class _CounselorClassRoutinePageState extends State<CounselorClassRoutinePage> {
       body: LoadingWrapper(
         isLoading: _isLoading,
         hasData: _schedules.isNotEmpty,
+        error: _errorMessage,
         skeleton: _buildSkeleton(context),
+        onRetry: _fetchSchedules,
         onRefresh: _fetchSchedules,
-        child: _errorMessage != null && _schedules.isEmpty
-                ? Center(
-                    child: Padding(
-                      padding: EdgeInsets.all(context.spacing * 1.5),
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(Icons.error_outline, color: theme.colorScheme.error, size: context.scale(48)),
-                          SizedBox(height: context.md),
-                          Text(_errorMessage!, textAlign: TextAlign.center, style: theme.textTheme.titleMedium?.copyWith(color: theme.colorScheme.error)),
-                          SizedBox(height: context.lg),
-                          FilledButton.icon(onPressed: _fetchSchedules, icon: const Icon(Icons.refresh), label: const Text("RETRY")),
-                        ],
-                      ),
-                    ),
-                  )
-                : SingleChildScrollView(
+        child: SingleChildScrollView(
                     physics: const AlwaysScrollableScrollPhysics(),
                     padding: context.pagePadding,
                     child: Center(

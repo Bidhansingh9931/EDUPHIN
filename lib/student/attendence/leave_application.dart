@@ -3,6 +3,7 @@ import 'package:eduphin/services/api_service.dart';
 import 'package:eduphin/services/responsive_helper.dart';
 import 'package:eduphin/services/common_widgets.dart';
 import 'package:eduphin/services/caching_service.dart';
+import 'package:eduphin/services/error_handler.dart';
 import 'package:eduphin/teacher/dashboard/student_leave_model.dart';
 import 'package:intl/intl.dart';
 
@@ -54,14 +55,7 @@ class _LeaveApplicationPageState extends State<LeaveApplicationPage> {
     } catch (e) {
       if (mounted) {
         setState(() => _isLoading = false);
-        if (_allLeaves.isEmpty) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text("Error fetching leaves: $e"),
-              backgroundColor: Theme.of(context).colorScheme.error,
-            ),
-          );
-        }
+        ErrorHandler.showError(context, e);
       }
     }
   }
@@ -500,12 +494,7 @@ class _ApplyLeaveBottomSheetState extends State<_ApplyLeaveBottomSheet> {
     } catch (e) {
       setState(() => _isSubmitting = false);
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text("Error: $e"),
-            backgroundColor: Theme.of(context).colorScheme.error,
-          ),
-        );
+        ErrorHandler.showError(context, e);
       }
     }
   }

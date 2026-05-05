@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:eduphin/services/error_handler.dart';
 import 'package:csv/csv.dart';
 import 'package:eduphin/manager_dashboard/account_statics/accountant/add_accountant.dart';
 import 'package:eduphin/services/api_service.dart';
@@ -138,6 +139,7 @@ class _AccountantListPageState extends State<AccountantListPage> {
           _error = e;
           _isLoading = false;
         });
+        ErrorHandler.showError(context, e);
       }
     }
   }
@@ -173,6 +175,7 @@ class _AccountantListPageState extends State<AccountantListPage> {
           _error = e;
           _isLoading = false;
         });
+        ErrorHandler.showError(context, e);
       }
     }
   }
@@ -210,9 +213,7 @@ class _AccountantListPageState extends State<AccountantListPage> {
       await OpenFile.open(path);
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("Failed to download accountant list: $e")),
-      );
+      ErrorHandler.showError(context, e);
     }
   }
 

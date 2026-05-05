@@ -1,3 +1,4 @@
+import 'package:eduphin/services/error_handler.dart';
 import 'package:eduphin/services/api_service.dart';
 import 'package:eduphin/services/responsive_helper.dart';
 import 'package:eduphin/teacher/dashboard/event_models.dart';
@@ -50,9 +51,12 @@ class _MyRegisteredEventPageState extends State<MyRegisteredEventPage> {
     } catch (e) {
       if (mounted) {
         setState(() {
-          _error = e.toString();
+          _error = ErrorHandler.getMessage(e);
           _isLoading = false;
         });
+        if (_events != null) {
+          ErrorHandler.showError(context, e);
+        }
       }
     }
   }

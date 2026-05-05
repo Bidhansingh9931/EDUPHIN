@@ -1,3 +1,4 @@
+import 'package:eduphin/services/error_handler.dart';
 import 'package:eduphin/teacher/dashboard/teacher_cache_service.dart';
 import 'package:shimmer/shimmer.dart';
 import 'package:eduphin/services/api_service.dart';
@@ -53,7 +54,7 @@ class _VirtualIdPageState extends State<VirtualIdPage> {
     } catch (e) {
       if (_idData == null) {
         setState(() {
-          _error = e.toString();
+          _error = ErrorHandler.getMessage(e);
           _isLoading = false;
         });
       }
@@ -276,16 +277,18 @@ class _VirtualIdPageState extends State<VirtualIdPage> {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      _idInfo("Position", data.position ?? "Teacher"),
-                      _idInfo("Employee ID", data.employeeId ?? "N/A"),
+                      Expanded(child: _idInfo("Position", data.position ?? "Teacher")),
+                      SizedBox(width: context.scale(8)),
+                      Expanded(child: _idInfo("Employee ID", data.employeeId ?? "N/A")),
                     ],
                   ),
                   SizedBox(height: context.scale(12)),
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      _idInfo("Employment Type", data.employmentType ?? "Full-time"),
-                      _idInfo("Joining Date", data.joiningDate ?? "N/A"),
+                      Expanded(child: _idInfo("Employment Type", data.employmentType ?? "Full-time")),
+                      SizedBox(width: context.scale(8)),
+                      Expanded(child: _idInfo("Joining Date", data.joiningDate ?? "N/A")),
                     ],
                   ),
                 ],

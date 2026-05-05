@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:eduphin/services/error_handler.dart';
 import 'package:eduphin/services/api_service.dart';
 import 'package:eduphin/services/responsive_helper.dart';
 import 'package:eduphin/teacher/dashboard/common_widgets.dart';
@@ -21,9 +22,9 @@ class _AddScheduleScreenState extends State<AddScheduleScreen> {
   final _startTimeController = TextEditingController();
   final _endTimeController = TextEditingController();
 
-  int? _selectedClassId;
-  int? _selectedSectionId;
-  int? _selectedSubjectId;
+  dynamic _selectedClassId;
+  dynamic _selectedSectionId;
+  dynamic _selectedSubjectId;
 
   DateTime? _selectedDate;
   TimeOfDay? _selectedStartTime;
@@ -48,53 +49,113 @@ class _AddScheduleScreenState extends State<AddScheduleScreen> {
       final response = await ApiService.get('manager/classes');
       if (response.statusCode == 200) {
         if (!mounted) return;
+        final decoded = json.decode(response.body);
         setState(() {
-          _classes = json.decode(response.body)['data'];
+          _classes = (decoded is List) ? decoded : (decoded['data'] ?? []);
         });
       }
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Failed to load classes: $e')),
-      );
+      ErrorHandler.showError(context, e);
     }
   }
 
-  Future<void> _fetchSections(int classId) async {
+  Future<void> _fetchSections(dynamic classId) async {
     setState(() => _isSectionsLoading = true);
     try {
       final response = await ApiService.get('manager/classes/$classId/sections');
+      bool found = false;
       if (response.statusCode == 200) {
         if (!mounted) return;
-        setState(() {
-          _sections = json.decode(response.body)['data'];
-        });
+        final decoded = json.decode(response.body);
+        var data = (decoded is Map) ? (decoded['data'] ?? decoded) : decoded;
+        List list = [];
+        if (data is Map && data.containsKey('sections')) {
+          list = data['sections'] as List;
+        } else if (data is List) {
+          list = data;
+        }
+        if (list.isNotEmpty) {
+          setState(() => _sections = list);
+          found = true;
+        }
+      }
+      
+      if (!found) {
+        // Fallback: If class-specific route fails or returns empty, try getting sections from the class object
+        final selectedClass = _classes.firstWhere(
+          (c) => c['id'].toString() == classId.toString(), 
+          orElse: () => null
+        );
+        if (selectedClass != null && selectedClass['sections'] != null) {
+          setState(() {
+            _sections = selectedClass['sections'] is List ? selectedClass['sections'] : [];
+          });
+        }
       }
     } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Failed to load sections: $e')),
-      );
+      debugPrint('Error fetching sections: $e');
     } finally {
       if (mounted) setState(() => _isSectionsLoading = false);
     }
   }
 
-  Future<void> _fetchSubjects(int classId) async {
+  Future<void> _fetchSubjects(dynamic classId) async {
     setState(() => _isSubjectsLoading = true);
     try {
-      final response = await ApiService.get('manager/classes/$classId/subjects');
+      // Try class-specific subjects first
+      var response = await ApiService.get('manager/classes/$classId/subjects');
+      bool found = false;
+      
       if (response.statusCode == 200) {
-        if (!mounted) return;
-        setState(() {
-          _subjects = json.decode(response.body)['data'];
-        });
+        final decoded = json.decode(response.body);
+        var data = (decoded is Map) ? (decoded['data'] ?? decoded) : decoded;
+        List list = [];
+        if (data is Map && data.containsKey('subjects')) {
+          list = data['subjects'] as List;
+        } else if (data is List) {
+          list = data;
+        }
+        if (list.isNotEmpty) {
+          setState(() => _subjects = list);
+          found = true;
+        }
+      }
+
+      if (!found) {
+        // Fallback 1: Try getting subjects from the class object if available
+        final selectedClass = _classes.firstWhere(
+          (c) => c['id'].toString() == classId.toString(), 
+          orElse: () => null
+        );
+        if (selectedClass != null && selectedClass['subjects'] != null) {
+          setState(() {
+            _subjects = selectedClass['subjects'] is List ? selectedClass['subjects'] : [];
+          });
+          if (_subjects.isNotEmpty) found = true;
+        }
+      }
+
+      // Fallback 2: Try the general subjects endpoint
+      if (!found) {
+        response = await ApiService.get('manager/subjects');
+        if (response.statusCode == 200) {
+          if (!mounted) return;
+          final decoded = json.decode(response.body);
+          setState(() {
+            var data = (decoded is Map) ? (decoded['data'] ?? decoded) : decoded;
+            if (data is Map && data.containsKey('subjects')) {
+              _subjects = data['subjects'] as List;
+            } else if (data is List) {
+              _subjects = data;
+            } else {
+              _subjects = [];
+            }
+          });
+        }
       }
     } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Failed to load subjects: $e')),
-      );
+      debugPrint('Error fetching subjects: $e');
     } finally {
       if (mounted) setState(() => _isSubjectsLoading = false);
     }
@@ -135,7 +196,7 @@ class _AddScheduleScreenState extends State<AddScheduleScreen> {
           'end_time': _selectedEndTime != null ? "${_selectedEndTime!.hour.toString().padLeft(2, '0')}:${_selectedEndTime!.minute.toString().padLeft(2, '0')}:00" : '',
           'venue': _venueController.text,
         };
-        final response = await ApiService.post('manager/exam-papers', body);
+        final response = await ApiService.post('manager/exams/${widget.examId}/schedule', body);
 
         if (response.statusCode == 201 || response.statusCode == 200) {
           if (!mounted) return;
@@ -144,17 +205,12 @@ class _AddScheduleScreenState extends State<AddScheduleScreen> {
           );
           Navigator.pop(context, true);
         } else {
-           if (!mounted) return;
-          final error = json.decode(response.body)['message'] ?? 'Failed to add schedule.';
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Error: $error')),
-          );
+          final responseData = json.decode(response.body);
+          throw Exception(responseData['message'] ?? 'Failed to add schedule.');
         }
       } catch (e) {
-         if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('An error occurred: $e')),
-        );
+        if (!mounted) return;
+        ErrorHandler.showError(context, e);
       } finally {
         if (mounted) setState(() => _isLoading = false);
       }
@@ -199,9 +255,9 @@ class _AddScheduleScreenState extends State<AddScheduleScreen> {
                     context,
                     children: [
                       buildLabel(context, "Select Class"),
-                      buildDropdown<int>(
+                      buildDropdown<dynamic>(
                         context,
-                        _classes.map((c) => c['id'] as int).toList(),
+                        _classes.map((c) => c['id']).toList(),
                         _selectedClassId,
                         (value) {
                           setState(() {
@@ -217,29 +273,46 @@ class _AddScheduleScreenState extends State<AddScheduleScreen> {
                           });
                         },
                         hint: "Select Class",
-                        itemBuilder: (id) => _classes.firstWhere((c) => c['id'] == id)['name'] ?? 'N/A',
+                        itemBuilder: (id) {
+                          final cls = _classes.firstWhere(
+                            (c) => c['id'].toString() == id.toString(),
+                            orElse: () => null,
+                          );
+                          return cls != null ? (cls['name'] ?? 'N/A').toString() : 'N/A';
+                        },
                       ),
 
                       buildLabel(context, "Select Section"),
-                      buildDropdown<int>(
+                      buildDropdown<dynamic>(
                         context,
-                        _sections.map((s) => s['id'] as int).toList(),
+                        _sections.map((s) => s['id']).toList(),
                         _selectedSectionId,
                         (value) => setState(() => _selectedSectionId = value),
                         hint: "Select Section",
-                        itemBuilder: (id) => _sections.firstWhere((s) => s['id'] == id)['name'] ?? 'N/A',
+                        itemBuilder: (id) {
+                          final section = _sections.firstWhere(
+                            (s) => s['id'].toString() == id.toString(),
+                            orElse: () => null,
+                          );
+                          return section != null ? (section['section_name'] ?? section['name']).toString() : 'N/A';
+                        },
                         isLoading: _isSectionsLoading,
-                        validator: (value) => value == null ? 'Please select a section' : null,
                       ),
 
                       buildLabel(context, "Select Subject"),
-                      buildDropdown<int>(
+                      buildDropdown<dynamic>(
                         context,
-                        _subjects.map((s) => s['id'] as int).toList(),
+                        _subjects.map((s) => s['id']).toList(),
                         _selectedSubjectId,
                         (value) => setState(() => _selectedSubjectId = value),
                         hint: "Select Subject",
-                        itemBuilder: (id) => _subjects.firstWhere((s) => s['id'] == id)['name'] ?? 'N/A',
+                        itemBuilder: (id) {
+                          final subject = _subjects.firstWhere(
+                            (s) => s['id'].toString() == id.toString(),
+                            orElse: () => null,
+                          );
+                          return subject != null ? (subject['name'] ?? 'N/A').toString() : 'N/A';
+                        },
                         isLoading: _isSubjectsLoading,
                         validator: (value) => value == null ? 'Please select a subject' : null,
                       ),

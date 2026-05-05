@@ -1,5 +1,7 @@
+import 'package:eduphin/services/error_handler.dart';
 import 'dart:async';
 import 'dart:convert';
+import 'dart:io';
 import 'package:eduphin/moderator_dashboard/cache_helper.dart';
 import 'package:eduphin/moderator_dashboard/skeleton_widgets.dart';
 import 'package:eduphin/services/api_service.dart';
@@ -37,7 +39,7 @@ class ClassProvider {
       }
       final token = await ApiService.getToken();
       if (token == null) {
-        throw Exception('Authentication token not found.');
+        throw ApiException('Session expired. Please log in again.', statusCode: 401);
       }
 
       final response = await http.get(
@@ -55,13 +57,16 @@ class ClassProvider {
           final List<dynamic> classesJson = data['classes'];
           return classesJson.map((json) => ClassInfo.fromJson(json)).toList();
         } else {
-          throw Exception(data['message'] ?? 'Failed to load classes.');
+          throw ApiException(data['message'] ?? 'Failed to load classes');
         }
       } else {
-        throw Exception('Failed to load classes. Status Code: ${response.statusCode}');
+        throw ApiException('Failed to load classes', statusCode: response.statusCode);
       }
+    } on SocketException {
+      throw NetworkException();
     } catch (e) {
-      throw Exception('Failed to fetch classes: $e');
+      if (e is ApiException || e is NetworkException) rethrow;
+      throw Exception('An unexpected error occurred: $e');
     }
   }
 
@@ -104,6 +109,13 @@ class _ClassesPageState extends State<ClassesPage> {
     setState(() {
       _classesFuture = _provider.fetchClasses(widget.instituteId, bypassCache: bypassCache);
     });
+    try {
+      await _classesFuture;
+    } catch (e) {
+      if (mounted) {
+        ErrorHandler.showError(context, e);
+      }
+    }
   }
 
   @override

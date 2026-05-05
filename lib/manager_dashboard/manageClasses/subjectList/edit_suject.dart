@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:eduphin/services/error_handler.dart';
 import 'package:eduphin/manager_dashboard/manageClasses/subjectList/subject_list.dart';
 import 'package:eduphin/services/api_service.dart';
 import 'package:eduphin/services/responsive_helper.dart';
@@ -78,12 +79,7 @@ class _UpdateSubjectPageState extends State<UpdateSubjectPage> {
       }
     } catch (e) {
       if (mounted) {
-        final theme = context.theme;
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-              content: Text(e.toString().replaceFirst('Exception: ', '')),
-              backgroundColor: theme.colorScheme.error),
-        );
+        ErrorHandler.showError(context, e);
       }
     } finally {
       if (mounted) {

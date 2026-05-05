@@ -1,4 +1,6 @@
+import 'package:eduphin/services/error_handler.dart';
 import 'dart:async';
+import 'dart:io';
 import 'package:eduphin/moderator_dashboard/cache_helper.dart';
 import 'package:eduphin/moderator_dashboard/skeleton_widgets.dart';
 import 'package:eduphin/moderator_dashboard/moderator_dashboard.dart';
@@ -12,6 +14,7 @@ import 'employ_details.dart';
 
 const List<String> employeeRoles = [
   'All',
+  'Moderator',
   'Principal',
   'Institute Manager',
   'Counselors',
@@ -29,13 +32,20 @@ class EmployeeProvider {
   String getCacheKey(String instituteId) => 'employees_list_$instituteId';
 
   Future<List<Employee>> fetchEmployees(String instituteId, {bool bypassCache = false}) async {
-    if (!bypassCache) {
-      final cached = await getCachedEmployees(instituteId);
-      if (cached != null) return cached;
+    try {
+      if (!bypassCache) {
+        final cached = await getCachedEmployees(instituteId);
+        if (cached != null) return cached;
+      }
+      final data = await ApiService.getEmployees(instituteId);
+      await CacheHelper.save(getCacheKey(instituteId), data.map((e) => e.toJson()).toList());
+      return data;
+    } on SocketException {
+      throw NetworkException();
+    } catch (e) {
+      if (e is NetworkException) rethrow;
+      throw Exception('Failed to fetch employees: $e');
     }
-    final data = await ApiService.getEmployees(instituteId);
-    await CacheHelper.save(getCacheKey(instituteId), data.map((e) => e.toJson()).toList());
-    return data;
   }
 
   Future<List<Employee>?> getCachedEmployees(String instituteId) async {
@@ -95,7 +105,13 @@ class _ManageInstitutePageState extends State<ManageInstitute> {
     setState(() {
       _employeesFuture = _provider.fetchEmployees(widget.instituteId, bypassCache: bypassCache);
     });
-    await _employeesFuture;
+    try {
+      await _employeesFuture;
+    } catch (e) {
+      if (mounted) {
+        ErrorHandler.showError(context, e);
+      }
+    }
   }
 
   @override

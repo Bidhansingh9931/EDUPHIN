@@ -3,6 +3,7 @@ import 'package:eduphin/services/common_widgets.dart';
 import 'package:eduphin/services/pdf_service.dart';
 import 'package:eduphin/services/api_service.dart';
 import 'package:eduphin/services/caching_service.dart';
+import 'package:eduphin/services/error_handler.dart';
 import 'package:eduphin/student/student_virtual_id_model.dart';
 import 'package:flutter/material.dart';
 import 'package:eduphin/services/responsive_helper.dart';
@@ -60,7 +61,8 @@ class _StudentCardPageState extends State<StudentCardPage> {
       if (mounted) {
         setState(() {
           isLoading = false;
-          if (idData == null) errorMessage = e.toString();
+          ErrorHandler.showError(context, e);
+          if (idData == null) errorMessage = ErrorHandler.getMessage(e);
         });
       }
     }

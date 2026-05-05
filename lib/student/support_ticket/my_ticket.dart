@@ -1,5 +1,6 @@
 import 'package:eduphin/services/caching_service.dart';
 import 'package:eduphin/services/common_widgets.dart';
+import 'package:eduphin/services/error_handler.dart';
 import 'package:flutter/material.dart';
 import 'package:eduphin/services/api_service.dart';
 import 'package:eduphin/services/responsive_helper.dart';
@@ -197,12 +198,7 @@ class _SupportTicketsPageState extends State<SupportTicketsPage> {
     } catch (e) {
       if (mounted) {
         setState(() => _isLoading = false);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text("Error fetching tickets: $e"),
-            backgroundColor: context.theme.colorScheme.error,
-          ),
-        );
+        ErrorHandler.showError(context, e);
       }
     }
   }

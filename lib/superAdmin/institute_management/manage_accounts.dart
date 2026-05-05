@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:eduphin/services/responsive_helper.dart';
 import 'package:eduphin/services/theme_service.dart';
+import 'package:eduphin/services/error_handler.dart';
 import 'package:flutter/material.dart';
 import 'package:eduphin/services/api_service.dart';
 import 'package:eduphin/moderator_dashboard/institute/institute_model.dart';
@@ -69,9 +70,10 @@ class _ManageAccountsScreenState extends State<ManageAccountsScreen> {
     } catch (e) {
       if (mounted) {
         setState(() {
-          _errorMessage = e.toString();
+          _errorMessage = ErrorHandler.getMessage(e);
           _isLoading = false;
         });
+        ErrorHandler.showError(context, e);
       }
     }
   }

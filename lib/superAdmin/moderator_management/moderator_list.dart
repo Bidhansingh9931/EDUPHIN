@@ -1,6 +1,7 @@
 import 'package:eduphin/services/responsive_helper.dart';
 import 'package:eduphin/services/theme_service.dart';
 import 'package:eduphin/services/common_widgets.dart';
+import 'package:eduphin/services/error_handler.dart';
 import 'package:flutter/material.dart';
 import '../../services/api_service.dart';
 import '../cache_service.dart';
@@ -52,7 +53,7 @@ class _ModeratorListScreenState extends State<ModeratorListScreen> {
     } catch (e) {
       if (mounted) {
         setState(() => _isLoading = false);
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Error: $e")));
+        ErrorHandler.showError(context, e);
       }
     }
   }
@@ -78,7 +79,7 @@ class _ModeratorListScreenState extends State<ModeratorListScreen> {
         _fetchModerators();
         if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Deleted successfully")));
       } catch (e) {
-        if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Error: $e")));
+        if (mounted) ErrorHandler.showError(context, e);
       }
     }
   }

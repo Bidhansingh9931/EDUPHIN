@@ -1,3 +1,4 @@
+import 'package:eduphin/services/error_handler.dart';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:eduphin/services/common_widgets.dart';
@@ -55,9 +56,7 @@ class _TicketDetailsPageState extends State<TicketDetailsPage> {
       _loadDetails();
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: $e')),
-        );
+        ErrorHandler.showError(context, e);
       }
     } finally {
       if (mounted) setState(() => _isSending = false);
@@ -75,9 +74,7 @@ class _TicketDetailsPageState extends State<TicketDetailsPage> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: $e')),
-        );
+        ErrorHandler.showError(context, e);
       }
     }
   }

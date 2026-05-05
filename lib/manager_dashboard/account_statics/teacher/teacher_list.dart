@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
 import 'package:csv/csv.dart';
+import 'package:eduphin/services/error_handler.dart';
 import 'package:eduphin/manager_dashboard/account_statics/teacher/add_teacher.dart';
 import 'package:eduphin/services/api_service.dart';
 import 'package:eduphin/services/caching_service.dart';
@@ -131,6 +132,7 @@ class _TeacherListPageState extends State<TeacherListPage> {
           _error = e;
           _isLoading = _roles.isEmpty;
         });
+        ErrorHandler.showError(context, e);
       }
     }
   }
@@ -163,6 +165,7 @@ class _TeacherListPageState extends State<TeacherListPage> {
           _error = e;
           _isLoading = _teachers.isEmpty;
         });
+        ErrorHandler.showError(context, e);
       }
     }
   }
@@ -187,7 +190,7 @@ class _TeacherListPageState extends State<TeacherListPage> {
       await file.writeAsString(csv);
       await OpenFile.open(path);
     } catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Download failed: $e")));
+      if (mounted) ErrorHandler.showError(context, e);
     }
   }
 

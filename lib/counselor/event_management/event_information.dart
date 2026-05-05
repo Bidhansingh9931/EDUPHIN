@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:eduphin/services/responsive_helper.dart';
 import 'package:flutter/material.dart';
 import '../../services/api_service.dart';
+import '../../services/error_handler.dart';
 import '../../services/caching_service.dart';
 import '../../services/common_widgets.dart';
 import '../counselor_models.dart';
@@ -76,17 +77,19 @@ class _ManageEventsPageState extends State<ExploreEventsPage> {
       } else {
         if (mounted && _events.isEmpty) {
           setState(() {
-            _errorMessage = ApiService.errorMessage(response, "Failed to load events");
+            _errorMessage = ErrorHandler.getMessage("Failed to load events. Status: ${response.statusCode}");
             _isLoading = false;
           });
+          ErrorHandler.showError(context, _errorMessage);
         }
       }
     } catch (e) {
       if (mounted && _events.isEmpty) {
         setState(() {
-          _errorMessage = e.toString().replaceFirst("Exception: ", "");
+          _errorMessage = ErrorHandler.getMessage(e);
           _isLoading = false;
         });
+        ErrorHandler.showError(context, e);
       }
     }
   }
@@ -106,12 +109,14 @@ class _ManageEventsPageState extends State<ExploreEventsPage> {
         );
         _fetchEvents();
       } else {
-        final error = jsonDecode(response.body)['message'] ?? "Registration failed";
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(error)));
+        if (mounted) {
+          ErrorHandler.showError(context, "Registration failed. Status: ${response.statusCode}");
+        }
       }
     } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Error: $e")));
+      if (mounted) {
+        ErrorHandler.showError(context, e);
+      }
     }
   }
 
@@ -151,12 +156,14 @@ class _ManageEventsPageState extends State<ExploreEventsPage> {
                   ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Registered successfully!")));
                   _fetchEvents();
                 } else {
-                  final error = jsonDecode(response.body)['message'] ?? "Registration failed";
-                  ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(error)));
+                  if (mounted) {
+                    ErrorHandler.showError(context, "Registration failed. Status: ${response.statusCode}");
+                  }
                 }
               } catch (e) {
-                if (!mounted) return;
-                ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Error: $e")));
+                if (mounted) {
+                  ErrorHandler.showError(context, e);
+                }
               }
             },
             child: const Text("REGISTER"),

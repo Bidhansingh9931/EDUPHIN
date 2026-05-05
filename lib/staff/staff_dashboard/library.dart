@@ -196,6 +196,7 @@ class _StaffLibraryPageState extends State<StaffLibraryPage> {
               return LoadingWrapper<BookPagination>(
                 snapshot: snapshot,
                 skeleton: _buildSkeleton(context),
+                onRetry: () => _fetchBooks(refresh: true),
                 builder: (pagination) {
                   // Only update the list if it's the current page's data
                   if (pagination.currentPage == _currentPage || _currentPage == 1) {

@@ -1,3 +1,4 @@
+import 'package:eduphin/services/error_handler.dart';
 import 'package:eduphin/services/responsive_helper.dart';
 import 'package:flutter/material.dart';
 import 'package:eduphin/services/common_widgets.dart';
@@ -50,9 +51,7 @@ class _AddReviewsPageState extends State<AddReviewsPage> {
         }
       } catch (e) {
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Failed to submit review: $e'), backgroundColor: Colors.red),
-          );
+          ErrorHandler.showError(context, e);
         }
       } finally {
         if (mounted) {

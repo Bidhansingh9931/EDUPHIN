@@ -1,4 +1,5 @@
 import 'package:eduphin/services/responsive_helper.dart';
+import 'package:eduphin/services/error_handler.dart';
 import 'package:flutter/material.dart';
 import 'package:eduphin/services/api_service.dart';
 import 'package:intl/intl.dart';
@@ -54,7 +55,7 @@ class _FAQManagementScreenState extends State<FAQManagementScreen> {
     } catch (e) {
       if (mounted) {
         setState(() {
-          _errorMessage = e.toString();
+          _errorMessage = ErrorHandler.getMessage(e);
           _isLoading = false;
         });
       }
@@ -106,7 +107,7 @@ class _FAQManagementScreenState extends State<FAQManagementScreen> {
         if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("FAQ deleted successfully")));
         _fetchFaqs();
       } catch (e) {
-        if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString())));
+        if (mounted) ErrorHandler.showError(context, e);
       }
     }
   }
@@ -136,6 +137,11 @@ class _FAQManagementScreenState extends State<FAQManagementScreen> {
           ],
         ),
         actions: [
+          IconButton(
+            onPressed: () => _showFAQModal(),
+            icon: const Icon(Icons.add_circle_outline, color: Colors.blue),
+            tooltip: "Add FAQ",
+          ),
           IconButton(
             onPressed: _handleLogout,
             icon: const Icon(Icons.logout, color: Colors.red),
@@ -294,10 +300,10 @@ class _CreateFAQModalState extends State<CreateFAQModal> {
       widget.onSuccess();
       if (mounted) {
         Navigator.pop(context);
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("FAQ saved successfully")));
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("FAQ saved successfully")));
       }
     } catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString())));
+      if (mounted) ErrorHandler.showError(context, e);
     } finally {
       if (mounted) setState(() => _isSaving = false);
     }

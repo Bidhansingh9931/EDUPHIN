@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:ui';
 
+import 'package:eduphin/services/error_handler.dart';
 import 'package:eduphin/services/caching_service.dart';
 import 'package:eduphin/services/common_widgets.dart';
 import 'package:eduphin/services/responsive_helper.dart';
@@ -116,6 +117,7 @@ class _RemarksPageState extends State<RemarksPage> {
           _error = e;
           _isLoading = false;
         });
+        ErrorHandler.showError(context, e);
       }
     }
   }
@@ -358,16 +360,10 @@ class _DeleteRemarkDialogState extends State<DeleteRemarkDialog> {
         );
         widget.onUpdate();
       }
-    } on Exception catch (e) {
+    } catch (e) {
       if (mounted) {
-        final theme = Theme.of(context);
         Navigator.of(context).pop();
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(e.toString().replaceFirst('Exception: ', '')),
-            backgroundColor: theme.colorScheme.error,
-          ),
-        );
+        ErrorHandler.showError(context, e);
       }
     } finally {
       if (mounted) {

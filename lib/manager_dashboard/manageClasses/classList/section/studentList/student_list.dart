@@ -3,6 +3,7 @@ import 'dart:convert';
 
 import 'package:eduphin/manager_dashboard/manageClasses/classList/section/studentList/remarks.dart';
 import 'package:eduphin/manager_dashboard/manageClasses/classList/section/studentList/view_attendence.dart';
+import 'package:eduphin/services/error_handler.dart';
 import 'package:eduphin/services/api_service.dart';
 import 'package:eduphin/services/caching_service.dart';
 import 'package:eduphin/services/common_widgets.dart';
@@ -100,6 +101,7 @@ class _StudentListPageState extends State<StudentListPage> {
           _error = e;
           _isLoading = false;
         });
+        ErrorHandler.showError(context, e);
       }
     }
   }

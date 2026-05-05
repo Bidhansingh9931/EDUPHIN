@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:eduphin/services/responsive_helper.dart';
 import 'package:flutter/material.dart';
 import '../../services/api_service.dart';
+import '../../services/error_handler.dart';
 import '../../services/caching_service.dart';
 import '../../services/common_widgets.dart';
 import '../counselor_models.dart';
@@ -71,19 +72,25 @@ class _ManageClassesPageState extends State<ManageClassesPage> {
           _processData(data);
         }
       } else {
-        if (mounted && _classes.isEmpty) {
-          setState(() {
-            _errorMessage = ApiService.errorMessage(response, "Failed to load classes");
-            _isLoading = false;
-          });
+        if (mounted) {
+          if (_classes.isEmpty) {
+            setState(() {
+              _errorMessage = ErrorHandler.getMessage("Status: ${response.statusCode}");
+              _isLoading = false;
+            });
+          }
+          ErrorHandler.showError(context, "Status: ${response.statusCode}");
         }
       }
     } catch (e) {
-      if (mounted && _classes.isEmpty) {
-        setState(() {
-          _errorMessage = e.toString().replaceFirst("Exception: ", "");
-          _isLoading = false;
-        });
+      if (mounted) {
+        if (_classes.isEmpty) {
+          setState(() {
+            _errorMessage = ErrorHandler.getMessage(e);
+            _isLoading = false;
+          });
+        }
+        ErrorHandler.showError(context, e);
       }
     }
   }
@@ -148,24 +155,10 @@ class _ManageClassesPageState extends State<ManageClassesPage> {
         child: LoadingWrapper(
           isLoading: _isLoading,
           hasData: _classes.isNotEmpty,
+          error: _errorMessage,
           skeleton: _buildSkeleton(),
-          child: _errorMessage != null && _classes.isEmpty
-              ? Center(
-                  child: Padding(
-                    padding: EdgeInsets.all(context.scale(24.0)),
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(Icons.error_outline, color: theme.colorScheme.error, size: context.scale(48)),
-                        SizedBox(height: context.md),
-                        Text(_errorMessage!, textAlign: TextAlign.center, style: TextStyle(color: theme.colorScheme.error, fontSize: context.font(14))),
-                        SizedBox(height: context.lg),
-                        FilledButton.icon(onPressed: _fetchClasses, icon: const Icon(Icons.refresh), label: const Text("RETRY")),
-                      ],
-                    ),
-                  ),
-                )
-              : _classes.isEmpty
+          onRetry: _fetchClasses,
+          child: _classes.isEmpty
                   ? ListView(
                       children: [
                         SizedBox(height: context.scale(200)),

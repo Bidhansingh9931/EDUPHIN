@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:eduphin/services/api_service.dart';
 import 'package:eduphin/teacher/dashboard/library_models.dart';
 import 'package:intl/intl.dart';
+import '../../services/error_handler.dart';
 
 class LendingBooksPage extends StatefulWidget {
   const LendingBooksPage({super.key});
@@ -36,7 +37,9 @@ class _LendingBooksPageState extends State<LendingBooksPage> {
       'due_to': _dueToController.text,
       if (_selectedStatus != 'all') 'returned_status': _selectedStatus,
     };
-    _lendingStream = ApiService.getAccountantLendingBooksStream(filters, _currentPage);
+    _lendingStream = ApiService.getAccountantLendingBooksStream(filters, _currentPage)..handleError((error) {
+      if (mounted) ErrorHandler.showError(context, error);
+    });
   }
 
   @override

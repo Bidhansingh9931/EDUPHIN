@@ -1,3 +1,4 @@
+import 'package:eduphin/services/error_handler.dart';
 import 'package:eduphin/services/responsive_helper.dart';
 import 'package:eduphin/teacher/dashboard/attendance_model.dart';
 import 'package:eduphin/teacher/dashboard/common_widgets.dart';
@@ -61,13 +62,11 @@ class _MarkAttendancePageState extends State<MarkAttendancePage> {
       if (mounted) {
         if (_students.isEmpty) {
           setState(() {
-            _error = "Failed to load attendance: $e";
+            _error = ErrorHandler.getMessage(e);
             _isLoading = false;
           });
         } else {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text("Failed to update attendance data: $e")),
-          );
+          ErrorHandler.showError(context, e);
           setState(() {
             _isLoading = false;
           });
@@ -427,12 +426,7 @@ class _MarkAttendancePageState extends State<MarkAttendancePage> {
       }
     } catch (e) {
        if(mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Failed to submit attendance: $e'),
-            backgroundColor: const Color(0xFFEF4444), // Red
-          ),
-        );
+        ErrorHandler.showError(context, e);
        }
     }
   }

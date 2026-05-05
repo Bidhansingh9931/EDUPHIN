@@ -4,6 +4,7 @@ import 'package:eduphin/services/pdf_service.dart';
 import 'package:eduphin/services/responsive_helper.dart';
 import 'package:flutter/material.dart';
 import 'package:eduphin/services/api_service.dart';
+import 'package:eduphin/services/error_handler.dart';
 import 'package:eduphin/services/caching_service.dart';
 import 'counselor_models.dart';
 
@@ -53,7 +54,10 @@ class _VirtualIdCardPageState extends State<VirtualIdCardPage> {
         });
       }
     } catch (e) {
-      if (mounted) setState(() => _isLoading = false);
+      if (mounted) {
+        ErrorHandler.showError(context, e);
+        setState(() => _isLoading = false);
+      }
     }
   }
 

@@ -1,5 +1,6 @@
 import 'package:eduphin/services/responsive_helper.dart';
 import 'package:eduphin/services/theme_service.dart';
+import 'package:eduphin/services/error_handler.dart';
 import 'package:flutter/material.dart';
 import '../services/api_service.dart';
 import 'cache_service.dart';
@@ -51,7 +52,7 @@ class _CustomerContactScreenState extends State<CustomerContactScreen> {
       debugPrint("Error fetching contacts: $e");
       if (mounted) {
         setState(() => _isLoading = false);
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Error: $e")));
+        ErrorHandler.showError(context, e);
       }
     }
   }

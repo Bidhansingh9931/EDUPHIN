@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 import 'package:eduphin/services/responsive_helper.dart';
 import 'package:flutter/material.dart';
 import 'package:eduphin/services/api_service.dart';
+import 'package:eduphin/services/error_handler.dart';
 import 'package:eduphin/teacher/dashboard/ticket_details_models.dart';
 import 'package:eduphin/teacher/dashboard/ticket_models.dart';
 import 'package:file_picker/file_picker.dart';
@@ -62,6 +63,7 @@ class _TicketPageState extends State<TicketPage> {
       }
     } catch (e) {
       debugPrint("Error fetching ticket details: $e");
+      if (mounted) ErrorHandler.showError(context, e);
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
@@ -102,9 +104,7 @@ class _TicketPageState extends State<TicketPage> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-            content: Text('Failed to send reply: $e'),
-            backgroundColor: const Color(0xFFEF4444)));
+        ErrorHandler.showError(context, e);
       }
     } finally {
       if (mounted) setState(() => _isSending = false);

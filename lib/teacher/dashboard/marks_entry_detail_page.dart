@@ -1,3 +1,4 @@
+import 'package:eduphin/services/error_handler.dart';
 import 'package:flutter/material.dart';
 import 'package:eduphin/services/api_service.dart';
 import 'package:eduphin/services/responsive_helper.dart';
@@ -62,9 +63,12 @@ class _MarksEntryDetailPageState extends State<MarksEntryDetailPage> {
     } catch (e) {
       if (mounted) {
         setState(() {
-          _error = e.toString();
+          _error = ErrorHandler.getMessage(e);
           _isLoading = false;
         });
+        if (_students != null) {
+          ErrorHandler.showError(context, e);
+        }
       }
     }
   }
@@ -264,9 +268,7 @@ class _MarksEntryDetailPageState extends State<MarksEntryDetailPage> {
       Navigator.of(context).pop();
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Failed to submit marks: $e'), backgroundColor: Color(0xFFEF4444)),
-      );
+      ErrorHandler.showError(context, e);
     } finally {
       if (mounted) setState(() => _isSubmitting = false);
     }

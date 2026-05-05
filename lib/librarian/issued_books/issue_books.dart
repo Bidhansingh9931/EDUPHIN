@@ -1,3 +1,4 @@
+import '../../../services/error_handler.dart';
 import '../../services/responsive_helper.dart';
 import 'package:flutter/material.dart';
 import '../../../services/api_service.dart';
@@ -59,9 +60,7 @@ class _IssueBookPageState extends State<IssueBookPage> {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Book issued successfully")));
       Navigator.pop(context, true);
     } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Error: $e")));
-      }
+      if (mounted) ErrorHandler.showError(context, e);
     } finally {
       if (mounted) setState(() => _isSubmitting = false);
     }

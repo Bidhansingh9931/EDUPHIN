@@ -1,5 +1,6 @@
 import 'package:eduphin/services/caching_service.dart';
 import 'package:eduphin/services/common_widgets.dart';
+import 'package:eduphin/services/error_handler.dart';
 import 'package:eduphin/services/pdf_service.dart';
 import 'package:flutter/material.dart';
 import 'package:eduphin/services/api_service.dart';
@@ -54,14 +55,7 @@ class _AdmitCardPageState extends State<AdmitCardPage> {
     } catch (e) {
       if (mounted) {
         setState(() => _isLoading = false);
-        if (_registrations.isEmpty) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text("Error fetching registered exams: $e"),
-              backgroundColor: Theme.of(context).colorScheme.error,
-            ),
-          );
-        }
+        ErrorHandler.showError(context, e);
       }
     }
   }
@@ -85,12 +79,7 @@ class _AdmitCardPageState extends State<AdmitCardPage> {
     } catch (e) {
       setState(() => _isLoadingDetails[regId] = false);
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text("Error fetching admit card details: $e"),
-            backgroundColor: theme.colorScheme.error,
-          ),
-        );
+        ErrorHandler.showError(context, e);
       }
     }
   }
@@ -324,15 +313,15 @@ class _AdmitCardPageState extends State<AdmitCardPage> {
                                 ),
                                 SizedBox(height: context.scale(20)),
                               ],
-                              
+
                               _buildInfoSection("Student Information", [
                                 _buildDetailRow("Student Name", details['student']?['user']?['name']),
                                 _buildDetailRow("Roll Number", details['student']?['roll_no']),
                                 _buildDetailRow("Class / Section", "${details['student']?['class']?['name'] ?? ''} - ${details['student']?['section']?['name'] ?? ''}"),
                               ]),
-      
+
                               SizedBox(height: context.scale(24)),
-      
+
                               /// PAPER SCHEDULE
                               Row(
                                 children: [
@@ -345,7 +334,7 @@ class _AdmitCardPageState extends State<AdmitCardPage> {
                                 ],
                               ),
                               SizedBox(height: context.scale(16)),
-      
+
                               /// TABLE
                               Container(
                                 decoration: BoxDecoration(
@@ -368,7 +357,7 @@ class _AdmitCardPageState extends State<AdmitCardPage> {
                                         ],
                                       ),
                                     ),
-      
+
                                     /// TABLE ROWS
                                     ...(details['papers'] as List? ?? []).map((paper) {
                                       final subject = paper['subject']?['name'] ?? 'N/A';
@@ -377,7 +366,7 @@ class _AdmitCardPageState extends State<AdmitCardPage> {
                                           : 'N/A';
                                       final time = "${paper['start_time'] ?? ''}\n${paper['end_time'] ?? ''}";
                                       final venue = paper['venue'] ?? 'N/A';
-      
+
                                       return Container(
                                         padding: EdgeInsets.symmetric(horizontal: context.scale(12), vertical: context.scale(12)),
                                         decoration: BoxDecoration(
@@ -396,9 +385,9 @@ class _AdmitCardPageState extends State<AdmitCardPage> {
                                   ],
                                 ),
                               ),
-      
+
                               SizedBox(height: context.scale(24)),
-      
+
                               /// PRINT BUTTON
                               SizedBox(
                                 width: double.infinity,
@@ -453,9 +442,13 @@ class _AdmitCardPageState extends State<AdmitCardPage> {
             label,
             style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: context.font(13)),
           ),
-          Text(
-            value?.toString() ?? 'N/A',
-            style: TextStyle(color: theme.colorScheme.onSurface, fontWeight: FontWeight.w600, fontSize: context.font(13)),
+          SizedBox(width: context.scale(16)),
+          Expanded(
+            child: Text(
+              value?.toString() ?? 'N/A',
+              textAlign: TextAlign.right,
+              style: TextStyle(color: theme.colorScheme.onSurface, fontWeight: FontWeight.w600, fontSize: context.font(13)),
+            ),
           ),
         ],
       ),

@@ -1,4 +1,6 @@
+import 'package:eduphin/services/error_handler.dart';
 import 'dart:convert';
+import 'dart:io';
 import 'package:eduphin/moderator_dashboard/cache_helper.dart';
 import 'package:eduphin/moderator_dashboard/skeleton_widgets.dart';
 import 'package:eduphin/services/api_service.dart';
@@ -58,30 +60,37 @@ class TestimonialProvider {
   static const String _cacheKey = 'moderator_testimonials_list';
 
   Future<List<Testimonial>> fetchTestimonials({bool bypassCache = false}) async {
-    if (!bypassCache) {
-      final cached = await CacheHelper.load(_cacheKey);
-      if (cached != null && cached is List) {
-        return cached.map((e) => Testimonial.fromJson(e)).toList();
+    try {
+      if (!bypassCache) {
+        final cached = await CacheHelper.load(_cacheKey);
+        if (cached != null && cached is List) {
+          return cached.map((e) => Testimonial.fromJson(e)).toList();
+        }
       }
-    }
-    final response = await ApiService.get('moderator/testimonials');
+      final response = await ApiService.get('moderator/testimonials');
 
-    if (response.statusCode == 200) {
-      final body = jsonDecode(response.body);
+      if (response.statusCode == 200) {
+        final body = jsonDecode(response.body);
 
-      List<dynamic> testimonialsData;
-      if (body is List) {
-        testimonialsData = body;
-      } else if (body is Map<String, dynamic> && body['data'] is List) {
-        testimonialsData = body['data'];
+        List<dynamic> testimonialsData;
+        if (body is List) {
+          testimonialsData = body;
+        } else if (body is Map<String, dynamic> && body['data'] is List) {
+          testimonialsData = body['data'];
+        } else {
+          throw ApiException('Received invalid data from server.');
+        }
+
+        await CacheHelper.save(_cacheKey, testimonialsData);
+        return testimonialsData.map((json) => Testimonial.fromJson(json as Map<String, dynamic>)).toList();
       } else {
-        throw Exception('Failed to parse testimonials: Unexpected JSON structure.');
+        throw ApiException('Failed to load testimonials', statusCode: response.statusCode);
       }
-
-      await CacheHelper.save(_cacheKey, testimonialsData);
-      return testimonialsData.map((json) => Testimonial.fromJson(json as Map<String, dynamic>)).toList();
-    } else {
-      throw Exception('Failed to load testimonials. Status code: ${response.statusCode}');
+    } on SocketException {
+      throw NetworkException();
+    } catch (e) {
+      if (e is ApiException || e is NetworkException) rethrow;
+      throw Exception('An unexpected error occurred: $e');
     }
   }
 
@@ -94,15 +103,23 @@ class TestimonialProvider {
   }
 
   Future<void> deleteTestimonial(int id) async {
-    final response = await ApiService.delete('moderator/testimonials/$id');
+    try {
+      final response = await ApiService.delete('moderator/testimonials/$id');
 
-    if (response.statusCode == 200) {
-      await CacheHelper.clear(_cacheKey);
-    } else {
-      throw Exception('Failed to delete testimonial.');
+      if (response.statusCode == 200) {
+        await CacheHelper.clear(_cacheKey);
+      } else {
+        throw ApiException('Failed to delete testimonial', statusCode: response.statusCode);
+      }
+    } on SocketException {
+      throw NetworkException();
+    } catch (e) {
+      if (e is ApiException || e is NetworkException) rethrow;
+      throw Exception('An unexpected error occurred: $e');
     }
   }
 }
+
 
 // The main page to display and manage testimonials.
 class TestimonialsPage extends StatefulWidget {
@@ -128,10 +145,17 @@ class _TestimonialsPageState extends State<TestimonialsPage> {
     _fetchData();
   }
 
-  void _fetchData({bool bypassCache = false}) {
+  Future<void> _fetchData({bool bypassCache = false}) async {
     setState(() {
       _testimonialsFuture = _provider.fetchTestimonials(bypassCache: bypassCache);
     });
+    try {
+      await _testimonialsFuture;
+    } catch (e) {
+      if (mounted) {
+        ErrorHandler.showError(context, e);
+      }
+    }
   }
 
   // Navigate to Add/Edit page and refresh if data was changed
@@ -165,15 +189,7 @@ class _TestimonialsPageState extends State<TestimonialsPage> {
       }
     } catch (e) {
       if (mounted) {
-        final theme = context.theme;
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Failed to delete: $e'),
-            backgroundColor: theme.colorScheme.error,
-            behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(context.sm)),
-          ),
-        );
+        ErrorHandler.showError(context, e);
       }
     }
   }

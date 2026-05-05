@@ -1,3 +1,4 @@
+import 'package:eduphin/services/error_handler.dart';
 import 'dart:convert';
 import 'package:eduphin/services/responsive_helper.dart';
 import 'package:eduphin/manager_dashboard/recentSupportTickets/assigned_ticket.dart';
@@ -20,7 +21,6 @@ import 'feeStructure/fee_Structure/fee_structure.dart';
 import 'feeStructure/studentFeeDetails/student_fee_details.dart';
 import 'library/available_books.dart';
 import 'library/lending_books.dart';
-import 'library/book_requests.dart';
 import 'manageClasses/classList/class_list.dart';
 import 'manageClasses/schedule/class_schedule_search.dart';
 import 'manageClasses/subjectList/subject_list.dart';
@@ -236,8 +236,11 @@ class DashboardData {
     }
 
     final profileData = json['profile'] != null ? Profile.fromJson(json['profile']) : const Profile(name: 'N/A', role: 'N/A', email: 'N/A', phone: 'N/A', imageUrl: '');
-    final rolesData = (json['roles_summary'] as List? ?? []).map((i) => RoleSummary.fromJson(i)).toList();
-    final eventsData = (json['events'] as List? ?? []).map((i) => UpcomingEvent.fromJson(i, context)).toList();
+    final rolesRaw = json['roles_summary'];
+    final rolesData = (rolesRaw is List ? rolesRaw : []).map((i) => RoleSummary.fromJson(i)).toList();
+    
+    final eventsRaw = json['events'];
+    final eventsData = (eventsRaw is List ? eventsRaw : []).map((i) => UpcomingEvent.fromJson(i, context)).toList();
 
     void navigate(Widget page) {
       if (context.mounted) {
@@ -276,7 +279,6 @@ class DashboardData {
       library: [
         Library(title: "Available Books", onTap: () => navigate(const AvailableBooksScreen())),
         Library(title: "Lending Books", onTap: () => navigate(const LendingBooksScreen())),
-        Library(title: "Book Requests", onTap: () => navigate(const BookRequestsScreen())),
       ],
       studyMaterial: [
         StudyMaterial(title: "Notes", onTap: () => navigate(const NotesPage())),
@@ -381,6 +383,7 @@ class _ManagerDashboardPageState extends State<ManagerDashboardPage> {
         _isLoading = false;
         _error = e;
       });
+      ErrorHandler.showError(context, e);
     }
   }
 
@@ -682,7 +685,7 @@ class CustomQuickActionBox extends StatelessWidget {
           itemCount: actions.length,
           gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
             crossAxisCount: context.responsive(2, tablet: 4, desktop: 4),
-            childAspectRatio: 1.1,
+            childAspectRatio: 1.8,
             crossAxisSpacing: context.scale(12),
             mainAxisSpacing: context.scale(12),
           ),

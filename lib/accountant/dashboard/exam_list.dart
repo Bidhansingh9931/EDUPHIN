@@ -2,6 +2,7 @@ import 'package:eduphin/services/common_widgets.dart';
 import 'package:eduphin/services/responsive_helper.dart';
 import 'package:flutter/material.dart';
 import 'package:eduphin/services/api_service.dart';
+import 'package:eduphin/services/error_handler.dart';
 import 'package:eduphin/accountant/dashboard/accountant_dashboard_model.dart';
 import 'exam_paper_schedule.dart';
 
@@ -18,12 +19,14 @@ class _ExamListPageState extends State<ExamListPage> {
   @override
   void initState() {
     super.initState();
-    _examsStream = ApiService.getAccountantExamsStream();
+    _refreshExams();
   }
 
   void _refreshExams() {
     setState(() {
-      _examsStream = ApiService.getAccountantExamsStream();
+      _examsStream = ApiService.getAccountantExamsStream()..handleError((error) {
+        if (mounted) ErrorHandler.showError(context, error);
+      });
     });
   }
 
@@ -59,20 +62,28 @@ class _ExamListPageState extends State<ExamListPage> {
                         SizedBox(height: context.md),
                         exams.isEmpty
                             ? _buildEmptyState(context)
-                            : GridView.builder(
-                                shrinkWrap: true,
-                                physics: const NeverScrollableScrollPhysics(),
-                                gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                                  crossAxisCount: context.responsive(1, tablet: 2, desktop: 3),
-                                  mainAxisExtent: context.scale(230),
-                                  crossAxisSpacing: context.spacing,
-                                  mainAxisSpacing: context.spacing,
-                                ),
-                                itemCount: exams.length,
-                                itemBuilder: (context, index) {
-                                  return _buildExamCard(context, exams[index]);
-                                },
-                              ),
+                            : context.isMobile
+                                ? ListView.separated(
+                                    shrinkWrap: true,
+                                    physics: const NeverScrollableScrollPhysics(),
+                                    itemCount: exams.length,
+                                    separatorBuilder: (context, index) => SizedBox(height: context.spacing),
+                                    itemBuilder: (context, index) => _buildExamCard(context, exams[index]),
+                                  )
+                                : GridView.builder(
+                                    shrinkWrap: true,
+                                    physics: const NeverScrollableScrollPhysics(),
+                                    gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                                      crossAxisCount: context.responsive(1, tablet: 2, desktop: 3),
+                                      mainAxisExtent: context.scale(230),
+                                      crossAxisSpacing: context.spacing,
+                                      mainAxisSpacing: context.spacing,
+                                    ),
+                                    itemCount: exams.length,
+                                    itemBuilder: (context, index) {
+                                      return _buildExamCard(context, exams[index]);
+                                    },
+                                  ),
                       ],
                     ),
                   ),

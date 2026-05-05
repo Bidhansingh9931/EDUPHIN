@@ -1,3 +1,5 @@
+import 'package:intl/intl.dart';
+
 class BookPagination {
   final List<Book> books;
   final BookFilters filters;
@@ -32,13 +34,14 @@ class BookPagination {
       return 0;
     }
 
-    int total = _toInt(metaSource['total'] ?? metaSource['total_books'] ?? 257); // Fallback to 257 for testing
-    int perPage = _toInt(metaSource['per_page'] ?? metaSource['perPage'] ?? 10);
-    int currentPage = _toInt(metaSource['current_page'] ?? metaSource['currentPage'] ?? 1);
-    
-    // Explicitly calculate lastPage from total books
-    int lastPage = _toInt(metaSource['last_page'] ?? metaSource['lastPage'] ?? metaSource['total_pages']);
-    if (lastPage <= 1 && total > 0) {
+    // Try to find total/per_page/current_page in either metaSource or root json
+    int total = _toInt(metaSource['total'] ?? json['total'] ?? metaSource['total_books'] ?? 0);
+    int perPage = _toInt(metaSource['per_page'] ?? json['per_page'] ?? metaSource['perPage'] ?? 10);
+    int currentPage = _toInt(metaSource['current_page'] ?? json['current_page'] ?? metaSource['currentPage'] ?? 1);
+    int lastPage = _toInt(metaSource['last_page'] ?? json['last_page'] ?? metaSource['lastPage'] ?? 0);
+
+    // If lastPage is missing but we have total, calculate it
+    if (lastPage <= 0 && total > 0) {
       lastPage = (total / (perPage > 0 ? perPage : 10)).ceil();
     }
 
@@ -211,6 +214,7 @@ class IssuedBook {
   final String? returnedAt;
   final String? issueNo;
   final int? daysOverdue;
+  final String? lenderName;
 
   IssuedBook({
     required this.id,
@@ -220,17 +224,29 @@ class IssuedBook {
     this.returnedAt,
     this.issueNo,
     this.daysOverdue,
+    this.lenderName,
   });
 
   factory IssuedBook.fromJson(Map<String, dynamic> json) {
+    String formatDate(String? dateStr) {
+      if (dateStr == null || dateStr == 'N/A') return 'N/A';
+      try {
+        final date = DateTime.parse(dateStr);
+        return DateFormat('MMM dd, yyyy').format(date);
+      } catch (e) {
+        return dateStr;
+      }
+    }
+
     return IssuedBook(
       id: json['id'] ?? 0,
       book: Book.fromJson(json['book'] ?? {}),
-      issuedAt: json['issued_at'] ?? 'N/A',
-      dueDate: json['due_date'] ?? 'N/A',
+      issuedAt: formatDate(json['issued_at']),
+      dueDate: formatDate(json['due_date']),
       returnedAt: json['returned_at'],
       issueNo: json['issue_no']?.toString() ?? 'ISN-${json['id']}',
       daysOverdue: json['days_overdue'] ?? 0,
+      lenderName: json['lender']?['name'],
     );
   }
 
@@ -243,6 +259,7 @@ class IssuedBook {
       'returned_at': returnedAt,
       'issue_no': issueNo,
       'days_overdue': daysOverdue,
+      'lender_name': lenderName,
     };
   }
 }

@@ -1,3 +1,4 @@
+import 'package:eduphin/services/error_handler.dart';
 import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
@@ -42,17 +43,19 @@ class EmployeeDetailsProvider {
           return null;
         }
       } else {
-        throw Exception('Failed to load employee details. Status: ${response.statusCode}');
+        throw ApiException('Failed to load employee details', statusCode: response.statusCode);
       }
+    } on SocketException {
+      throw NetworkException();
     } catch (e) {
-      throw Exception('An error occurred while fetching employee details: $e');
+      if (e is ApiException || e is NetworkException) rethrow;
+      throw Exception('An unexpected error occurred: $e');
     }
   }
 
   Future<void> saveEmployeeDetails(EmployeeDetails details) async {
     try {
       final fields = details.toApiData();
-      fields['_method'] = 'PUT'; // Laravel method spoofing for multipart update
 
       http.StreamedResponse response;
       if (details.webImage != null) {
@@ -87,11 +90,13 @@ class EmployeeDetailsProvider {
       }
 
       if (response.statusCode < 200 || response.statusCode >= 300) {
-        final respStr = await response.stream.bytesToString();
-        throw Exception('Failed to save employee details. Status: ${response.statusCode}, Body: $respStr');
+        throw ApiException('Failed to save changes', statusCode: response.statusCode);
       }
+    } on SocketException {
+      throw NetworkException();
     } catch (e) {
-      throw Exception('An error occurred while saving employee details: $e');
+      if (e is ApiException || e is NetworkException) rethrow;
+      throw Exception('An unexpected error occurred: $e');
     }
   }
 }

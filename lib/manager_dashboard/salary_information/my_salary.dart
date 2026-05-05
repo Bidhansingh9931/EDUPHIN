@@ -5,6 +5,7 @@ import 'package:eduphin/services/responsive_helper.dart';
 import 'package:http/http.dart' as http;
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:eduphin/services/error_handler.dart';
 import 'package:eduphin/services/api_service.dart';
 
 // --- DATA MODELS ---
@@ -180,6 +181,7 @@ class _MySalaryPageState extends State<MySalaryPage> {
         _isLoading = _accountDetails == null;
         _error = e;
       });
+      ErrorHandler.showError(context, e);
     }
   }
 
@@ -231,12 +233,7 @@ class _MySalaryPageState extends State<MySalaryPage> {
       }
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Error: ${e.toString()}'),
-          backgroundColor: Colors.red,
-        ),
-      );
+      ErrorHandler.showError(context, e);
     } finally {
       if (mounted) {
         setState(() => _isSaving = false);

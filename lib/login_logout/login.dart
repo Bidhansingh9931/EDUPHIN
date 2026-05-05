@@ -1,6 +1,7 @@
 import 'package:eduphin/services/responsive_helper.dart';
 import 'package:flutter/material.dart';
 import 'package:eduphin/services/api_service.dart';
+import 'package:eduphin/services/error_handler.dart';
 import 'package:eduphin/accountant/dashboard/accountant_dashbard.dart';
 import 'package:eduphin/counselor/counselor_dashboard.dart';
 import 'package:eduphin/librarian/librarian_dashboard.dart';
@@ -11,6 +12,7 @@ import 'package:eduphin/student/student_dashboard.dart';
 import 'package:eduphin/teacher/dashboard/teacher_dashboard.dart';
 import 'package:eduphin/staff/staff_dashboard/staff_dashboard.dart';
 import 'package:eduphin/superAdmin/super_admin_dashboard.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class Roles {
   static const int superAdmin = 1;
@@ -40,6 +42,36 @@ class _LoginPageState extends State<LoginPage> {
   String _error = '';
 
   @override
+  void initState() {
+    super.initState();
+    _loadSavedCredentials();
+  }
+
+  Future<void> _loadSavedCredentials() async {
+    final prefs = await SharedPreferences.getInstance();
+    final savedEmail = prefs.getString('remember_email');
+    final rememberMe = prefs.getBool('remember_me') ?? false;
+
+    if (rememberMe && savedEmail != null) {
+      setState(() {
+        emailController.text = savedEmail;
+        isChecked = true;
+      });
+    }
+  }
+
+  Future<void> _saveCredentials() async {
+    final prefs = await SharedPreferences.getInstance();
+    if (isChecked) {
+      await prefs.setString('remember_email', emailController.text.trim());
+      await prefs.setBool('remember_me', true);
+    } else {
+      await prefs.remove('remember_email');
+      await prefs.setBool('remember_me', false);
+    }
+  }
+
+  @override
   void dispose() {
     emailController.dispose();
     passwordController.dispose();
@@ -55,14 +87,15 @@ class _LoginPageState extends State<LoginPage> {
 
     try {
       final roleId = await ApiService.login(emailController.text.trim(), passwordController.text.trim());
+      await _saveCredentials();
       if (!mounted) return;
       _navigateToDashboard(roleId);
     } catch (e) {
-      debugPrint('An error occurred during login: $e');
       if (!mounted) return;
       setState(() {
-        _error = e.toString().replaceFirst('Exception: ', '');
+        _error = ErrorHandler.getMessage(e);
       });
+      ErrorHandler.showError(context, e);
     } finally {
       if (mounted) {
         setState(() {
@@ -206,8 +239,8 @@ class _LoginPageState extends State<LoginPage> {
                       Row(
                         children: [
                           SizedBox(
-                            height: 24,
-                            width: 24,
+                            height: context.scale(24),
+                            width: context.scale(24),
                             child: Checkbox(
                               value: isChecked,
                               onChanged: (bool? newValue) {
@@ -218,11 +251,13 @@ class _LoginPageState extends State<LoginPage> {
                               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
                             ),
                           ),
-                          const SizedBox(width: 8),
-                          Text(
-                            "Remember me",
-                            style: theme.textTheme.bodyMedium?.copyWith(
-                              fontSize: context.font(14),
+                          SizedBox(width: context.scale(8)),
+                          Expanded(
+                            child: Text(
+                              "Remember me",
+                              style: theme.textTheme.bodyMedium?.copyWith(
+                                fontSize: context.font(14),
+                              ),
                             ),
                           ),
                         ],
@@ -249,6 +284,18 @@ class _LoginPageState extends State<LoginPage> {
                                     fontWeight: FontWeight.bold,
                                   ),
                                 ),
+                        ),
+                      ),
+                      SizedBox(height: context.scale(16)),
+                      TextButton(
+                        onPressed: () => Navigator.pushNamed(context, '/privacy-policy'),
+                        child: Text(
+                          "Privacy Policy",
+                          style: TextStyle(
+                            color: theme.hintColor,
+                            fontSize: context.font(14),
+                            decoration: TextDecoration.underline,
+                          ),
                         ),
                       ),
                     ],

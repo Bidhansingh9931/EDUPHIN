@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
 import '../services/api_service.dart';
+import '../services/error_handler.dart';
 import '../services/caching_service.dart';
 import 'package:eduphin/counselor/counselor_models.dart' as counselor_model;
 
@@ -159,7 +160,7 @@ class _CounselorProfilePageState extends State<CounselorProfilePage> {
       });
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Error fetching profile: $e")));
+        ErrorHandler.showError(context, e);
         setState(() => _isLoading = false);
       }
     }
@@ -258,7 +259,7 @@ class _CounselorProfilePageState extends State<CounselorProfilePage> {
       _fetchProfile();
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Error: $e")));
+        ErrorHandler.showError(context, e);
         setState(() => _isLoading = false);
       }
     }
@@ -533,10 +534,14 @@ class _CounselorProfilePageState extends State<CounselorProfilePage> {
                           );
 
         if (confirm == true) {
-          await ApiService.logout();
-          if (mounted) {
-            final navigator = Navigator.of(context);
-            navigator.pushNamedAndRemoveUntil('/login', (route) => false);
+          try {
+            await ApiService.logout();
+            if (mounted) {
+              final navigator = Navigator.of(context);
+              navigator.pushNamedAndRemoveUntil('/login', (route) => false);
+            }
+          } catch (e) {
+            if (mounted) ErrorHandler.showError(context, e);
           }
         }
       },

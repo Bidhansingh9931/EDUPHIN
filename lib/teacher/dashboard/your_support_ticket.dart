@@ -3,6 +3,7 @@ import 'package:eduphin/teacher/dashboard/ticket_details_page.dart';
 import 'package:eduphin/teacher/dashboard/create_new_support_ticket.dart';
 import 'package:eduphin/teacher/dashboard/teacher_cache_service.dart';
 import 'package:flutter/material.dart';
+import 'package:eduphin/services/error_handler.dart';
 import 'package:eduphin/services/api_service.dart';
 import 'package:eduphin/teacher/dashboard/ticket_models.dart';
 import 'package:eduphin/services/responsive_helper.dart';
@@ -67,13 +68,11 @@ class _YourSupportTicketPageState extends State<YourSupportTicketPage> {
       if (mounted) {
         if (_tickets == null) {
           setState(() {
-            _error = e.toString();
+            _error = ErrorHandler.getMessage(e);
             _isLoading = false;
           });
         } else {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text("Failed to update tickets: $e")),
-          );
+          ErrorHandler.showError(context, e);
           setState(() {
             _isLoading = false;
           });

@@ -1,6 +1,7 @@
 import 'package:eduphin/services/api_service.dart';
 import 'package:eduphin/services/caching_service.dart';
 import 'package:eduphin/services/common_widgets.dart';
+import 'package:eduphin/services/error_handler.dart';
 import 'package:eduphin/student/student_fee_model.dart';
 import 'package:flutter/material.dart';
 import 'package:eduphin/services/responsive_helper.dart';
@@ -51,12 +52,11 @@ class _StudentFeePageState extends State<StudentFeePage> {
       }
     } catch (e) {
       if (mounted) {
-        setState(() {
-          isLoading = false;
-          if (feeData == null) {
-            errorMessage = e.toString();
-          }
-        });
+        setState(() => isLoading = false);
+        ErrorHandler.showError(context, e);
+        if (feeData == null) {
+          errorMessage = ErrorHandler.getMessage(e);
+        }
       }
     }
   }
@@ -104,12 +104,7 @@ class _StudentFeePageState extends State<StudentFeePage> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text("Error fetching receipt: $e"),
-            backgroundColor: colorScheme.error,
-          ),
-        );
+        ErrorHandler.showError(context, e);
       }
     }
   }
@@ -302,9 +297,9 @@ class _StudentFeePageState extends State<StudentFeePage> {
         children: [
           Icon(icon, color: color, size: context.scale(24)),
           SizedBox(height: context.scale(12)),
-          Text(title, style: TextStyle(color: colorScheme.onSurfaceVariant, fontSize: context.font(12), fontWeight: FontWeight.w600)),
+          Text(title, style: TextStyle(color: colorScheme.onSurfaceVariant, fontSize: context.font(12), fontWeight: FontWeight.w600), maxLines: 1, overflow: TextOverflow.ellipsis),
           SizedBox(height: context.scale(4)),
-          Text(amount, style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800, fontSize: context.font(16))),
+          FittedBox(fit: BoxFit.scaleDown, child: Text(amount, style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800, fontSize: context.font(16)))),
         ],
       ),
     );
@@ -492,28 +487,39 @@ class _StudentFeePageState extends State<StudentFeePage> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text("Ref: ${p.referenceNo ?? "-"}", style: TextStyle(color: colorScheme.onSurfaceVariant, fontSize: context.font(11))),
-                        Text("By: ${p.submitter?.name ?? "-"}", style: TextStyle(color: colorScheme.onSurfaceVariant, fontSize: context.font(11))),
+                        Text("Ref: ${p.referenceNo ?? "-"}", 
+                          style: TextStyle(color: colorScheme.onSurfaceVariant, fontSize: context.font(11)),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        Text("By: ${p.submitter?.name ?? "-"}", 
+                          style: TextStyle(color: colorScheme.onSurfaceVariant, fontSize: context.font(11)),
+                          overflow: TextOverflow.ellipsis,
+                        ),
                       ],
                     ),
                   ),
-                  ElevatedButton.icon(
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF10B981).withValues(alpha: 0.1),
-                      foregroundColor: const Color(0xFF10B981),
-                      minimumSize: Size.zero,
-                      padding: EdgeInsets.symmetric(horizontal: context.scale(12), vertical: context.scale(8)),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(context.scale(8)),
-                        side: const BorderSide(color: Color(0xFF10B981), width: 0.5),
+                  SizedBox(width: context.scale(8)),
+                  Flexible(
+                    child: ElevatedButton.icon(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF10B981).withValues(alpha: 0.1),
+                        foregroundColor: const Color(0xFF10B981),
+                        minimumSize: Size.zero,
+                        padding: EdgeInsets.symmetric(horizontal: context.scale(12), vertical: context.scale(8)),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(context.scale(8)),
+                          side: const BorderSide(color: Color(0xFF10B981), width: 0.5),
+                        ),
+                        elevation: 0,
                       ),
-                      elevation: 0,
+                      onPressed: () {
+                        if (p.idHash != null) _printReceipt(p.idHash!);
+                      },
+                      icon: Icon(Icons.receipt_long_rounded, size: context.scale(14)),
+                      label: FittedBox(
+                        child: Text("RECEIPT", style: TextStyle(fontSize: context.font(11), fontWeight: FontWeight.bold)),
+                      ),
                     ),
-                    onPressed: () {
-                      if (p.idHash != null) _printReceipt(p.idHash!);
-                    },
-                    icon: Icon(Icons.receipt_long_rounded, size: context.scale(14)),
-                    label: Text("RECEIPT", style: TextStyle(fontSize: context.font(11), fontWeight: FontWeight.bold)),
                   ),
                 ],
               ),
