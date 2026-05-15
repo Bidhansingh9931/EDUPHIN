@@ -351,6 +351,9 @@ class ApiService {
         headers.remove('Accept');
       }
       
+      // Some servers fail preflight if 'Accept' is application/json during multipart upload
+      // We'll keep it as is for now, but ensure it's allowed.
+      
       final uri = _uri(endpoint);
 
       _logRequest('POST-MULTIPART-BYTES', uri, body: fields);
