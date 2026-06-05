@@ -1,12 +1,17 @@
+import 'package:eduphin/services/error_handler.dart';
 import 'package:eduphin/moderator_dashboard/dashboard_cards/role_distribution.dart';
 import 'package:eduphin/moderator_dashboard/notification.dart';
 import 'package:eduphin/moderator_dashboard/profile.dart';
+import 'package:eduphin/services/api_service.dart';
+import 'package:eduphin/services/common_widgets.dart';
+import 'package:eduphin/services/responsive_helper.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 
 import 'all_review.dart';
 import 'dashboard_data_provider.dart';
 import 'dashboard_models.dart';
+import 'skeleton_widgets.dart';
 
 class ModeratorDashboardPage extends StatefulWidget {
   const ModeratorDashboardPage({super.key});
@@ -21,30 +26,48 @@ class _ModeratorDashboardPageState extends State<ModeratorDashboardPage> {
 
   late Future<DashboardData> _dashboardDataFuture;
   final DashboardDataProvider _dataProvider = DashboardDataProvider();
+  DashboardData? _cachedData;
 
   @override
   void initState() {
     super.initState();
     _dashboardDataFuture = _dataProvider.fetchDashboardData();
+    _loadCacheAndFetch();
+  }
+
+  Future<void> _loadCacheAndFetch() async {
+    final cached = await _dataProvider.getCachedData();
+    if (mounted) {
+      setState(() {
+        _cachedData = cached;
+        _dashboardDataFuture = _dataProvider.fetchDashboardData();
+      });
+    }
   }
 
   Future<void> _refreshData() async {
     setState(() {
-      _dashboardDataFuture = _dataProvider.fetchDashboardData();
+      _dashboardDataFuture = _dataProvider.fetchDashboardData(bypassCache: true);
     });
+    try {
+      await _dashboardDataFuture;
+    } catch (e) {
+      if (mounted) {
+        ErrorHandler.showError(context, e);
+      }
+    }
   }
 
   @override
   Widget build(BuildContext context) {
+    final theme = context.theme;
+
     return Scaffold(
-      backgroundColor: const Color(0xFF0D1820),
       appBar: AppBar(
-        backgroundColor: const Color(0xFF0D1820),
         elevation: 0,
-        automaticallyImplyLeading: false,
-        title: const Text(
+        title: Text(
           "Dashboard Overview",
-          style: TextStyle(color: Colors.white, fontSize: 18),
+          style: TextStyle(fontSize: context.font(18)),
         ),
         centerTitle: true,
         actions: [
@@ -55,14 +78,14 @@ class _ModeratorDashboardPageState extends State<ModeratorDashboardPage> {
                     content: Text('Download started... (placeholder)')),
               );
             },
-            icon: const Icon(Icons.download, color: Colors.white),
+            icon: Icon(Icons.download, size: context.scale(24)),
           ),
           IconButton(
             onPressed: () {
               Navigator.push(context,
                   MaterialPageRoute(builder: (_) => const NotificationPage()));
             },
-            icon: const Icon(Icons.notifications, color: Colors.white),
+            icon: Icon(Icons.notifications, size: context.scale(24)),
           ),
         ],
       ),
@@ -71,69 +94,46 @@ class _ModeratorDashboardPageState extends State<ModeratorDashboardPage> {
         child: FutureBuilder<DashboardData>(
           future: _dashboardDataFuture,
           builder: (context, snapshot) {
-            if (snapshot.connectionState == ConnectionState.waiting) {
-              return const Center(child: CircularProgressIndicator());
-            } else if (snapshot.hasError) {
-              return Center(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Text(
-                      'Error: An error occurred: ${snapshot.error}',
-                      textAlign: TextAlign.center,
-                      style: const TextStyle(color: Colors.white70),
-                    ),
-                    const SizedBox(height: 20),
-                    ElevatedButton(
-                      onPressed: _refreshData,
-                      child: const Text('Retry'),
-                    ),
-                  ],
-                ),
-              );
-            } else if (snapshot.hasData) {
-              return _buildDashboardBody(snapshot.data!);
-            } else {
-              return const Center(
-                child: Text(
-                  'No data available.',
-                  style: TextStyle(color: Colors.white70),
-                ),
-              );
-            }
+            return ModeratorLoadingWrapper<DashboardData>(
+              snapshot: snapshot,
+              cachedData: _cachedData,
+              skeleton: const DashboardSkeleton(),
+              onRefresh: _refreshData,
+              builder: (data) => _buildDashboardBody(data),
+            );
           },
         ),
       ),
     );
   }
 
-  Widget _buildDashboardBody(DashboardData data) {
-    final screenWidth = MediaQuery.of(context).size.width;
-    final screenHeight = MediaQuery.of(context).size.height;
+  Widget _buildSectionHeader(String title) {
+    final theme = context.theme;
+    return Text(
+      title,
+      style: theme.textTheme.titleMedium?.copyWith(
+        fontWeight: FontWeight.bold,
+        fontSize: context.font(18),
+      ),
+    );
+  }
 
-    double responsiveFontSize(double baseFontSize) {
-      if (screenWidth > 1200) {
-        return baseFontSize * 1.2;
-      } else if (screenWidth > 600) {
-        return baseFontSize * 1.1;
-      } else {
-        return baseFontSize;
-      }
-    }
+  Widget _buildDashboardBody(DashboardData data) {
+    final theme = context.theme;
+    final colorScheme = theme.colorScheme;
 
     final pieChartColors = [
-      const Color(0xFF2E6CFF),
-      const Color(0xFF2ECF7E),
-      const Color(0xFF8A63FF),
-      const Color(0xFFFFC107),
-      const Color(0xFFE91E63),
-      const Color(0xFF00BCD4),
+      colorScheme.primary,
+      colorScheme.secondary,
+      colorScheme.tertiary,
+      colorScheme.error,
+      colorScheme.primaryContainer,
+      colorScheme.secondaryContainer,
     ];
 
     return SingleChildScrollView(
       physics: const AlwaysScrollableScrollPhysics(),
-      padding: EdgeInsets.symmetric(
-          horizontal: screenWidth * 0.04, vertical: 8),
+      padding: context.pagePadding,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -145,58 +145,53 @@ class _ModeratorDashboardPageState extends State<ModeratorDashboardPage> {
                     context,
                     MaterialPageRoute(
                         builder: (context) =>
-                            const ModeratorProfilePage())),
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(40),
-                  child: Image.asset(
-                    'assets/images/girl_image.webp',
-                    width: 45,
-                    height: 45,
-                    fit: BoxFit.cover,
-                  ),
+                        const ModeratorProfilePage())).then((_) => _refreshData()),
+                child: ProfileAvatar(
+                  imageUrl: data.userPhoto.isNotEmpty
+                      ? ApiService.getStorageUrl(data.userPhoto)
+                      : null,
+                  radius: context.scale(24),
                 ),
               ),
-              const SizedBox(width: 12),
+              SizedBox(width: context.spacing),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text("Welcome back, Sarah!",
-                        style: TextStyle(
-                            color: Colors.white,
-                            fontSize: responsiveFontSize(18),
-                            fontWeight: FontWeight.bold)),
-                    const SizedBox(height: 3),
+                    Text("Welcome back, ${data.userName}!",
+                        style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold)),
+                    SizedBox(height: context.scale(4)),
                     Text(
                       "Here is the information about your moderator dashboard.",
                       maxLines: 2,
-                      style: TextStyle(
-                          color: Colors.white54,
-                          fontSize: responsiveFontSize(12)),
+                      style: theme.textTheme.bodySmall,
                     ),
                   ],
                 ),
               ),
             ],
           ),
-          SizedBox(height: screenHeight * 0.02),
+          SizedBox(height: context.spacing),
           Container(
-            height: 45,
-            padding: const EdgeInsets.symmetric(horizontal: 14),
+            height: context.scale(48),
+            padding: EdgeInsets.symmetric(horizontal: context.spacing),
             decoration: BoxDecoration(
-              color: const Color(0xFF13232E),
-              borderRadius: BorderRadius.circular(30),
+              color: colorScheme.surfaceContainerLow,
+              borderRadius: BorderRadius.circular(context.scale(30)),
+              border: Border.all(
+                color: colorScheme.outlineVariant.withValues(alpha: 0.5),
+                width: 0.5,
+              ),
             ),
-            child: const Row(
+            child: Row(
               children: [
-                Icon(Icons.search, color: Colors.white54),
-                SizedBox(width: 10),
+                Icon(Icons.search, color: colorScheme.onSurfaceVariant, size: context.scale(20)),
+                SizedBox(width: context.spacing / 2),
                 Expanded(
                   child: TextField(
-                    style: TextStyle(color: Colors.white),
                     decoration: InputDecoration(
                       hintText: "Search accounts, institutes...",
-                      hintStyle: TextStyle(color: Colors.white38),
+                      hintStyle: theme.textTheme.bodyMedium?.copyWith(color: colorScheme.onSurfaceVariant.withValues(alpha: 0.5)),
                       border: InputBorder.none,
                     ),
                   ),
@@ -204,7 +199,7 @@ class _ModeratorDashboardPageState extends State<ModeratorDashboardPage> {
               ],
             ),
           ),
-          SizedBox(height: screenHeight * 0.02),
+          SizedBox(height: context.spacing),
           LayoutBuilder(builder: (context, constraints) {
             if (constraints.maxWidth < 480) {
               return Column(
@@ -214,7 +209,7 @@ class _ModeratorDashboardPageState extends State<ModeratorDashboardPage> {
                       selectedValue = newValue;
                     });
                   }, ['Last 7 Days', 'Last 30 Days', 'Last 60 Days']),
-                  const SizedBox(height: 10),
+                  SizedBox(height: context.spacing / 2),
                   _buildDropdown(selectedValue2, (newValue) {
                     setState(() {
                       selectedValue2 = newValue;
@@ -231,30 +226,28 @@ class _ModeratorDashboardPageState extends State<ModeratorDashboardPage> {
                 children: [
                   Expanded(
                       child: _buildDropdown(selectedValue, (newValue) {
-                    setState(() {
-                      selectedValue = newValue;
-                    });
-                  }, ['Last 7 Days', 'Last 30 Days', 'Last 60 Days'])),
-                  const SizedBox(width: 10),
+                        setState(() {
+                          selectedValue = newValue;
+                        });
+                      }, ['Last 7 Days', 'Last 30 Days', 'Last 60 Days'])),
+                  SizedBox(width: context.spacing / 2),
                   Expanded(
                       child: _buildDropdown(selectedValue2, (newValue) {
-                    setState(() {
-                      selectedValue2 = newValue;
-                    });
-                  }, [
-                    'All Institutes',
-                    'Active Institutes',
-                    'Inactive Institutes'
-                  ])),
+                        setState(() {
+                          selectedValue2 = newValue;
+                        });
+                      }, [
+                        'All Institutes',
+                        'Active Institutes',
+                        'Inactive Institutes'
+                      ])),
                 ],
               );
             }
           }),
-          SizedBox(height: screenHeight * 0.02),
-          Text("Dashboard Overview",
-              style: TextStyle(
-                  color: Colors.white, fontSize: responsiveFontSize(18))),
-          const SizedBox(height: 12),
+          SizedBox(height: context.spacing),
+          _buildSectionHeader("Dashboard Overview"),
+          SizedBox(height: context.scale(12)),
           LayoutBuilder(builder: (context, constraints) {
             int crossAxisCount;
             double childAspectRatio;
@@ -279,8 +272,8 @@ class _ModeratorDashboardPageState extends State<ModeratorDashboardPage> {
               itemCount: data.gridItems.length,
               gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
                 crossAxisCount: crossAxisCount,
-                crossAxisSpacing: 12,
-                mainAxisSpacing: 12,
+                crossAxisSpacing: context.spacing / 2,
+                mainAxisSpacing: context.spacing / 2,
                 childAspectRatio: childAspectRatio,
               ),
               itemBuilder: (context, index) {
@@ -301,15 +294,12 @@ class _ModeratorDashboardPageState extends State<ModeratorDashboardPage> {
               },
             );
           }),
-          const SizedBox(height: 18),
-          Text("User Role Distribution",
-              style: TextStyle(
-                  color: Colors.white, fontSize: responsiveFontSize(18))),
-          const SizedBox(height: 10),
+          SizedBox(height: context.spacing),
+          _buildSectionHeader("User Role Distribution"),
+          SizedBox(height: context.scale(12)),
           Card(
-            color: const Color(0xFF10202A),
             shape:
-                RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+            RoundedRectangleBorder(borderRadius: BorderRadius.circular(context.scale(14))),
             clipBehavior: Clip.antiAlias,
             child: InkWell(
               onTap: () => Navigator.push(
@@ -318,25 +308,25 @@ class _ModeratorDashboardPageState extends State<ModeratorDashboardPage> {
                       builder: (_) => const RoleDistributionPage())),
               child: Padding(
                 padding:
-                    const EdgeInsets.symmetric(horizontal: 14, vertical: 16),
+                EdgeInsets.all(context.spacing),
                 child: Column(
                   children: [
                     SizedBox(
-                      height: 160,
+                      height: context.scale(180),
                       child: Stack(
                         alignment: Alignment.center,
                         children: [
                           PieChart(
                             PieChartData(
-                              sectionsSpace: 3,
-                              centerSpaceRadius: 42,
+                              sectionsSpace: context.scale(4),
+                              centerSpaceRadius: context.scale(50),
                               startDegreeOffset: -90,
                               sections: List.generate(data.gridItems.length, (index) {
                                 final item = data.gridItems[index];
                                 return PieChartSectionData(
                                   value: double.tryParse(item.value) ?? 0.0,
                                   color: pieChartColors[index % pieChartColors.length],
-                                  radius: 40,
+                                  radius: context.scale(40),
                                   title: '',
                                 );
                               }),
@@ -346,19 +336,16 @@ class _ModeratorDashboardPageState extends State<ModeratorDashboardPage> {
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
                               Text(data.gridItems.fold<int>(0, (sum, item) => sum + (int.tryParse(item.value) ?? 0)).toString(),
-                                  style: TextStyle(
-                                      color: Colors.white,
-                                      fontSize: responsiveFontSize(22),
-                                      fontWeight: FontWeight.bold)),
-                              const SizedBox(height: 4),
-                              const Text("Total Users",
-                                  style: TextStyle(color: Colors.white60)),
+                                  style: theme.textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold)),
+                              SizedBox(height: context.scale(4)),
+                              Text("Total Users",
+                                  style: theme.textTheme.bodySmall),
                             ],
                           ),
                         ],
                       ),
                     ),
-                    const SizedBox(height: 12),
+                    SizedBox(height: context.spacing),
                     ...List.generate(data.gridItems.length, (index) {
                       final item = data.gridItems[index];
                       return LegendRow(
@@ -372,22 +359,20 @@ class _ModeratorDashboardPageState extends State<ModeratorDashboardPage> {
               ),
             ),
           ),
-          SizedBox(height: screenHeight * 0.02),
+          SizedBox(height: context.spacing),
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text("Recent Reviews",
-                  style: TextStyle(
-                      color: Colors.white, fontSize: responsiveFontSize(18))),
+              _buildSectionHeader("Recent Reviews"),
               GestureDetector(
                 onTap: () => Navigator.push(context,
                     MaterialPageRoute(builder: (_) => const AllReviewsPage())),
-                child: const Text("View All",
-                    style: TextStyle(color: Color(0xFF2E6CFF))),
+                child: Text("View All",
+                    style: TextStyle(color: colorScheme.primary, fontWeight: FontWeight.bold)),
               ),
             ],
           ),
-          const SizedBox(height: 10),
+          SizedBox(height: context.scale(12)),
           ListView.builder(
             shrinkWrap: true,
             physics: const NeverScrollableScrollPhysics(),
@@ -399,53 +384,48 @@ class _ModeratorDashboardPageState extends State<ModeratorDashboardPage> {
                 school: review.school,
                 rating: review.rating,
                 review: review.review,
-                avatarAsset: review.avatarAsset,
+                avatarUrl: review.avatarUrl,
               );
             },
           ),
-          SizedBox(height: screenHeight * 0.02),
-          Text("Database Status",
-              style: TextStyle(
-                  color: Colors.white, fontSize: responsiveFontSize(18))),
-          const SizedBox(height: 10),
+          SizedBox(height: context.spacing),
+          _buildSectionHeader("Database Status"),
+          SizedBox(height: context.scale(12)),
           Row(
             children: [
               Expanded(
                   child: StatCard(
                       title: "Databases", value: data.databaseCount)),
-              const SizedBox(width: 12),
+              SizedBox(width: context.spacing / 2),
               Expanded(
                   child:
-                      StatCard(title: "Data Usage", value: data.dataUsage)),
+                  StatCard(title: "Data Usage", value: data.dataUsage)),
             ],
           ),
-          const SizedBox(height: 12),
+          SizedBox(height: context.spacing / 2),
           Card(
-            color: const Color(0xFF10202A),
             shape:
-                RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            RoundedRectangleBorder(borderRadius: BorderRadius.circular(context.scale(12))),
             child: Padding(
-              padding: const EdgeInsets.all(14),
+              padding: EdgeInsets.all(context.spacing),
               child: Row(
                 children: [
-                  const Icon(Icons.cloud_done, color: Color(0xFF2ECF7E)),
-                  const SizedBox(width: 12),
-                  const Expanded(
+                  Icon(Icons.cloud_done, color: theme.colorScheme.primary),
+                  SizedBox(width: context.spacing),
+                  Expanded(
                       child: Text("System Uptime",
-                          style: TextStyle(color: Colors.white))),
+                          style: theme.textTheme.bodyMedium)),
                   Text(data.systemUptime,
-                      style: const TextStyle(
-                          color: Color(0xFF2ECF7E),
+                      style: TextStyle(
+                          color: theme.colorScheme.primary,
                           fontWeight: FontWeight.bold)),
                 ],
               ),
             ),
           ),
-          SizedBox(height: screenHeight * 0.02),
-          Text("Recent Activities",
-              style: TextStyle(
-                  color: Colors.white, fontSize: responsiveFontSize(18))),
-          const SizedBox(height: 10),
+          SizedBox(height: context.spacing),
+          _buildSectionHeader("Recent Activities"),
+          SizedBox(height: context.scale(12)),
           ListView.builder(
             shrinkWrap: true,
             physics: const NeverScrollableScrollPhysics(),
@@ -460,7 +440,7 @@ class _ModeratorDashboardPageState extends State<ModeratorDashboardPage> {
               );
             },
           ),
-          SizedBox(height: screenHeight * 0.05),
+          SizedBox(height: context.scale(40)),
         ],
       ),
     );
@@ -468,29 +448,36 @@ class _ModeratorDashboardPageState extends State<ModeratorDashboardPage> {
 
   Widget _buildDropdown(
       String? value, ValueChanged<String?> onChanged, List<String> items) {
+    final theme = context.theme;
+    final colorScheme = theme.colorScheme;
+    
     return Container(
-      height: 40,
-      padding: const EdgeInsets.symmetric(horizontal: 14),
+      height: context.scale(44),
+      padding: EdgeInsets.symmetric(horizontal: context.spacing),
       decoration: BoxDecoration(
-        color: const Color(0xFF13232E),
-        borderRadius: BorderRadius.circular(20),
+        color: colorScheme.surfaceContainerLow,
+        borderRadius: BorderRadius.circular(context.scale(22)),
+        border: Border.all(
+          color: colorScheme.outlineVariant.withValues(alpha: 0.5),
+          width: 0.5,
+        ),
       ),
       child: DropdownButtonHideUnderline(
         child: DropdownButton<String>(
           value: value,
-          dropdownColor: const Color(0xFF13232E),
+          dropdownColor: colorScheme.surfaceContainerLow,
           isExpanded: true,
-          icon: const Icon(Icons.keyboard_arrow_down,
-              color: Colors.white, size: 18),
+          icon: Icon(Icons.keyboard_arrow_down,
+              color: colorScheme.onSurface, size: context.scale(18)),
           items: items.map<DropdownMenuItem<String>>((String value) {
             return DropdownMenuItem<String>(
               value: value,
               child:
-                  Text(value, style: const TextStyle(color: Colors.white)),
+              Text(value, style: theme.textTheme.bodyMedium),
             );
           }).toList(),
           onChanged: onChanged,
-          style: const TextStyle(color: Colors.white),
+          style: theme.textTheme.bodyMedium,
         ),
       ),
     );
@@ -517,48 +504,40 @@ class DashboardCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final color = isPositive ? const Color(0xFF2ECF7E) : const Color(0xFFFF6B6B);
-    final screenWidth = MediaQuery.of(context).size.width;
-
-    double responsiveFontSize(double baseFontSize) {
-      if (screenWidth > 1200) {
-        return baseFontSize * 1.2;
-      } else if (screenWidth > 600) {
-        return baseFontSize * 1.1;
-      } else {
-        return baseFontSize;
-      }
-    }
+    final theme = context.theme;
+    final colorScheme = theme.colorScheme;
+    final color = isPositive ? colorScheme.primary : colorScheme.error;
 
     return InkWell(
       onTap: onTap,
+      borderRadius: BorderRadius.circular(context.scale(14)),
       child: Container(
-        padding: const EdgeInsets.all(15),
+        padding: EdgeInsets.all(context.spacing),
         decoration: BoxDecoration(
-          color: const Color(0xFF13232E),
-          borderRadius: BorderRadius.circular(14),
+          color: colorScheme.surfaceContainerLow,
+          borderRadius: BorderRadius.circular(context.scale(14)),
+          border: Border.all(
+            color: colorScheme.outlineVariant.withValues(alpha: 0.5),
+            width: 0.5,
+          ),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             CircleAvatar(
-              radius: 18,
-              backgroundColor: Colors.white12,
-              child: Icon(icon, color: Colors.white, size: 20),
+              radius: context.scale(20),
+              backgroundColor: colorScheme.onSurface.withValues(alpha: 0.1),
+              child: Icon(icon, color: colorScheme.primary, size: context.scale(20)),
             ),
-            const SizedBox(height: 12),
+            SizedBox(height: context.scale(8)),
             Text(
               value,
-              style: TextStyle(
-                  color: Colors.white,
-                  fontSize: responsiveFontSize(22),
-                  fontWeight: FontWeight.bold),
+              style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
             ),
-            const SizedBox(height: 4),
+            SizedBox(height: context.scale(4)),
             Text(
               title,
-              style: TextStyle(
-                  color: Colors.white60, fontSize: responsiveFontSize(12)),
+              style: theme.textTheme.bodySmall,
             ),
             const Spacer(),
             Row(
@@ -566,9 +545,9 @@ class DashboardCard extends StatelessWidget {
                 Icon(
                   isPositive ? Icons.arrow_upward : Icons.arrow_downward,
                   color: color,
-                  size: 18,
+                  size: context.scale(16),
                 ),
-                const SizedBox(width: 4),
+                SizedBox(width: context.scale(4)),
                 Text(
                   "${percentage.toStringAsFixed(1)}%",
                   style: TextStyle(color: color, fontWeight: FontWeight.w500),
@@ -590,35 +569,28 @@ class StatCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final screenWidth = MediaQuery.of(context).size.width;
-    double responsiveFontSize(double baseFontSize) {
-      if (screenWidth > 1200) {
-        return baseFontSize * 1.2;
-      } else if (screenWidth > 600) {
-        return baseFontSize * 1.1;
-      } else {
-        return baseFontSize;
-      }
-    }
+    final theme = context.theme;
 
     return Card(
-      color: const Color(0xFF10202A),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      elevation: 0,
+      color: theme.colorScheme.surfaceContainerLow,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(context.scale(12)),
+        side: BorderSide(
+          color: theme.colorScheme.outlineVariant.withValues(alpha: 0.5),
+          width: 0.5,
+        ),
+      ),
       child: Padding(
-        padding: const EdgeInsets.all(14),
+        padding: EdgeInsets.all(context.spacing),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(title,
-                style: TextStyle(
-                    color: Colors.white60,
-                    fontSize: responsiveFontSize(14))),
-            const SizedBox(height: 6),
+                style: theme.textTheme.bodySmall),
+            SizedBox(height: context.scale(4)),
             Text(value,
-                style: TextStyle(
-                    color: Colors.white,
-                    fontSize: responsiveFontSize(20),
-                    fontWeight: FontWeight.bold)),
+                style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold)),
           ],
         ),
       ),
@@ -631,7 +603,7 @@ class ReviewCard extends StatelessWidget {
   final String school;
   final double rating;
   final String review;
-  final String avatarAsset;
+  final String? avatarUrl;
 
   const ReviewCard({
     super.key,
@@ -639,26 +611,34 @@ class ReviewCard extends StatelessWidget {
     required this.school,
     required this.rating,
     required this.review,
-    required this.avatarAsset,
+    this.avatarUrl,
   });
 
   @override
   Widget build(BuildContext context) {
+    final theme = context.theme;
+
     return Card(
-      color: const Color(0xFF10202A),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-      margin: const EdgeInsets.symmetric(vertical: 8),
+      elevation: 0,
+      color: theme.colorScheme.surfaceContainerLow,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(context.scale(14)),
+        side: BorderSide(
+          color: theme.colorScheme.outlineVariant.withValues(alpha: 0.5),
+          width: 0.5,
+        ),
+      ),
+      margin: EdgeInsets.only(bottom: context.spacing / 2),
       child: Padding(
-        padding: const EdgeInsets.all(14.0),
+        padding: EdgeInsets.all(context.spacing),
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            if (avatarAsset.isNotEmpty)
-              ClipRRect(
-                  borderRadius: BorderRadius.circular(30),
-                  child: Image.asset(avatarAsset,
-                      width: 48, height: 48, fit: BoxFit.cover)),
-            const SizedBox(width: 14),
+            ProfileAvatar(
+              imageUrl: avatarUrl,
+              radius: context.scale(24),
+            ),
+            SizedBox(width: context.spacing),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -666,20 +646,18 @@ class ReviewCard extends StatelessWidget {
                   Row(
                     children: [
                       Text(name,
-                          style: const TextStyle(
-                              color: Colors.white,
-                              fontWeight: FontWeight.bold)),
+                          style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.bold)),
                       const Spacer(),
                       Text("⭐ $rating",
-                          style: const TextStyle(color: Color(0xFFFFC857))),
+                          style: const TextStyle(color: Color(0xFFFFC857), fontWeight: FontWeight.bold)),
                     ],
                   ),
-                  const SizedBox(height: 6),
+                  SizedBox(height: context.scale(4)),
                   Text(school,
-                      style: const TextStyle(color: Colors.white60)),
-                  const SizedBox(height: 8),
+                      style: theme.textTheme.bodySmall),
+                  SizedBox(height: context.scale(8)),
                   Text(review,
-                      style: const TextStyle(color: Colors.white70),
+                      style: theme.textTheme.bodyMedium,
                       maxLines: 3,
                       overflow: TextOverflow.ellipsis),
                 ],
@@ -699,26 +677,27 @@ class LegendRow extends StatelessWidget {
 
   const LegendRow(
       {super.key,
-      required this.title,
-      required this.value,
-      required this.color});
+        required this.title,
+        required this.value,
+        required this.color});
 
   @override
   Widget build(BuildContext context) {
+    final theme = context.theme;
+    
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 6),
+      padding: EdgeInsets.symmetric(vertical: context.scale(4)),
       child: Row(
         children: [
           Container(
-              width: 14,
-              height: 14,
+              width: context.scale(12),
+              height: context.scale(12),
               decoration: BoxDecoration(color: color, shape: BoxShape.circle)),
-          const SizedBox(width: 10),
-          Text(title, style: const TextStyle(color: Colors.white)),
+          SizedBox(width: context.spacing / 2),
+          Text(title, style: theme.textTheme.bodyMedium),
           const Spacer(),
           Text(value.toString(),
-              style: const TextStyle(
-                  color: Colors.white, fontWeight: FontWeight.bold)),
+              style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.bold)),
         ],
       ),
     );
@@ -741,23 +720,33 @@ class ActivityTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = context.theme;
+
     return Card(
-      color: const Color(0xFF10202A),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      margin: const EdgeInsets.symmetric(vertical: 6),
+      elevation: 0,
+      color: theme.colorScheme.surfaceContainerLow,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(context.scale(12)),
+        side: BorderSide(
+          color: theme.colorScheme.outlineVariant.withValues(alpha: 0.5),
+          width: 0.5,
+        ),
+      ),
+      margin: EdgeInsets.only(bottom: context.spacing / 2),
       child: Padding(
-        padding: const EdgeInsets.all(12),
+        padding: EdgeInsets.all(context.spacing / 1.5),
         child: Row(
           children: [
-            Icon(icon, color: color),
-            const SizedBox(width: 12),
+            Icon(icon, color: color, size: context.scale(20)),
+            SizedBox(width: context.spacing / 2),
             Expanded(
-              child: Text(text, style: const TextStyle(color: Colors.white)),
+              child: Text(text, style: theme.textTheme.bodyMedium),
             ),
-            Text(time, style: const TextStyle(color: Colors.white60)),
+            Text(time, style: theme.textTheme.bodySmall),
           ],
         ),
       ),
     );
   }
 }
+

@@ -2,6 +2,11 @@ import 'dart:async';
 import 'dart:convert';
 
 import 'package:eduphin/services/api_service.dart';
+import 'package:eduphin/services/error_handler.dart';
+import 'package:eduphin/services/common_widgets.dart';
+import 'package:eduphin/services/caching_service.dart';
+import 'package:eduphin/services/responsive_helper.dart';
+import 'package:eduphin/teacher/dashboard/common_widgets.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
@@ -113,30 +118,64 @@ class _TicketDetailsPageState extends State<TicketDetailsPage> {
   final ScrollController _scrollController = ScrollController();
 
   bool _isLoading = true;
-  String? _error;
+  Object? _error;
   TicketDetails? _ticketDetails;
   final List<ChatMessage> _sessionMessages = [];
   int? _currentUserId;
+  late final String _cacheKey;
 
   @override
   void initState() {
     super.initState();
-    _fetchTicketDetails();
+    _cacheKey = 'ticket_details_${widget.ticketId}';
+    _loadData();
+  }
+
+  Future<void> _loadData() async {
+    await _loadCachedData();
+    await _fetchTicketDetails();
+  }
+
+  Future<void> _loadCachedData() async {
+    final cachedData = await CacheService.getCache(_cacheKey);
+    if (cachedData != null) {
+      if (mounted) {
+        setState(() {
+          _processData(cachedData['replies'], cachedData['profile']);
+          _isLoading = false;
+        });
+      }
+    }
+  }
+
+  void _processData(dynamic repliesData, dynamic profileData) {
+    final dynamic userIdDynamic = profileData['data']?['id'];
+    final currentUserId = int.tryParse(userIdDynamic.toString()) ?? 0;
+
+    if (currentUserId == 0) return;
+
+    final details = TicketDetails.fromJson(repliesData, currentUserId);
+
+    _currentUserId = currentUserId;
+    _ticketDetails = details;
+    _sessionMessages.clear();
+    _sessionMessages.addAll(details.messages);
   }
 
   Future<void> _fetchTicketDetails() async {
-    if (!mounted) return;
-    setState(() {
-      _isLoading = true;
-      _error = null;
-    });
+    if (_ticketDetails == null) {
+      setState(() {
+        _isLoading = true;
+        _error = null;
+      });
+    }
 
     try {
       // Pre-flight check for a valid ticket ID
       if (widget.ticketId == 'N/A' || widget.ticketId.isEmpty) {
         throw Exception('Invalid Ticket ID provided.');
       }
-      
+
       final results = await Future.wait([
         ApiService.get('manager/tickets/${widget.ticketId}/replies'),
         ApiService.get('manager/profile'),
@@ -148,42 +187,37 @@ class _TicketDetailsPageState extends State<TicketDetailsPage> {
       final profileResponse = results[1];
 
       if (repliesResponse.statusCode != 200) {
-        throw Exception('Failed to load ticket details: ${repliesResponse.body}');
+        throw Exception('Failed to load ticket details');
       }
       if (profileResponse.statusCode != 200) {
-        throw Exception('Failed to load user profile: ${profileResponse.body}');
+        throw Exception('Failed to load user profile');
       }
 
       final repliesData = jsonDecode(repliesResponse.body);
       final profileData = jsonDecode(profileResponse.body);
 
-      final dynamic userIdDynamic = profileData['data']?['id'];
-      final currentUserId = int.tryParse(userIdDynamic.toString()) ?? 0;
-
-      if (currentUserId == 0) {
-        throw Exception('Could not determine the current user ID.');
-      }
-
-      final details = TicketDetails.fromJson(repliesData, currentUserId);
-
-      setState(() {
-        _currentUserId = currentUserId;
-        _ticketDetails = details;
-        _sessionMessages.clear();
-        _sessionMessages.addAll(details.messages);
+      await CacheService.setCache(_cacheKey, {
+        'replies': repliesData,
+        'profile': profileData,
       });
 
+      if (mounted) {
+        setState(() {
+          _processData(repliesData, profileData);
+          _isLoading = false;
+          _error = null;
+        });
+      }
     } catch (e) {
       if (mounted) {
         setState(() {
-          _error = e.toString().replaceFirst('Exception: ', '');
+          _isLoading = false;
+          _error = e;
         });
+        ErrorHandler.showError(context, e);
       }
     } finally {
       if (mounted) {
-        setState(() {
-          _isLoading = false;
-        });
         _scrollToBottom();
       }
     }
@@ -216,9 +250,7 @@ class _TicketDetailsPageState extends State<TicketDetailsPage> {
         setState(() {
           _sessionMessages.remove(userMessage);
         });
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(e.toString().replaceFirst('Exception: ', ''))),
-        );
+        ErrorHandler.showError(context, e);
       }
     } finally {
       if (mounted) {
@@ -245,96 +277,194 @@ class _TicketDetailsPageState extends State<TicketDetailsPage> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
+    final theme = context.theme;
     return Scaffold(
-      backgroundColor: theme.scaffoldBackgroundColor,
+      backgroundColor: theme.colorScheme.surface,
       appBar: AppBar(
-        title: const Text("Ticket Details"),
-        centerTitle: true,
+        title: Text("Ticket Details", style: theme.appBarTheme.titleTextStyle?.copyWith(fontSize: context.font(18))),
+        centerTitle: false,
       ),
-      body: _buildBody(theme),
+      body: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 1000),
+          child: _buildBody(context),
+        ),
+      ),
     );
   }
 
-  Widget _buildBody(ThemeData theme) {
-    if (_isLoading) {
-      return const Center(child: CircularProgressIndicator());
-    }
-    if (_error != null) {
-      return Center(
-        child: Column(mainAxisSize: MainAxisSize.min, children: [
-          Text(_error!),
-          const SizedBox(height: 10),
-          ElevatedButton(onPressed: _fetchTicketDetails, child: const Text("Retry")),
-        ]),
-      );
-    }
-    if (_ticketDetails == null) {
-      return const Center(child: Text("No details available."));
-    }
+  Widget _buildBody(BuildContext context) {
+    return LoadingWrapper(
+      isLoading: _isLoading,
+      hasData: _ticketDetails != null,
+      error: _error,
+      onRetry: _fetchTicketDetails,
+      skeleton: _buildSkeleton(),
+      child: _ticketDetails == null
+          ? const Center(child: Text("No details available."))
+          : Column(
+              children: [
+                Expanded(
+                  child: ListView.builder(
+                    controller: _scrollController,
+                    padding: context.pagePadding.copyWith(bottom: 100),
+                    itemCount: _sessionMessages.length + 1, // +1 for the header card
+                    itemBuilder: (context, index) {
+                      if (index == 0) {
+                        return Padding(
+                          padding: EdgeInsets.only(bottom: context.md),
+                          child: CustomTicketDetailsBox(
+                            ticket: _ticketDetails!,
+                          ),
+                        );
+                      }
+                      final message = _sessionMessages[index - 1];
+                      return ChatBubble(message: message);
+                    },
+                  ),
+                ),
+                _buildInputArea(context),
+              ],
+            ),
+    );
+  }
+
+  Widget _buildSkeleton() {
     return Column(
       children: [
         Expanded(
-          child: ListView.builder(
-            controller: _scrollController,
-            padding: const EdgeInsets.fromLTRB(16, 16, 16, 50),
-            itemCount: _sessionMessages.length + 1, // +1 for the header card
-            itemBuilder: (context, index) {
-              if (index == 0) {
-                return Padding(
-                  padding: const EdgeInsets.only(bottom: 16.0),
-                  child: CustomTicketDetailsBox(
-                    ticket: _ticketDetails!,
-                  ),
-                );
-              }
-              final message = _sessionMessages[index - 1];
-              return ChatBubble(message: message);
-            },
+          child: ListView(
+            padding: context.pagePadding,
+            children: [
+              Container(
+                padding: context.pagePadding,
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(context.scale(16)),
+                  border: Border.all(color: Colors.grey.shade200),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Wrap(
+                      spacing: 20,
+                      runSpacing: 10,
+                      children: List.generate(5, (_) => const SkeletonBox(height: 35, width: 100)),
+                    ),
+                    const Padding(
+                      padding: EdgeInsets.symmetric(vertical: 16),
+                      child: Divider(),
+                    ),
+                    const SkeletonBox(height: 15, width: 120),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 20),
+              _buildSkeletonChatBubble(false),
+              _buildSkeletonChatBubble(true),
+              _buildSkeletonChatBubble(false),
+              _buildSkeletonChatBubble(true),
+            ],
           ),
         ),
-        _buildInputArea(theme),
+        Container(
+          padding: EdgeInsets.all(context.spacing),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            border: Border(top: BorderSide(color: Colors.grey.shade200)),
+          ),
+          child: Row(
+            children: [
+              const Expanded(child: SkeletonBox(height: 50, borderRadius: 25)),
+              const SizedBox(width: 10),
+              const SkeletonBox(height: 50, width: 50, borderRadius: 25),
+            ],
+          ),
+        ),
       ],
     );
   }
 
-  Widget _buildInputArea(ThemeData theme) {
+  Widget _buildSkeletonChatBubble(bool isUser) {
+    return Align(
+      alignment: isUser ? Alignment.centerRight : Alignment.centerLeft,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 8),
+        child: SkeletonBox(
+          height: 40,
+          width: 200,
+          borderRadius: 12,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildInputArea(BuildContext context) {
+    final theme = context.theme;
     return Container(
-      padding: const EdgeInsets.all(8).copyWith(bottom: MediaQuery.of(context).padding.bottom + 8),
+      padding: EdgeInsets.fromLTRB(
+        context.spacing,
+        context.sm,
+        context.spacing,
+        context.sm + MediaQuery.of(context).padding.bottom,
+      ),
       decoration: BoxDecoration(
-        color: theme.cardColor,
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withAlpha(35),
-            spreadRadius: 1,
-            blurRadius: 5,
-            offset: const Offset(0, -2),
-          ),
-        ],
+        color: theme.colorScheme.surfaceContainerLow,
+        border: Border(
+          top: BorderSide(color: theme.colorScheme.outlineVariant, width: 0.5),
+        ),
       ),
       child: Row(
         children: [
           Expanded(
             child: TextField(
               controller: _controller,
+              style: theme.textTheme.bodyMedium?.copyWith(fontSize: context.font(14)),
               decoration: InputDecoration(
-                hintText: "Ask something...",
-                filled: true,
-                fillColor: theme.scaffoldBackgroundColor,
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(24),
-                  borderSide: BorderSide.none,
+                hintText: "Type your reply...",
+                hintStyle: theme.textTheme.bodyMedium?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.6),
+                  fontSize: context.font(14),
                 ),
-                contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                filled: true,
+                fillColor: theme.colorScheme.surface,
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(context.scale(24)),
+                  borderSide: BorderSide(color: theme.colorScheme.outlineVariant),
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(context.scale(24)),
+                  borderSide: BorderSide(color: theme.colorScheme.outlineVariant),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(context.scale(24)),
+                  borderSide: BorderSide(color: theme.colorScheme.primary, width: 1.5),
+                ),
+                contentPadding: EdgeInsets.symmetric(
+                  horizontal: context.md,
+                  vertical: context.sm,
+                ),
               ),
+              maxLines: null,
+              keyboardType: TextInputType.multiline,
+              textCapitalization: TextCapitalization.sentences,
             ),
           ),
-          const SizedBox(width: 8),
-          IconButton(
-            icon: Icon(Icons.send, color: _isSavingMessage ? Colors.grey : theme.colorScheme.primary),
-            onPressed: _sendMessage,
+          SizedBox(width: context.sm),
+          Material(
+            color: theme.colorScheme.primary,
+            shape: const CircleBorder(),
+            clipBehavior: Clip.antiAlias,
+            child: IconButton(
+              icon: Icon(
+                Icons.send_rounded,
+                color: theme.colorScheme.onPrimary,
+                size: context.scale(20),
+              ),
+              onPressed: _isSavingMessage ? null : _sendMessage,
+            ),
           )
-        ], 
+        ],
       ),
     );
   }
@@ -350,86 +480,147 @@ class CustomTicketDetailsBox extends StatelessWidget {
     required this.ticket,
   });
 
-  Color _getPriorityColor(TicketPriority priority, ThemeData theme) {
+  Color _getPriorityColor(TicketPriority priority, ColorScheme colorScheme) {
     switch (priority) {
       case TicketPriority.high:
-        return theme.colorScheme.error;
+        return colorScheme.error;
       case TicketPriority.medium:
-        return Colors.amber.shade700;
+        return Colors.orange;
       case TicketPriority.low:
-        return Colors.lightBlueAccent;
+        return Colors.blue;
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return Container(
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(12),
-        color: theme.primaryColor,
+    final theme = context.theme;
+    final colorScheme = theme.colorScheme;
+
+    return Card(
+      elevation: 0,
+      margin: EdgeInsets.zero,
+      color: colorScheme.surfaceContainerLow,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(context.scale(16)),
+        side: BorderSide(color: colorScheme.outlineVariant, width: 0.5),
       ),
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Wrap(
-            spacing: 16.0, 
-            runSpacing: 16.0, 
-            children: [
-              _buildDetailColumn(theme, "Name", ticket.name),
-              _buildDetailColumn(theme, "Category", ticket.category),
-              _buildDetailColumn(theme, "Ticket ID", ticket.ticketId),
-              _buildDetailColumn(theme, "Status", ticket.status.displayName, valueColor: theme.colorScheme.secondary),
-              _buildPriorityStatus(theme, ticket.priority),
-            ],
-          ),
-          const Divider(height: 32, thickness: 1),
-          Text(
-            "Conversation",
-            style: theme.textTheme.titleMedium?.copyWith(color: theme.colorScheme.onPrimary),
-          ),
-        ],
+      child: Padding(
+        padding: context.pagePadding,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Wrap(
+              spacing: context.lg,
+              runSpacing: context.md,
+              children: [
+                _buildDetailColumn(context, "Requester", ticket.name),
+                _buildDetailColumn(context, "Category", ticket.category),
+                _buildDetailColumn(context, "Ticket ID", ticket.ticketId),
+                _buildStatusColumn(context, ticket.status),
+                _buildPriorityStatus(context, ticket.priority),
+              ],
+            ),
+            Padding(
+              padding: EdgeInsets.only(top: context.md),
+              child: Divider(color: colorScheme.outlineVariant, thickness: 0.5),
+            ),
+            Text(
+              "Conversation Log",
+              style: theme.textTheme.titleSmall?.copyWith(
+                color: colorScheme.primary,
+                fontWeight: FontWeight.bold,
+                letterSpacing: 0.5,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
 
-  Widget _buildDetailColumn(ThemeData theme, String title, String value, {Color? valueColor}) {
+  Widget _buildDetailColumn(BuildContext context, String title, String value) {
+    final theme = context.theme;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       mainAxisSize: MainAxisSize.min,
       children: [
-        Text(title, style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onPrimary.withAlpha(180))),
-        const SizedBox(height: 2),
+        Text(
+          title.toUpperCase(),
+          style: theme.textTheme.labelSmall?.copyWith(
+            color: theme.colorScheme.onSurfaceVariant,
+            fontWeight: FontWeight.bold,
+            letterSpacing: 1.1,
+          ),
+        ),
+        SizedBox(height: context.xs),
         Text(
           value,
-          style: theme.textTheme.bodyLarge?.copyWith(
-              color: valueColor ?? theme.colorScheme.onPrimary,
-              fontWeight: FontWeight.w500),
+          style: theme.textTheme.bodyMedium?.copyWith(
+            color: theme.colorScheme.onSurface,
+            fontWeight: FontWeight.w600,
+          ),
         ),
       ],
     );
   }
 
-  Widget _buildPriorityStatus(ThemeData theme, TicketPriority priority) {
-    final priorityColor = _getPriorityColor(priority, theme);
+  Widget _buildStatusColumn(BuildContext context, TicketStatus status) {
+    final theme = context.theme;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       mainAxisSize: MainAxisSize.min,
       children: [
-        Text("Priority",
-            style: theme.textTheme.bodySmall
-                ?.copyWith(color: theme.colorScheme.onPrimary.withAlpha(180))),
-        const SizedBox(height: 2),
+        Text(
+          "STATUS",
+          style: theme.textTheme.labelSmall?.copyWith(
+            color: theme.colorScheme.onSurfaceVariant,
+            fontWeight: FontWeight.bold,
+            letterSpacing: 1.1,
+          ),
+        ),
+        SizedBox(height: context.xs),
+        Text(
+          status.displayName,
+          style: theme.textTheme.bodyMedium?.copyWith(
+            color: theme.colorScheme.secondary,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildPriorityStatus(BuildContext context, TicketPriority priority) {
+    final colorScheme = context.theme.colorScheme;
+    final priorityColor = _getPriorityColor(priority, colorScheme);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(
+          "PRIORITY",
+          style: context.theme.textTheme.labelSmall?.copyWith(
+            color: colorScheme.onSurfaceVariant,
+            fontWeight: FontWeight.bold,
+            letterSpacing: 1.1,
+            fontSize: context.font(11),
+          ),
+        ),
+        SizedBox(height: context.xs),
         Container(
-          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+          padding: EdgeInsets.symmetric(horizontal: context.sm, vertical: context.xs),
           decoration: BoxDecoration(
-            color: priorityColor.withAlpha(55),
-            borderRadius: BorderRadius.circular(8),
+            color: priorityColor.withValues(alpha: 0.1),
+            borderRadius: BorderRadius.circular(context.xs),
+            border: Border.all(color: priorityColor.withValues(alpha: 0.3), width: 0.5),
           ),
           child: Text(
-            priority.displayName,
-            style: theme.textTheme.labelMedium?.copyWith(color: priorityColor, fontWeight: FontWeight.bold),
+            priority.displayName.toUpperCase(),
+            style: context.theme.textTheme.labelSmall?.copyWith(
+              color: priorityColor,
+              fontWeight: FontWeight.bold,
+              fontSize: context.font(10),
+            ),
           ),
         ),
       ],
@@ -444,22 +635,44 @@ class ChatBubble extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
+    final theme = context.theme;
     final isUser = message.isUser;
+
     return Align(
       alignment: isUser ? Alignment.centerRight : Alignment.centerLeft,
       child: Container(
-        padding: const EdgeInsets.all(12),
-        margin: const EdgeInsets.symmetric(vertical: 5),
+        padding: EdgeInsets.symmetric(
+          horizontal: context.md,
+          vertical: context.sm,
+        ),
+        margin: EdgeInsets.only(
+          top: context.xs,
+          bottom: context.xs,
+          left: isUser ? context.xl : 0,
+          right: isUser ? 0 : context.xl,
+        ),
         decoration: BoxDecoration(
-          color: isUser ? theme.colorScheme.primary : theme.colorScheme.surface,
-          borderRadius: BorderRadius.circular(12),
+          color: isUser
+              ? theme.colorScheme.primaryContainer
+              : theme.colorScheme.surfaceContainerLowest,
+          borderRadius: BorderRadius.only(
+            topLeft: Radius.circular(context.scale(12)),
+            topRight: Radius.circular(context.scale(12)),
+            bottomLeft: Radius.circular(isUser ? context.scale(12) : 0),
+            bottomRight: Radius.circular(isUser ? 0 : context.scale(12)),
+          ),
+          border: Border.all(
+            color: isUser
+                ? theme.colorScheme.primary.withValues(alpha: 0.2)
+                : theme.colorScheme.outlineVariant,
+            width: 0.5,
+          ),
         ),
         child: Text(
           message.text,
-          style: theme.textTheme.bodyLarge?.copyWith(
+          style: theme.textTheme.bodyMedium?.copyWith(
             color: isUser
-                ? theme.colorScheme.onPrimary
+                ? theme.colorScheme.onPrimaryContainer
                 : theme.colorScheme.onSurface,
           ),
         ),
@@ -467,3 +680,4 @@ class ChatBubble extends StatelessWidget {
     );
   }
 }
+

@@ -1,5 +1,7 @@
 import 'dart:convert';
+import 'package:eduphin/services/error_handler.dart';
 import 'package:eduphin/services/api_service.dart';
+import 'package:eduphin/services/responsive_helper.dart';
 import 'package:flutter/material.dart';
 
 class CreateNewSectionPage extends StatefulWidget {
@@ -11,7 +13,7 @@ class CreateNewSectionPage extends StatefulWidget {
 }
 
 class _CreateNewSectionPageState extends State<CreateNewSectionPage> {
-  final _formKey = GlobalKey<FormState>(); // Add a form key for validation
+  final _formKey = GlobalKey<FormState>();
   final _limitController = TextEditingController();
   bool _isLoading = false;
   bool _isFetchingMentors = true;
@@ -33,21 +35,14 @@ class _CreateNewSectionPageState extends State<CreateNewSectionPage> {
       _isFetchingMentors = true;
     });
     try {
-      // CORRECTED: Use the 'meta' endpoint to get teachers and other related data.
       final response = await ApiService.get('manager/class-schedules/meta');
       if (mounted) {
-        final theme = Theme.of(context);
+        final theme = context.theme;
         final responseData = jsonDecode(response.body);
         if (response.statusCode == 200 && responseData['status'] == true) {
-          // CORRECTED: The list of teachers is under the 'teachers' key.
           final List<dynamic> teachersList = responseData['teachers'];
-          // Safely process the list to handle potential nulls in names
           final processedMentors = teachersList.map((teacher) {
-            // --- THIS IS THE MODIFIED PART ---
-            // Try to get the full name from a 'name' field first.
             String fullName = teacher['name'] ?? '';
-
-            // If 'name' is not present or empty, fall back to 'first_name' and 'last_name'.
             if (fullName.isEmpty) {
                 final firstName = teacher['first_name'] ?? '';
                 final lastName = teacher['last_name'] ?? '';
@@ -56,30 +51,20 @@ class _CreateNewSectionPageState extends State<CreateNewSectionPage> {
             
             return {
                 'id': teacher['id'],
-                // If after all attempts the name is still empty, use 'Unnamed Mentor'.
                 'name': fullName.isNotEmpty ? fullName : 'Unnamed Mentor',
             };
-          }).where((mentor) => mentor['id'] != null).toList(); // Filter out invalid entries
+          }).where((mentor) => mentor['id'] != null).toList();
 
           setState(() {
             _mentors = processedMentors;
           });
         } else {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(responseData['message'] ?? 'Failed to load mentors.'),
-              backgroundColor: theme.colorScheme.error,
-            ),
-          );
+          throw Exception(responseData['message'] ?? 'Failed to load mentors.');
         }
       }
     } catch (e) {
       if (mounted) {
-        final theme = Theme.of(context);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-              content: Text('An error occurred while fetching mentors: $e'), backgroundColor: theme.colorScheme.error),
-        );
+        ErrorHandler.showError(context, e);
       }
     } finally {
       if (mounted) {
@@ -91,7 +76,6 @@ class _CreateNewSectionPageState extends State<CreateNewSectionPage> {
   }
 
   Future<void> _createSection() async {
-    // Validate the form before proceeding
     if (!_formKey.currentState!.validate()) {
       return;
     }
@@ -110,7 +94,7 @@ class _CreateNewSectionPageState extends State<CreateNewSectionPage> {
       });
 
       if (mounted) {
-        final theme = Theme.of(context);
+        final theme = context.theme;
         final responseData = jsonDecode(response.body);
         if (response.statusCode == 201 && responseData['status'] == true) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -120,23 +104,14 @@ class _CreateNewSectionPageState extends State<CreateNewSectionPage> {
               backgroundColor: theme.colorScheme.primary,
             ),
           );
-          Navigator.pop(context, true); // Pop with true to indicate success
+          Navigator.pop(context, true);
         } else {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content:
-                  Text(responseData['message'] ?? 'Failed to create section.'),
-              backgroundColor: theme.colorScheme.error,
-            ),
-          );
+          throw Exception(responseData['message'] ?? 'Failed to create section.');
         }
       }
     } catch (e) {
       if (mounted) {
-        final theme = Theme.of(context);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('An error occurred: $e'), backgroundColor: theme.colorScheme.error),
-        );
+        ErrorHandler.showError(context, e);
       }
     } finally {
       if (mounted) {
@@ -155,89 +130,97 @@ class _CreateNewSectionPageState extends State<CreateNewSectionPage> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
+    final theme = context.theme;
     return Scaffold(
-      backgroundColor: theme.scaffoldBackgroundColor,
+      backgroundColor: theme.colorScheme.surface,
       appBar: AppBar(
-        title: const Text("Create New Section"),
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        leading: IconButton(
+          icon: Icon(Icons.arrow_back, color: theme.colorScheme.onSurface),
+          onPressed: () => Navigator.pop(context),
+        ),
+        title: Text(
+          "Create New Section",
+          style: TextStyle(
+            fontWeight: FontWeight.bold,
+            color: theme.colorScheme.onSurface,
+            fontSize: context.font(20),
+          ),
+        ),
         centerTitle: true,
       ),
       body: SingleChildScrollView(
-        padding: const EdgeInsets.fromLTRB(16, 16, 16, 50),
+        padding: EdgeInsets.fromLTRB(context.scale(16), context.scale(16), context.scale(16), context.scale(100)),
         child: Center(
-          child: ConstrainedBox(
-            constraints:
-                const BoxConstraints(maxWidth: 500), // Limits width on large screens
+          child: Container(
+            constraints: BoxConstraints(maxWidth: context.responsive(double.infinity, tablet: 600, desktop: 800)),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(context.scale(16)),
+              color: theme.colorScheme.surfaceContainerLow,
+              border: Border.all(color: theme.colorScheme.outlineVariant),
+            ),
+            padding: EdgeInsets.all(context.scale(20)),
             child: Form(
               key: _formKey,
-              child: Container(
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(10),
-                  color: theme.primaryColor,
-                ),
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    _buildSectionDropdown(theme),
-                    const SizedBox(height: 16),
-                    _buildMentorDropdown(theme),
-                    const SizedBox(height: 16),
-                    _buildTextField(
-                      theme: theme,
-                      controller: _limitController,
-                      label: "Class Limit",
-                      hint: "e.g., 40",
-                      keyboardType: TextInputType.number,
-                      validator: (value) => value == null || value.isEmpty
-                          ? 'Please set a class limit'
-                          : null,
-                    ),
-                    const SizedBox(height: 24),
-                    // Responsive button row
-                    Row(
-                      children: [
-                        Expanded(
-                          child: OutlinedButton(
-                            onPressed: () => Navigator.pop(context),
-                            style: OutlinedButton.styleFrom(
-                              padding: const EdgeInsets.symmetric(vertical: 16),
-                              foregroundColor: theme.colorScheme.onPrimary,
-                              side: BorderSide(color: theme.dividerColor),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                            ),                            child: const Text("Cancel"),
-                          ),
-                        ),
-                        const SizedBox(width: 16),
-                        Expanded(
-                          child: ElevatedButton(
-                            onPressed: _isLoading ? null : _createSection,
-                            style: ElevatedButton.styleFrom(
-                              padding: const EdgeInsets.symmetric(vertical: 16),
-                              backgroundColor:
-                                  theme.colorScheme.primaryContainer,
-                              foregroundColor:
-                                  theme.colorScheme.onPrimaryContainer,
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(12),
-                              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _buildSectionDropdown(theme),
+                  SizedBox(height: context.scale(20)),
+                  _buildMentorDropdown(theme),
+                  SizedBox(height: context.scale(20)),
+                  _buildTextField(
+                    theme: theme,
+                    controller: _limitController,
+                    label: "Class Limit",
+                    hint: "e.g., 40",
+                    keyboardType: TextInputType.number,
+                    validator: (value) => value == null || value.isEmpty
+                        ? 'Please set a class limit'
+                        : null,
+                  ),
+                  SizedBox(height: context.scale(32)),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: OutlinedButton(
+                          onPressed: () => Navigator.pop(context),
+                          style: OutlinedButton.styleFrom(
+                            padding: EdgeInsets.symmetric(vertical: context.scale(16)),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(context.scale(12)),
                             ),
-                            child: _isLoading
-                                ? const SizedBox(
-                                    height: 24,
-                                    width: 24,
-                                    child: CircularProgressIndicator(
-                                        strokeWidth: 3),
-                                  )
-                                : const Text("Create Section"),
+                            side: BorderSide(color: theme.colorScheme.outlineVariant),
                           ),
+                          child: Text("Cancel", style: TextStyle(color: theme.colorScheme.onSurface, fontSize: context.font(16), fontWeight: FontWeight.w600)),
                         ),
-                      ],
-                    ),
-                  ],
-                ),
+                      ),
+                      SizedBox(width: context.scale(16)),
+                      Expanded(
+                        child: ElevatedButton(
+                          onPressed: _isLoading ? null : _createSection,
+                          style: ElevatedButton.styleFrom(
+                            padding: EdgeInsets.symmetric(vertical: context.scale(16)),
+                            backgroundColor: theme.colorScheme.primary,
+                            foregroundColor: theme.colorScheme.onPrimary,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(context.scale(12)),
+                            ),
+                            elevation: 0,
+                          ),
+                          child: _isLoading
+                              ? SizedBox(
+                                  height: context.scale(24),
+                                  width: context.scale(24),
+                                  child: CircularProgressIndicator(strokeWidth: 3, color: theme.colorScheme.onPrimary),
+                                )
+                              : Text("Create Section", style: TextStyle(fontSize: context.font(16), fontWeight: FontWeight.bold)),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
               ),
             ),
           ),
@@ -250,28 +233,38 @@ class _CreateNewSectionPageState extends State<CreateNewSectionPage> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text("Section Name",
-            style: theme.textTheme.titleMedium
-                ?.copyWith(color: theme.colorScheme.onPrimary)),
-        const SizedBox(height: 8),
+        Text("Section Name", style: TextStyle(color: theme.colorScheme.onSurface, fontWeight: FontWeight.bold, fontSize: context.font(14))),
+        SizedBox(height: context.scale(8)),
         DropdownButtonFormField<String>(
           value: _selectedSectionName,
-          hint: const Text('Select a Section'),
+          dropdownColor: theme.colorScheme.surface,
+          hint: Text('Select a Section', style: TextStyle(color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.5), fontSize: context.font(14))),
           isExpanded: true,
+          style: TextStyle(color: theme.colorScheme.onSurface, fontSize: context.font(14)),
           decoration: InputDecoration(
             filled: true,
-            fillColor: theme.scaffoldBackgroundColor,
+            fillColor: theme.colorScheme.surface,
+            isDense: true,
+            contentPadding: EdgeInsets.all(context.scale(14)),
             border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(10),
-              borderSide: BorderSide.none,
+              borderRadius: BorderRadius.circular(context.scale(10)),
+              borderSide: BorderSide(color: theme.colorScheme.outlineVariant),
+            ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(context.scale(10)),
+              borderSide: BorderSide(color: theme.colorScheme.outlineVariant),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(context.scale(10)),
+              borderSide: BorderSide(color: theme.colorScheme.primary, width: 1.5),
             ),
             errorBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(10),
+              borderRadius: BorderRadius.circular(context.scale(10)),
               borderSide: BorderSide(color: theme.colorScheme.error, width: 1),
             ),
             focusedErrorBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(10),
-              borderSide: BorderSide(color: theme.colorScheme.error, width: 2),
+              borderRadius: BorderRadius.circular(context.scale(10)),
+              borderSide: BorderSide(color: theme.colorScheme.error, width: 1.5),
             ),
           ),
           items: _sectionNames.map<DropdownMenuItem<String>>((String value) {
@@ -296,30 +289,38 @@ class _CreateNewSectionPageState extends State<CreateNewSectionPage> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text("Mentor Teacher",
-            style: theme.textTheme.titleMedium
-                ?.copyWith(color: theme.colorScheme.onPrimary)),
-        const SizedBox(height: 8),
+        Text("Mentor Teacher", style: TextStyle(color: theme.colorScheme.onSurface, fontWeight: FontWeight.bold, fontSize: context.font(14))),
+        SizedBox(height: context.scale(8)),
         DropdownButtonFormField<String>(
           value: _selectedMentorId,
-          hint: _isFetchingMentors
-              ? const Text('Loading Mentors...')
-              : const Text('Select a Mentor'),
+          dropdownColor: theme.colorScheme.surface,
+          hint: Text(_isFetchingMentors ? 'Loading Mentors...' : 'Select a Mentor', style: TextStyle(color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.5), fontSize: context.font(14))),
           isExpanded: true,
+          style: TextStyle(color: theme.colorScheme.onSurface, fontSize: context.font(14)),
           decoration: InputDecoration(
             filled: true,
-            fillColor: theme.scaffoldBackgroundColor,
+            fillColor: theme.colorScheme.surface,
+            isDense: true,
+            contentPadding: EdgeInsets.all(context.scale(14)),
             border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(10),
-              borderSide: BorderSide.none,
+              borderRadius: BorderRadius.circular(context.scale(10)),
+              borderSide: BorderSide(color: theme.colorScheme.outlineVariant),
+            ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(context.scale(10)),
+              borderSide: BorderSide(color: theme.colorScheme.outlineVariant),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(context.scale(10)),
+              borderSide: BorderSide(color: theme.colorScheme.primary, width: 1.5),
             ),
             errorBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(10),
+              borderRadius: BorderRadius.circular(context.scale(10)),
               borderSide: BorderSide(color: theme.colorScheme.error, width: 1),
             ),
             focusedErrorBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(10),
-              borderSide: BorderSide(color: theme.colorScheme.error, width: 2),
+              borderRadius: BorderRadius.circular(context.scale(10)),
+              borderSide: BorderSide(color: theme.colorScheme.error, width: 1.5),
             ),
           ),
           items: _mentors.map<DropdownMenuItem<String>>((mentor) {
@@ -352,21 +353,30 @@ class _CreateNewSectionPageState extends State<CreateNewSectionPage> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(label,
-            style: theme.textTheme.titleMedium
-                ?.copyWith(color: theme.colorScheme.onPrimary)),
-        const SizedBox(height: 8),
+        Text(label, style: TextStyle(color: theme.colorScheme.onSurface, fontWeight: FontWeight.bold, fontSize: context.font(14))),
+        SizedBox(height: context.scale(8)),
         TextFormField(
           controller: controller,
           keyboardType: keyboardType,
+          style: TextStyle(color: theme.colorScheme.onSurface, fontSize: context.font(14)),
           decoration: InputDecoration(
             hintText: hint,
-            hintStyle: TextStyle(color: theme.hintColor),
+            hintStyle: TextStyle(color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.5), fontSize: context.font(14)),
             filled: true,
-            fillColor: theme.scaffoldBackgroundColor,
+            fillColor: theme.colorScheme.surface,
+            isDense: true,
+            contentPadding: EdgeInsets.all(context.scale(14)),
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(10),
-              borderSide: BorderSide.none,
+              borderSide: BorderSide(color: theme.colorScheme.outlineVariant),
+            ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(10),
+              borderSide: BorderSide(color: theme.colorScheme.outlineVariant),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(10),
+              borderSide: BorderSide(color: theme.colorScheme.primary, width: 1.5),
             ),
             errorBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(10),
@@ -374,7 +384,7 @@ class _CreateNewSectionPageState extends State<CreateNewSectionPage> {
             ),
             focusedErrorBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(10),
-              borderSide: BorderSide(color: theme.colorScheme.error, width: 2),
+              borderSide: BorderSide(color: theme.colorScheme.error, width: 1.5),
             ),
           ),
           validator: validator,
@@ -383,3 +393,4 @@ class _CreateNewSectionPageState extends State<CreateNewSectionPage> {
     );
   }
 }
+

@@ -1,6 +1,11 @@
+import 'package:eduphin/services/error_handler.dart';
 import 'dart:async';
 import 'dart:convert';
+import 'dart:io';
+import 'package:eduphin/moderator_dashboard/cache_helper.dart';
+import 'package:eduphin/moderator_dashboard/skeleton_widgets.dart';
 import 'package:eduphin/services/api_service.dart';
+import 'package:eduphin/services/responsive_helper.dart';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 
@@ -24,31 +29,54 @@ class ClassInfo {
 
 // 2. Data Provider to fetch class data
 class ClassProvider {
-  Future<List<ClassInfo>> fetchClasses(String instituteId) async {
-    final token = await ApiService.getToken();
-    if (token == null) {
-      throw Exception('Authentication token not found.');
-    }
+  static const String _cacheKeyPrefix = 'classes_list_';
 
-    final response = await http.get(
-      Uri.parse('${ApiService.baseUrl}/moderator/institutes/$instituteId/classes'),
-      headers: {
-        'Authorization': 'Bearer $token',
-        'Accept': 'application/json',
-      },
-    );
-
-    if (response.statusCode == 200) {
-      final data = jsonDecode(response.body);
-      if (data['success'] == true && data['classes'] != null) {
-        final List<dynamic> classesJson = data['classes'];
-        return classesJson.map((json) => ClassInfo.fromJson(json)).toList();
-      } else {
-        throw Exception(data['message'] ?? 'Failed to load classes.');
+  Future<List<ClassInfo>> fetchClasses(String instituteId, {bool bypassCache = false}) async {
+    try {
+      if (!bypassCache) {
+        final cached = await getCachedClasses(instituteId);
+        if (cached != null) return cached;
       }
-    } else {
-      throw Exception('Failed to load classes. Status Code: ${response.statusCode}');
+      final token = await ApiService.getToken();
+      if (token == null) {
+        throw ApiException('Session expired. Please log in again.', statusCode: 401);
+      }
+
+      final response = await http.get(
+        Uri.parse('${ApiService.baseUrl}/moderator/institutes/$instituteId/classes'),
+        headers: {
+          'Authorization': 'Bearer $token',
+          'Accept': 'application/json',
+        },
+      );
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        if (data['success'] == true && data['classes'] != null) {
+          await CacheHelper.save(_cacheKeyPrefix + instituteId, data);
+          final List<dynamic> classesJson = data['classes'];
+          return classesJson.map((json) => ClassInfo.fromJson(json)).toList();
+        } else {
+          throw ApiException(data['message'] ?? 'Failed to load classes');
+        }
+      } else {
+        throw ApiException('Failed to load classes', statusCode: response.statusCode);
+      }
+    } on SocketException {
+      throw NetworkException();
+    } catch (e) {
+      if (e is ApiException || e is NetworkException) rethrow;
+      throw Exception('An unexpected error occurred: $e');
     }
+  }
+
+  Future<List<ClassInfo>?> getCachedClasses(String instituteId) async {
+    final cached = await CacheHelper.load(_cacheKeyPrefix + instituteId);
+    if (cached != null && cached['classes'] != null) {
+      final List<dynamic> classesJson = cached['classes'];
+      return classesJson.map((json) => ClassInfo.fromJson(json)).toList();
+    }
+    return null;
   }
 }
 
@@ -64,178 +92,143 @@ class ClassesPage extends StatefulWidget {
 class _ClassesPageState extends State<ClassesPage> {
   final ClassProvider _provider = ClassProvider();
   late Future<List<ClassInfo>> _classesFuture;
+  List<ClassInfo>? _cachedClasses;
 
   @override
   void initState() {
     super.initState();
-    _classesFuture = _provider.fetchClasses(widget.instituteId);
+    _loadInitialData();
+  }
+
+  Future<void> _loadInitialData() async {
+    _cachedClasses = await _provider.getCachedClasses(widget.instituteId);
+    _refreshClasses();
+  }
+
+  Future<void> _refreshClasses({bool bypassCache = false}) async {
+    setState(() {
+      _classesFuture = _provider.fetchClasses(widget.instituteId, bypassCache: bypassCache);
+    });
+    try {
+      await _classesFuture;
+    } catch (e) {
+      if (mounted) {
+        ErrorHandler.showError(context, e);
+      }
+    }
   }
 
   @override
   Widget build(BuildContext context) {
-    final screenWidth = MediaQuery.of(context).size.width;
-
-    double responsiveFontSize(double baseSize) {
-      if (screenWidth > 1200) {
-        return baseSize * 1.2;
-      } else if (screenWidth > 600) {
-        return baseSize * 1.1;
-      }
-      return baseSize;
-    }
+    final theme = context.theme;
+    final colorScheme = theme.colorScheme;
 
     return Scaffold(
-      backgroundColor: const Color(0xFF0D1B2A),
+      backgroundColor: theme.scaffoldBackgroundColor,
       appBar: AppBar(
-        title: Text(
-          'Classes',
-          style: TextStyle(fontSize: responsiveFontSize(20), color: Colors.white),
-        ),
-        backgroundColor: const Color(0xFF0D1B2A),
-        elevation: 0,
-        iconTheme: const IconThemeData(color: Colors.white),
+        title: Text('Institute Classes', style: TextStyle(fontSize: context.font(20), fontWeight: FontWeight.bold)),
+        actions: [
+          IconButton(
+            onPressed: () => _refreshClasses(bypassCache: true),
+            icon: Icon(Icons.refresh_rounded, size: context.scale(24)),
+          ),
+          SizedBox(width: context.md),
+        ],
       ),
       body: FutureBuilder<List<ClassInfo>>(
         future: _classesFuture,
         builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
-          }
-          if (snapshot.hasError) {
-            return Center(child: Text('Error: ${snapshot.error}', style: const TextStyle(color: Colors.white70)));
-          }
-          if (!snapshot.hasData || snapshot.data!.isEmpty) {
-            return const Center(child: Text('No classes found.', style: const TextStyle(color: Colors.white70)));
-          }
-
-          final classes = snapshot.data!;
-
-          return LayoutBuilder(
-            builder: (context, constraints) {
-              if (constraints.maxWidth > 600) {
-                int crossAxisCount = constraints.maxWidth > 1200 ? 4 : (constraints.maxWidth > 900 ? 3 : 2);
-                return GridView.builder(
-                  padding: EdgeInsets.fromLTRB(screenWidth * 0.04, screenWidth * 0.04, screenWidth * 0.04, 50),
-                  itemCount: classes.length,
-                  gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                    crossAxisCount: crossAxisCount,
-                    crossAxisSpacing: 16,
-                    mainAxisSpacing: 16,
-                    childAspectRatio: 2.5, // Aspect ratio for grid items
-                  ),
-                  itemBuilder: (context, index) {
-                    return ClassCard(
-                      classInfo: classes[index],
-                      isGridView: true,
-                    );
-                  },
-                );
-              } else {
-                return ListView.builder(
-                  padding: const EdgeInsets.fromLTRB(0, 8, 0, 50),
-                  itemCount: classes.length,
-                  itemBuilder: (context, index) {
-                    return ClassCard(
-                      classInfo: classes[index],
-                      isGridView: false,
-                    );
-                  },
-                );
+          return ModeratorLoadingWrapper<List<ClassInfo>>(
+            snapshot: snapshot,
+            cachedData: _cachedClasses,
+            skeleton: const ListSkeleton(),
+            onRefresh: () => _refreshClasses(bypassCache: true),
+            builder: (classes) {
+              if (classes.isEmpty) {
+                return _buildEmptyState(context);
               }
+
+              return RefreshIndicator(
+                onRefresh: () => _refreshClasses(bypassCache: true),
+                color: theme.colorScheme.primary,
+                child: SingleChildScrollView(
+                  padding: context.pagePadding,
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  child: Center(
+                    child: ConstrainedBox(
+                      constraints: BoxConstraints(maxWidth: context.scale(1200)),
+                      child: GridView.builder(
+                        shrinkWrap: true,
+                        physics: const NeverScrollableScrollPhysics(),
+                        itemCount: classes.length,
+                        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                          crossAxisCount: context.responsive(1, tablet: 2, desktop: 3),
+                          crossAxisSpacing: context.md,
+                          mainAxisSpacing: context.md,
+                          mainAxisExtent: context.scale(100),
+                        ),
+                        itemBuilder: (context, index) {
+                          return _buildClassCard(context, classes[index]);
+                        },
+                      ),
+                    ),
+                  ),
+                ),
+              );
             },
           );
         },
       ),
     );
   }
-}
 
-class ClassCard extends StatelessWidget {
-  final ClassInfo classInfo;
-  final bool isGridView;
-
-  const ClassCard({
-    super.key,
-    required this.classInfo,
-    this.isGridView = false,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final screenWidth = MediaQuery.of(context).size.width;
-    double responsiveFontSize(double baseSize) {
-      if (screenWidth > 1200) return baseSize * 1.2;
-      if (screenWidth > 600) return baseSize * 1.1;
-      return baseSize;
-    }
-
-    final cardContent = isGridView
-        ? Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              CircleAvatar(
-                radius: responsiveFontSize(22),
-                backgroundColor: const Color(0xFF0D1B2A),
-                child: Icon(Icons.book, color: Colors.white, size: responsiveFontSize(24)),
-              ),
-              const SizedBox(height: 12),
-              Text(
-                classInfo.name,
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  color: Colors.white,
-                  fontWeight: FontWeight.bold,
-                  fontSize: responsiveFontSize(14),
-                ),
-                overflow: TextOverflow.ellipsis,
-              ),
-              const SizedBox(height: 4),
-              Text(
-                classInfo.section,
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  color: Colors.white70,
-                  fontSize: responsiveFontSize(12),
-                ),
-                overflow: TextOverflow.ellipsis,
-              ),
-            ],
-          )
-        : ListTile(
-            leading: CircleAvatar(
-              backgroundColor: const Color(0xFF0D1B2A),
-              child: Icon(Icons.book, color: Colors.white, size: responsiveFontSize(22)),
-            ),
-            title: Text(
-              classInfo.name,
-              style: TextStyle(
-                color: Colors.white,
-                fontWeight: FontWeight.bold,
-                fontSize: responsiveFontSize(16),
-              ),
-            ),
-            subtitle: Text(
-              classInfo.section,
-              style: TextStyle(
-                color: Colors.white70,
-                fontSize: responsiveFontSize(14),
-              ),
-            ),
-            onTap: () {},
-          );
+  Widget _buildClassCard(BuildContext context, ClassInfo classInfo) {
+    final theme = context.theme;
+    final colorScheme = theme.colorScheme;
 
     return Card(
-      color: const Color(0xFF1B263B),
-      elevation: 2,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      margin: isGridView ? EdgeInsets.zero : EdgeInsets.symmetric(horizontal: screenWidth * 0.04, vertical: 8),
-      child: InkWell(
-        onTap: () {},
-        borderRadius: BorderRadius.circular(12),
-        child: Padding(
-          padding: EdgeInsets.all(isGridView ? 16 : 8),
-          child: cardContent,
+      color: theme.colorScheme.surfaceContainerLow,
+      elevation: 0,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(context.md),
+        side: BorderSide(color: theme.colorScheme.outlineVariant),
+      ),
+      child: ListTile(
+        contentPadding: EdgeInsets.symmetric(horizontal: context.md, vertical: context.sm),
+        leading: Container(
+          padding: EdgeInsets.all(context.sm),
+          decoration: BoxDecoration(
+            color: colorScheme.primary.withValues(alpha: 0.1),
+            borderRadius: BorderRadius.circular(context.sm),
+          ),
+          child: Icon(Icons.class_rounded, color: colorScheme.primary, size: context.scale(24)),
         ),
+        title: Text(
+          classInfo.name,
+          style: TextStyle(fontWeight: FontWeight.bold, fontSize: context.font(16), color: theme.colorScheme.onSurface),
+        ),
+        subtitle: Text(
+          "Section: ${classInfo.section}",
+          style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: context.font(14)),
+        ),
+        trailing: Icon(Icons.arrow_forward_ios_rounded, size: context.scale(16), color: theme.colorScheme.onSurfaceVariant),
+        onTap: () {},
+      ),
+    );
+  }
+
+  Widget _buildEmptyState(BuildContext context) {
+    final theme = context.theme;
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(Icons.class_outlined, size: context.scale(64), color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.3)),
+          SizedBox(height: context.md),
+          Text("No classes found", style: TextStyle(fontWeight: FontWeight.bold, fontSize: context.font(16), color: theme.colorScheme.onSurfaceVariant)),
+          SizedBox(height: context.sm),
+          Text("There are no classes recorded for this institute.", textAlign: TextAlign.center, style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: context.font(14))),
+        ],
       ),
     );
   }

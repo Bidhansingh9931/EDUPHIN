@@ -1,12 +1,14 @@
 import 'dart:convert';
+import 'package:eduphin/services/error_handler.dart';
+import 'package:eduphin/manager_dashboard/examinations/edit_schedule.dart';
 import 'package:eduphin/manager_dashboard/examinations/add_schedule.dart';
 import 'package:eduphin/services/api_service.dart';
+import 'package:eduphin/services/caching_service.dart';
+import 'package:eduphin/services/common_widgets.dart';
+import 'package:eduphin/services/responsive_helper.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
-import 'enter_marks_page.dart';
-
-// Data model for a single paper in a schedule
 class ExamPaper {
   final int id;
   final int examId;
@@ -38,24 +40,23 @@ class ExamPaper {
 
   factory ExamPaper.fromJson(Map<String, dynamic> json) {
     return ExamPaper(
-      id: json['id'],
-      examId: json['exam_id'],
-      classId: json['class_id'],
-      sectionId: json['section_id'],
-      subjectId: json['subject_id'],
-      className: json['class']?['name'] ?? 'N/A',
-      sectionName: json['section']?['name'] ?? 'N/A',
-      subjectName: json['subject']?['name'] ?? 'N/A',
-      venue: json['venue'] ?? '-',
-      date: json['paper_date'],
-      startTime: json['start_time'],
-      endTime: json['end_time'],
+      id: int.tryParse(json['id']?.toString() ?? '') ?? 0,
+      examId: int.tryParse(json['exam_id']?.toString() ?? '') ?? 0,
+      classId: int.tryParse(json['class_id']?.toString() ?? '') ?? 0,
+      sectionId: int.tryParse(json['section_id']?.toString() ?? '') ?? 0,
+      subjectId: int.tryParse(json['subject_id']?.toString() ?? '') ?? 0,
+      className: json['class']?['name']?.toString() ?? 'N/A',
+      sectionName: (json['section']?['section_name'] ?? json['section']?['name'])?.toString() ?? 'N/A',
+      subjectName: json['subject']?['name']?.toString() ?? 'N/A',
+      venue: json['venue']?.toString() ?? '-',
+      date: json['paper_date']?.toString(),
+      startTime: json['start_time']?.toString(),
+      endTime: json['end_time']?.toString(),
     );
   }
 }
 
 class ManageSchedulePage extends StatefulWidget {
-  // Pass these values when navigating to this page
   final int examId;
   final String examName;
 
@@ -70,30 +71,66 @@ class ManageSchedulePage extends StatefulWidget {
 }
 
 class _ManageSchedulePageState extends State<ManageSchedulePage> {
-  late Future<List<ExamPaper>> _scheduleFuture;
+  bool _isLoading = true;
+  List<ExamPaper> _papers = [];
+  Object? _error;
 
   @override
   void initState() {
     super.initState();
-    _scheduleFuture = _fetchSchedule();
+    _loadCacheAndFetch();
   }
 
-  Future<List<ExamPaper>> _fetchSchedule() async {
+  Future<void> _loadCacheAndFetch() async {
+    final cacheKey = 'manager_exam_schedule_${widget.examId}';
+    final cachedData = await CacheService.getCache(cacheKey);
+    if (cachedData != null && mounted) {
+      final List<dynamic> paperJson = cachedData;
+      setState(() {
+        _papers = paperJson.map((json) => ExamPaper.fromJson(json)).toList();
+      });
+    }
+    _fetchSchedule();
+  }
+
+  Future<void> _fetchSchedule() async {
+    if (!mounted) return;
+    setState(() {
+      _isLoading = _papers.isEmpty;
+      _error = null;
+    });
+
     try {
       final response = await ApiService.get('manager/exams/${widget.examId}/schedule');
       if (response.statusCode == 200) {
-        final List<dynamic> jsonData = json.decode(response.body)['data'] ?? [];
-        return jsonData.map((e) => ExamPaper.fromJson(e)).toList();
+        final body = json.decode(response.body);
+        final List<dynamic> paperJson = body['data'] ?? [];
+        await CacheService.setCache('manager_exam_schedule_${widget.examId}', paperJson);
+        if (mounted) {
+          setState(() {
+            _papers = paperJson.map((json) => ExamPaper.fromJson(json)).toList();
+            _isLoading = false;
+          });
+        }
       } else {
         throw Exception('Failed to load schedule. Status code: ${response.statusCode}');
       }
     } catch (e) {
-      rethrow;
+      if (mounted) {
+        setState(() {
+          _error = e;
+          _isLoading = false;
+        });
+        ErrorHandler.showError(context, e);
+      }
     }
   }
 
+  void _refreshSchedule() {
+    _fetchSchedule();
+  }
+
   Future<void> _deleteSchedule(int paperId) async {
-    // Show confirmation dialog before deleting
     final bool? confirmed = await showDialog(
       context: context,
       builder: (context) => AlertDialog(
@@ -106,27 +143,24 @@ class _ManageSchedulePageState extends State<ManageSchedulePage> {
       ),
     );
 
-    if (confirmed != true) return; // User cancelled
+    if (confirmed != true) return;
 
     try {
-      final response = await ApiService.delete('manager/class-schedules/$paperId');
+      final response = await ApiService.post('manager/exams/${widget.examId}/schedule/$paperId', {
+        '_method': 'DELETE',
+      });
       if (response.statusCode == 200 || response.statusCode == 204) {
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Schedule deleted successfully!')),
         );
-        // Refresh the list
-        setState(() {
-          _scheduleFuture = _fetchSchedule();
-        });
+        _refreshSchedule();
       } else {
         throw Exception('Failed to delete schedule. Status: ${response.statusCode}');
       }
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('An error occurred: $e')),
-      );
+      ErrorHandler.showError(context, e);
     }
   }
 
@@ -138,223 +172,169 @@ class _ManageSchedulePageState extends State<ManageSchedulePage> {
       ),
     ).then((value) {
       if (value == true) {
-        // If a schedule was added, refresh the list
-        setState(() {
-          _scheduleFuture = _fetchSchedule();
-        });
+        _refreshSchedule();
       }
     });
   }
 
   @override
   Widget build(BuildContext context) {
+    final theme = context.theme;
     return Scaffold(
+      backgroundColor: theme.scaffoldBackgroundColor,
       appBar: AppBar(
-        title: Text(widget.examName), // Use dynamic exam name
+        title: Text(widget.examName, style: TextStyle(fontWeight: FontWeight.bold, fontSize: context.font(20))),
         centerTitle: true,
       ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: _navigateToAddSchedule,
-        icon: const Icon(Icons.add),
-        label: const Text("Add Schedule"),
+        backgroundColor: theme.colorScheme.primary,
+        foregroundColor: theme.colorScheme.onPrimary,
+        icon: Icon(Icons.add, size: context.scale(24)),
+        label: Text("Add Schedule", style: TextStyle(fontSize: context.font(14), fontWeight: FontWeight.bold)),
       ),
-      body: FutureBuilder<List<ExamPaper>>(
-        future: _scheduleFuture,
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
-          } else if (snapshot.hasError) {
-            return Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Text('Error: ${snapshot.error}'),
-                  const SizedBox(height: 16),
-                  ElevatedButton(
-                    onPressed: () {
-                      setState(() {
-                        _scheduleFuture = _fetchSchedule();
-                      });
-                    },
-                    child: const Text('Retry'),
-                  ),
-                ],
-              ),
-            );
-          } else if (!snapshot.hasData || snapshot.data!.isEmpty) {
-            return const Center(child: Text('No schedule found for this exam.'));
-          }
-
-          final papers = snapshot.data!;
-
-          return ListView.separated(
-            padding: const EdgeInsets.fromLTRB(16, 16, 16, 80), // Added padding for FAB
-            itemCount: papers.length,
-            separatorBuilder: (context, index) => const SizedBox(height: 16),
-            itemBuilder: (context, index) {
-              final paper = papers[index];
-              final formattedDate = paper.date != null ? DateFormat('d MMM yyyy').format(DateTime.parse(paper.date!)) : "N/A";
-              final formattedStartTime = paper.startTime != null ? DateFormat('h:mm a').format(DateFormat('HH:mm:ss').parse(paper.startTime!)) : "N/A";
-              final formattedEndTime = paper.endTime != null ? DateFormat('h:mm a').format(DateFormat('HH:mm:ss').parse(paper.endTime!)) : "N/A";
-
-              return CustomExamResultContainerBox(
-                heading: "Class: ${paper.className}",
-                section: "Section: ${paper.sectionName}",
-                subject: paper.subjectName,
-                venue: paper.venue ?? 'N/A',
-                date: formattedDate,
-                time: '$formattedStartTime - $formattedEndTime',
-                onDelete: () => _deleteSchedule(paper.id),
-                onEnterMarks: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => EnterMarksPage(
-                        paperId: paper.id,
-                        examId: paper.examId,
-                        classId: paper.classId,
-                        sectionId: paper.sectionId,
-                        subjectId: paper.subjectId,
-                        subjectName: paper.subjectName,
+      body: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 1200),
+          child: LoadingWrapper(
+            isLoading: _isLoading,
+            hasData: _papers.isNotEmpty,
+            error: _error,
+            onRetry: _refreshSchedule,
+            skeleton: _buildSkeleton(),
+            child: RefreshIndicator(
+              onRefresh: () async => _refreshSchedule(),
+              child: _papers.isEmpty
+                  ? SingleChildScrollView(
+                      physics: const AlwaysScrollableScrollPhysics(),
+                      child: Container(
+                        height: MediaQuery.of(context).size.height * 0.7,
+                        alignment: Alignment.center,
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(Icons.calendar_today_outlined, size: context.scale(64), color: theme.colorScheme.outlineVariant),
+                            SizedBox(height: context.md),
+                            Text('No schedule found for this exam.', style: theme.textTheme.titleMedium?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
+                          ],
+                        ),
                       ),
+                    )
+                  : GridView.builder(
+                      padding: EdgeInsets.fromLTRB(context.spacing, context.spacing, context.spacing, context.scale(80)),
+                      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                        crossAxisCount: context.responsive(1, tablet: 2, desktop: 3),
+                        crossAxisSpacing: context.spacing,
+                        mainAxisSpacing: context.spacing,
+                        mainAxisExtent: context.scale(230),
+                      ),
+                      itemCount: _papers.length,
+                      itemBuilder: (context, index) => _buildPaperItem(_papers[index]),
                     ),
-                  );
-                },
-              );
-            },
-          );
-        },
+            ),
+          ),
+        ),
       ),
     );
   }
-}
 
-class CustomExamResultContainerBox extends StatelessWidget {
-  final String heading;
-  final String subject;
-  final String section;
-  final String venue;
-  final String date;
-  final String time;
-  final VoidCallback onEnterMarks;
-  final VoidCallback onDelete;
+  Widget _buildSkeleton() {
+    return GridView.builder(
+      padding: EdgeInsets.all(context.spacing),
+      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: context.responsive(1, tablet: 2, desktop: 3),
+        crossAxisSpacing: context.spacing,
+        mainAxisSpacing: context.spacing,
+        mainAxisExtent: context.scale(230),
+      ),
+      itemCount: 6,
+      itemBuilder: (context, index) => SkeletonBox(height: context.scale(230), borderRadius: context.scale(16)),
+    );
+  }
 
-  const CustomExamResultContainerBox({
-    super.key,
-    required this.heading,
-    required this.subject,
-    required this.section,
-    required this.venue,
-    required this.date,
-    required this.time,
-    required this.onEnterMarks,
-    required this.onDelete,
-  });
 
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
+  Widget _buildPaperItem(ExamPaper paper) {
+    final theme = context.theme;
+    final formattedDate = paper.date != null ? DateFormat('d MMM yyyy').format(DateTime.parse(paper.date!)) : "N/A";
+    final formattedStartTime = paper.startTime != null ? DateFormat('h:mm a').format(DateFormat('HH:mm:ss').parse(paper.startTime!)) : "N/A";
+    final formattedEndTime = paper.endTime != null ? DateFormat('h:mm a').format(DateFormat('HH:mm:ss').parse(paper.endTime!)) : "N/A";
 
-    return Container(
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(10),
-        color: theme.primaryColor,
+    return Card(
+      elevation: 0,
+      color: theme.colorScheme.surfaceContainerLow,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(context.scale(16)),
+        side: BorderSide(color: theme.colorScheme.outlineVariant.withValues(alpha: 0.5)),
       ),
       child: Padding(
-        padding: const EdgeInsets.all(16),
+        padding: EdgeInsets.all(context.spacing),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Row(
               children: [
-                const Icon(Icons.book, size: 18),
-                const SizedBox(width: 8),
-                Flexible(
-                  child: Text(heading, overflow: TextOverflow.ellipsis, style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onPrimary)),
-                ),
-                Text(" - ", style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onPrimary)),
-                Text(section, style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onPrimary)),
-              ],
-            ),
-            const SizedBox(height: 5),
-            Row(
-              children: [
+                Icon(Icons.class_outlined, size: context.scale(20), color: theme.colorScheme.primary),
+                SizedBox(width: context.sm),
                 Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text("SUBJECT", style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onPrimary.withAlpha(150))),
-                      Text(subject, style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onPrimary)),
-                    ],
-                  ),
-                ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text("VENUE", style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onPrimary.withAlpha(150))),
-                      Text(venue, style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onPrimary)),
-                    ],
+                  child: Text(
+                    "Class ${paper.className} - ${paper.sectionName}",
+                    style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
                   ),
                 ),
               ],
             ),
-            const SizedBox(height: 5),
+            SizedBox(height: context.md),
+            _buildInfoRow(context, "Subject", paper.subjectName, Icons.book_outlined),
+            SizedBox(height: context.sm),
+            _buildInfoRow(context, "Venue", paper.venue ?? 'N/A', Icons.location_on_outlined),
+            SizedBox(height: context.sm),
+            _buildInfoRow(context, "Schedule", "$formattedDate • $formattedStartTime - $formattedEndTime", Icons.schedule_outlined),
+            const Spacer(),
             Row(
               children: [
                 Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text("Date", style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onPrimary.withAlpha(150))),
-                      Text(date, style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onPrimary)),
-                    ],
-                  ),
-                ),
-                 const SizedBox(width: 16),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text("Time", style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onPrimary.withAlpha(150))),
-                      Text(time, style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onPrimary)),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 8),
-            Divider(color: theme.colorScheme.onPrimary.withAlpha(180), thickness: 1),
-            const SizedBox(height: 8),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Expanded(
-                  child: ElevatedButton.icon(
-                    onPressed: onEnterMarks,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: theme.colorScheme.secondary,
-                      foregroundColor: theme.colorScheme.onSecondary,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                      padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
-                    ),
-                    icon: const Icon(Icons.edit, size: 16),
-                    label: const Text("Enter Marks"),
-                  ),
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: ElevatedButton.icon(
-                    onPressed: onDelete,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: theme.colorScheme.errorContainer,
-                      foregroundColor: theme.colorScheme.onErrorContainer,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                      padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
-                    ),
-                    icon: const Icon(Icons.delete, size: 16),
+                  child: OutlinedButton.icon(
+                    onPressed: () => _deleteSchedule(paper.id),
+                    icon: Icon(Icons.delete_outline, size: context.scale(18)),
                     label: const Text("Delete"),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: theme.colorScheme.error,
+                      side: BorderSide(color: theme.colorScheme.error.withValues(alpha: 0.5)),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(context.scale(12))),
+                    ),
+                  ),
+                ),
+                SizedBox(width: context.md),
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: () async {
+                      final result = await Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => EditScheduleScreen(
+                            paperId: paper.id,
+                            examId: paper.examId,
+                            initialClassId: paper.classId,
+                            initialSectionId: paper.sectionId,
+                            initialSubjectId: paper.subjectId,
+                            initialVenue: paper.venue,
+                            initialDate: paper.date,
+                            initialStartTime: paper.startTime,
+                            initialEndTime: paper.endTime,
+                          ),
+                        ),
+                      );
+                      if (result == true) {
+                        _refreshSchedule();
+                      }
+                    },
+                    icon: Icon(Icons.edit_outlined, size: context.scale(18)),
+                    label: const Text("Edit"),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: theme.colorScheme.primary,
+                      side: BorderSide(color: theme.colorScheme.primary.withValues(alpha: 0.5)),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(context.scale(12))),
+                    ),
                   ),
                 ),
               ],
@@ -364,4 +344,26 @@ class CustomExamResultContainerBox extends StatelessWidget {
       ),
     );
   }
+
+  Widget _buildInfoRow(BuildContext context, String label, String value, IconData icon) {
+    final theme = context.theme;
+    return Row(
+      children: [
+        Icon(icon, size: context.scale(16), color: theme.colorScheme.onSurfaceVariant),
+        SizedBox(width: context.sm),
+        Expanded(
+          child: RichText(
+            text: TextSpan(
+              style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurface),
+              children: [
+                TextSpan(text: "$label: ", style: const TextStyle(fontWeight: FontWeight.bold)),
+                TextSpan(text: value),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
 }
+

@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 
 import 'package:eduphin/services/api_service.dart';
+import 'package:eduphin/services/error_handler.dart';
 import 'package:flutter/material.dart';
 
 import 'section_model.dart';
@@ -41,12 +42,12 @@ class _EditSectionPageState extends State<EditSectionPage> {
 
       final responseData = jsonDecode(response.body);
       if (response.statusCode == 200 && responseData['status'] == true) {
-        final List<dynamic> teachersList = responseData['data'];
-        _mentors = teachersList.map((teacher) {
+        final List<dynamic> teachersList = responseData['data'] ?? [];
+        _mentors = teachersList.where((teacher) => teacher['user'] != null).map((teacher) {
           final user = teacher['user'];
           return {
-            'id': user['id'] as int,
-            'name': '${user['first_name']} ${user['last_name']}',
+            'id': user['id'] is int ? user['id'] : int.tryParse(user['id'].toString()) ?? 0,
+            'name': '${user['first_name'] ?? ''} ${user['last_name'] ?? ''}'.trim(),
           };
         }).toList();
 
@@ -57,16 +58,18 @@ class _EditSectionPageState extends State<EditSectionPage> {
         );
 
         setState(() {
-          if (currentMentor['id'] != null) {
+          if (currentMentor['id'] != null && currentMentor['id'] != 0) {
             _selectedMentorId = currentMentor['id'].toString();
           }
         });
       } else {
-        _showErrorSnackbar(responseData['message'] ?? 'Failed to load mentors.');
+        if (mounted) {
+          ErrorHandler.showError(context, responseData['message'] ?? 'Failed to load mentors.');
+        }
       }
     } catch (e) {
       if (mounted) {
-        _showErrorSnackbar('An error occurred: $e');
+        ErrorHandler.showError(context, e);
       }
     } finally {
       if (mounted) {
@@ -103,24 +106,17 @@ class _EditSectionPageState extends State<EditSectionPage> {
         );
         Navigator.pop(context, true); // Pop with true to indicate success
       } else {
-        _showErrorSnackbar(responseData['message'] ?? 'Failed to update section.');
+        throw Exception(responseData['message'] ?? 'Failed to update section.');
       }
     } catch (e) {
       if (mounted) {
-        _showErrorSnackbar('An error occurred: $e');
+        ErrorHandler.showError(context, e);
       }
     } finally {
       if (mounted) {
         setState(() => _isSaving = false);
       }
     }
-  }
-
-  void _showErrorSnackbar(String message) {
-    final theme = Theme.of(context);
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message), backgroundColor: theme.colorScheme.error),
-    );
   }
 
   @override

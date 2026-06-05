@@ -1,7 +1,11 @@
 import 'dart:convert';
+import 'package:eduphin/services/common_widgets.dart';
+import 'package:eduphin/services/caching_service.dart';
+import 'package:eduphin/services/responsive_helper.dart';
 import 'package:http/http.dart' as http;
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:eduphin/services/error_handler.dart';
 import 'package:eduphin/services/api_service.dart';
 
 // --- DATA MODELS ---
@@ -81,6 +85,7 @@ class _MySalaryPageState extends State<MySalaryPage> {
   bool _isSaving = false;
   final List<PastSalaryRecord> _pastRecords = [];
   Map<String, dynamic>? _accountDetails;
+  Object? _error;
 
   // Text editing controllers for the form fields
   final _bankAccountController = TextEditingController();
@@ -92,7 +97,7 @@ class _MySalaryPageState extends State<MySalaryPage> {
   @override
   void initState() {
     super.initState();
-    _fetchSalaryData();
+    _loadCacheAndFetch();
   }
 
   @override
@@ -105,9 +110,46 @@ class _MySalaryPageState extends State<MySalaryPage> {
     super.dispose();
   }
 
+  Future<void> _loadCacheAndFetch() async {
+    final cachedData = await CacheService.getCache('manager_my_salary');
+    if (cachedData != null && mounted) {
+      _processData(cachedData);
+      setState(() => _isLoading = false);
+    }
+    _fetchSalaryData();
+  }
+
+  void _processData(Map<String, dynamic> data) {
+    _accountDetails = data['account'] as Map<String, dynamic>?;
+    if (_accountDetails != null) {
+      final details = SalaryDetails.fromJson(_accountDetails!);
+      final records = (data['salaries'] as List)
+          .map((record) => PastSalaryRecord.fromJson(record))
+          .toList();
+
+      if (mounted) {
+        setState(() {
+          _pastRecords.clear();
+          _pastRecords.addAll(records);
+
+          _bankAccountController.text = details.bankAccount;
+          _ifscController.text = details.ifsc;
+          _bankNameController.text = details.bankName;
+          _employerBranchController.text = details.employerBranch;
+          _zoneController.text = details.zone;
+        });
+      }
+    }
+  }
+
   Future<void> _fetchSalaryData() async {
     if (!mounted) return;
-    setState(() => _isLoading = true);
+    if (_accountDetails == null) {
+      setState(() {
+        _isLoading = true;
+        _error = null;
+      });
+    }
 
     try {
       final token = await ApiService.getToken();
@@ -125,27 +167,9 @@ class _MySalaryPageState extends State<MySalaryPage> {
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
-        
-        _accountDetails = data['account'] as Map<String, dynamic>?;
-        if (_accountDetails == null) {
-          throw Exception("Could not retrieve account details.");
-        }
-
-        final details = SalaryDetails.fromJson(_accountDetails!);
-        final records = (data['salaries'] as List)
-            .map((record) => PastSalaryRecord.fromJson(record))
-            .toList();
-
+        await CacheService.setCache('manager_my_salary', data);
+        _processData(data);
         setState(() {
-          _pastRecords.clear();
-          _pastRecords.addAll(records);
-
-          _bankAccountController.text = details.bankAccount;
-          _ifscController.text = details.ifsc;
-          _bankNameController.text = details.bankName;
-          _employerBranchController.text = details.employerBranch;
-          _zoneController.text = details.zone;
-
           _isLoading = false;
         });
       } else {
@@ -153,10 +177,11 @@ class _MySalaryPageState extends State<MySalaryPage> {
       }
     } catch (e) {
       if (!mounted) return;
-      setState(() => _isLoading = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error: ${e.toString()}')),
-      );
+      setState(() {
+        _isLoading = _accountDetails == null;
+        _error = e;
+      });
+      ErrorHandler.showError(context, e);
     }
   }
 
@@ -208,12 +233,7 @@ class _MySalaryPageState extends State<MySalaryPage> {
       }
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Error: ${e.toString()}'),
-          backgroundColor: Colors.red,
-        ),
-      );
+      ErrorHandler.showError(context, e);
     } finally {
       if (mounted) {
         setState(() => _isSaving = false);
@@ -223,142 +243,220 @@ class _MySalaryPageState extends State<MySalaryPage> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
+    final theme = context.theme;
     return Scaffold(
-      backgroundColor: theme.scaffoldBackgroundColor,
+      backgroundColor: theme.colorScheme.surface,
       appBar: AppBar(
-        title: const Text("Salary and Bank Details"),
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        leading: IconButton(
+          icon: Icon(Icons.arrow_back, color: theme.colorScheme.onSurface),
+          onPressed: () => Navigator.pop(context),
+        ),
+        title: Text(
+          "Salary and Bank Details",
+          style: TextStyle(
+            fontWeight: FontWeight.bold,
+            color: theme.colorScheme.onSurface,
+            fontSize: context.font(18),
+          ),
+        ),
+        centerTitle: true,
       ),
-      floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
-      floatingActionButton: _isLoading ? null : _buildSaveButton(theme),
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : LayoutBuilder(builder: (context, constraints) {
-              if (constraints.maxWidth > 800) {
-                return _buildWideLayout();
-              } else {
-                return _buildNarrowLayout();
-              }
-            }),
-    );
-  }
-
-  Widget _buildSaveButton(ThemeData theme) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16.0),
-      child: SizedBox(
-        width: double.infinity,
-        child: FloatingActionButton.extended(
-          onPressed: _isSaving ? null : _saveSalaryData,
-          label: _isSaving
-              ? const CircularProgressIndicator(valueColor: AlwaysStoppedAnimation(Colors.white))
-              : Text("Save Changes", style: theme.textTheme.labelLarge?.copyWith(color: theme.colorScheme.onPrimary)),
+      bottomNavigationBar: _isLoading && _accountDetails == null
+          ? null
+          : Container(
+              padding: EdgeInsets.fromLTRB(context.scale(16), context.scale(8), context.scale(16), context.scale(24)),
+              decoration: BoxDecoration(
+                color: theme.colorScheme.surface,
+                border: Border(top: BorderSide(color: theme.colorScheme.outlineVariant)),
+              ),
+              child: SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  onPressed: _isSaving ? null : _saveSalaryData,
+                  style: ElevatedButton.styleFrom(
+                    padding: EdgeInsets.symmetric(vertical: context.scale(14)),
+                    backgroundColor: theme.colorScheme.primary,
+                    foregroundColor: theme.colorScheme.onPrimary,
+                    elevation: 0,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(context.scale(12))),
+                  ),
+                  child: _isSaving
+                      ? SizedBox(height: context.scale(20), width: context.scale(20), child: CircularProgressIndicator(strokeWidth: 2, color: theme.colorScheme.onPrimary))
+                      : Text("Save Changes", style: TextStyle(fontSize: context.font(16), fontWeight: FontWeight.bold)),
+                ),
+              ),
+            ),
+      body: LoadingWrapper(
+        isLoading: _isLoading,
+        hasData: _accountDetails != null,
+        error: _error,
+        onRetry: _fetchSalaryData,
+        skeleton: _buildSkeleton(),
+        child: SingleChildScrollView(
+          padding: context.pagePadding,
+          child: Center(
+            child: ConstrainedBox(
+              constraints: BoxConstraints(maxWidth: context.scale(1000)),
+              child: context.responsive(
+                _buildNarrowLayout(),
+                tablet: _buildWideLayout(),
+              ),
+            ),
+          ),
         ),
       ),
     );
   }
 
-  // --- LAYOUTS ---
-
-  Widget _buildNarrowLayout() {
+  Widget _buildSkeleton() {
     return SingleChildScrollView(
-      padding: const EdgeInsets.fromLTRB(16, 16, 16, 80),
-      child: Column(
-        children: [
-          _buildBankingInfoSection(),
-          const SizedBox(height: 16),
-          _buildPastSalariesSection(),
-        ],
+      padding: context.pagePadding,
+      child: Center(
+        child: ConstrainedBox(
+          constraints: BoxConstraints(maxWidth: context.scale(1000)),
+          child: Column(
+            children: [
+              SkeletonBox(height: context.scale(350), borderRadius: context.scale(16)),
+              SizedBox(height: context.scale(24)),
+              SkeletonBox(height: context.scale(400), borderRadius: context.scale(16)),
+            ],
+          ),
+        ),
       ),
     );
   }
 
+
+  // --- LAYOUTS ---
+
+  Widget _buildNarrowLayout() {
+    return Column(
+      children: [
+        _buildBankingInfoSection(),
+        SizedBox(height: context.scale(24)),
+        _buildPastSalariesSection(),
+      ],
+    );
+  }
+
   Widget _buildWideLayout() {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 16, 16, 80),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Expanded(
-            flex: 2,
-            child: SingleChildScrollView(child: _buildBankingInfoSection()),
-          ),
-          const SizedBox(width: 16),
-          Expanded(
-            flex: 3,
-            child: SingleChildScrollView(child: _buildPastSalariesSection()),
-          ),
-        ],
-      ),
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Expanded(
+          flex: 2,
+          child: _buildBankingInfoSection(),
+        ),
+        SizedBox(width: context.scale(24)),
+        Expanded(
+          flex: 3,
+          child: _buildPastSalariesSection(),
+        ),
+      ],
     );
   }
 
   // --- SECTIONS ---
 
   Widget _buildBankingInfoSection() {
-    return SectionCard(
-      title: "Banking Information",
-      icon: Icons.account_balance,
-      children: [
-        CustomTextField(label: "Bank Account Number", controller: _bankAccountController, editable: true),
-        CustomTextField(label: "IFSC Code", controller: _ifscController, editable: true),
-        CustomTextField(label: "Bank Name", controller: _bankNameController, editable: true),
-        const Divider(height: 24),
-        CustomTextField(label: "Employer Branch", controller: _employerBranchController, editable: true),
-        CustomTextField(label: "Zone / Sector", controller: _zoneController, editable: true),
-      ],
+    final theme = context.theme;
+    return Container(
+      padding: EdgeInsets.all(context.scale(20)),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surfaceContainerLow,
+        borderRadius: BorderRadius.circular(context.scale(16)),
+        border: Border.all(color: theme.colorScheme.outlineVariant),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.account_balance, color: theme.colorScheme.primary, size: context.scale(20)),
+              SizedBox(width: context.scale(10)),
+              Text("Banking Information", style: TextStyle(fontSize: context.font(16), fontWeight: FontWeight.bold, color: theme.colorScheme.onSurface)),
+            ],
+          ),
+          SizedBox(height: context.scale(20)),
+          CustomTextField(label: "Bank Account Number", controller: _bankAccountController, editable: true),
+          CustomTextField(label: "IFSC Code", controller: _ifscController, editable: true),
+          CustomTextField(label: "Bank Name", controller: _bankNameController, editable: true),
+          Divider(height: context.scale(32), color: theme.colorScheme.outlineVariant),
+          CustomTextField(label: "Employer Branch", controller: _employerBranchController, editable: true),
+          CustomTextField(label: "Zone / Sector", controller: _zoneController, editable: true),
+        ],
+      ),
     );
   }
 
   Widget _buildPastSalariesSection() {
-    return SectionCard(
-      title: "Past Salary Record",
-      icon: Icons.history,
-      children: [
-        if (_pastRecords.isEmpty)
-          const Center(child: Text("No records found."))
-        else
-          ListView.separated(
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            itemCount: _pastRecords.length,
-            separatorBuilder: (context, index) => const SizedBox(height: 16),
-            itemBuilder: (context, index) {
-              return _buildSalaryRecordCard(_pastRecords[index]);
-            },
-          )
-      ],
+    final theme = context.theme;
+    return Container(
+      padding: EdgeInsets.all(context.scale(20)),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surfaceContainerLow,
+        borderRadius: BorderRadius.circular(context.scale(16)),
+        border: Border.all(color: theme.colorScheme.outlineVariant),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.history, color: theme.colorScheme.primary, size: context.scale(20)),
+              SizedBox(width: context.scale(10)),
+              Text("Past Salary Record", style: TextStyle(fontSize: context.font(16), fontWeight: FontWeight.bold, color: theme.colorScheme.onSurface)),
+            ],
+          ),
+          SizedBox(height: context.scale(20)),
+          if (_pastRecords.isEmpty)
+            Center(child: Padding(padding: EdgeInsets.all(context.scale(20)), child: Text("No records found.", style: TextStyle(color: theme.colorScheme.onSurfaceVariant))))
+          else
+            ListView.separated(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              itemCount: _pastRecords.length,
+              separatorBuilder: (context, index) => SizedBox(height: context.scale(12)),
+              itemBuilder: (context, index) {
+                return _buildSalaryRecordCard(_pastRecords[index]);
+              },
+            )
+        ],
+      ),
     );
   }
 
   Widget _buildSalaryRecordCard(PastSalaryRecord record) {
-    final theme = Theme.of(context);
+    final theme = context.theme;
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: EdgeInsets.all(context.scale(16)),
       decoration: BoxDecoration(
-        color: theme.scaffoldBackgroundColor,
-        borderRadius: BorderRadius.circular(14),
+        color: theme.colorScheme.surface,
+        borderRadius: BorderRadius.circular(context.scale(12)),
+        border: Border.all(color: theme.colorScheme.outlineVariant.withValues(alpha: 0.5)),
       ),
       child: Column(
         children: [
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(record.monthYear, style: theme.textTheme.titleMedium),
+              Text(record.monthYear, style: TextStyle(fontSize: context.font(15), fontWeight: FontWeight.bold, color: theme.colorScheme.onSurface)),
               Row(
                 children: [
-                  Icon(Icons.currency_rupee, size: 20, color: Colors.green.shade400),
-                  Text(record.amount, style: theme.textTheme.titleMedium?.copyWith(color: Colors.green.shade400)),
+                  Text("₹", style: TextStyle(fontSize: context.font(14), color: Colors.green, fontWeight: FontWeight.bold)),
+                  Text(record.amount, style: TextStyle(fontSize: context.font(15), fontWeight: FontWeight.bold, color: Colors.green)),
                 ],
               )
             ],
           ),
-          const SizedBox(height: 4),
+          SizedBox(height: context.scale(4)),
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(record.paidOn, style: theme.textTheme.bodySmall?.copyWith(color: theme.hintColor)),
-              Text("View Details", style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.secondary)),
+              Text(record.paidOn, style: TextStyle(fontSize: context.font(12), color: theme.colorScheme.onSurfaceVariant)),
+              Text("View Details", style: TextStyle(fontSize: context.font(12), fontWeight: FontWeight.bold, color: theme.colorScheme.primary)),
             ],
           ),
         ],
@@ -368,40 +466,6 @@ class _MySalaryPageState extends State<MySalaryPage> {
 }
 
 // --- REUSABLE WIDGETS ---
-
-class SectionCard extends StatelessWidget {
-  final String title;
-  final IconData icon;
-  final List<Widget> children;
-
-  const SectionCard({super.key, required this.title, required this.icon, required this.children});
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: theme.colorScheme.surface,
-        borderRadius: BorderRadius.circular(14),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Icon(icon, color: theme.colorScheme.secondary),
-              const SizedBox(width: 10),
-              Text(title, style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold)),
-            ],
-          ),
-          const SizedBox(height: 16),
-          ...children,
-        ],
-      ),
-    );
-  }
-}
 
 class CustomTextField extends StatelessWidget {
   final String label;
@@ -419,27 +483,27 @@ class CustomTextField extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
+    final theme = context.theme;
     return Padding(
-      padding: const EdgeInsets.only(bottom: 12.0),
+      padding: EdgeInsets.only(bottom: context.scale(12)),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(label, style: theme.textTheme.labelMedium?.copyWith(color: theme.hintColor)),
-          const SizedBox(height: 6),
+          Text(label, style: TextStyle(fontSize: context.font(13), fontWeight: FontWeight.bold, color: theme.colorScheme.onSurface)),
+          SizedBox(height: context.scale(6)),
           TextFormField(
             enabled: editable,
             controller: controller,
-            style: theme.textTheme.bodyLarge,
+            style: TextStyle(fontSize: context.font(14), color: theme.colorScheme.onSurface),
             decoration: InputDecoration(
               filled: true,
-              fillColor: editable ? theme.scaffoldBackgroundColor : theme.colorScheme.surface.withAlpha(100),
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(10),
-                borderSide: BorderSide.none,
-              ),
-              prefixIcon: icon != null ? Icon(icon, color: theme.hintColor) : null,
-              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+              fillColor: theme.colorScheme.surface,
+              contentPadding: EdgeInsets.symmetric(horizontal: context.scale(16), vertical: context.scale(12)),
+              border: OutlineInputBorder(borderRadius: BorderRadius.circular(context.scale(10)), borderSide: BorderSide(color: theme.colorScheme.outlineVariant)),
+              enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(context.scale(10)), borderSide: BorderSide(color: theme.colorScheme.outlineVariant)),
+              focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(context.scale(10)), borderSide: BorderSide(color: theme.colorScheme.primary, width: 1.5)),
+              disabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(context.scale(10)), borderSide: BorderSide(color: theme.colorScheme.outlineVariant.withValues(alpha: 0.5))),
+              prefixIcon: icon != null ? Icon(icon, color: theme.colorScheme.onSurfaceVariant, size: context.scale(20)) : null,
             ),
           ),
         ],
@@ -447,3 +511,5 @@ class CustomTextField extends StatelessWidget {
     );
   }
 }
+
+

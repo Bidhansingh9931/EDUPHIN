@@ -1,7 +1,11 @@
 import 'dart:convert';
 import 'package:eduphin/services/api_service.dart';
+import 'package:eduphin/services/error_handler.dart';
+import 'package:eduphin/services/caching_service.dart';
+import 'package:eduphin/services/common_widgets.dart';
+import 'package:eduphin/services/responsive_helper.dart';
+import 'package:eduphin/teacher/dashboard/common_widgets.dart';
 import 'package:flutter/material.dart';
-
 import 'searchSchedule/daily_class_schedule.dart';
 
 // --- Data Models from API ---
@@ -43,65 +47,72 @@ class _ClassScheduleSearchPageState extends State<ClassScheduleSearchPage> {
   String? _selectedSection;
   List<String> _classList = [];
   List<String> _sectionList = [];
-  String _error = '';
+  Object? _error;
 
   @override
   void initState() {
     super.initState();
+    _loadCacheAndFetch();
+  }
+
+  Future<void> _loadCacheAndFetch() async {
+    final cachedData = await CacheService.getCache('manager_class_schedules_meta');
+    if (cachedData != null && mounted) {
+      _processData(cachedData);
+    }
     _fetchDropdownData();
   }
 
-  @override
-  void dispose() {
-    _selectDateController.dispose();
-    super.dispose();
+  void _processData(dynamic data) {
+    final List<dynamic> classData = data['classes'] ?? [];
+
+    final List<String> fetchedClasses = classData
+        .map((json) => ApiClass.fromJson(json).name)
+        .whereType<String>()
+        .toList();
+
+    setState(() {
+      _classList = fetchedClasses;
+      _sectionList = ['A', 'B', 'C', 'D'];
+      if (_selectedClass == null && fetchedClasses.isNotEmpty) {
+        _selectedClass = fetchedClasses.first;
+      }
+    });
   }
 
   Future<void> _fetchDropdownData() async {
     if (!mounted) return;
     setState(() {
-      _isLoading = true;
-      _error = '';
+      _isLoading = _classList.isEmpty;
+      _error = null;
     });
 
     try {
       final response = await ApiService.get('manager/class-schedules/meta');
-      
-      if (!mounted) return;
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
         if (data['status'] == true) {
-          final List<dynamic> classData = data['classes'] ?? [];
-
-          final List<String> fetchedClasses = classData
-              .map((json) => ApiClass.fromJson(json).name)
-              .whereType<String>()
-              .toList();
-
-          setState(() {
-            _classList = fetchedClasses;
-            _sectionList = ['A', 'B', 'C', 'D'];
-            _selectedClass = fetchedClasses.isNotEmpty ? fetchedClasses.first : null;
-            _selectedSection = null;
-          });
+          await CacheService.setCache('manager_class_schedules_meta', data);
+          if (mounted) {
+            _processData(data);
+            setState(() {
+              _isLoading = false;
+            });
+          }
         } else {
-          throw Exception('API returned an error: ${data['message'] ?? 'Unknown error'}');
+          throw Exception(data['message'] ?? 'Failed to load metadata');
         }
       } else {
-        throw Exception('Failed to load data. Status code: ${response.statusCode}');
+        throw Exception('Failed to load data. Status: ${response.statusCode}');
       }
     } catch (e) {
       if (mounted) {
         setState(() {
-          _error = e.toString().replaceFirst("Exception: ", "");
-        });
-      }
-    } finally {
-      if (mounted) {
-        setState(() {
+          _error = e;
           _isLoading = false;
         });
+        ErrorHandler.showError(context, e);
       }
     }
   }
@@ -140,111 +151,118 @@ class _ClassScheduleSearchPageState extends State<ClassScheduleSearchPage> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
+    final theme = context.theme;
     return Scaffold(
-      backgroundColor: theme.scaffoldBackgroundColor,
+      backgroundColor: theme.colorScheme.surface,
       appBar: AppBar(
-        title: const Text("Class Schedule Search"),
-        centerTitle: true,
+        title: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text("Schedule Search", style: theme.appBarTheme.titleTextStyle?.copyWith(fontSize: context.font(18))),
+            Text("Find daily schedules for classes", style: theme.textTheme.labelSmall?.copyWith(color: theme.hintColor, fontSize: context.font(11))),
+          ],
+        ),
+        centerTitle: false,
       ),
-      floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
-      floatingActionButton: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16.0),
-        child: SizedBox(
-          width: double.infinity,
-          child: ElevatedButton(
-            onPressed: _isLoading || _error.isNotEmpty ? null : _searchSchedule,
-            style: ElevatedButton.styleFrom(
-              padding: const EdgeInsets.symmetric(vertical: 16),
-              backgroundColor: theme.colorScheme.primary,
-              foregroundColor: theme.colorScheme.onPrimary,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
+      bottomNavigationBar: _isLoading || _error != null
+          ? null
+          : SafeArea(
+              child: Container(
+                padding: EdgeInsets.fromLTRB(context.spacing, context.scale(8), context.spacing, context.scale(16)),
+                decoration: BoxDecoration(
+                  color: theme.colorScheme.surface,
+                  border: Border(top: BorderSide(color: theme.colorScheme.outlineVariant.withValues(alpha: 0.5))),
+                ),
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 600),
+                  child: buildActionButton(context, "SEARCH SCHEDULE", _searchSchedule),
+                ),
               ),
             ),
-            child: const Text("Search"),
-          ),
-        ),
+      body: LoadingWrapper(
+        isLoading: _isLoading,
+        hasData: _classList.isNotEmpty,
+        error: _error,
+        onRetry: _fetchDropdownData,
+        skeleton: _buildSkeleton(),
+        child: _buildBody(theme),
       ),
-      body: _buildBody(theme),
     );
   }
-  
+
+  Widget _buildSkeleton() {
+    return Padding(
+      padding: context.pagePadding,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SkeletonBox(height: context.scale(30), width: context.scale(200)),
+          SizedBox(height: context.scale(8)),
+          SkeletonBox(height: context.scale(15), width: context.scale(300)),
+          SizedBox(height: context.scale(24)),
+          SkeletonBox(height: context.scale(250), borderRadius: context.scale(16)),
+        ],
+      ),
+    );
+  }
+
   Widget _buildBody(ThemeData theme) {
-    if (_isLoading) {
-      return const Center(child: CircularProgressIndicator());
-    }
-
-    if (_error.isNotEmpty) {
-      return Center(
-        child: Padding(
-          padding: const EdgeInsets.all(20.0),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Text('Error: $_error', style: TextStyle(color: theme.colorScheme.error), textAlign: TextAlign.center,),
-              const SizedBox(height: 16),
-              ElevatedButton(onPressed: _fetchDropdownData, child: const Text("Retry"))
-            ],
-          ),
-        ),
-      );
-    }
-
     return SingleChildScrollView(
-      padding: const EdgeInsets.fromLTRB(16, 16, 16, 100),
+      padding: context.pagePadding,
       child: Center(
         child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 500),
+          constraints: const BoxConstraints(maxWidth: 600),
           child: Form(
             key: _formKey,
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const SizedBox(height: 16),
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+                Text(
+                  "Search Parameters",
+                  style: TextStyle(color: theme.colorScheme.onSurface, fontWeight: FontWeight.bold, fontSize: context.font(18)),
+                ),
+                SizedBox(height: context.scale(4)),
+                Text(
+                  "Select details to find a specific daily schedule",
+                  style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: context.font(12)),
+                ),
+                SizedBox(height: context.scale(24)),
+                buildFilterCard(
+                  context,
                   children: [
-                    _buildDropdown(
-                      theme,
-                      label: "Class",
-                      value: _selectedClass,
-                      items: _classList,
-                      onChanged: (value) => setState(() => _selectedClass = value),
-                      hint: "--Select Class",
-                    ),
-                    const SizedBox(width: 16),
-                    _buildDropdown(
-                      theme,
-                      label: "Section",
-                      value: _selectedSection,
-                      items: _sectionList,
-                      onChanged: (value) => setState(() => _selectedSection = value),
-                      hint: "--Select Section",
-                    ),
+                    buildResponsiveRow(context, [
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          buildLabel(context, "Class"),
+                          buildDropdown(
+                            context,
+                            _classList,
+                            _selectedClass,
+                            (value) => setState(() => _selectedClass = value),
+                            hint: "Select Class",
+                          ),
+                        ],
+                      ),
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          buildLabel(context, "Section"),
+                          buildDropdown(
+                            context,
+                            _sectionList,
+                            _selectedSection,
+                            (value) => setState(() => _selectedSection = value),
+                            hint: "Select Section",
+                          ),
+                        ],
+                      ),
+                    ]),
+                    SizedBox(height: context.scale(16)),
+                    buildLabel(context, "Date"),
+                    buildDateField(context, _selectDateController, "Select Date"),
                   ],
                 ),
-                const SizedBox(height: 16),
-                Text("Date", style: theme.textTheme.titleMedium),
-                const SizedBox(height: 8),
-                TextFormField(
-                  controller: _selectDateController,
-                  readOnly: true,
-                  onTap: () => selectDate(context, _selectDateController),
-                  decoration: InputDecoration(
-                    prefixIcon: const Icon(Icons.calendar_month),
-                    filled: true,
-                    fillColor: theme.colorScheme.surface,
-                    hintText: "Select Date",
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: BorderSide.none,
-                    ),
-                  ),
-                  validator: (value) =>
-                      value!.isEmpty ? 'Please select a date' : null,
-                ),
-                const SizedBox(height: 80), // Padding for FAB
               ],
             ),
           ),
@@ -253,40 +271,4 @@ class _ClassScheduleSearchPageState extends State<ClassScheduleSearchPage> {
     );
   }
 
-  Widget _buildDropdown(
-    ThemeData theme,
-      {required String label,
-      String? value,
-      required List<String> items,
-      required ValueChanged<String?> onChanged,
-      required String hint}) {
-    return Expanded(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            label,
-            style: theme.textTheme.titleMedium,
-          ),
-          const SizedBox(height: 8),
-          DropdownButtonFormField<String>(
-            value: value,
-            isExpanded: true,
-            items: items.map((e) => DropdownMenuItem(value: e, child: Text(e, overflow: TextOverflow.ellipsis))).toList(),
-            onChanged: onChanged,
-            decoration: InputDecoration(
-              filled: true,
-              fillColor: theme.colorScheme.surface,
-              hintText: hint,
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-                borderSide: BorderSide.none,
-              ),
-            ),
-            validator: (value) => value == null ? 'Please make a selection' : null,
-          ),
-        ],
-      ),
-    );
-  }
 }

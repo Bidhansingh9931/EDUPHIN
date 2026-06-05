@@ -1,41 +1,13 @@
 import 'dart:convert';
+import 'package:eduphin/services/error_handler.dart';
+import 'package:eduphin/manager_dashboard/library/add_book.dart';
 import 'package:eduphin/services/api_service.dart';
+import 'package:eduphin/services/caching_service.dart';
+import 'package:eduphin/services/common_widgets.dart';
+import 'package:eduphin/services/responsive_helper.dart';
+import 'package:eduphin/teacher/dashboard/common_widgets.dart';
+import 'package:eduphin/teacher/dashboard/library_models.dart';
 import 'package:flutter/material.dart';
-
-class Book {
-  final String title;
-  final String author;
-  final String? isbn;
-  final String? publicationYear;
-  final String? category;
-  final String? language;
-  final String? format;
-  final int? availableCopies;
-
-  Book({
-    required this.title,
-    required this.author,
-    this.isbn,
-    this.publicationYear,
-    this.category,
-    this.language,
-    this.format,
-    this.availableCopies,
-  });
-
-  factory Book.fromMap(Map<String, dynamic> map) {
-    return Book(
-      title: map['title'] ?? '',
-      author: map['author'] ?? '',
-      isbn: map['isbn'],
-      publicationYear: map['publication_year']?.toString(),
-      category: map['category'],
-      language: map['language'],
-      format: map['format'],
-      availableCopies: map['available_copies'],
-    );
-  }
-}
 
 class AvailableBooksScreen extends StatefulWidget {
   const AvailableBooksScreen({super.key});
@@ -47,7 +19,7 @@ class AvailableBooksScreen extends StatefulWidget {
 class _AvailableBooksScreenState extends State<AvailableBooksScreen> {
   final searchController = TextEditingController();
   bool _isLoading = true;
-  String _error = '';
+  Object? _error;
 
   List<Book> _allBooks = [];
   List<Book> _filteredBooks = [];
@@ -55,10 +27,28 @@ class _AvailableBooksScreenState extends State<AvailableBooksScreen> {
   @override
   void initState() {
     super.initState();
-    _fetchBooks();
+    _loadCachedData().then((_) => _fetchBooks());
+  }
+
+  Future<void> _loadCachedData() async {
+    final cache = await CacheService.getCache('available_books');
+    if (cache != null && mounted) {
+      final List<dynamic> bookData = cache;
+      setState(() {
+        _allBooks = bookData.map((data) => Book.fromJson(data)).toList();
+        _filterBooks(searchController.text);
+        _isLoading = false;
+      });
+    }
   }
 
   Future<void> _fetchBooks() async {
+    if (mounted) {
+      setState(() {
+        _isLoading = _allBooks.isEmpty;
+        _error = null;
+      });
+    }
     try {
       final response = await ApiService.get('manager/books');
 
@@ -66,31 +56,27 @@ class _AvailableBooksScreenState extends State<AvailableBooksScreen> {
         final body = json.decode(response.body);
         if (body['status'] == true) {
           final List<dynamic> bookData = body['data']['data'];
+          await CacheService.setCache('available_books', bookData);
           if (mounted) {
             setState(() {
-              _allBooks = bookData.map((data) => Book.fromMap(data)).toList();
-              _filteredBooks = _allBooks;
+              _allBooks = bookData.map((data) => Book.fromJson(data)).toList();
+              _filterBooks(searchController.text);
               _isLoading = false;
             });
           }
         } else {
-          setState(() {
-            _error = 'Failed to load books: ${body['message']}';
-            _isLoading = false;
-          });
+          throw Exception(body['message'] ?? 'Failed to load books');
         }
       } else {
-        setState(() {
-          _error = 'Failed to load books. Status code: ${response.statusCode}';
-          _isLoading = false;
-        });
+        throw Exception('Failed to load books. Status code: ${response.statusCode}');
       }
     } catch (e) {
       if (mounted) {
         setState(() {
-          _error = 'An error occurred: $e';
+          _error = e;
           _isLoading = false;
         });
+        ErrorHandler.showError(context, e);
       }
     }
   }
@@ -109,56 +95,156 @@ class _AvailableBooksScreenState extends State<AvailableBooksScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
+    final theme = context.theme;
     return Scaffold(
       backgroundColor: theme.scaffoldBackgroundColor,
       appBar: AppBar(
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        leading: BackButton(color: theme.colorScheme.onSurface),
-        title: Text(
-          "Available Books",
-          style: TextStyle(color: theme.colorScheme.onSurface),
-        ),
-      ),
-      body: Padding(
-        padding: const EdgeInsets.fromLTRB(16, 0, 16, 50),
-        child: Column(
+        title: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Search Bar
-            TextField(
-              controller: searchController,
-              style: TextStyle(color: theme.colorScheme.onSurface),
-              decoration: InputDecoration(
-                hintText: "Search by Title, Author, or Category...",
-                hintStyle: TextStyle(color: theme.hintColor),
-                prefixIcon: Icon(Icons.search, color: theme.hintColor),
-                filled: true,
-                fillColor: theme.cardColor,
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(28),
-                  borderSide: BorderSide.none,
+            Text("Available Books", style: theme.appBarTheme.titleTextStyle?.copyWith(fontSize: context.font(18))),
+            Text("Browse and search library inventory", style: theme.textTheme.labelSmall?.copyWith(color: theme.hintColor, fontSize: context.font(11))),
+          ],
+        ),
+        centerTitle: false,
+        actions: [
+          IconButton(
+            onPressed: _fetchBooks,
+            icon: const Icon(Icons.refresh_rounded),
+            tooltip: "Refresh List",
+          ),
+          SizedBox(width: context.xs),
+        ],
+      ),
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: () async {
+          final result = await Navigator.push(
+            context,
+            MaterialPageRoute(builder: (context) => const AddBookScreen()),
+          );
+          if (result == true) _fetchBooks();
+        },
+        icon: const Icon(Icons.add_rounded),
+        label: const Text("Add Book"),
+        backgroundColor: theme.colorScheme.primary,
+        foregroundColor: theme.colorScheme.onPrimary,
+      ),
+      body: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 1200),
+          child: Column(
+            children: [
+              // Search Bar
+              Padding(
+                padding: context.pagePadding.copyWith(bottom: 0),
+                child: TextField(
+                  controller: searchController,
+                  style: TextStyle(color: theme.colorScheme.onSurface, fontSize: context.font(14)),
+                  decoration: InputDecoration(
+                    hintText: "Search by Title, Author, or Category...",
+                    hintStyle: TextStyle(color: theme.hintColor, fontSize: context.font(14)),
+                    prefixIcon: Icon(Icons.search, color: theme.hintColor, size: context.scale(20)),
+                    filled: true,
+                    fillColor: theme.colorScheme.surfaceContainerLow,
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(context.scale(28)),
+                      borderSide: BorderSide(color: theme.colorScheme.outlineVariant.withValues(alpha: 0.5)),
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(context.scale(28)),
+                      borderSide: BorderSide(color: theme.colorScheme.outlineVariant.withValues(alpha: 0.5)),
+                    ),
+                    contentPadding: EdgeInsets.symmetric(horizontal: context.scale(20), vertical: context.scale(12)),
+                  ),
+                  onChanged: _filterBooks,
                 ),
               ),
-              onChanged: _filterBooks,
-            ),
-            const SizedBox(height: 16),
-            Expanded(
-              child: _isLoading
-                  ? const Center(child: CircularProgressIndicator())
-                  : _error.isNotEmpty
-                      ? Center(child: Text(_error, style: TextStyle(color: theme.colorScheme.error)))
-                      : LayoutBuilder(
-                          builder: (context, constraints) {
-                            if (constraints.maxWidth > 600) {
-                              return _buildGridView(_filteredBooks);
-                            } else {
-                              return _buildListView(_filteredBooks);
-                            }
-                          },
+              SizedBox(height: context.md),
+              Expanded(
+                child: LoadingWrapper(
+                  isLoading: _isLoading,
+                  hasData: _allBooks.isNotEmpty,
+                  error: _error,
+                  onRetry: _fetchBooks,
+                  skeleton: _buildSkeleton(context),
+                  child: _filteredBooks.isEmpty
+                      ? Center(
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(Icons.search_off_rounded, size: context.scale(64), color: theme.colorScheme.outlineVariant.withValues(alpha: 0.5)),
+                              SizedBox(height: context.scale(16)),
+                              Text("No books found matching your search.", style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: context.font(16))),
+                            ],
+                          ),
+                        )
+                      : RefreshIndicator(
+                          onRefresh: _fetchBooks,
+                          child: context.responsive(
+                            _buildListView(_filteredBooks),
+                            tablet: _buildGridView(_filteredBooks, crossAxisCount: 2),
+                            desktop: _buildGridView(_filteredBooks, crossAxisCount: 3),
+                          ),
                         ),
-            )
-          ],
+                ),
+              )
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSkeleton(BuildContext context) {
+    return ListView.builder(
+      padding: context.pagePadding,
+      itemCount: 5,
+      itemBuilder: (context, index) => Padding(
+        padding: EdgeInsets.only(bottom: context.md),
+        child: Container(
+          padding: EdgeInsets.all(context.spacing),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(context.scale(16)),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  SkeletonBox(width: context.scale(30), height: context.scale(20)),
+                  SizedBox(width: context.scale(12)),
+                  Expanded(child: SkeletonBox(height: context.scale(20))),
+                ],
+              ),
+              SizedBox(height: context.scale(16)),
+              Row(
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        SkeletonBox(height: context.scale(12), width: context.scale(60)),
+                        SizedBox(height: context.scale(4)),
+                        SkeletonBox(height: context.scale(16)),
+                      ],
+                    ),
+                  ),
+                  SizedBox(width: context.scale(16)),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        SkeletonBox(height: context.scale(12), width: context.scale(60)),
+                        SizedBox(height: context.scale(4)),
+                        SkeletonBox(height: context.scale(16)),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -166,27 +252,51 @@ class _AvailableBooksScreenState extends State<AvailableBooksScreen> {
 
   Widget _buildListView(List<Book> books) {
     return ListView.builder(
+      padding: context.pagePadding.copyWith(bottom: context.xl * 2),
+      physics: const AlwaysScrollableScrollPhysics(),
       itemCount: books.length,
       itemBuilder: (context, index) {
         return Padding(
-          padding: const EdgeInsets.only(bottom: 16.0),
-          child: _BookCard(book: books[index], index: index),
+          padding: EdgeInsets.only(bottom: context.md),
+          child: _BookCard(
+            book: books[index],
+            index: index,
+            onEdit: () async {
+              final result = await Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => AddBookScreen(book: books[index])),
+              );
+              if (result == true) _fetchBooks();
+            },
+          ),
         );
       },
     );
   }
 
-  Widget _buildGridView(List<Book> books) {
+  Widget _buildGridView(List<Book> books, {required int crossAxisCount}) {
     return GridView.builder(
+      padding: context.pagePadding.copyWith(bottom: context.xl * 2),
+      physics: const AlwaysScrollableScrollPhysics(),
       itemCount: books.length,
-      gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
-        maxCrossAxisExtent: 500,
-        mainAxisSpacing: 16,
-        crossAxisSpacing: 16,
-        childAspectRatio: 2.2, // Adjust for content
+      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: crossAxisCount,
+        mainAxisSpacing: context.md,
+        crossAxisSpacing: context.md,
+        childAspectRatio: 1.3,
       ),
       itemBuilder: (context, index) {
-        return _BookCard(book: books[index], index: index);
+        return _BookCard(
+          book: books[index],
+          index: index,
+          onEdit: () async {
+            final result = await Navigator.push(
+              context,
+              MaterialPageRoute(builder: (context) => AddBookScreen(book: books[index])),
+            );
+            if (result == true) _fetchBooks();
+          },
+        );
       },
     );
   }
@@ -195,31 +305,58 @@ class _AvailableBooksScreenState extends State<AvailableBooksScreen> {
 class _BookCard extends StatelessWidget {
   final Book book;
   final int index;
+  final VoidCallback onEdit;
 
-  const _BookCard({required this.book, required this.index});
+  const _BookCard({required this.book, required this.index, required this.onEdit});
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
+    final theme = context.theme;
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: EdgeInsets.all(context.spacing),
       decoration: BoxDecoration(
-        color: theme.cardColor,
-        borderRadius: BorderRadius.circular(18),
+        color: theme.colorScheme.surfaceContainerLow,
+        borderRadius: BorderRadius.circular(context.scale(16)),
+        border: Border.all(color: theme.colorScheme.outlineVariant.withValues(alpha: 0.5)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            "${index + 1}.  ${book.title}",
-            style: theme.textTheme.titleMedium?.copyWith(
-              color: theme.colorScheme.onSurface,
-              fontWeight: FontWeight.bold,
-            ),
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                padding: EdgeInsets.symmetric(horizontal: context.scale(8), vertical: context.scale(4)),
+                decoration: BoxDecoration(
+                  color: theme.colorScheme.primaryContainer,
+                  borderRadius: BorderRadius.circular(context.scale(6)),
+                ),
+                child: Text(
+                  (index + 1).toString(),
+                  style: TextStyle(color: theme.colorScheme.onPrimaryContainer, fontWeight: FontWeight.bold, fontSize: context.font(12)),
+                ),
+              ),
+              SizedBox(width: context.scale(12)),
+              Expanded(
+                child: Text(
+                  book.title,
+                  style: TextStyle(
+                    color: theme.colorScheme.onSurface,
+                    fontWeight: FontWeight.bold,
+                    fontSize: context.font(16),
+                  ),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+              IconButton(
+                onPressed: onEdit,
+                icon: Icon(Icons.edit_outlined, size: context.scale(20), color: theme.colorScheme.primary),
+                visualDensity: VisualDensity.compact,
+              ),
+            ],
           ),
-          const SizedBox(height: 12),
+          SizedBox(height: context.md),
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -227,21 +364,20 @@ class _BookCard extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    _buildInfoField(theme, "Author", book.author),
-                    _buildInfoField(theme, "Year", book.publicationYear ?? '-'),
-                    _buildInfoField(theme, "ISBN", book.isbn ?? '-'),
-                    _buildInfoField(theme, "Format", book.format ?? '-'),
+                    _buildInfoField(context, "Author", book.author),
+                    _buildInfoField(context, "Year", book.publicationYear ?? '-'),
+                    _buildInfoField(context, "ISBN", book.isbn ?? '-'),
                   ],
                 ),
               ),
-              const SizedBox(width: 16),
+              SizedBox(width: context.scale(16)),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    _buildInfoField(theme, "Category", book.category ?? '-'),
-                    _buildInfoField(theme, "Language", book.language ?? '-'),
-                    _buildInfoField(theme, "Available Copies", book.availableCopies?.toString() ?? '-'),
+                    _buildInfoField(context, "Category", book.category ?? '-'),
+                    _buildInfoField(context, "Format", book.format ?? '-'),
+                    _buildInfoField(context, "Available", book.availableCopies?.toString() ?? '0', isHighlight: true),
                   ],
                 ),
               ),
@@ -252,21 +388,29 @@ class _BookCard extends StatelessWidget {
     );
   }
 
-  Widget _buildInfoField(ThemeData theme, String label, String value) {
+  Widget _buildInfoField(BuildContext context, String label, String value, {bool isHighlight = false}) {
+    final theme = context.theme;
     return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
+      padding: EdgeInsets.only(bottom: context.scale(8)),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            label,
-            style: theme.textTheme.bodySmall
-                ?.copyWith(color: theme.colorScheme.onSurface.withOpacity(0.7)),
+            label.toUpperCase(),
+            style: theme.textTheme.labelSmall?.copyWith(
+              color: theme.colorScheme.secondary,
+              fontSize: context.font(9),
+              fontWeight: FontWeight.bold,
+              letterSpacing: 0.5,
+            ),
           ),
           Text(
             value,
-            style: theme.textTheme.bodyMedium
-                ?.copyWith(color: theme.colorScheme.onSurface),
+            style: TextStyle(
+              color: isHighlight ? theme.colorScheme.primary : theme.colorScheme.onSurface,
+              fontSize: context.font(13),
+              fontWeight: isHighlight ? FontWeight.bold : FontWeight.w500,
+            ),
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
           ),

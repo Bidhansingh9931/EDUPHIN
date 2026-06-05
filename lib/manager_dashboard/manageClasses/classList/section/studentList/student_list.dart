@@ -3,7 +3,11 @@ import 'dart:convert';
 
 import 'package:eduphin/manager_dashboard/manageClasses/classList/section/studentList/remarks.dart';
 import 'package:eduphin/manager_dashboard/manageClasses/classList/section/studentList/view_attendence.dart';
+import 'package:eduphin/services/error_handler.dart';
 import 'package:eduphin/services/api_service.dart';
+import 'package:eduphin/services/caching_service.dart';
+import 'package:eduphin/services/common_widgets.dart';
+import 'package:eduphin/services/responsive_helper.dart';
 import 'package:flutter/material.dart';
 
 // Data model for a Student
@@ -11,14 +15,16 @@ class Student {
   final int id;
   final String name;
   final String regNo;
+  final String? photo;
 
-  const Student({required this.id, required this.name, required this.regNo});
+  const Student({required this.id, required this.name, required this.regNo, this.photo});
 
   factory Student.fromJson(Map<String, dynamic> json) {
     return Student(
       id: json['id'] ?? 0,
       name: "${json['first_name'] ?? ''} ${json['last_name'] ?? ''}".trim(),
       regNo: json['registration_no'] ?? 'N/A',
+      photo: json['photo'],
     );
   }
 }
@@ -40,19 +46,30 @@ class StudentListPage extends StatefulWidget {
 class _StudentListPageState extends State<StudentListPage> {
   bool _isLoading = true;
   List<Student> _students = [];
-  String _error = '';
+  Object? _error;
 
   @override
   void initState() {
     super.initState();
+    _loadCacheAndFetch();
+  }
+
+  Future<void> _loadCacheAndFetch() async {
+    final cacheKey = 'section_students_${widget.sectionId}';
+    final cachedData = await CacheService.getCache(cacheKey);
+    if (cachedData != null && mounted) {
+      setState(() {
+        _students = (cachedData as List).map((studentJson) => Student.fromJson(studentJson)).toList();
+      });
+    }
     _fetchStudents();
   }
 
   Future<void> _fetchStudents() async {
     if (!mounted) return;
     setState(() {
-      _isLoading = true;
-      _error = '';
+      _isLoading = _students.isEmpty;
+      _error = null;
     });
 
     try {
@@ -61,110 +78,119 @@ class _StudentListPageState extends State<StudentListPage> {
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
         if (data['status'] == true && data['data'] is List) {
-          final fetchedStudents = (data['data'] as List)
-              .map((studentJson) => Student.fromJson(studentJson))
-              .toList();
+          final fetchedStudents = (data['data'] as List).map((studentJson) => Student.fromJson(studentJson)).toList();
+
+          final cacheKey = 'section_students_${widget.sectionId}';
+          await CacheService.setCache(cacheKey, data['data']);
 
           if (mounted) {
             setState(() {
               _students = fetchedStudents;
+              _isLoading = false;
             });
           }
         } else {
-          throw Exception('API response format is incorrect or status is false.');
+          throw Exception(data['message'] ?? 'Failed to load students');
         }
       } else {
-        throw Exception('Failed to load students: ${response.statusCode}');
+        throw Exception('Failed to load students. Status: ${response.statusCode}');
       }
-    } on TimeoutException {
+    } catch (e) {
       if (mounted) {
         setState(() {
-          _error = "The connection timed out. Please try again.";
-        });
-      }
-    } on Exception catch (e) {
-      if (mounted) {
-        setState(() {
-          _error = e.toString().replaceFirst('Exception: ', '');
-        });
-      }
-    } finally {
-      if (mounted) {
-        setState(() {
+          _error = e;
           _isLoading = false;
         });
+        ErrorHandler.showError(context, e);
       }
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
+    final theme = context.theme;
     return Scaffold(
       backgroundColor: theme.scaffoldBackgroundColor,
       appBar: AppBar(
-        title: Row(
-          children: [
-            Text("Students in ${widget.sectionName}"),
-            const Spacer(),
-            IconButton(onPressed: () {}, icon: const Icon(Icons.more_vert_sharp)),
-          ],
-        ),
+        title: Text("Students in ${widget.sectionName}"),
+        actions: [
+          IconButton(
+            onPressed: _fetchStudents,
+            icon: const Icon(Icons.refresh_rounded),
+            tooltip: "Refresh",
+          ),
+          SizedBox(width: context.xs),
+        ],
       ),
-      body: _buildBody(),
+      body: LoadingWrapper(
+        isLoading: _isLoading,
+        hasData: _students.isNotEmpty,
+        error: _error,
+        onRetry: _fetchStudents,
+        skeleton: _buildSkeleton(),
+        child: _students.isEmpty ? _buildEmptyState(theme) : _buildContent(),
+      ),
     );
   }
 
-  Widget _buildBody() {
-    final theme = Theme.of(context);
-    if (_isLoading) {
-      return const Center(child: CircularProgressIndicator());
-    }
-    if (_error.isNotEmpty) {
-      return Center(
-        child: Padding(
-          padding: const EdgeInsets.all(16.0),
-          child: Text(
-            _error,
-            textAlign: TextAlign.center,
-            style: TextStyle(color: theme.colorScheme.error),
-          ),
-        ),
-      );
-    }
-    if (_students.isEmpty) {
-      return const Center(child: Text("No students found in this section."));
-    }
+  Widget _buildSkeleton() {
+    return ListView.separated(
+      padding: context.pagePadding,
+      itemCount: 8,
+      separatorBuilder: (context, index) => SizedBox(height: context.md),
+      itemBuilder: (context, index) => SkeletonBox(
+        height: context.scale(150),
+        borderRadius: context.scale(10),
+      ),
+    );
+  }
 
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 16, 16, 50),
-      child: LayoutBuilder(
-        builder: (context, constraints) {
-          if (constraints.maxWidth > 600) {
-            return GridView.builder(
-              gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
-                maxCrossAxisExtent: 400,
-                crossAxisSpacing: 16,
-                mainAxisSpacing: 16,
-                childAspectRatio: 2.5,
-              ),
-              itemCount: _students.length,
-              itemBuilder: (context, index) {
-                final student = _students[index];
-                return StudentCard(student: student);
-              },
-            );
-          } else {
-            return ListView.separated(
-              itemCount: _students.length,
-              separatorBuilder: (context, index) => const SizedBox(height: 16),
-              itemBuilder: (context, index) {
-                final student = _students[index];
-                return StudentCard(student: student);
-              },
-            );
-          }
-        },
+  Widget _buildEmptyState(ThemeData theme) {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(Icons.people_outline, size: context.scale(64), color: theme.colorScheme.outlineVariant),
+          SizedBox(height: context.md),
+          Text("No students found in this section.", style: theme.textTheme.bodyLarge),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildContent() {
+    return RefreshIndicator(
+      onRefresh: _fetchStudents,
+      child: Padding(
+        padding: context.pagePadding.copyWith(bottom: 0),
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            if (constraints.maxWidth > 600) {
+              return GridView.builder(
+                padding: const EdgeInsets.only(bottom: 24),
+                gridDelegate: SliverGridDelegateWithMaxCrossAxisExtent(
+                  maxCrossAxisExtent: 400,
+                  crossAxisSpacing: context.md,
+                  mainAxisSpacing: context.md,
+                  childAspectRatio: 2.2,
+                ),
+                itemCount: _students.length,
+                itemBuilder: (context, index) {
+                  return StudentCard(student: _students[index]);
+                },
+              );
+            } else {
+              return ListView.separated(
+                padding: const EdgeInsets.only(bottom: 24),
+                itemCount: _students.length,
+                separatorBuilder: (context, index) => SizedBox(height: context.md),
+                itemBuilder: (context, index) {
+                  return StudentCard(student: _students[index]);
+                },
+              );
+            }
+          },
+        ),
       ),
     );
   }
@@ -177,31 +203,50 @@ class StudentCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
+    final theme = context.theme;
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: EdgeInsets.all(context.scale(16)),
       decoration: BoxDecoration(
         color: theme.colorScheme.surface,
-        borderRadius: BorderRadius.circular(10),
+        borderRadius: BorderRadius.circular(context.scale(10)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Text(
-            student.name,
-            style: theme.textTheme.titleLarge?.copyWith(
-              color: theme.colorScheme.onSurface,
-            ),
+          Row(
+            children: [
+              ProfileAvatar(
+                imageUrl: ApiService.getStorageUrl(student.photo),
+                radius: context.scale(24),
+                borderWidth: 1,
+              ),
+              SizedBox(width: context.scale(12)),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      student.name,
+                      style: theme.textTheme.titleLarge?.copyWith(
+                        color: theme.colorScheme.onSurface,
+                        fontSize: context.font(18),
+                      ),
+                    ),
+                    const SizedBox(height: 1),
+                    Text(
+                      "Reg No: ${student.regNo}",
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        color: theme.colorScheme.onSurface.withAlpha(150),
+                        fontSize: context.font(14),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
           ),
-          const SizedBox(height: 1),
-          Text(
-            "Reg No: ${student.regNo}",
-            style: theme.textTheme.bodyMedium?.copyWith(
-              color: theme.colorScheme.onSurface.withAlpha(150),
-            ),
-          ),
-          const SizedBox(height: 12),
+          SizedBox(height: context.scale(12)),
           Row(
             children: [
               Expanded(

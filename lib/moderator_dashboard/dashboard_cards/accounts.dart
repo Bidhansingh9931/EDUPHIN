@@ -1,8 +1,14 @@
+import 'package:eduphin/services/error_handler.dart';
 import 'dart:async';
 import 'dart:convert';
+import 'dart:io';
+import 'package:eduphin/moderator_dashboard/cache_helper.dart';
 import 'package:eduphin/moderator_dashboard/dashboard_cards/add_account.dart';
 import 'package:eduphin/moderator_dashboard/dashboard_cards/active_institutes/manage/employ_details.dart';
+import 'package:eduphin/moderator_dashboard/skeleton_widgets.dart';
 import 'package:eduphin/services/api_service.dart';
+import 'package:eduphin/services/common_widgets.dart';
+import 'package:eduphin/services/responsive_helper.dart';
 import 'package:flutter/material.dart';
 
 // 1. Data Model for an Account
@@ -10,11 +16,13 @@ class Account {
   final int id;
   final String name;
   final String email;
+  final String? imageUrl;
 
   Account({
     required this.id,
     required this.name,
     required this.email,
+    this.imageUrl,
   });
 
   factory Account.fromJson(Map<String, dynamic> json) {
@@ -22,33 +30,50 @@ class Account {
       id: json['id'],
       name: json['name'] ?? 'No Name',
       email: json['email'] ?? 'No Email',
+      imageUrl: ApiService.getStorageUrl(json['photo']),
     );
   }
 }
 
 // 2. Data Provider to fetch account data from the API
 class AccountProvider {
-  Future<List<Account>> fetchAccounts(String instituteId) async {
+  static const String _cacheKeyPrefix = 'accounts_list_';
+
+  Future<List<Account>> fetchAccounts(String instituteId, {bool bypassCache = false}) async {
     try {
+      if (!bypassCache) {
+        final cached = await getCachedAccounts(instituteId);
+        if (cached != null) return cached;
+      }
       final response = await ApiService.get('moderator/institutes/$instituteId/accounts');
-      
-      // Print the raw response body for debugging
-      print('API Response: ${response.body}');
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
         if (data['success'] == true && data['accounts'] != null) {
+          await CacheHelper.save(_cacheKeyPrefix + instituteId, data);
           final List<dynamic> accountsJson = data['accounts'];
           return accountsJson.map((json) => Account.fromJson(json)).toList();
         } else {
-          throw Exception(data['message'] ?? 'Failed to load accounts.');
+          throw ApiException(data['message'] ?? 'Failed to load accounts');
         }
       } else {
-        throw Exception('Failed to load accounts. Status Code: ${response.statusCode}');
+        throw ApiException('Failed to load accounts', statusCode: response.statusCode);
       }
+    } on SocketException {
+      throw NetworkException();
     } catch (e) {
-      throw Exception('Failed to fetch accounts: $e');
+      if (e is ApiException || e is NetworkException) rethrow;
+      throw Exception('An unexpected error occurred: $e');
     }
+  }
+
+  Future<List<Account>?> getCachedAccounts(String instituteId) async {
+    final cached = await CacheHelper.load(_cacheKeyPrefix + instituteId);
+    if (cached != null && cached['accounts'] != null) {
+      final List<dynamic> accountsJson = cached['accounts'];
+      return accountsJson.map((json) => Account.fromJson(json)).toList();
+    }
+    return null;
   }
 }
 
@@ -64,6 +89,7 @@ class AccountsPage extends StatefulWidget {
 class _AccountsPageState extends State<AccountsPage> {
   final AccountProvider _provider = AccountProvider();
   late Future<List<Account>> _accountsFuture;
+  List<Account>? _cachedAccounts;
   List<Account> _allAccounts = [];
   List<Account> _filteredAccounts = [];
   final TextEditingController _searchController = TextEditingController();
@@ -71,25 +97,34 @@ class _AccountsPageState extends State<AccountsPage> {
   @override
   void initState() {
     super.initState();
-    _fetchAccounts();
+    _loadInitialData();
     _searchController.addListener(_filterAccounts);
   }
 
-  void _fetchAccounts() {
-    _accountsFuture = _provider.fetchAccounts(widget.instituteId);
-    _accountsFuture.then((accounts) {
-      if (mounted) {
-        setState(() {
-          _allAccounts = accounts;
-          _filteredAccounts = accounts;
-        });
-      }
-    }).catchError((error) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error fetching accounts: $error')),
-        );
-      }
+  Future<void> _loadInitialData() async {
+    _cachedAccounts = await _provider.getCachedAccounts(widget.instituteId);
+    if (_cachedAccounts != null) {
+      _allAccounts = _cachedAccounts!;
+      _filteredAccounts = _cachedAccounts!;
+    }
+    _fetchAccounts();
+  }
+
+  void _fetchAccounts({bool bypassCache = false}) {
+    setState(() {
+      _accountsFuture = _provider.fetchAccounts(widget.instituteId, bypassCache: bypassCache);
+      _accountsFuture.then((accounts) {
+        if (mounted) {
+          setState(() {
+            _allAccounts = accounts;
+            _filteredAccounts = accounts;
+          });
+        }
+      }).catchError((error) {
+        if (mounted) {
+          ErrorHandler.showError(context, error);
+        }
+      });
     });
   }
 
@@ -111,42 +146,40 @@ class _AccountsPageState extends State<AccountsPage> {
   }
 
   void _refreshAccounts() {
-    final future = _provider.fetchAccounts(widget.instituteId);
-    if (mounted) {
-      setState(() {
-        _accountsFuture = future;
-      });
-    }
-    future.then((accounts) {
-      if (mounted) {
-        setState(() {
-          _allAccounts = accounts;
-          _filterAccounts(); // Re-apply filter
-        });
-      }
-    }).catchError((error) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error refreshing accounts: $error')),
-        );
-      }
-    });
+    _fetchAccounts(bypassCache: true);
   }
 
   Future<String?> _selectRoleDialog() async {
-    final theme = Theme.of(context);
     return showDialog<String>(
       context: context,
       builder: (context) {
+        final theme = context.theme;
         return AlertDialog(
-          backgroundColor: theme.cardColor,
-          title: Text('Select Role', style: theme.textTheme.titleLarge),
+          backgroundColor: theme.colorScheme.surfaceContainerLow,
+          surfaceTintColor: Colors.transparent,
+          title: Text('Select Role', style: TextStyle(fontSize: context.font(20), fontWeight: FontWeight.bold, color: theme.colorScheme.onSurface)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(context.md),
+            side: BorderSide(color: theme.colorScheme.outlineVariant),
+          ),
           content: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              ListTile(title: Text('Manager', style: theme.textTheme.bodyLarge), onTap: () => Navigator.of(context).pop('2')),
-              ListTile(title: Text('Teacher', style: theme.textTheme.bodyLarge), onTap: () => Navigator.of(context).pop('3')),
-              ListTile(title: Text('Librarian', style: theme.textTheme.bodyLarge), onTap: () => Navigator.of(context).pop('4')),
+              ListTile(
+                leading: Icon(Icons.manage_accounts_rounded, size: context.scale(24), color: theme.colorScheme.primary),
+                title: Text('Manager', style: TextStyle(fontSize: context.font(16), color: theme.colorScheme.onSurface)),
+                onTap: () => Navigator.of(context).pop('2')
+              ),
+              ListTile(
+                leading: Icon(Icons.school_rounded, size: context.scale(24), color: theme.colorScheme.primary),
+                title: Text('Teacher', style: TextStyle(fontSize: context.font(16), color: theme.colorScheme.onSurface)), 
+                onTap: () => Navigator.of(context).pop('3')
+              ),
+              ListTile(
+                leading: Icon(Icons.local_library_rounded, size: context.scale(24), color: theme.colorScheme.primary),
+                title: Text('Librarian', style: TextStyle(fontSize: context.font(16), color: theme.colorScheme.onSurface)), 
+                onTap: () => Navigator.of(context).pop('4')
+              ),
             ],
           ),
         );
@@ -172,29 +205,28 @@ class _AccountsPageState extends State<AccountsPage> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final isDarkMode = theme.brightness == Brightness.dark;
-    final screenSize = MediaQuery.of(context).size;
+    final theme = context.theme;
+    final colorScheme = theme.colorScheme;
 
     return Scaffold(
       backgroundColor: theme.scaffoldBackgroundColor,
       appBar: AppBar(
-        title: const Text('Accounts'),
+        title: Text('Manage Accounts', style: TextStyle(fontSize: context.font(20), fontWeight: FontWeight.bold)),
         bottom: PreferredSize(
-          preferredSize: const Size.fromHeight(kToolbarHeight),
+          preferredSize: Size.fromHeight(context.scale(70)),
           child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16.0),
+            padding: EdgeInsets.fromLTRB(context.md, 0, context.md, context.sm),
             child: TextField(
               controller: _searchController,
-              style: TextStyle(color: theme.colorScheme.onSurface),
+              style: TextStyle(fontSize: context.font(14), color: theme.colorScheme.onSurface),
               decoration: InputDecoration(
-                hintText: 'Search accounts...',
-                hintStyle: TextStyle(color: theme.hintColor),
-                prefixIcon: Icon(Icons.search, color: theme.hintColor),
+                hintText: 'Search by name or email...',
+                hintStyle: TextStyle(color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.5)),
+                prefixIcon: Icon(Icons.search_rounded, color: theme.colorScheme.primary),
                 filled: true,
-                fillColor: isDarkMode ? theme.colorScheme.surface : Colors.grey.shade200,
+                fillColor: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
                 border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
+                  borderRadius: BorderRadius.circular(context.sm),
                   borderSide: BorderSide.none,
                 ),
               ),
@@ -202,65 +234,72 @@ class _AccountsPageState extends State<AccountsPage> {
           ),
         ),
       ),
-      body: FutureBuilder<List<Account>>(
-        future: _accountsFuture,
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting && _allAccounts.isEmpty) {
-            return const Center(child: CircularProgressIndicator());
-          }
-          if (snapshot.hasError && _allAccounts.isEmpty) {
-            return Center(child: Text('Error: ${snapshot.error}', style: TextStyle(color: theme.colorScheme.onSurfaceVariant)));
-          }
-          if (_allAccounts.isEmpty) {
-            return Center(child: Text('No accounts found.', style: TextStyle(color: theme.colorScheme.onSurfaceVariant)));
+      body: ModeratorLoadingWrapper<List<Account>>(
+        snapshot: AsyncSnapshot.withData(
+          _allAccounts.isNotEmpty ? ConnectionState.done : ConnectionState.waiting,
+          _allAccounts,
+        ),
+        cachedData: _cachedAccounts,
+        skeleton: const ListSkeleton(),
+        onRefresh: _refreshAccounts,
+        builder: (allAccounts) {
+          if (allAccounts.isEmpty) {
+            return _buildEmptyState(context, "No accounts found");
           }
 
           final accounts = _filteredAccounts;
-          if(accounts.isEmpty && _searchController.text.isNotEmpty) {
-            return Center(child: Text('No accounts found for your search.', style: TextStyle(color: theme.colorScheme.onSurfaceVariant)));
+          if (accounts.isEmpty && _searchController.text.isNotEmpty) {
+            return _buildEmptyState(context, "No results for \"${_searchController.text}\"");
           }
 
-
-          return LayoutBuilder(
-            builder: (context, constraints) {
-              if (constraints.maxWidth > 600) {
-                int crossAxisCount = constraints.maxWidth > 1200 ? 4 : (constraints.maxWidth > 900 ? 3 : 2);
-                return GridView.builder(
-                  padding: EdgeInsets.fromLTRB(screenSize.width * 0.04, screenSize.width * 0.04, screenSize.width * 0.04, 50),
-                  itemCount: accounts.length,
-                  gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                    crossAxisCount: crossAxisCount,
-                    crossAxisSpacing: 16,
-                    mainAxisSpacing: 16,
-                    childAspectRatio: 2.5,
+          return RefreshIndicator(
+            onRefresh: () async => _refreshAccounts(),
+            child: SingleChildScrollView(
+              padding: context.pagePadding,
+              physics: const AlwaysScrollableScrollPhysics(),
+              child: Center(
+                child: ConstrainedBox(
+                  constraints: BoxConstraints(maxWidth: context.scale(1200)),
+                  child: GridView.builder(
+                    shrinkWrap: true,
+                    physics: const NeverScrollableScrollPhysics(),
+                    itemCount: accounts.length,
+                    gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                      crossAxisCount: context.responsive(1, tablet: 2, desktop: 3),
+                      crossAxisSpacing: context.md,
+                      mainAxisSpacing: context.md,
+                      mainAxisExtent: context.scale(100),
+                    ),
+                    itemBuilder: (context, index) {
+                      return AccountCard(account: accounts[index]);
+                    },
                   ),
-                  itemBuilder: (context, index) {
-                    return AccountCard(
-                      account: accounts[index],
-                      isGridView: true,
-                    );
-                  },
-                );
-              } else {
-                return ListView.builder(
-                  padding: const EdgeInsets.fromLTRB(0, 8, 0, 50),
-                  itemCount: accounts.length,
-                  itemBuilder: (context, index) {
-                    return AccountCard(
-                      account: accounts[index],
-                      isGridView: false,
-                    );
-                  },
-                );
-              }
-            },
+                ),
+              ),
+            ),
           );
         },
       ),
-      floatingActionButton: FloatingActionButton(
+      floatingActionButton: FloatingActionButton.extended(
         onPressed: _navigateToAddAccount,
         backgroundColor: theme.colorScheme.primary,
-        child: const Icon(Icons.add, color: Colors.white),
+        foregroundColor: theme.colorScheme.onPrimary,
+        icon: Icon(Icons.person_add_rounded, size: context.scale(24)),
+        label: Text("Add Account", style: TextStyle(fontSize: context.font(14), fontWeight: FontWeight.bold)),
+      ),
+    );
+  }
+
+  Widget _buildEmptyState(BuildContext context, String message) {
+    final theme = context.theme;
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(Icons.person_search_rounded, size: context.scale(64), color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.3)),
+          SizedBox(height: context.md),
+          Text(message, style: TextStyle(fontWeight: FontWeight.bold, fontSize: context.font(16), color: theme.colorScheme.onSurfaceVariant)),
+        ],
       ),
     );
   }
@@ -268,80 +307,43 @@ class _AccountsPageState extends State<AccountsPage> {
 
 class AccountCard extends StatelessWidget {
   final Account account;
-  final bool isGridView;
 
   const AccountCard({
     super.key,
     required this.account,
-    this.isGridView = false,
   });
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final screenSize = MediaQuery.of(context).size;
-    double responsiveFontSize(double baseSize) {
-      if (screenSize.width > 1200) return baseSize * 1.2;
-      if (screenSize.width > 600) return baseSize * 1.1;
-      return baseSize;
-    }
-
-    final cardContent = isGridView
-        ? Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              CircleAvatar(
-                radius: responsiveFontSize(22),
-                backgroundColor: theme.scaffoldBackgroundColor,
-                child: Icon(Icons.person_outline, color: theme.colorScheme.onSurface, size: responsiveFontSize(24)),
-              ),
-              const SizedBox(height: 12),
-              Text(
-                account.name,
-                textAlign: TextAlign.center,
-                style: theme.textTheme.titleMedium?.copyWith(
-                  fontWeight: FontWeight.bold,
-                  fontSize: responsiveFontSize(14),
-                ),
-                overflow: TextOverflow.ellipsis,
-              ),
-              const SizedBox(height: 4),
-              Text(
-                account.email,
-                textAlign: TextAlign.center,
-                style: theme.textTheme.bodyMedium?.copyWith(
-                  fontSize: responsiveFontSize(12),
-                ),
-                overflow: TextOverflow.ellipsis,
-              ),
-            ],
-          )
-        : ListTile(
-            leading: CircleAvatar(
-              backgroundColor: theme.scaffoldBackgroundColor,
-              child: Icon(Icons.person_outline, color: theme.colorScheme.onSurface, size: responsiveFontSize(22)),
-            ),
-            title: Text(
-              account.name,
-              style: theme.textTheme.titleMedium?.copyWith(
-                fontWeight: FontWeight.bold,
-                fontSize: responsiveFontSize(16),
-              ),
-            ),
-            subtitle: Text(
-              account.email,
-              style: theme.textTheme.bodyMedium?.copyWith(
-                fontSize: responsiveFontSize(14),
-              ),
-            ),
-          );
+    final theme = context.theme;
+    final colorScheme = theme.colorScheme;
 
     return Card(
-      color: theme.cardColor,
-      elevation: 2,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      margin: isGridView ? EdgeInsets.zero : EdgeInsets.symmetric(horizontal: screenSize.width * 0.04, vertical: 8),
-      child: InkWell(
+      color: theme.colorScheme.surfaceContainerLow,
+      elevation: 0,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(context.md),
+        side: BorderSide(color: theme.colorScheme.outlineVariant),
+      ),
+      child: ListTile(
+        contentPadding: EdgeInsets.symmetric(horizontal: context.md, vertical: context.sm),
+        leading: ProfileAvatar(
+          imageUrl: account.imageUrl,
+          radius: context.scale(20),
+        ),
+        title: Text(
+          account.name,
+          style: TextStyle(fontWeight: FontWeight.bold, fontSize: context.font(15), color: theme.colorScheme.onSurface),
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+        ),
+        subtitle: Text(
+          account.email,
+          style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: context.font(13)),
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+        ),
+        trailing: Icon(Icons.chevron_right_rounded, size: context.scale(24), color: theme.colorScheme.onSurfaceVariant),
         onTap: () {
           Navigator.push(
             context,
@@ -350,11 +352,6 @@ class AccountCard extends StatelessWidget {
             ),
           );
         },
-        borderRadius: BorderRadius.circular(12),
-        child: Padding(
-          padding: EdgeInsets.all(isGridView ? 16 : 8),
-          child: cardContent,
-        ),
       ),
     );
   }

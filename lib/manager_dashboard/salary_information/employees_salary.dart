@@ -1,5 +1,9 @@
 import 'dart:convert';
+import 'package:eduphin/services/error_handler.dart';
+import 'package:eduphin/services/common_widgets.dart';
+import 'package:eduphin/services/caching_service.dart';
 import 'package:eduphin/services/api_service.dart';
+import 'package:eduphin/services/responsive_helper.dart';
 import 'package:flutter/material.dart';
 
 import 'account_details.dart';
@@ -67,24 +71,45 @@ class _EmployeesSalaryPageState extends State<EmployeesSalaryPage> {
   List<Employee> _filteredEmployees = [];
   List<String> _roles = ["All"]; // Dynamic list for roles
   final TextEditingController _searchController = TextEditingController();
+  Object? _error;
 
   @override
   void initState() {
     super.initState();
-    _fetchEmployees();
+    _loadCacheAndFetch();
     _searchController.addListener(_filterEmployees);
   }
 
-  @override
-  void dispose() {
-    _searchController.dispose();
-    super.dispose();
+  Future<void> _loadCacheAndFetch() async {
+    final cachedData = await CacheService.getCache('employees_salary');
+    if (cachedData != null && mounted) {
+      final List<dynamic> rolesData = cachedData['roles'];
+      final Map<int, String> roleMap = {
+        for (var role in rolesData)
+          if (role['id'] != null && role['name'] != null)
+            role['id'] as int: role['name'] as String
+      };
+      final List<String> roleNames = ["All", ...roleMap.values.toSet()];
+
+      final List<dynamic> accountsData = cachedData['accounts'];
+      final List<Employee> employees = accountsData
+          .map((account) => Employee.fromJson(account, roleMap))
+          .toList();
+
+      setState(() {
+        _allEmployees = employees;
+        _filteredEmployees = employees;
+        _roles = roleNames;
+      });
+    }
+    _fetchEmployees();
   }
 
   Future<void> _fetchEmployees() async {
     if (!mounted) return;
     setState(() {
-      _isLoading = true;
+      _isLoading = _allEmployees.isEmpty;
+      _error = null;
     });
 
     try {
@@ -94,6 +119,7 @@ class _EmployeesSalaryPageState extends State<EmployeesSalaryPage> {
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
+        await CacheService.setCache('employees_salary', data);
 
         final List<dynamic> rolesData = data['roles'];
         final Map<int, String> roleMap = {
@@ -114,17 +140,17 @@ class _EmployeesSalaryPageState extends State<EmployeesSalaryPage> {
           _roles = roleNames;
           _isLoading = false;
         });
+        _filterEmployees(); // Re-apply filter in case something was searched
       } else {
         throw Exception('Failed to load employees: ${response.statusCode}');
       }
     } catch (e) {
       if (!mounted) return;
       setState(() {
-        _isLoading = false;
+        _error = e;
+        _isLoading = _allEmployees.isEmpty;
       });
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error: ${e.toString().replaceFirst("Exception: ", "")}')),
-      );
+      ErrorHandler.showError(context, e);
     }
   }
 
@@ -153,17 +179,16 @@ class _EmployeesSalaryPageState extends State<EmployeesSalaryPage> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
+    final theme = context.theme;
     return Scaffold(
       backgroundColor: theme.scaffoldBackgroundColor,
       appBar: AppBar(
-        backgroundColor: theme.appBarTheme.backgroundColor ?? theme.primaryColor,
         leading: const BackButton(),
         title: const Text("Employees Salary"),
         centerTitle: true,
       ),
       body: Padding(
-        padding: const EdgeInsets.fromLTRB(16, 16, 16, 0), // Removed bottom padding here
+        padding: context.pagePadding.copyWith(bottom: 0),
         child: Column(
           children: [
             /// Search Bar
@@ -174,28 +199,33 @@ class _EmployeesSalaryPageState extends State<EmployeesSalaryPage> {
                 hintText: "Search for employees...",
                 hintStyle: TextStyle(color: theme.hintColor),
                 filled: true,
-                fillColor: theme.cardColor,
+                fillColor: theme.colorScheme.surfaceContainerLow,
                 border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: BorderSide.none,
+                  borderRadius: BorderRadius.circular(context.scale(12)),
+                  borderSide: BorderSide(color: theme.colorScheme.outlineVariant),
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(context.scale(12)),
+                  borderSide: BorderSide(color: theme.colorScheme.outlineVariant),
                 ),
               ),
             ),
 
-            const SizedBox(height: 12),
+            SizedBox(height: context.sm),
 
             /// Filter
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 12),
               decoration: BoxDecoration(
-                color: theme.cardColor,
-                borderRadius: BorderRadius.circular(12),
+                color: theme.colorScheme.surfaceContainerLow,
+                borderRadius: BorderRadius.circular(context.scale(12)),
+                border: Border.all(color: theme.colorScheme.outlineVariant),
               ),
               child: DropdownButton<String>(
                 value: _selectedRole,
                 hint: Text("Filter by Role", style: TextStyle(color: theme.hintColor)),
                 isExpanded: true,
-                dropdownColor: theme.cardColor,
+                dropdownColor: theme.colorScheme.surfaceContainerLow,
                 underline: const SizedBox(),
                 icon: Icon(Icons.keyboard_arrow_down, color: theme.hintColor),
                 style: theme.textTheme.bodyLarge,
@@ -217,21 +247,24 @@ class _EmployeesSalaryPageState extends State<EmployeesSalaryPage> {
               ),
             ),
 
-            const SizedBox(height: 16),
+            SizedBox(height: context.md),
 
             /// Employee List
             Expanded(
-              child: _isLoading
-                  ? const Center(child: CircularProgressIndicator())
-                  : _filteredEmployees.isEmpty
-                      ? const Center(child: Text("No employees found."))
-                      : LayoutBuilder(builder: (context, constraints) {
-                          if (constraints.maxWidth > 600) {
-                            return _buildGridView();
-                          } else {
-                            return _buildListView();
-                          }
-                        }),
+              child: LoadingWrapper(
+                isLoading: _isLoading,
+                hasData: _filteredEmployees.isNotEmpty,
+                error: _error,
+                onRetry: _fetchEmployees,
+                skeleton: _buildSkeleton(),
+                child: _filteredEmployees.isEmpty
+                    ? const Center(child: Text("No employees found."))
+                    : context.responsive(
+                        _buildListView(),
+                        tablet: _buildGridView(),
+                        desktop: _buildGridView(),
+                      ),
+              ),
             )
           ],
         ),
@@ -239,9 +272,29 @@ class _EmployeesSalaryPageState extends State<EmployeesSalaryPage> {
     );
   }
 
+  Widget _buildSkeleton() {
+    return context.responsive(
+      ListView.separated(
+        itemCount: 8,
+        separatorBuilder: (context, index) => SizedBox(height: context.sm),
+        itemBuilder: (context, index) => SkeletonBox(height: context.scale(80), borderRadius: context.scale(14)),
+      ),
+      tablet: GridView.builder(
+        itemCount: 8,
+        gridDelegate: SliverGridDelegateWithMaxCrossAxisExtent(
+          maxCrossAxisExtent: 400,
+          mainAxisSpacing: context.sm,
+          crossAxisSpacing: context.sm,
+          childAspectRatio: 3.2,
+        ),
+        itemBuilder: (context, index) => SkeletonBox(height: context.scale(80), borderRadius: context.scale(14)),
+      ),
+    );
+  }
+
   Widget _buildListView() {
     return ListView.separated(
-      padding: const EdgeInsets.only(bottom: 50), // Added bottom padding
+      padding: const EdgeInsets.only(bottom: 24),
       itemCount: _filteredEmployees.length,
       itemBuilder: (context, index) {
         final employee = _filteredEmployees[index];
@@ -257,18 +310,18 @@ class _EmployeesSalaryPageState extends State<EmployeesSalaryPage> {
           ),
         );
       },
-      separatorBuilder: (context, index) => const SizedBox(height: 12),
+      separatorBuilder: (context, index) => SizedBox(height: context.sm),
     );
   }
 
   Widget _buildGridView() {
     return GridView.builder(
-      padding: const EdgeInsets.only(bottom: 50), // Added bottom padding
+      padding: const EdgeInsets.only(bottom: 24),
       itemCount: _filteredEmployees.length,
-      gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
+      gridDelegate: SliverGridDelegateWithMaxCrossAxisExtent(
         maxCrossAxisExtent: 400,
-        mainAxisSpacing: 12,
-        crossAxisSpacing: 12,
+        mainAxisSpacing: context.sm,
+        crossAxisSpacing: context.sm,
         childAspectRatio: 3.2, // Adjust for better card shape
       ),
       itemBuilder: (context, index) {
@@ -297,20 +350,19 @@ class EmployeeCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
+    final theme = context.theme;
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: theme.cardColor,
-        borderRadius: BorderRadius.circular(14),
+        color: theme.colorScheme.surfaceContainerLow,
+        borderRadius: BorderRadius.circular(context.scale(14)),
+        border: Border.all(color: theme.colorScheme.outlineVariant),
       ),
       child: Row(
         children: [
           /// Avatar
-          CircleAvatar(
-            radius: 26,
-            backgroundColor: theme.colorScheme.secondaryContainer,
-            child: Icon(Icons.person, size: 30, color: theme.colorScheme.onSecondaryContainer),
+          ProfileAvatar(
+            radius: context.scale(26),
           ),
           const SizedBox(width: 12),
 
@@ -324,12 +376,20 @@ class EmployeeCard extends StatelessWidget {
                 const SizedBox(height: 4),
                 Text(employee.info, style: theme.textTheme.bodySmall?.copyWith(color: theme.hintColor), overflow: TextOverflow.ellipsis),
                 const SizedBox(height: 8),
-                Chip(
-                  label: Text(employee.role),
-                  backgroundColor: employee.roleColor.withAlpha(35),
-                  labelStyle: TextStyle(color: employee.roleColor, fontWeight: FontWeight.bold, fontSize: 12),
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 0),
-                  materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: employee.roleColor.withAlpha(35),
+                    borderRadius: BorderRadius.circular(context.scale(8)),
+                  ),
+                  child: Text(
+                    employee.role,
+                    style: TextStyle(
+                      color: employee.roleColor,
+                      fontWeight: FontWeight.bold,
+                      fontSize: context.font(12),
+                    ),
+                  ),
                 ),
               ],
             ),

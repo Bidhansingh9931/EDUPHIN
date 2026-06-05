@@ -1,8 +1,12 @@
+import 'package:eduphin/services/error_handler.dart';
 import 'dart:convert';
+import 'dart:io';
+import 'package:eduphin/moderator_dashboard/cache_helper.dart';
+import 'package:eduphin/moderator_dashboard/skeleton_widgets.dart';
 import 'package:eduphin/services/api_service.dart';
-import 'package:flutter/foundation.dart';
+import 'package:eduphin/services/responsive_helper.dart';
+import 'package:eduphin/services/common_widgets.dart';
 import 'package:flutter/material.dart';
-import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
 
 import 'add_edit_testimonial_page.dart';
@@ -14,6 +18,7 @@ class Testimonial {
   final String designation;
   final String message;
   final String? image;
+  final int status;
   final DateTime? createdAt;
   final DateTime? updatedAt;
 
@@ -23,6 +28,7 @@ class Testimonial {
     required this.designation,
     required this.message,
     this.image,
+    this.status = 1,
     this.createdAt,
     this.updatedAt,
   });
@@ -42,6 +48,7 @@ class Testimonial {
       designation: json['designation'] ?? 'N/A',
       message: json['message'] ?? '',
       image: json['image'],
+      status: json['status'] ?? 1,
       createdAt: safeParseDateTime(json['created_at']),
       updatedAt: safeParseDateTime(json['updated_at']),
     );
@@ -50,64 +57,69 @@ class Testimonial {
 
 // Provider to interact with the testimonial API.
 class TestimonialProvider {
-  Future<List<Testimonial>> fetchTestimonials() async {
-    final token = await ApiService.getToken();
-    if (token == null) throw Exception('Authentication token not found.');
+  static const String _cacheKey = 'moderator_testimonials_list';
 
-    final response = await http.get(
-      Uri.parse('${ApiService.baseUrl}/api/moderator/testimonials'),
-      headers: {
-        'Authorization': 'Bearer $token',
-        'Accept': 'application/json',
-      },
-    );
-
-    if (kDebugMode) {
-      print('Testimonials API Response: ${response.body}');
-    }
-
-    if (response.statusCode == 200) {
-      final body = jsonDecode(response.body);
-
-      // CORRECTED: More robust JSON parsing to handle multiple possible structures.
-      List<dynamic> testimonialsData;
-
-      if (body is List) {
-        testimonialsData = body;
-      } else if (body is Map<String, dynamic> && body['data'] is List) {
-        testimonialsData = body['data'];
-      } else {
-        // This will catch cases where 'data' is not a list or the structure is unexpected.
-        throw Exception(
-            'Failed to parse testimonials: Unexpected JSON structure.');
+  Future<List<Testimonial>> fetchTestimonials({bool bypassCache = false}) async {
+    try {
+      if (!bypassCache) {
+        final cached = await CacheHelper.load(_cacheKey);
+        if (cached != null && cached is List) {
+          return cached.map((e) => Testimonial.fromJson(e)).toList();
+        }
       }
+      final response = await ApiService.get('moderator/testimonials');
 
-      return testimonialsData
-          .map((json) => Testimonial.fromJson(json as Map<String, dynamic>))
-          .toList();
-    } else {
-      throw Exception(
-          'Failed to load testimonials. Status code: ${response.statusCode}');
+      if (response.statusCode == 200) {
+        final body = jsonDecode(response.body);
+
+        List<dynamic> testimonialsData;
+        if (body is List) {
+          testimonialsData = body;
+        } else if (body is Map<String, dynamic> && body['data'] is List) {
+          testimonialsData = body['data'];
+        } else {
+          throw ApiException('Received invalid data from server.');
+        }
+
+        await CacheHelper.save(_cacheKey, testimonialsData);
+        return testimonialsData.map((json) => Testimonial.fromJson(json as Map<String, dynamic>)).toList();
+      } else {
+        throw ApiException('Failed to load testimonials', statusCode: response.statusCode);
+      }
+    } on SocketException {
+      throw NetworkException();
+    } catch (e) {
+      if (e is ApiException || e is NetworkException) rethrow;
+      throw Exception('An unexpected error occurred: $e');
     }
+  }
+
+  Future<List<Testimonial>?> getCachedTestimonials() async {
+    final cached = await CacheHelper.load(_cacheKey);
+    if (cached != null && cached is List) {
+      return cached.map((e) => Testimonial.fromJson(e)).toList();
+    }
+    return null;
   }
 
   Future<void> deleteTestimonial(int id) async {
-    final token = await ApiService.getToken();
-    if (token == null) throw Exception('Authentication token not found.');
+    try {
+      final response = await ApiService.delete('moderator/testimonials/$id');
 
-    final response = await http.delete(
-      Uri.parse('${ApiService.baseUrl}/api/moderator/testimonials/$id'),
-      headers: {
-        'Authorization': 'Bearer $token',
-        'Accept': 'application/json',
-      },
-    );
-
-    if (response.statusCode != 200) {
-      throw Exception('Failed to delete testimonial.');
+      if (response.statusCode == 200) {
+        await CacheHelper.clear(_cacheKey);
+      } else {
+        throw ApiException('Failed to delete testimonial', statusCode: response.statusCode);
+      }
+    } on SocketException {
+      throw NetworkException();
+    } catch (e) {
+      if (e is ApiException || e is NetworkException) rethrow;
+      throw Exception('An unexpected error occurred: $e');
     }
   }
 }
+
 
 // The main page to display and manage testimonials.
 class TestimonialsPage extends StatefulWidget {
@@ -120,17 +132,30 @@ class TestimonialsPage extends StatefulWidget {
 class _TestimonialsPageState extends State<TestimonialsPage> {
   final TestimonialProvider _provider = TestimonialProvider();
   late Future<List<Testimonial>> _testimonialsFuture;
+  List<Testimonial>? _cachedTestimonials;
 
   @override
   void initState() {
     super.initState();
+    _loadInitialData();
+  }
+
+  Future<void> _loadInitialData() async {
+    _cachedTestimonials = await _provider.getCachedTestimonials();
     _fetchData();
   }
 
-  void _fetchData() {
+  Future<void> _fetchData({bool bypassCache = false}) async {
     setState(() {
-      _testimonialsFuture = _provider.fetchTestimonials();
+      _testimonialsFuture = _provider.fetchTestimonials(bypassCache: bypassCache);
     });
+    try {
+      await _testimonialsFuture;
+    } catch (e) {
+      if (mounted) {
+        ErrorHandler.showError(context, e);
+      }
+    }
   }
 
   // Navigate to Add/Edit page and refresh if data was changed
@@ -144,7 +169,7 @@ class _TestimonialsPageState extends State<TestimonialsPage> {
     );
 
     if (result == true) {
-      _fetchData();
+      _fetchData(bypassCache: true);
     }
   }
 
@@ -153,19 +178,18 @@ class _TestimonialsPageState extends State<TestimonialsPage> {
       await _provider.deleteTestimonial(id);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-              content: Text('Testimonial deleted successfully'),
-              backgroundColor: Colors.green),
+          SnackBar(
+            content: const Text('Testimonial deleted successfully'),
+            backgroundColor: Colors.green,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(context.sm)),
+          ),
         );
-        _fetchData(); // Refresh the list
+        _fetchData(bypassCache: true); // Refresh the list
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-              content: Text('Failed to delete: $e'),
-              backgroundColor: Colors.red),
-        );
+        ErrorHandler.showError(context, e);
       }
     }
   }
@@ -174,22 +198,26 @@ class _TestimonialsPageState extends State<TestimonialsPage> {
     showDialog(
       context: context,
       builder: (BuildContext context) {
+        final theme = context.theme;
         return AlertDialog(
-          backgroundColor: const Color(0xFF1B263B),
-          title: const Text('Confirm Delete',
-              style: TextStyle(color: Colors.white)),
-          content: const Text(
+          backgroundColor: theme.colorScheme.surfaceContainerLow,
+          surfaceTintColor: Colors.transparent,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(context.md),
+            side: BorderSide(color: theme.colorScheme.outlineVariant),
+          ),
+          title: Text('Confirm Delete', style: TextStyle(fontSize: context.font(20), fontWeight: FontWeight.bold, color: theme.colorScheme.onSurface)),
+          content: Text(
               'Are you sure you want to delete this testimonial?',
-              style: TextStyle(color: Colors.white70)),
+              style: TextStyle(fontSize: context.font(16), color: theme.colorScheme.onSurfaceVariant)),
           actions: <Widget>[
             TextButton(
-              child: const Text('Cancel',
-                  style: TextStyle(color: Colors.white70)),
+              child: Text('Cancel', style: TextStyle(fontSize: context.font(14), color: theme.colorScheme.primary)),
               onPressed: () => Navigator.of(context).pop(),
             ),
             TextButton(
-              child: const Text('Delete',
-                  style: TextStyle(color: Colors.redAccent)),
+              child: Text('Delete',
+                  style: TextStyle(color: theme.colorScheme.error, fontSize: context.font(14), fontWeight: FontWeight.bold)),
               onPressed: () {
                 Navigator.of(context).pop();
                 _deleteItem(id);
@@ -203,50 +231,65 @@ class _TestimonialsPageState extends State<TestimonialsPage> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = context.theme;
     return Scaffold(
-      backgroundColor: const Color(0xFF0D1B2A),
+      backgroundColor: theme.scaffoldBackgroundColor,
       appBar: AppBar(
-        title:
-            const Text('Testimonials', style: TextStyle(color: Colors.white)),
-        backgroundColor: const Color(0xFF0D1B2A),
-        iconTheme: const IconThemeData(color: Colors.white),
+        title: Text('Testimonials', style: TextStyle(fontSize: context.font(20), fontWeight: FontWeight.bold)),
         actions: [
           IconButton(
-            icon:
-                const Icon(Icons.add_comment_outlined, color: Colors.white),
+            icon: Icon(Icons.add_comment_outlined, size: context.scale(24)),
             onPressed: () => _navigateAndRefresh(),
           ),
+          SizedBox(width: context.md),
         ],
       ),
       body: FutureBuilder<List<Testimonial>>(
         future: _testimonialsFuture,
         builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
-          }
-          if (snapshot.hasError) {
-            return Center(
-                child: Text('Error: ${snapshot.error}',
-                    style: const TextStyle(color: Colors.redAccent)));
-          }
-          if (!snapshot.hasData || snapshot.data!.isEmpty) {
-            return const Center(
-                child: Text('No testimonials found.',
-                    style: TextStyle(color: Colors.white70)));
-          }
+          return ModeratorLoadingWrapper<List<Testimonial>>(
+            snapshot: snapshot,
+            cachedData: _cachedTestimonials,
+            skeleton: const TestimonialSkeleton(),
+            onRefresh: () async => _fetchData(bypassCache: true),
+            builder: (testimonials) {
+              if (testimonials.isEmpty) {
+                return Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.reviews_outlined,
+                          size: context.scale(64),
+                          color: theme.colorScheme.onSurfaceVariant
+                              .withValues(alpha: 0.3)),
+                      SizedBox(height: context.md),
+                      Text('No testimonials found.',
+                          style: TextStyle(
+                              color: theme.colorScheme.onSurfaceVariant,
+                              fontSize: context.font(16),
+                              fontWeight: FontWeight.bold)),
+                    ],
+                  ),
+                );
+              }
 
-          final testimonials = snapshot.data!;
-
-          return ListView.builder(
-            padding: const EdgeInsets.all(16.0),
-            itemCount: testimonials.length,
-            itemBuilder: (context, index) {
-              return TestimonialCard(
-                testimonial: testimonials[index],
-                onDelete: () =>
-                    _showDeleteConfirmation(testimonials[index].id),
-                onEdit: () =>
-                    _navigateAndRefresh(testimonial: testimonials[index]),
+              return RefreshIndicator(
+                onRefresh: () async => _fetchData(bypassCache: true),
+                color: theme.colorScheme.primary,
+                child: ListView.builder(
+                  padding: context.pagePadding,
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  itemCount: testimonials.length,
+                  itemBuilder: (context, index) {
+                    return TestimonialCard(
+                      testimonial: testimonials[index],
+                      onDelete: () =>
+                          _showDeleteConfirmation(testimonials[index].id),
+                      onEdit: () =>
+                          _navigateAndRefresh(testimonial: testimonials[index]),
+                    );
+                  },
+                ),
               );
             },
           );
@@ -269,70 +312,64 @@ class TestimonialCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    String? imageUrl;
-    if (testimonial.image != null) {
-      imageUrl = '${ApiService.baseImageUrl}/storage/${testimonial.image}';
-    }
+    final theme = context.theme;
+    final imageUrl = ApiService.getStorageUrl(testimonial.image);
 
     return Card(
-      color: const Color(0xFF1B263B),
-      margin: const EdgeInsets.only(bottom: 16),
-      elevation: 4,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      margin: EdgeInsets.only(bottom: context.md),
+      color: theme.colorScheme.surfaceContainerLow,
+      elevation: 0,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(context.md),
+        side: BorderSide(color: theme.colorScheme.outlineVariant),
+      ),
       child: Padding(
-        padding: const EdgeInsets.all(16.0),
+        padding: EdgeInsets.all(context.md),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
+              crossAxisAlignment: CrossAxisAlignment.center,
               children: [
-                CircleAvatar(
-                  radius: 30,
-                  backgroundColor: const Color(0xFF0D1B2A),
-                  backgroundImage:
-                      imageUrl != null ? NetworkImage(imageUrl) : null,
-                  child: imageUrl == null
-                      ? const Icon(Icons.person,
-                          color: Colors.white70, size: 30)
-                      : null,
+                ProfileAvatar(
+                  imageUrl: imageUrl,
+                  radius: context.scale(24),
                 ),
-                const SizedBox(width: 16),
+                SizedBox(width: context.md),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(testimonial.name,
-                          style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 18,
-                              fontWeight: FontWeight.bold)),
-                      const SizedBox(height: 4),
+                          style: TextStyle(
+                              fontSize: context.font(16),
+                              fontWeight: FontWeight.bold,
+                              color: theme.colorScheme.onSurface)),
                       Text(testimonial.designation,
-                          style: const TextStyle(
-                              color: Colors.white70,
+                          style: TextStyle(
+                              color: theme.colorScheme.onSurfaceVariant,
+                              fontSize: context.font(13),
                               fontStyle: FontStyle.italic)),
                     ],
                   ),
                 ),
               ],
             ),
-            const SizedBox(height: 16),
+            SizedBox(height: context.md),
             Text(
               '"${testimonial.message}"',
-              style:
-                  const TextStyle(color: Colors.white, fontSize: 16, height: 1.5),
+              style: TextStyle(fontSize: context.font(15), height: 1.5, color: theme.colorScheme.onSurface),
             ),
-            const SizedBox(height: 12),
+            SizedBox(height: context.md),
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 if (testimonial.createdAt != null)
                   Text(
                     DateFormat.yMMMd().format(testimonial.createdAt!),
-                    style: const TextStyle(
-                      color: Colors.white60,
-                      fontSize: 12,
+                    style: TextStyle(
+                      color: theme.colorScheme.onSurfaceVariant,
+                      fontSize: context.font(12),
                     ),
                   )
                 else
@@ -340,14 +377,16 @@ class TestimonialCard extends StatelessWidget {
                 Row(
                   children: [
                     IconButton(
-                      icon: const Icon(Icons.edit_outlined,
-                          color: Colors.white70, size: 20),
+                      icon: Icon(Icons.edit_outlined,
+                          color: theme.colorScheme.onSurfaceVariant, size: context.scale(20)),
                       onPressed: onEdit,
+                      visualDensity: VisualDensity.compact,
                     ),
                     IconButton(
-                      icon: const Icon(Icons.delete_outline,
-                          color: Colors.redAccent, size: 20),
+                      icon: Icon(Icons.delete_outline,
+                          color: theme.colorScheme.error, size: context.scale(20)),
                       onPressed: onDelete,
+                      visualDensity: VisualDensity.compact,
                     ),
                   ],
                 ),

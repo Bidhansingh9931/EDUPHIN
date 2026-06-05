@@ -1,16 +1,20 @@
+import 'package:eduphin/services/error_handler.dart';
 import 'dart:async';
-
+import 'dart:io';
+import 'package:eduphin/moderator_dashboard/cache_helper.dart';
+import 'package:eduphin/moderator_dashboard/skeleton_widgets.dart';
 import 'package:eduphin/moderator_dashboard/moderator_dashboard.dart';
 import 'package:eduphin/moderator_dashboard/dashboard_cards/active_institutes/manage/add_employee.dart';
 import 'package:eduphin/services/api_service.dart';
+import 'package:eduphin/services/responsive_helper.dart';
 import 'package:flutter/material.dart';
 
 import 'employee_model.dart';
 import 'employ_details.dart';
 
-// 3. Dynamic list of roles
 const List<String> employeeRoles = [
   'All',
+  'Moderator',
   'Principal',
   'Institute Manager',
   'Counselors',
@@ -23,6 +27,36 @@ const List<String> employeeRoles = [
   'Physical Education',
 ];
 
+// 1. Data Provider to fetch employee data
+class EmployeeProvider {
+  String getCacheKey(String instituteId) => 'employees_list_$instituteId';
+
+  Future<List<Employee>> fetchEmployees(String instituteId, {bool bypassCache = false}) async {
+    try {
+      if (!bypassCache) {
+        final cached = await getCachedEmployees(instituteId);
+        if (cached != null) return cached;
+      }
+      final data = await ApiService.getEmployees(instituteId);
+      await CacheHelper.save(getCacheKey(instituteId), data.map((e) => e.toJson()).toList());
+      return data;
+    } on SocketException {
+      throw NetworkException();
+    } catch (e) {
+      if (e is NetworkException) rethrow;
+      throw Exception('Failed to fetch employees: $e');
+    }
+  }
+
+  Future<List<Employee>?> getCachedEmployees(String instituteId) async {
+    final cached = await CacheHelper.load(getCacheKey(instituteId));
+    if (cached != null) {
+      return (cached as List).map((e) => Employee.fromJson(e)).toList();
+    }
+    return null;
+  }
+}
+
 class ManageInstitute extends StatefulWidget {
   final String instituteName;
   final String instituteId;
@@ -30,7 +64,7 @@ class ManageInstitute extends StatefulWidget {
   const ManageInstitute({
     super.key,
     this.instituteName = "Global Tech Academy",
-    required this.instituteId, // Made required to ensure it's passed
+    required this.instituteId,
   });
 
   @override
@@ -38,52 +72,52 @@ class ManageInstitute extends StatefulWidget {
 }
 
 class _ManageInstitutePageState extends State<ManageInstitute> {
+  final EmployeeProvider _provider = EmployeeProvider();
   final _searchController = TextEditingController();
 
-  bool _isLoading = true;
-  String? _error;
   List<Employee> _allEmployees = [];
   List<Employee> _filteredEmployees = [];
   String _selectedRole = 'All';
+  late Future<List<Employee>> _employeesFuture;
+  List<Employee>? _cachedEmployees;
 
   @override
   void initState() {
     super.initState();
-    _fetchEmployees();
+    _loadInitialData();
     _searchController.addListener(_applyFilters);
+  }
+
+  Future<void> _loadInitialData() async {
+    _cachedEmployees = await _provider.getCachedEmployees(widget.instituteId);
+    if (_cachedEmployees != null) {
+      _allEmployees = _cachedEmployees!;
+      _applyFiltersNoState();
+    }
+    if (mounted) {
+      setState(() {
+        _employeesFuture = _provider.fetchEmployees(widget.instituteId);
+      });
+    }
+  }
+
+  Future<void> _fetchEmployees({bool bypassCache = false}) async {
+    setState(() {
+      _employeesFuture = _provider.fetchEmployees(widget.instituteId, bypassCache: bypassCache);
+    });
+    try {
+      await _employeesFuture;
+    } catch (e) {
+      if (mounted) {
+        ErrorHandler.showError(context, e);
+      }
+    }
   }
 
   @override
   void dispose() {
     _searchController.dispose();
     super.dispose();
-  }
-
-  Future<void> _fetchEmployees() async {
-    setState(() {
-      _isLoading = true;
-      _error = null;
-    });
-    try {
-      final employees = await ApiService.getEmployees(widget.instituteId);
-      if (mounted) {
-        setState(() {
-          _allEmployees = employees;
-          _filteredEmployees = employees;
-          _isLoading = false;
-        });
-      }
-    } catch (e) {
-      if (mounted) {
-        setState(() {
-          _isLoading = false;
-          _error = e.toString();
-        });
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to load employees: $e')),
-        );
-      }
-    }
   }
 
   void _applyFilters() {
@@ -95,6 +129,15 @@ class _ManageInstitutePageState extends State<ManageInstitute> {
         return nameMatches && roleMatches;
       }).toList();
     });
+  }
+
+  void _applyFiltersNoState() {
+    final query = _searchController.text.toLowerCase();
+    _filteredEmployees = _allEmployees.where((employee) {
+      final nameMatches = employee.name.toLowerCase().contains(query);
+      final roleMatches = _selectedRole == 'All' || employee.role == _selectedRole;
+      return nameMatches && roleMatches;
+    }).toList();
   }
 
   void _onRoleSelected(String role) {
@@ -119,132 +162,160 @@ class _ManageInstitutePageState extends State<ManageInstitute> {
 
   @override
   Widget build(BuildContext context) {
-    final screenWidth = MediaQuery.of(context).size.width;
-    double responsiveFontSize(double baseSize) {
-      if (screenWidth > 1200) return baseSize * 1.2;
-      if (screenWidth > 600) return baseSize * 1.1;
-      return baseSize;
-    }
+    final theme = context.theme;
+    final colorScheme = theme.colorScheme;
 
     return Scaffold(
-      backgroundColor: const Color(0xFF0D1B2A),
       appBar: AppBar(
-        backgroundColor: const Color(0xFF0D1B2A),
-        iconTheme: const IconThemeData(color: Colors.white),
-        title: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Expanded(
-              child: Text(
-                widget.instituteName,
-                style: TextStyle(color: Colors.white, fontSize: responsiveFontSize(18)),
-                overflow: TextOverflow.ellipsis,
-              ),
-            ),
-            InkWell(
-              onTap: () => Navigator.pushReplacement(
-                context,
-                MaterialPageRoute(builder: (context) => const ModeratorDashboardPage()),
-              ),
-              child: const Icon(Icons.home_sharp, size: 30, color: Colors.white),
-            ),
-          ],
-        ),
+        title: Text(widget.instituteName, style: TextStyle(fontSize: context.font(20))),
+        actions: [
+          IconButton(
+            onPressed: () => Navigator.pushAndRemoveUntil(context, MaterialPageRoute(builder: (context) => const ModeratorDashboardPage()), (route) => false),
+            icon: Icon(Icons.dashboard_rounded, size: context.scale(24)),
+          ),
+          SizedBox(width: context.md),
+        ],
       ),
-      body: Padding(
-        padding: EdgeInsets.fromLTRB(screenWidth * 0.04, 12, screenWidth * 0.04, 0),
+      body: RefreshIndicator(
+        onRefresh: () => _fetchEmployees(bypassCache: true),
         child: Column(
           children: [
-            Row(
-              children: [
-                Expanded(
-                  child: TextField(
-                    controller: _searchController,
-                    style: TextStyle(color: Colors.white, fontSize: responsiveFontSize(14)),
-                    decoration: InputDecoration(
-                      hintText: "Search employees...",
-                      hintStyle: TextStyle(color: Colors.white54, fontSize: responsiveFontSize(14)),
-                      prefixIcon: const Icon(Icons.search, color: Colors.white54),
-                      filled: true,
-                      fillColor: const Color(0xFF1B263B),
-                      contentPadding: const EdgeInsets.symmetric(vertical: 0, horizontal: 20),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(30),
-                        borderSide: BorderSide.none,
+            Padding(
+              padding: context.pagePadding.copyWith(bottom: 0),
+              child: Column(
+                children: [
+                  Row(
+                    children: [
+                      Expanded(
+                        child: TextField(
+                          controller: _searchController,
+                          style: TextStyle(fontSize: context.font(14)),
+                          decoration: InputDecoration(
+                            hintText: "Search employees...",
+                            hintStyle: TextStyle(color: colorScheme.onSurfaceVariant, fontSize: context.font(14)),
+                            prefixIcon: Icon(Icons.search_rounded, color: colorScheme.primary),
+                            filled: true,
+                            fillColor: colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
+                            contentPadding: EdgeInsets.symmetric(horizontal: context.md, vertical: context.sm),
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(context.scale(12)),
+                              borderSide: BorderSide(color: colorScheme.outlineVariant),
+                            ),
+                            enabledBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(context.scale(12)),
+                              borderSide: BorderSide(color: colorScheme.outlineVariant),
+                            ),
+                            focusedBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(context.scale(12)),
+                              borderSide: BorderSide(color: colorScheme.primary, width: 2),
+                            ),
+                          ),
+                        ),
                       ),
+                      SizedBox(width: context.md),
+                      IconButton.filled(
+                        onPressed: _navigateAndRefresh,
+                        icon: Icon(Icons.person_add_rounded, size: context.scale(24)),
+                        style: IconButton.styleFrom(
+                          backgroundColor: colorScheme.primary,
+                          foregroundColor: colorScheme.onPrimary,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(context.scale(12))),
+                          padding: EdgeInsets.all(context.scale(12)),
+                        ),
+                      ),
+                    ],
+                  ),
+                  SizedBox(height: context.md),
+                  SizedBox(
+                    height: context.scale(40),
+                    child: ListView.builder(
+                      scrollDirection: Axis.horizontal,
+                      itemCount: employeeRoles.length,
+                      itemBuilder: (context, index) {
+                        final role = employeeRoles[index];
+                        final isSelected = _selectedRole == role;
+                        return Padding(
+                          padding: EdgeInsets.only(right: context.scale(8)),
+                          child: FilterChip(
+                            label: Text(role, style: TextStyle(fontSize: context.font(12), color: isSelected ? colorScheme.onPrimary : colorScheme.onSurfaceVariant, fontWeight: isSelected ? FontWeight.bold : FontWeight.normal)),
+                            selected: isSelected,
+                            onSelected: (bool selected) => _onRoleSelected(role),
+                            backgroundColor: colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
+                            selectedColor: colorScheme.primary,
+                            showCheckmark: false,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(context.scale(20)), 
+                              side: BorderSide(color: isSelected ? colorScheme.primary : colorScheme.outlineVariant)
+                            ),
+                          ),
+                        );
+                      },
                     ),
                   ),
-                ),
-                const SizedBox(width: 10),
-                GestureDetector(
-                  onTap: _navigateAndRefresh,
-                  child: Container(
-                    width: 50,
-                    height: 50,
-                    decoration: const BoxDecoration(
-                      color: Color(0xFF1B263B),
-                      shape: BoxShape.circle,
-                    ),
-                    child: const Icon(Icons.person_add_alt_1_outlined, color: Colors.white, size: 24),
-                  ),
-                ),
-              ],),
-            const SizedBox(height: 15),
-            SizedBox(
-              height: 40,
-              child: ListView.builder(
-                scrollDirection: Axis.horizontal,
-                itemCount: employeeRoles.length,
-                itemBuilder: (context, index) {
-                  final role = employeeRoles[index];
-                  return Padding(
-                    padding: const EdgeInsets.only(right: 8.0),
-                    child: RoleChip(
-                      label: role,
-                      isSelected: _selectedRole == role,
-                      onTap: () => _onRoleSelected(role),
-                    ),
+                ],
+              ),
+            ),
+            SizedBox(height: context.md),
+            Expanded(
+              child: FutureBuilder<List<Employee>>(
+                future: _employeesFuture,
+                builder: (context, snapshot) {
+                  return ModeratorLoadingWrapper<List<Employee>>(
+                    snapshot: snapshot,
+                    cachedData: _cachedEmployees,
+                    skeleton: const ListSkeleton(),
+                    onRefresh: () => _fetchEmployees(bypassCache: true),
+                    builder: (employees) {
+                      _allEmployees = employees;
+                      _applyFiltersNoState();
+
+                      if (_filteredEmployees.isEmpty) {
+                        return _buildEmptyState(context);
+                      }
+                      return SingleChildScrollView(
+                        padding: context.pagePadding,
+                        physics: const AlwaysScrollableScrollPhysics(),
+                        child: Center(
+                          child: ConstrainedBox(
+                            constraints: BoxConstraints(maxWidth: context.scale(1200)),
+                            child: GridView.builder(
+                              shrinkWrap: true,
+                              physics: const NeverScrollableScrollPhysics(),
+                              itemCount: _filteredEmployees.length,
+                              gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                                crossAxisCount: context.responsive(1, tablet: 2, desktop: 3),
+                                crossAxisSpacing: context.md,
+                                mainAxisSpacing: context.md,
+                                mainAxisExtent: context.scale(80),
+                              ),
+                              itemBuilder: (context, index) {
+                                return EmployeeCard(employee: _filteredEmployees[index]);
+                              },
+                            ),
+                          ),
+                        ),
+                      );
+                    },
                   );
                 },
               ),
             ),
-            const SizedBox(height: 15),
-            Expanded(
-              child: _isLoading
-                  ? const Center(child: CircularProgressIndicator())
-                  : _error != null
-                      ? Center(child: Text("Error: $_error", style: TextStyle(color: Colors.red.shade300, fontSize: responsiveFontSize(14))))
-                      : _filteredEmployees.isEmpty
-                          ? Center(child: Text("No employees found.", style: TextStyle(color: Colors.white54, fontSize: responsiveFontSize(14))))
-                          : LayoutBuilder(builder: (context, constraints) {
-                              if (constraints.maxWidth > 600) {
-                                int crossAxisCount = constraints.maxWidth > 1200 ? 4 : (constraints.maxWidth > 900 ? 3 : 2);
-                                return GridView.builder(
-                                  padding: const EdgeInsets.only(bottom: 16),
-                                  itemCount: _filteredEmployees.length,
-                                  gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                                    crossAxisCount: crossAxisCount,
-                                    crossAxisSpacing: 16,
-                                    mainAxisSpacing: 16,
-                                    childAspectRatio: 3,
-                                  ),
-                                  itemBuilder: (context, index) {
-                                    return EmployeeCard(_filteredEmployees[index]);
-                                  },
-                                );
-                              } else {
-                                return ListView.builder(
-                                  padding: const EdgeInsets.only(bottom: 50),
-                                  itemCount: _filteredEmployees.length,
-                                  itemBuilder: (context, index) {
-                                    return EmployeeCard(_filteredEmployees[index]);
-                                  },
-                                );
-                              }
-                            }),
-            ),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildEmptyState(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(Icons.people_outline_rounded, size: context.scale(64), color: colorScheme.onSurfaceVariant.withValues(alpha: 0.3)),
+          SizedBox(height: context.md),
+          Text("No employees found", style: TextStyle(fontWeight: FontWeight.bold, fontSize: context.font(16), color: colorScheme.onSurfaceVariant)),
+        ],
       ),
     );
   }
@@ -253,97 +324,59 @@ class _ManageInstitutePageState extends State<ManageInstitute> {
 class EmployeeCard extends StatelessWidget {
   final Employee employee;
 
-  const EmployeeCard(this.employee, {super.key});
+  const EmployeeCard({super.key, required this.employee});
 
   @override
   Widget build(BuildContext context) {
-    final screenWidth = MediaQuery.of(context).size.width;
-    double responsiveFontSize(double baseSize) {
-      if (screenWidth > 1200) return baseSize * 1.2;
-      if (screenWidth > 600) return baseSize * 1.1;
-      return baseSize;
-    }
+    final colorScheme = Theme.of(context).colorScheme;
 
-    return InkWell(
-      onTap: () {
-        Navigator.push(
-          context,
-          MaterialPageRoute(builder: (context) => EmployeeDetailsPage(employeeId: employee.id)),
-        );
-      },
-      borderRadius: BorderRadius.circular(16),
-      child: Container(
-        margin: const EdgeInsets.only(bottom: 12),
-        padding: const EdgeInsets.all(12),
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(16),
-          color: const Color(0xFF1B263B),
-        ),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.center,
-          children: [
-            CircleAvatar(
-              radius: 25,
-              backgroundColor: const Color(0xFF0D1B2A),
-              child: Icon(Icons.person_outline_sharp, size: responsiveFontSize(28), color: Colors.white70),
-            ),
-            const SizedBox(width: 16),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Text(
-                    employee.name,
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: responsiveFontSize(16),
-                      fontWeight: FontWeight.bold,
-                    ),
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    employee.role,
-                    style: TextStyle(color: Colors.white70, fontSize: responsiveFontSize(13)),
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
+    return Card(
+      elevation: 0,
+      color: colorScheme.surfaceContainerLow,
+      surfaceTintColor: Colors.transparent,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(context.scale(16)),
+        side: BorderSide(color: colorScheme.outlineVariant, width: 1),
       ),
-    );
-  }
-}
-
-class RoleChip extends StatelessWidget {
-  final String label;
-  final bool isSelected;
-  final VoidCallback onTap;
-
-  const RoleChip({
-    super.key,
-    required this.label,
-    required this.isSelected,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(20),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-        decoration: BoxDecoration(
-          color: isSelected ? const Color(0xFF0E86D4) : const Color(0xFF1B263B),
-          borderRadius: BorderRadius.circular(20),
-        ),
-        child: Text(
-          label,
-          style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+      child: InkWell(
+        onTap: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(builder: (context) => EmployeeDetailsPage(employeeId: employee.id)),
+          );
+        },
+        borderRadius: BorderRadius.circular(context.scale(16)),
+        child: Padding(
+          padding: EdgeInsets.symmetric(horizontal: context.md),
+          child: Row(
+            children: [
+              CircleAvatar(
+                radius: context.scale(20),
+                backgroundColor: colorScheme.primaryContainer,
+                child: Text(employee.name[0].toUpperCase(), style: TextStyle(color: colorScheme.onPrimaryContainer, fontWeight: FontWeight.bold, fontSize: context.font(14))),
+              ),
+              SizedBox(width: context.md),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Text(
+                      employee.name,
+                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: context.font(14), color: colorScheme.onSurface),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    Text(
+                      employee.email ?? employee.role, // Use email if available, else role
+                      style: TextStyle(color: colorScheme.onSurfaceVariant, fontSize: context.font(12)),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
+                ),
+              ),
+              Icon(Icons.chevron_right_rounded, size: context.scale(20), color: colorScheme.onSurfaceVariant),
+            ],
+          ),
         ),
       ),
     );

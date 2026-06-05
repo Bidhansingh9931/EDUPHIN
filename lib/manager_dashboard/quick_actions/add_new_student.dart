@@ -5,9 +5,13 @@ import 'package:eduphin/models/academic_data.dart';
 import 'package:eduphin/models/class.dart';
 import 'package:eduphin/models/new_student.dart';
 import 'package:eduphin/models/section.dart';
+import 'package:eduphin/services/common_widgets.dart';
+import 'package:eduphin/services/responsive_helper.dart';
+import 'package:eduphin/services/caching_service.dart';
+import 'package:eduphin/services/error_handler.dart';
 import 'package:eduphin/services/api_service.dart';
 import 'package:file_picker/file_picker.dart';
-import 'package:http/http.dart' as http;
+import 'package:image_picker/image_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
@@ -20,7 +24,11 @@ class AddNewStudentPage extends StatefulWidget {
 
 class _AddNewStudentPageState extends State<AddNewStudentPage> {
   final _formKey = GlobalKey<FormState>();
-  late Future<AcademicData> _academicDataFuture;
+  
+  AcademicData? _academicData;
+  bool _isLoading = true;
+  Object? _error;
+  final String _cacheKey = 'manager_academic_data';
 
   final _newStudent = NewStudent();
   bool _isSubmitting = false;
@@ -31,18 +39,50 @@ class _AddNewStudentPageState extends State<AddNewStudentPage> {
   @override
   void initState() {
     super.initState();
-    _academicDataFuture = _fetchAcademicData();
+    _loadData();
   }
 
-  Future<AcademicData> _fetchAcademicData() async {
+  Future<void> _loadData() async {
+    await _loadCachedData();
+    await _fetchAcademicData();
+  }
+
+  Future<void> _loadCachedData() async {
+    final cachedData = await CacheService.getCache(_cacheKey);
+    if (cachedData != null) {
+      if (mounted) {
+        setState(() {
+          final List<dynamic> classData = cachedData['data'];
+          _classes = classData.map((data) => Class.fromJson(data)).toList();
+          _academicData = AcademicData(classes: _classes);
+          _isLoading = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _fetchAcademicData() async {
+    if (_academicData == null) {
+      setState(() {
+        _isLoading = true;
+        _error = null;
+      });
+    }
     try {
       final response = await ApiService.get('manager/classes');
       if (response.statusCode == 200) {
         final responseBody = jsonDecode(response.body);
         if (responseBody['status'] == true) {
+          await CacheService.setCache(_cacheKey, responseBody);
           List<dynamic> classData = responseBody['data'];
-          List<Class> classes = classData.map((data) => Class.fromJson(data)).toList();
-          return AcademicData(classes: classes);
+          if (mounted) {
+            setState(() {
+              _classes = classData.map((data) => Class.fromJson(data)).toList();
+              _academicData = AcademicData(classes: _classes);
+              _isLoading = false;
+              _error = null;
+            });
+          }
         } else {
           throw Exception('Failed to load academic data: ${responseBody['message']}');
         }
@@ -51,16 +91,50 @@ class _AddNewStudentPageState extends State<AddNewStudentPage> {
         throw Exception('Failed to load academic data: ${responseBody['message'] ?? 'Server error with status code ${response.statusCode}'}');
       }
     } catch (e) {
-      throw Exception('An error occurred while fetching academic data: ${e.toString().replaceFirst("Exception: ", "")}');
+      if (mounted) {
+        setState(() {
+          _error = e;
+          _isLoading = _academicData == null;
+        });
+        ErrorHandler.showError(context, e);
+      }
+    }
+  }
+
+  Future<void> _pickImage(void Function(AppFile file) onFilePicked, {bool compress = true}) async {
+    final ImagePicker picker = ImagePicker();
+    final XFile? image = await picker.pickImage(
+      source: ImageSource.gallery,
+      maxWidth: compress ? 1024 : null,
+      maxHeight: compress ? 1024 : null,
+      imageQuality: compress ? 80 : null,
+    );
+
+    if (image != null) {
+      final bytes = await image.readAsBytes();
+      setState(() {
+        onFilePicked(AppFile(
+          name: image.name,
+          path: kIsWeb ? null : image.path,
+          bytes: bytes,
+        ));
+      });
     }
   }
 
   Future<void> _pickFile(void Function(AppFile file) onFilePicked) async {
-    FilePickerResult? result = await FilePicker.platform.pickFiles(type: FileType.any);
+    FilePickerResult? result = await FilePicker.platform.pickFiles(
+      type: FileType.any,
+      withData: true, // Crucial for Web to get bytes
+    );
     if (result != null) {
       final file = result.files.single;
       setState(() {
-        onFilePicked(AppFile(name: file.name, path: kIsWeb ? null : file.path, bytes: file.bytes));
+        onFilePicked(AppFile(
+          name: file.name,
+          path: kIsWeb ? null : file.path,
+          bytes: file.bytes,
+        ));
       });
     }
   }
@@ -77,21 +151,17 @@ class _AddNewStudentPageState extends State<AddNewStudentPage> {
     setState(() => _isSubmitting = true);
 
     try {
-      final responseData = await _addStudent(_newStudent);
+      await ApiService.addStudent(_newStudent);
       if (!mounted) {
         return;
       }
-      final message = responseData['message'] ?? 'Student added successfully!';
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message), backgroundColor: theme.colorScheme.primary));
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: const Text('Student added successfully!'), backgroundColor: theme.colorScheme.primary));
       Navigator.of(context).pop(true);
     } catch (e) {
       if (!mounted) {
         return;
       }
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(e.toString().replaceFirst("Exception: ", "")),
-            backgroundColor: theme.colorScheme.error),
-      );
+      ErrorHandler.showError(context, e);
     } finally {
       if (mounted) {
         setState(() => _isSubmitting = false);
@@ -99,130 +169,80 @@ class _AddNewStudentPageState extends State<AddNewStudentPage> {
     }
   }
 
-  Future<void> _addFileToRequest(
-      http.MultipartRequest request, String field, AppFile? file) async {
-    if (file == null) {
-      return;
-    }
-    if (kIsWeb && file.bytes != null) {
-      request.files.add(
-          http.MultipartFile.fromBytes(field, file.bytes!, filename: file.name));
-    } else if (!kIsWeb && file.path != null) {
-      request.files.add(await http.MultipartFile.fromPath(field, file.path!));
-    }
-  }
-
-  Future<Map<String, dynamic>> _addStudent(NewStudent student) async {
-    final url = Uri.parse('${ApiService.baseUrl}/api/manager/students');
-    final token = await ApiService.getToken();
-    if (token == null) {
-      throw Exception("Authentication token not found.");
-    }
-
-    try {
-      var request = http.MultipartRequest('POST', url);
-      request.headers.addAll({
-        'Accept': 'application/json',
-        'Authorization': 'Bearer $token',
-      });
-
-      request.fields.addAll({
-        'first_name': student.firstName,
-        'student_roll_no': student.rollNo,
-        'registration_no': student.registrationNo,
-        'email': student.email,
-        'password': student.password,
-        'class_id': student.classId.toString(),
-        'section_id': student.sectionId.toString(),
-        'dob': DateFormat('yyyy-MM-dd').format(student.dob!),
-        'gender': student.gender!,
-        'middle_name': student.middleName,
-        'last_name': student.lastName,
-        'phone': student.phone,
-        'alternate_phone': student.altPhone,
-        'address': student.address,
-        'city': student.city,
-        'district': student.district,
-        'state': student.state,
-        'pincode': student.pincode,
-        'blood_group': student.bloodGroup ?? '',
-        'nationality': student.nationality,
-        'admission_date': student.admissionDate != null
-            ? DateFormat('yyyy-MM-dd').format(student.admissionDate!)
-            : '',
-        'lateral_admission': student.lateralAdmission ?? '',
-        'admission_category': student.admissionCategory ?? '',
-        'student_status': student.studentStatus ?? '',
-        'aadhaar_no': student.aadhaarNumber,
-        'father_name': student.fatherName,
-        'father_occupation': student.fatherOccupation,
-        'father_phone': student.fatherPhone,
-        'mother_name': student.motherName,
-        'mother_occupation': student.motherOccupation,
-        'mother_phone': student.motherPhone,
-        'guardian_name': student.guardianName,
-        'guardian_relation': student.guardianRelation,
-        'guardian_phone': student.guardianPhone,
-        'allergies': student.allergies,
-        'medications': student.medications,
-      });
-
-      await _addFileToRequest(request, 'profile_image', student.profileImage);
-      await _addFileToRequest(request, 'aadhar_file', student.aadhaarFile);
-      await _addFileToRequest(request, 'doc_10th_marksheet', student.marksheet10);
-      await _addFileToRequest(request, 'doc_12th_marksheet', student.marksheet12);
-      await _addFileToRequest(
-          request, 'doc_transfer_certificate', student.transferCertificate);
-      await _addFileToRequest(request, 'doc_id_proof', student.idProof);
-
-      final streamedResponse =
-          await request.send().timeout(const Duration(seconds: 30));
-      final response = await http.Response.fromStream(streamedResponse);
-      final responseBody = jsonDecode(response.body);
-
-      if (response.statusCode == 201 && responseBody['status'] == true) {
-        return responseBody;
-      } else {
-        throw Exception(responseBody['message'] ??
-            'Failed to add student. Status: ${response.statusCode}');
-      }
-    } on TimeoutException {
-      throw Exception('Connection timed out. Please try again.');
-    } on http.ClientException {
-      throw Exception(
-          'Could not connect to the server. Check your network connection and the server address.');
-    } catch (e) {
-      throw Exception('An unexpected error occurred: ${e.toString()}');
-    }
-  }
+  // Removed _addFileToRequest and _addStudent as they are moved to ApiService
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
+    final theme = context.theme;
     return Scaffold(
       backgroundColor: theme.scaffoldBackgroundColor,
-      appBar: AppBar(title: const Text("Add New Student"), centerTitle: true),
+      appBar: AppBar(
+        title: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text("Add New Student", style: theme.appBarTheme.titleTextStyle?.copyWith(fontSize: context.font(18))),
+            Text("Register a new student to the institution", style: theme.textTheme.labelSmall?.copyWith(color: theme.hintColor, fontSize: context.font(11))),
+          ],
+        ),
+        centerTitle: false,
+      ),
       floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
-      floatingActionButton: _buildActionButtons(theme),
-      body: FutureBuilder<AcademicData>(
-        future: _academicDataFuture,
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
-          } else if (snapshot.hasError) {
-            return Center(
-                child: Text(
-                    "Error: ${snapshot.error.toString().replaceFirst("Exception: ", "")}"));
-          } else if (snapshot.hasData) {
-            _classes = snapshot.data!.classes;
-            return _buildForm(theme, snapshot.data!);
-          } else {
-            return const Center(child: Text("No academic data available."));
-          }
-        },
+      floatingActionButton: _isLoading && _academicData == null ? null : _buildActionButtons(theme),
+      body: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 800),
+          child: LoadingWrapper(
+            isLoading: _isLoading,
+            hasData: _academicData != null,
+            error: _error,
+            onRetry: _fetchAcademicData,
+            skeleton: _buildSkeleton(),
+            child: _academicData != null ? _buildForm(theme, _academicData!) : const SizedBox.shrink(),
+          ),
+        ),
       ),
     );
   }
+
+  Widget _buildSkeleton() {
+    return SingleChildScrollView(
+      padding: context.pagePadding.copyWith(bottom: context.scale(120)),
+      child: Column(
+        children: List.generate(
+          3,
+          (index) => Card(
+            margin: EdgeInsets.only(bottom: context.scale(16)),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(context.scale(12))),
+            child: Padding(
+              padding: EdgeInsets.all(context.scale(16)),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  SkeletonBox(height: context.scale(20), width: context.scale(150)),
+                  SizedBox(height: context.scale(16)),
+                  ...List.generate(
+                    3,
+                    (i) => Padding(
+                      padding: EdgeInsets.only(bottom: context.scale(16)),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          SkeletonBox(height: context.scale(14), width: context.scale(100)),
+                          SizedBox(height: context.scale(8)),
+                          SkeletonBox(height: context.scale(48), borderRadius: context.scale(10)),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
 
   Widget _buildForm(ThemeData theme, AcademicData academicData) {
     return SingleChildScrollView(
@@ -275,24 +295,24 @@ class _AddNewStudentPageState extends State<AddNewStudentPage> {
             isOptional: true),
         _buildTextField(theme, "Last Name", (val) => _newStudent.lastName = val),
         _buildFilePicker(theme, "Profile Image", _newStudent.profileImage,
-            (file) => setState(() => _newStudent.profileImage = file)),
+            (file) => setState(() => _newStudent.profileImage = file), isImage: true, isOptional: true),
         _buildTextField(
             theme, "Aadhaar Number", (val) => _newStudent.aadhaarNumber = val,
-            keyboardType: TextInputType.number),
+            keyboardType: TextInputType.number, isOptional: true),
         _buildFilePicker(theme, "Aadhaar File", _newStudent.aadhaarFile,
-            (file) => setState(() => _newStudent.aadhaarFile = file)),
+            (file) => setState(() => _newStudent.aadhaarFile = file), isImage: true, isOptional: true),
         _buildFilePicker(theme, "10th Marksheet", _newStudent.marksheet10,
-            (file) => setState(() => _newStudent.marksheet10 = file)),
+            (file) => setState(() => _newStudent.marksheet10 = file), isImage: true, isOptional: true),
         _buildFilePicker(
             theme, "12th Marksheet", _newStudent.marksheet12, (file) => setState(() => _newStudent.marksheet12 = file),
-            isOptional: true),
+            isOptional: true, isImage: true),
         _buildFilePicker(
             theme,
             "Transfer Certificate",
             _newStudent.transferCertificate,
-            (file) => setState(() => _newStudent.transferCertificate = file)),
+            (file) => setState(() => _newStudent.transferCertificate = file), isImage: true, isOptional: true),
         _buildFilePicker(theme, "ID Proof", _newStudent.idProof,
-            (file) => setState(() => _newStudent.idProof = file)),
+            (file) => setState(() => _newStudent.idProof = file), isImage: true, isOptional: true),
         _buildTextField(theme, "Roll No", (val) => _newStudent.rollNo = val),
         _buildTextField(
             theme, "Registration No", (val) => _newStudent.registrationNo = val),
@@ -317,8 +337,24 @@ class _AddNewStudentPageState extends State<AddNewStudentPage> {
             _newStudent.sectionId,
             _sectionsForSelectedClass,
             (val) => setState(() => _newStudent.sectionId = val)),
+        _buildDropdown<String>(
+            theme,
+            "Academic Session",
+            _newStudent.academicSession,
+            data.academicSessions
+                .map((e) => DropdownMenuItem(value: e, child: Text(e)))
+                .toList(),
+            (val) => setState(() => _newStudent.academicSession = val)),
+        _buildDropdown<String>(
+            theme,
+            "Academic Year",
+            _newStudent.academicYear,
+            data.academicYears
+                .map((e) => DropdownMenuItem(value: e, child: Text(e)))
+                .toList(),
+            (val) => setState(() => _newStudent.academicYear = val)),
         _buildDatePicker(theme, "Admission Date", _newStudent.admissionDate,
-            (date) => setState(() => _newStudent.admissionDate = date), isOptional: true),
+            (date) => setState(() => _newStudent.admissionDate = date)),
         _buildDropdown<String>(
             theme,
             "Lateral Admission",
@@ -326,7 +362,7 @@ class _AddNewStudentPageState extends State<AddNewStudentPage> {
             data.lateralAdmissionOptions
                 .map((e) => DropdownMenuItem(value: e, child: Text(e)))
                 .toList(),
-            (val) => setState(() => _newStudent.lateralAdmission = val)),
+            (val) => setState(() => _newStudent.lateralAdmission = val), isOptional: true),
         _buildDropdown<String>(
             theme,
             "Admission Category",
@@ -334,7 +370,7 @@ class _AddNewStudentPageState extends State<AddNewStudentPage> {
             data.admissionCategories
                 .map((e) => DropdownMenuItem(value: e, child: Text(e)))
                 .toList(),
-            (val) => setState(() => _newStudent.admissionCategory = val)),
+            (val) => setState(() => _newStudent.admissionCategory = val), isOptional: true),
         _buildDropdown<String>(
             theme,
             "Student Status",
@@ -370,9 +406,9 @@ class _AddNewStudentPageState extends State<AddNewStudentPage> {
               'O+',
               'O-'
             ].map((e) => DropdownMenuItem(value: e, child: Text(e))).toList(),
-            (val) => setState(() => _newStudent.bloodGroup = val)),
+            (val) => setState(() => _newStudent.bloodGroup = val), isOptional: true),
         _buildTextField(
-            theme, "Nationality", (val) => _newStudent.nationality = val),
+            theme, "Nationality", (val) => _newStudent.nationality = val, isOptional: true),
         _buildTextField(theme, "Phone", (val) => _newStudent.phone = val,
             keyboardType: TextInputType.phone),
         _buildTextField(
@@ -398,6 +434,7 @@ class _AddNewStudentPageState extends State<AddNewStudentPage> {
         _buildTextField(theme, "City", (val) => _newStudent.city = val),
         _buildTextField(theme, "District", (val) => _newStudent.district = val),
         _buildTextField(theme, "State", (val) => _newStudent.state = val),
+        _buildTextField(theme, "Country", (val) => _newStudent.country = val, initialValue: _newStudent.country),
         _buildTextField(theme, "Pincode", (val) => _newStudent.pincode = val,
             keyboardType: TextInputType.number),
       ];
@@ -406,17 +443,17 @@ class _AddNewStudentPageState extends State<AddNewStudentPage> {
         _buildTextField(
             theme, "Father's Name", (val) => _newStudent.fatherName = val),
         _buildTextField(theme, "Father's Occupation",
-            (val) => _newStudent.fatherOccupation = val),
+            (val) => _newStudent.fatherOccupation = val, isOptional: true),
         _buildTextField(
             theme, "Father's Phone", (val) => _newStudent.fatherPhone = val,
-            keyboardType: TextInputType.phone),
+            keyboardType: TextInputType.phone, isOptional: true),
         _buildTextField(
-            theme, "Mother's Name", (val) => _newStudent.motherName = val),
+            theme, "Mother's Name", (val) => _newStudent.motherName = val, isOptional: true),
         _buildTextField(theme, "Mother's Occupation",
-            (val) => _newStudent.motherOccupation = val),
+            (val) => _newStudent.motherOccupation = val, isOptional: true),
         _buildTextField(
             theme, "Mother's Phone", (val) => _newStudent.motherPhone = val,
-            keyboardType: TextInputType.phone),
+            keyboardType: TextInputType.phone, isOptional: true),
         _buildTextField(
             theme, "Guardian's Name", (val) => _newStudent.guardianName = val,
             isOptional: true),
@@ -436,7 +473,8 @@ class _AddNewStudentPageState extends State<AddNewStudentPage> {
       ];
 
   Widget _buildTextField(ThemeData theme, String label, ValueChanged<String> onChanged,
-      {String? Function(String?)? validator,
+      {String? initialValue,
+      String? Function(String?)? validator,
       bool isOptional = false,
       bool isPassword = false,
       int maxLines = 1,
@@ -444,9 +482,22 @@ class _AddNewStudentPageState extends State<AddNewStudentPage> {
     return Padding(
         padding: const EdgeInsets.only(bottom: 16.0),
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Text(label, style: theme.textTheme.labelLarge),
+          Text.rich(
+            TextSpan(
+              text: label,
+              style: theme.textTheme.labelLarge,
+              children: [
+                if (!isOptional)
+                  TextSpan(
+                    text: ' *',
+                    style: TextStyle(color: theme.colorScheme.error),
+                  ),
+              ],
+            ),
+          ),
           const SizedBox(height: 8),
           TextFormField(
+              initialValue: initialValue,
               onChanged: onChanged,
               maxLines: maxLines,
               keyboardType: keyboardType,
@@ -470,14 +521,26 @@ class _AddNewStudentPageState extends State<AddNewStudentPage> {
   }
 
   Widget _buildDropdown<T>(ThemeData theme, String label, T? value,
-      List<DropdownMenuItem<T>> items, ValueChanged<T?> onChanged) {
+      List<DropdownMenuItem<T>> items, ValueChanged<T?> onChanged, {bool isOptional = false}) {
     return Padding(
         padding: const EdgeInsets.only(bottom: 16.0),
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Text(label, style: theme.textTheme.labelLarge),
+          Text.rich(
+            TextSpan(
+              text: label,
+              style: theme.textTheme.labelLarge,
+              children: [
+                if (!isOptional)
+                  TextSpan(
+                    text: ' *',
+                    style: TextStyle(color: theme.colorScheme.error),
+                  ),
+              ],
+            ),
+          ),
           const SizedBox(height: 8),
           DropdownButtonFormField<T>(
-              value: value,
+              initialValue: value,
               items: items,
               onChanged: onChanged,
               decoration: InputDecoration(
@@ -491,22 +554,23 @@ class _AddNewStudentPageState extends State<AddNewStudentPage> {
                     borderRadius: BorderRadius.circular(10),
                     borderSide: BorderSide(color: theme.dividerColor),
                   )),
-              validator: (val) => val == null ? 'Please select a $label' : null),
+              validator: isOptional ? null : (val) => val == null ? 'Please select a $label' : null),
         ]));
   }
 
   Widget _buildClassDropdown(ThemeData theme, String label, int? value,
-      List<Class> items, ValueChanged<int?> onChanged) {
+      List<Class> items, ValueChanged<int?> onChanged, {bool isOptional = false}) {
     return _buildDropdown<int>(
         theme,
         label,
         value,
         items.map((e) => DropdownMenuItem(value: e.id, child: Text(e.name))).toList(),
-        onChanged);
+        onChanged,
+        isOptional: isOptional);
   }
 
   Widget _buildSectionDropdown(ThemeData theme, String label, int? value,
-      List<Section> items, ValueChanged<int?> onChanged) {
+      List<Section> items, ValueChanged<int?> onChanged, {bool isOptional = false}) {
     return _buildDropdown<int>(
         theme,
         label,
@@ -514,7 +578,8 @@ class _AddNewStudentPageState extends State<AddNewStudentPage> {
         items
             .map((e) => DropdownMenuItem(value: e.id, child: Text(e.name)))
             .toList(),
-        onChanged);
+        onChanged,
+        isOptional: isOptional);
   }
 
   Widget _buildDatePicker(ThemeData theme, String label, DateTime? date,
@@ -522,7 +587,19 @@ class _AddNewStudentPageState extends State<AddNewStudentPage> {
     return Padding(
         padding: const EdgeInsets.only(bottom: 16.0),
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Text(label, style: theme.textTheme.labelLarge),
+          Text.rich(
+            TextSpan(
+              text: label,
+              style: theme.textTheme.labelLarge,
+              children: [
+                if (!isOptional)
+                  TextSpan(
+                    text: ' *',
+                    style: TextStyle(color: theme.colorScheme.error),
+                  ),
+              ],
+            ),
+          ),
           const SizedBox(height: 8),
           FormField<DateTime>(
               initialValue: date,
@@ -563,23 +640,35 @@ class _AddNewStudentPageState extends State<AddNewStudentPage> {
 
   Widget _buildFilePicker(ThemeData theme, String label, AppFile? file,
       ValueChanged<AppFile> onFilePicked,
-      {bool isOptional = false}) {
-    final controller = TextEditingController(text: file?.name ?? "No file chosen");
+      {bool isOptional = false, bool isImage = false}) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 16.0),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(label, style: theme.textTheme.labelLarge),
+          Text.rich(
+            TextSpan(
+              text: label,
+              style: theme.textTheme.labelLarge,
+              children: [
+                if (!isOptional)
+                  TextSpan(
+                    text: ' *',
+                    style: TextStyle(color: theme.colorScheme.error),
+                  ),
+              ],
+            ),
+          ),
           const SizedBox(height: 8),
           TextFormField(
+            key: ValueKey(file?.name ?? "none"),
+            initialValue: file?.name ?? "No file chosen",
             readOnly: true,
-            controller: controller,
             decoration: InputDecoration(
               filled: true,
               suffixIcon: IconButton(
                   icon: Icon(Icons.upload_file, color: theme.colorScheme.primary),
-                  onPressed: () => _pickFile(onFilePicked)),
+                  onPressed: () => isImage ? _pickImage(onFilePicked) : _pickFile(onFilePicked)),
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(10),
                 borderSide: BorderSide(color: theme.dividerColor),
@@ -684,3 +773,4 @@ class _AddNewStudentPageState extends State<AddNewStudentPage> {
     });
   }
 }
+

@@ -2,6 +2,11 @@
 // import 'package:eduphin/moderator_dashboard/all_review.dart';
 // import 'package:eduphin/moderator_dashboard/all_testimonials.dart';
 import 'package:eduphin/moderator_dashboard/dashboard_cards/active_institutes/institutes.dart';
+import 'package:eduphin/moderator_dashboard/dashboard_cards/events.dart';
+import 'package:eduphin/moderator_dashboard/dashboard_cards/role_distribution.dart';
+import 'package:eduphin/moderator_dashboard/dashboard_cards/students.dart';
+import 'package:eduphin/moderator_dashboard/dashboard_cards/accounts.dart';
+import 'package:eduphin/services/api_service.dart';
 import 'package:flutter/material.dart';
 
 import 'dashboard_cards/testimonials_page.dart';
@@ -31,14 +36,14 @@ class Review {
   final String school;
   final double rating;
   final String review;
-  final String avatarAsset;
+  final String? avatarUrl;
 
   Review({
     required this.name,
     required this.school,
     required this.rating,
     required this.review,
-    required this.avatarAsset,
+    this.avatarUrl,
   });
 
   // The API response doesn't contain detailed reviews, so this will be populated with placeholder data.
@@ -48,7 +53,7 @@ class Review {
       school: json['school'] ?? 'N/A',
       rating: (json['rating'] as num?)?.toDouble() ?? 0.0,
       review: json['review'] ?? '',
-      avatarAsset: json['avatarAsset'] ?? '',
+      avatarUrl: json['image'] != null ? ApiService.getStorageUrl(json['image']) : null,
     );
   }
 }
@@ -56,21 +61,21 @@ class Testimonial {
   final String name;
   final String school;
   final String review;
-  final String avatarAsset;
+  final String? imageUrl;
 
   Testimonial({
     required this.name,
     required this.school,
     required this.review,
-    required this.avatarAsset,
+    this.imageUrl,
   });
 
   factory Testimonial.fromJson(Map<String, dynamic> json) {
     return Testimonial(
       name: json['name'] ?? 'N/A',
-      school: json['school'] ?? 'N/A',
-      review: json['review'] ?? '',
-      avatarAsset: json['avatarAsset'] ?? '',
+      school: json['designation'] ?? 'N/A',
+      review: json['message'] ?? '',
+      imageUrl: json['image'] != null ? ApiService.getStorageUrl(json['image']) : null,
     );
   }
 }
@@ -148,7 +153,9 @@ class DashboardData {
   final String dataUsage;
   final String systemUptime;
   final List<RecentActivity> recentActivities;
-   final List<Testimonial> testimonials;
+  final List<Testimonial> testimonials;
+  final String userName;
+  final String userPhoto;
 
   DashboardData({
     required this.gridItems,
@@ -158,17 +165,22 @@ class DashboardData {
     required this.systemUptime,
     required this.recentActivities,
     required this.testimonials,
+    this.userName = 'User',
+    this.userPhoto = '',
   });
 
-  factory DashboardData.fromJson(Map<String, dynamic> json) {
+  factory DashboardData.fromJson(Map<String, dynamic> json, {Map<String, dynamic>? profileJson}) {
     final roles = (json['roles'] as List<dynamic>? ?? []).cast<Map<String, dynamic>>();
     final List<GridItem> gridItems = [];
 
     // Manually add institutes to the grid items
     final int institutesCount = (json['counts'] as Map<String, dynamic>?)?['institutes'] ?? 0;
     gridItems.add(GridItem(tag: 'institutes', icon: Icons.school, value: institutesCount.toString(), title: 'Institutes', percentage: 0, isPositive: true, page: const InstitutesPage()));
-      final int testimonialCount = (json['counts'] as Map<String, dynamic>?)?['testimonials'] ?? 0;
+    final int testimonialCount = (json['counts'] as Map<String, dynamic>?)?['testimonials'] ?? 0;
     gridItems.add(GridItem(tag: 'testimonials', icon: Icons.comment, value: testimonialCount.toString(), title: 'Testimonials', percentage: 0, isPositive: true, page: const TestimonialsPage()));
+
+    final int eventsCount = (json['counts'] as Map<String, dynamic>?)?['events'] ?? 0;
+    gridItems.add(GridItem(tag: 'events', icon: Icons.event, value: eventsCount.toString(), title: 'Events', percentage: 0, isPositive: true, page: const EventsPage()));
 
 
     for (var role in roles) {
@@ -182,23 +194,35 @@ class DashboardData {
           title: roleName,
           percentage: 0,
           isPositive: true,
-          page: Container(), // Replace with actual page later
+          page: _getPageForRole(roleName), 
         ),
       );
     }
-    
+
     final activitiesList = (json['recent_activities'] as List<dynamic>? ?? []).cast<Map<String, dynamic>>();
     final recentActivities = activitiesList.map((i) => RecentActivity.fromJson(i)).toList();
 
-    final List<Review> reviews = List.generate(testimonialCount, (index) => Review(
-      name: 'User ${index + 1}',
-      school: 'Eduphin Institute',
-      rating: 5.0,
-      review: 'This is a great platform!',
-      avatarAsset: '',
-    ));
- final testimonialsList = (json['testimonials'] as List<dynamic>? ?? []).cast<Map<String, dynamic>>();
+    final List<Review> reviews = (json['testimonials'] as List<dynamic>? ?? [])
+        .take(5)
+        .map((i) => Review(
+              name: i['name'] ?? 'Anonymous',
+              school: i['designation'] ?? 'Eduphin Institute',
+              rating: 5.0,
+              review: i['message'] ?? 'Great platform!',
+              avatarUrl: i['image'] != null ? ApiService.getStorageUrl(i['image']) : null,
+            ))
+        .toList();
+
+    final testimonialsList = (json['testimonials'] as List<dynamic>? ?? []).cast<Map<String, dynamic>>();
     final testimonials = testimonialsList.map((i) => Testimonial.fromJson(i)).toList();
+
+    String name = 'User';
+    String photo = '';
+    if (profileJson != null) {
+      name = profileJson['user']?['name'] ?? 'User';
+      photo = profileJson['details']?['photo'] ?? '';
+    }
+
     return DashboardData(
       gridItems: gridItems,
       reviews: reviews,
@@ -207,7 +231,27 @@ class DashboardData {
       systemUptime: json['uptime']?.toString() ?? 'N/A',
       recentActivities: recentActivities,
       testimonials: testimonials,
+      userName: name,
+      userPhoto: photo,
     );
+  }
+
+  static Widget _getPageForRole(String roleName) {
+    switch (roleName) {
+      case 'Students':
+        return const StudentsPage(instituteId: '1'); 
+      case 'Teachers':
+      case 'Librarian':
+      case 'Accountants':
+      case 'Staff':
+      case 'Counselors':
+      case 'Institute Manager':
+      case 'Moderator':
+      case 'Super Admin':
+        return const AccountsPage(instituteId: '1');
+      default:
+        return const RoleDistributionPage();
+    }
   }
 
   static IconData _getIconForRole(String roleName) {

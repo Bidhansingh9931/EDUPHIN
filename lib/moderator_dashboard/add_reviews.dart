@@ -1,5 +1,7 @@
-
+import 'package:eduphin/services/error_handler.dart';
+import 'package:eduphin/services/responsive_helper.dart';
 import 'package:flutter/material.dart';
+import 'package:eduphin/services/common_widgets.dart';
 import 'add_review_model.dart';
 import 'add_review_provider.dart';
 
@@ -41,160 +43,142 @@ class _AddReviewsPageState extends State<AddReviewsPage> {
 
       try {
         await _addReviewProvider.submitReview(submission);
-
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Review submitted successfully!')),
-        );
-        _formKey.currentState!.reset();
-        _fullNameController.clear();
-        _designationController.clear();
-        _messageController.clear();
-
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Review submitted successfully!'), backgroundColor: Colors.green),
+          );
+          Navigator.pop(context, true);
+        }
       } catch (e) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to submit review: $e')),
-        );
+        if (mounted) {
+          ErrorHandler.showError(context, e);
+        }
       } finally {
-        setState(() {
-          _isLoading = false;
-        });
+        if (mounted) {
+          setState(() {
+            _isLoading = false;
+          });
+        }
       }
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
+    final theme = context.theme;
+    final colorScheme = theme.colorScheme;
+
     return Scaffold(
       appBar: AppBar(
-        title: const Text(
-          "Add Reviews",
-          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-        ),
+        title: const Text("Write a Review"),
       ),
-      body: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Form(
-          key: _formKey,
-          child: SingleChildScrollView(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Center(
-                  child: Stack(
-                    alignment: Alignment.bottomRight,
-                    children: [
-                      ClipRRect(
-                          borderRadius: BorderRadius.circular(50),
-                          child: Image.asset("assets/images/girl_image.webp",
-                              width: 100, height: 100, fit: BoxFit.cover)),
-                      Container(
-                          width: 30,
-                          height: 30,
-                          decoration: BoxDecoration(
-                            color: theme.primaryColor,
-                            borderRadius: BorderRadius.circular(15),
+      body: SingleChildScrollView(
+        padding: context.pagePadding,
+        child: Center(
+          child: ConstrainedBox(
+            constraints: BoxConstraints(maxWidth: context.scale(800)),
+            child: Form(
+              key: _formKey,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Center(
+                    child: ProfileAvatar(
+                      radius: context.scale(50),
+                      imageUrl: null, // No image yet
+                      onCameraTap: () {
+                        // Image picking logic would go here
+                      },
+                    ),
+                  ),
+                  SizedBox(height: context.scale(32)),
+                  Card(
+                    child: Padding(
+                      padding: EdgeInsets.all(context.scale(24.0)),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text("Reviewer Information", style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold, fontSize: context.font(16))),
+                          SizedBox(height: context.scale(24)),
+                          _buildFieldLabel(theme, "Full Name"),
+                          SizedBox(height: context.scale(8)),
+                          TextFormField(
+                            controller: _fullNameController,
+                            validator: (value) => value == null || value.isEmpty ? 'Required' : null,
+                            decoration: const InputDecoration(
+                              prefixIcon: Icon(Icons.person_outline_rounded),
+                              hintText: "e.g. Amelia Johnson",
+                            ),
                           ),
-                          child: Icon(
-                            Icons.camera_alt_rounded,
-                            color: theme.colorScheme.onPrimary,
-                            size: 20,
-                          )),
-                    ],
-                  ),
-                ),
-                const SizedBox(
-                  height: 30,
-                ),
-                Text("Full Name", style: theme.textTheme.titleMedium),
-                const SizedBox(height: 10),
-                TextFormField(
-                  controller: _fullNameController,
-                  validator: (value) {
-                    if (value == null || value.isEmpty) {
-                      return 'Please enter a full name';
-                    }
-                    return null;
-                  },
-                  decoration: InputDecoration(
-                    prefixIcon: const Icon(Icons.person),
-                    hintText: "Amelia Johnson",
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(
-                        10,
+                          SizedBox(height: context.scale(24)),
+                          _buildFieldLabel(theme, "Designation / Role"),
+                          SizedBox(height: context.scale(8)),
+                          TextFormField(
+                            controller: _designationController,
+                            validator: (value) => value == null || value.isEmpty ? 'Required' : null,
+                            decoration: const InputDecoration(
+                              prefixIcon: Icon(Icons.badge_outlined),
+                              hintText: "e.g. Parent, Grade 10",
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                   ),
-                ),
-                const SizedBox(
-                  height: 20,
-                ),
-                Text("Designation", style: theme.textTheme.titleMedium),
-                const SizedBox(height: 10),
-                TextFormField(
-                  controller: _designationController,
-                  validator: (value) {
-                    if (value == null || value.isEmpty) {
-                      return 'Please enter a designation';
-                    }
-                    return null;
-                  },
-                  decoration: InputDecoration(
-                    prefixIcon: const Icon(Icons.connect_without_contact),
-                    hintText: "Parent, Grade 10",
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(
-                        10,
+                  SizedBox(height: context.scale(24)),
+                  Card(
+                    child: Padding(
+                      padding: EdgeInsets.all(context.scale(24.0)),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text("Your Feedback", style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold, fontSize: context.font(16))),
+                          SizedBox(height: context.scale(24)),
+                          TextFormField(
+                            controller: _messageController,
+                            validator: (value) => value == null || value.isEmpty ? 'Required' : null,
+                            maxLines: 5,
+                            decoration: const InputDecoration(
+                              hintText: "Share your thoughts about the institute...",
+                              alignLabelWithHint: true,
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                   ),
-                ),
-                const SizedBox(
-                  height: 20,
-                ),
-                Text("Message", style: theme.textTheme.titleMedium),
-                const SizedBox(height: 10),
-                TextFormField(
-                  controller: _messageController,
-                  validator: (value) {
-                    if (value == null || value.isEmpty) {
-                      return 'Please enter a message';
-                    }
-                    return null;
-                  },
-                  maxLines: 5,
-                  decoration: InputDecoration(
-                      alignLabelWithHint: true,
-                      prefixIcon: const Padding(
-                        padding: EdgeInsets.only(bottom: 90, left: 10),
-                        child: Icon(
-                          Icons.message,
-                          size: 30,
-                        ),
-                      ),
-                      hintText: "Enter review message here...",
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(10),
-                      )),
-                ),
-                const SizedBox(
-                  height: 20,
-                ),
-                SizedBox(
-                    height: 50,
+                  SizedBox(height: context.scale(32)),
+                  SizedBox(
                     width: double.infinity,
-                    child: ElevatedButton(
-                        onPressed: _isLoading ? null : _submitReview,
-                        child: _isLoading
-                            ? const CircularProgressIndicator()
-                            : const Text("Send Reviews",
-                                style: TextStyle(
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: 15)))),
-              ],
+                    child: ElevatedButton.icon(
+                      onPressed: _isLoading ? null : _submitReview,
+                      icon: _isLoading
+                        ? SizedBox(width: context.scale(20), height: context.scale(20), child: CircularProgressIndicator(strokeWidth: 2, color: colorScheme.onPrimary))
+                        : Icon(Icons.send_rounded, size: context.scale(20)),
+                      label: Text(_isLoading ? "Submitting..." : "SUBMIT REVIEW", style: TextStyle(fontSize: context.font(14))),
+                      style: ElevatedButton.styleFrom(
+                        padding: EdgeInsets.symmetric(vertical: context.scale(18)),
+                      ),
+                    ),
+                  ),
+                  SizedBox(height: context.scale(50)),
+                ],
+              ),
             ),
           ),
         ),
+      ),
+    );
+  }
+
+  Widget _buildFieldLabel(ThemeData theme, String label) {
+    return Text(
+      label,
+      style: theme.textTheme.bodySmall?.copyWith(
+        fontWeight: FontWeight.bold,
+        color: theme.hintColor,
+        letterSpacing: 1.1,
+        fontSize: context.font(12),
       ),
     );
   }

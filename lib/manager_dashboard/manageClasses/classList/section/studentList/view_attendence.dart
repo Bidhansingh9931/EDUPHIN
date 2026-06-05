@@ -2,6 +2,10 @@ import 'dart:async';
 import 'dart:convert';
 
 import 'package:eduphin/services/api_service.dart';
+import 'package:eduphin/services/error_handler.dart';
+import 'package:eduphin/services/caching_service.dart';
+import 'package:eduphin/services/common_widgets.dart';
+import 'package:eduphin/services/responsive_helper.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
@@ -133,17 +137,12 @@ class ViewAttendancePageState extends State<ViewAttendancePage> {
       } else {
         throw Exception('Failed to load attendance data. Status Code: ${response.statusCode}');
       }
-    } on TimeoutException {
+    } catch (e) {
       if (mounted) {
         setState(() {
-          _error = "The connection timed out. Please try again.";
+          _error = ErrorHandler.getMessage(e);
         });
-      }
-    } on Exception catch (e) {
-      if (mounted) {
-        setState(() {
-          _error = e.toString().replaceFirst('Exception: ', '');
-        });
+        ErrorHandler.showError(context, e);
       }
     } finally {
       if (mounted) {
@@ -170,75 +169,54 @@ class ViewAttendancePageState extends State<ViewAttendancePage> {
   }
 
   Widget _buildBody() {
-    final theme = Theme.of(context);
-    if (_isLoading) {
-      return const Center(child: CircularProgressIndicator());
-    }
-    if (_error.isNotEmpty) {
-      return Center(
-        child: Padding(
-          padding: const EdgeInsets.all(16.0),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Text(
-                _error,
-                textAlign: TextAlign.center,
-                style: TextStyle(color: theme.colorScheme.error),
+    return LoadingWrapper(
+      isLoading: _isLoading,
+      hasData: _studentDetails != null,
+      error: _error.isEmpty ? null : _error,
+      onRetry: _fetchAttendanceData,
+      skeleton: const Center(child: CircularProgressIndicator()),
+      child: _studentDetails == null 
+          ? const SizedBox.shrink()
+          : Padding(
+              padding: const EdgeInsets.fromLTRB(16, 16, 16, 50),
+              child: Column(
+                children: [
+                  StudentInfoCard(details: _studentDetails!),
+                  const SizedBox(height: 16),
+                  Expanded(
+                    child: _attendanceRecords.isEmpty
+                        ? const Center(child: Text("No attendance records found."))
+                        : LayoutBuilder(builder: (context, constraints) {
+                            if (constraints.maxWidth > 600) {
+                              return GridView.builder(
+                                itemCount: _attendanceRecords.length,
+                                gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
+                                  maxCrossAxisExtent: 400,
+                                  mainAxisSpacing: 10,
+                                  crossAxisSpacing: 10,
+                                  childAspectRatio: 3,
+                                ),
+                                itemBuilder: (context, index) {
+                                  return AttendanceRecordCard(
+                                      record: _attendanceRecords[index]);
+                                },
+                              );
+                            } else {
+                              return ListView.separated(
+                                itemCount: _attendanceRecords.length,
+                                separatorBuilder: (context, index) =>
+                                    const SizedBox(height: 10),
+                                itemBuilder: (context, index) {
+                                  return AttendanceRecordCard(
+                                      record: _attendanceRecords[index]);
+                                },
+                              );
+                            }
+                          }),
+                  ),
+                ],
               ),
-              const SizedBox(height: 16),
-              ElevatedButton(
-                onPressed: _fetchAttendanceData,
-                child: const Text("Retry"),
-              )
-            ],
-          ),
-        ),
-      );
-    }
-    if (_studentDetails == null) {
-      return const Center(child: Text("No student details found."));
-    }
-
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 16, 16, 50),
-      child: Column(
-        children: [
-          StudentInfoCard(details: _studentDetails!),
-          const SizedBox(height: 16),
-          Expanded(
-            child: _attendanceRecords.isEmpty
-                ? const Center(child: Text("No attendance records found."))
-                : LayoutBuilder(builder: (context, constraints) {
-                    if (constraints.maxWidth > 600) {
-                      return GridView.builder(
-                        itemCount: _attendanceRecords.length,
-                        gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
-                          maxCrossAxisExtent: 400,
-                          mainAxisSpacing: 10,
-                          crossAxisSpacing: 10,
-                          childAspectRatio: 3,
-                        ),
-                        itemBuilder: (context, index) {
-                          return AttendanceRecordCard(
-                              record: _attendanceRecords[index]);
-                        },
-                      );
-                    } else {
-                      return ListView.separated(
-                        itemCount: _attendanceRecords.length,
-                        separatorBuilder: (context, index) =>
-                            const SizedBox(height: 10),
-                        itemBuilder: (context, index) {
-                          return AttendanceRecordCard(
-                              record: _attendanceRecords[index]);
-                        },
-                      );
-                    }
-                  }),
-          ),
-        ],
-      ),
+            ),
     );
   }
 }

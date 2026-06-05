@@ -1,10 +1,14 @@
 import 'dart:async';
 import 'dart:convert';
+import 'package:eduphin/manager_dashboard/manageClasses/classList/class_list.dart';
 import 'package:eduphin/services/api_service.dart';
+import 'package:eduphin/services/error_handler.dart';
+import 'package:eduphin/services/responsive_helper.dart';
 import 'package:flutter/material.dart';
 
 class CreateNewClassPage extends StatefulWidget {
-  const CreateNewClassPage({super.key});
+  final Class? classToEdit;
+  const CreateNewClassPage({super.key, this.classToEdit});
 
   @override
   State<StatefulWidget> createState() => _CreateNewClassPageState();
@@ -12,14 +16,26 @@ class CreateNewClassPage extends StatefulWidget {
 
 class _CreateNewClassPageState extends State<CreateNewClassPage> {
   final _formKey = GlobalKey<FormState>();
-  final _classNameController = TextEditingController();
-  final _classCodeController = TextEditingController();
-  final _descriptionController = TextEditingController();
+  late TextEditingController _classNameController;
+  late TextEditingController _classCodeController;
+  late TextEditingController _descriptionController;
   String? _selectedLevel;
   final List<String> _levels = ['Primary', 'Secondary', 'Sr. Sec', 'Graduation'];
   bool _isLoading = false;
 
-  Future<void> _createClass() async {
+  @override
+  void initState() {
+    super.initState();
+    _classNameController = TextEditingController(text: widget.classToEdit?.name);
+    _classCodeController = TextEditingController(text: widget.classToEdit?.code);
+    _descriptionController = TextEditingController(text: widget.classToEdit?.description);
+    _selectedLevel = widget.classToEdit?.level;
+    if (_selectedLevel != null && !_levels.contains(_selectedLevel)) {
+      _selectedLevel = null;
+    }
+  }
+
+  Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) {
       return;
     }
@@ -36,51 +52,30 @@ class _CreateNewClassPageState extends State<CreateNewClassPage> {
         'level': _selectedLevel!,
       };
 
-      final response = await ApiService.post('manager/classes', classData);
+      final response = widget.classToEdit == null
+          ? await ApiService.post('manager/classes', classData)
+          : await ApiService.put('manager/classes/${widget.classToEdit!.id}', classData);
+
       final responseData = jsonDecode(response.body);
 
       if (mounted) {
-        final theme = Theme.of(context);
-        if (response.statusCode == 201 && responseData['status'] == true) {
+        final theme = context.theme;
+        if ((response.statusCode == 201 || response.statusCode == 200) && responseData['status'] == true) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text(responseData['message'] ?? 'Class created successfully!'),
+              content: Text(responseData['message'] ?? (widget.classToEdit == null ? 'Class created successfully!' : 'Class updated successfully!')),
               backgroundColor: theme.colorScheme.primary,
             ),
           );
           Navigator.pop(context, true); // Pop with a true result to indicate success
         } else {
-          throw Exception(responseData['message'] ?? 'Failed to create class.');
+          throw Exception(responseData['message'] ?? 'Failed to process request.');
         }
       }
-    } on TimeoutException {
-      if (!mounted) return;
-      final theme = Theme.of(context);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: const Text('The connection timed out. Please check your network and try again.'),
-          backgroundColor: theme.colorScheme.error,
-        ),
-      );
-    } on Exception catch (e) {
-      if (!mounted) return;
-      final theme = Theme.of(context);
-      final message = e.toString().replaceFirst('Exception: ', '');
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(message),
-          backgroundColor: theme.colorScheme.error,
-        ),
-      );
     } catch (e) {
-      if (!mounted) return;
-      final theme = Theme.of(context);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('An unexpected error occurred: $e'),
-          backgroundColor: theme.colorScheme.error,
-        ),
-      );
+      if (mounted) {
+        ErrorHandler.showError(context, e);
+      }
     } finally {
       if (mounted) {
         setState(() {
@@ -100,99 +95,112 @@ class _CreateNewClassPageState extends State<CreateNewClassPage> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
+    final theme = context.theme;
+    final isEditing = widget.classToEdit != null;
+
     return Scaffold(
-      backgroundColor: theme.scaffoldBackgroundColor,
+      backgroundColor: theme.colorScheme.surface,
       appBar: AppBar(
-        title: const Text("Create New Class"),
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        leading: IconButton(
+          icon: Icon(Icons.arrow_back, color: theme.colorScheme.onSurface),
+          onPressed: () => Navigator.pop(context),
+        ),
+        title: Text(
+          isEditing ? "Edit Class" : "Create New Class",
+          style: TextStyle(
+            fontWeight: FontWeight.bold,
+            color: theme.colorScheme.onSurface,
+            fontSize: context.font(20),
+          ),
+        ),
         centerTitle: true,
       ),
       body: SingleChildScrollView(
-        padding: const EdgeInsets.fromLTRB(16, 16, 16, 50),
+        padding: EdgeInsets.fromLTRB(context.scale(16), context.scale(16), context.scale(16), context.scale(100)),
         child: Center(
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 500), // Limit form width
+          child: Container(
+            constraints: BoxConstraints(maxWidth: context.responsive(double.infinity, tablet: 600, desktop: 800)),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(context.scale(16)),
+              color: theme.colorScheme.surfaceContainerLow,
+              border: Border.all(color: theme.colorScheme.outlineVariant),
+            ),
+            padding: EdgeInsets.all(context.scale(20)),
             child: Form(
               key: _formKey,
-              child: Container(
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(10),
-                  color: theme.primaryColor,
-                ),
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    _buildTextField(
-                      theme: theme,
-                      controller: _classNameController,
-                      label: "Class Name",
-                      hint: "e.g., Class X",
-                      validator: (value) =>
-                          value!.isEmpty ? 'Please enter a class name' : null,
-                    ),
-                    const SizedBox(height: 16),
-                    _buildTextField(
-                      theme: theme,
-                      controller: _classCodeController,
-                      label: "Class Code",
-                      hint: "e.g., C-X",
-                      validator: (value) =>
-                          value!.isEmpty ? 'Please enter a class code' : null,
-                    ),
-                    const SizedBox(height: 16),
-                    _buildTextField(
-                      theme: theme,
-                      controller: _descriptionController,
-                      label: "Description (Optional)",
-                      hint: "Enter a short description for the class",
-                      maxLines: 5,
-                    ),
-                    const SizedBox(height: 16),
-                    _buildDropdownField(theme),
-                    const SizedBox(height: 24),
-                    // --- Responsive Button Row ---
-                    Row(
-                      children: [
-                        Expanded(
-                          child: OutlinedButton(
-                            onPressed: () => Navigator.of(context).pop(),
-                            style: OutlinedButton.styleFrom(
-                              padding: const EdgeInsets.symmetric(vertical: 16),
-                              foregroundColor: theme.colorScheme.onPrimary,
-                              side: BorderSide(color: theme.dividerColor),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(12),
-                              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _buildTextField(
+                    theme: theme,
+                    controller: _classNameController,
+                    label: "Class Name",
+                    hint: "e.g., Class X",
+                    validator: (value) =>
+                        value!.isEmpty ? 'Please enter a class name' : null,
+                  ),
+                  SizedBox(height: context.scale(16)),
+                  _buildTextField(
+                    theme: theme,
+                    controller: _classCodeController,
+                    label: "Class Code",
+                    hint: "e.g., C-X",
+                    validator: (value) =>
+                        value!.isEmpty ? 'Please enter a class code' : null,
+                  ),
+                  SizedBox(height: context.scale(16)),
+                  _buildTextField(
+                    theme: theme,
+                    controller: _descriptionController,
+                    label: "Description (Optional)",
+                    hint: "Enter a short description for the class",
+                    maxLines: 5,
+                  ),
+                  SizedBox(height: context.scale(16)),
+                  _buildDropdownField(theme),
+                  SizedBox(height: context.scale(32)),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: OutlinedButton(
+                          onPressed: () => Navigator.of(context).pop(),
+                          style: OutlinedButton.styleFrom(
+                            padding: EdgeInsets.symmetric(vertical: context.scale(16)),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(context.scale(12)),
                             ),
-                            child: const Text("Cancel"),
+                            side: BorderSide(color: theme.colorScheme.outlineVariant),
                           ),
+                          child: Text("Cancel", style: TextStyle(color: theme.colorScheme.onSurface, fontSize: context.font(16), fontWeight: FontWeight.w600)),
                         ),
-                        const SizedBox(width: 16),
-                        Expanded(
-                          child: ElevatedButton(
-                            onPressed: _isLoading ? null : _createClass,
-                            style: ElevatedButton.styleFrom(
-                              padding: const EdgeInsets.symmetric(vertical: 16),
-                              backgroundColor: theme.colorScheme.primaryContainer,
-                              foregroundColor: theme.colorScheme.onPrimaryContainer,
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(12),
-                              ),
+                      ),
+                      SizedBox(width: context.scale(16)),
+                      Expanded(
+                        child: ElevatedButton(
+                          onPressed: _isLoading ? null : _submit,
+                          style: ElevatedButton.styleFrom(
+                            padding: EdgeInsets.symmetric(vertical: context.scale(16)),
+                            backgroundColor: theme.colorScheme.primary,
+                            foregroundColor: theme.colorScheme.onPrimary,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(context.scale(12)),
                             ),
-                            child: _isLoading
-                                ? const SizedBox(
-                                    height: 24,
-                                    width: 24,
-                                    child: CircularProgressIndicator(strokeWidth: 3),
-                                  )
-                                : const Text("Create Class"),
+                            elevation: 0,
                           ),
+                          child: _isLoading
+                              ? SizedBox(
+                                  height: context.scale(24),
+                                  width: context.scale(24),
+                                  child: CircularProgressIndicator(strokeWidth: 3, color: theme.colorScheme.onPrimary),
+                                )
+                              : Text(isEditing ? "Update Class" : "Create Class", style: TextStyle(fontSize: context.font(16), fontWeight: FontWeight.bold)),
                         ),
-                      ],
-                    ),
-                  ],
-                ),
+                      ),
+                    ],
+                  ),
+                ],
               ),
             ),
           ),
@@ -212,27 +220,38 @@ class _CreateNewClassPageState extends State<CreateNewClassPage> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(label, style: theme.textTheme.titleMedium?.copyWith(color: theme.colorScheme.onPrimary)),
-        const SizedBox(height: 8),
+        Text(label, style: TextStyle(color: theme.colorScheme.onSurface, fontWeight: FontWeight.bold, fontSize: context.font(14))),
+        SizedBox(height: context.scale(8)),
         TextFormField(
           controller: controller,
           maxLines: maxLines,
+          style: TextStyle(color: theme.colorScheme.onSurface, fontSize: context.font(14)),
           decoration: InputDecoration(
             hintText: hint,
-            hintStyle: TextStyle(color: theme.hintColor),
+            hintStyle: TextStyle(color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.5), fontSize: context.font(14)),
             filled: true,
-            fillColor: theme.scaffoldBackgroundColor,
+            fillColor: theme.colorScheme.surface,
+            isDense: true,
+            contentPadding: EdgeInsets.all(context.scale(14)),
             border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(10),
-              borderSide: BorderSide.none,
+              borderRadius: BorderRadius.circular(context.scale(10)),
+              borderSide: BorderSide(color: theme.colorScheme.outlineVariant),
+            ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(context.scale(10)),
+              borderSide: BorderSide(color: theme.colorScheme.outlineVariant),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(context.scale(10)),
+              borderSide: BorderSide(color: theme.colorScheme.primary, width: 1.5),
             ),
             errorBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(10),
+              borderRadius: BorderRadius.circular(context.scale(10)),
               borderSide: BorderSide(color: theme.colorScheme.error, width: 1),
             ),
             focusedErrorBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(10),
-              borderSide: BorderSide(color: theme.colorScheme.error, width: 2),
+              borderRadius: BorderRadius.circular(context.scale(10)),
+              borderSide: BorderSide(color: theme.colorScheme.error, width: 1.5),
             ),
           ),
           validator: validator,
@@ -245,17 +264,29 @@ class _CreateNewClassPageState extends State<CreateNewClassPage> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text("Level", style: theme.textTheme.titleMedium?.copyWith(color: theme.colorScheme.onPrimary)),
-        const SizedBox(height: 8),
+        Text("Level", style: TextStyle(color: theme.colorScheme.onSurface, fontWeight: FontWeight.bold, fontSize: context.font(14))),
+        SizedBox(height: context.scale(8)),
         DropdownButtonFormField<String>(
           value: _selectedLevel,
-          hint: Text("Select Level", style: TextStyle(color: theme.hintColor)),
+          dropdownColor: theme.colorScheme.surface,
+          hint: Text("Select Level", style: TextStyle(color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.5), fontSize: context.font(14))),
+          style: TextStyle(color: theme.colorScheme.onSurface, fontSize: context.font(14)),
           decoration: InputDecoration(
             filled: true,
-            fillColor: theme.scaffoldBackgroundColor,
+            fillColor: theme.colorScheme.surface,
+            isDense: true,
+            contentPadding: EdgeInsets.all(context.scale(14)),
             border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(10),
-              borderSide: BorderSide.none,
+              borderRadius: BorderRadius.circular(context.scale(10)),
+              borderSide: BorderSide(color: theme.colorScheme.outlineVariant),
+            ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(context.scale(10)),
+              borderSide: BorderSide(color: theme.colorScheme.outlineVariant),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(context.scale(10)),
+              borderSide: BorderSide(color: theme.colorScheme.primary, width: 1.5),
             ),
           ),
           onChanged: (String? newValue) {

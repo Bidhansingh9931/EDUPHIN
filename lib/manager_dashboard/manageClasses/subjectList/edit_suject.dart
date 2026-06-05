@@ -1,7 +1,9 @@
 import 'dart:convert';
-
+import 'package:eduphin/services/error_handler.dart';
 import 'package:eduphin/manager_dashboard/manageClasses/subjectList/subject_list.dart';
 import 'package:eduphin/services/api_service.dart';
+import 'package:eduphin/services/responsive_helper.dart';
+import 'package:eduphin/teacher/dashboard/common_widgets.dart';
 import 'package:flutter/material.dart';
 
 class UpdateSubjectPage extends StatefulWidget {
@@ -64,9 +66,9 @@ class _UpdateSubjectPageState extends State<UpdateSubjectPage> {
 
       if (response.statusCode == 200 && responseData['status'] == true) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(responseData['message'] ?? 'Subject updated successfully!')),
+          SnackBar(content: Text(responseData['message'] ?? 'Subject updated successfully!'), backgroundColor: context.theme.colorScheme.primary),
         );
-        Navigator.of(context).pop(true); // Pop with success
+        Navigator.of(context).pop(true);
       } else {
         String errorMessage = responseData['message'] ?? 'An unknown error occurred.';
         if (responseData.containsKey('errors')) {
@@ -77,12 +79,7 @@ class _UpdateSubjectPageState extends State<UpdateSubjectPage> {
       }
     } catch (e) {
       if (mounted) {
-        final theme = Theme.of(context);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-              content: Text(e.toString().replaceFirst('Exception: ', '')),
-              backgroundColor: theme.colorScheme.error),
-        );
+        ErrorHandler.showError(context, e);
       }
     } finally {
       if (mounted) {
@@ -104,219 +101,108 @@ class _UpdateSubjectPageState extends State<UpdateSubjectPage> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
+    final theme = context.theme;
     return Scaffold(
-      backgroundColor: theme.scaffoldBackgroundColor,
+      backgroundColor: theme.colorScheme.surface,
       appBar: AppBar(
-        title: const Text("Update Subject"),
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        title: Text(
+          "Update Subject",
+          style: TextStyle(
+            fontWeight: FontWeight.bold,
+            color: theme.colorScheme.onSurface,
+            fontSize: context.font(20),
+          ),
+        ),
         centerTitle: true,
+        leading: IconButton(
+          icon: Icon(Icons.arrow_back, color: theme.colorScheme.onSurface),
+          onPressed: () => Navigator.pop(context),
+        ),
       ),
-      floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
-      floatingActionButton: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16.0),
+      bottomNavigationBar: Container(
+        padding: EdgeInsets.fromLTRB(context.scale(16), context.scale(8), context.scale(16), context.scale(24)),
+        decoration: BoxDecoration(
+          color: theme.colorScheme.surface,
+          border: Border(top: BorderSide(color: theme.colorScheme.outlineVariant)),
+        ),
         child: Row(
           children: [
             Expanded(
               child: OutlinedButton(
                 onPressed: () => Navigator.of(context).pop(),
                 style: OutlinedButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                  foregroundColor: theme.colorScheme.onSurface,
-                  side: BorderSide(color: theme.dividerColor),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
+                  padding: EdgeInsets.symmetric(vertical: context.scale(14)),
+                  side: BorderSide(color: theme.colorScheme.outlineVariant),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(context.scale(12))),
                 ),
-                child: const Text("Cancel"),
+                child: Text("Cancel", style: TextStyle(color: theme.colorScheme.onSurface, fontSize: context.font(16), fontWeight: FontWeight.w600)),
               ),
             ),
-            const SizedBox(width: 16),
+            SizedBox(width: context.scale(16)),
             Expanded(
               child: ElevatedButton(
                 onPressed: _isSaving ? null : _updateSubject,
                 style: ElevatedButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(vertical: 16),
+                  padding: EdgeInsets.symmetric(vertical: context.scale(14)),
                   backgroundColor: theme.colorScheme.primary,
                   foregroundColor: theme.colorScheme.onPrimary,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
+                  elevation: 0,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(context.scale(12))),
                 ),
                 child: _isSaving
-                    ? const SizedBox(
-                        height: 24,
-                        width: 24,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 3,
-                        ),
-                      )
-                    : const Text("Update Subject"),
+                    ? SizedBox(height: context.scale(20), width: context.scale(20), child: CircularProgressIndicator(strokeWidth: 2, color: theme.colorScheme.onPrimary))
+                    : Text("Update Subject", style: TextStyle(fontSize: context.font(16), fontWeight: FontWeight.bold)),
               ),
             ),
           ],
         ),
       ),
       body: SingleChildScrollView(
-        padding: const EdgeInsets.fromLTRB(16, 16, 16, 120),
+        padding: context.pagePadding,
         child: Center(
           child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 700),
+            constraints: const BoxConstraints(maxWidth: 600),
             child: Form(
               key: _formKey,
-              child: Container(
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(10),
-                  color: theme.primaryColor,
-                ),
-                padding: const EdgeInsets.all(16),
-                child: LayoutBuilder(
-                  builder: (context, constraints) {
-                    final isWide = constraints.maxWidth > 500;
-                    return isWide ? _buildWideLayout(theme) : _buildNarrowLayout(theme);
-                  },
-                ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    "Subject Details",
+                    style: TextStyle(color: theme.colorScheme.onSurface, fontWeight: FontWeight.bold, fontSize: context.font(18)),
+                  ),
+                  SizedBox(height: context.scale(4)),
+                  Text(
+                    "Update the information below for this subject.",
+                    style: theme.textTheme.labelSmall?.copyWith(color: theme.hintColor, fontSize: context.font(11)),
+                  ),
+                  SizedBox(height: context.scale(24)),
+                  buildFilterCard(
+                    context,
+                    children: [
+                      buildLabel(context, "Subject Name"),
+                      buildTextField(context, _nameController, "Enter Subject Name"),
+                      buildLabel(context, "Subject Code"),
+                      buildTextField(context, _codeController, "Enter Subject Code"),
+                      buildLabel(context, "Description (Optional)"),
+                      buildTextField(context, _descriptionController, "Enter a brief description...", maxLines: 4),
+                      buildLabel(context, "Credit"),
+                      buildTextField(context, _creditController, "Enter Subject Credit"),
+                      buildLabel(context, "Type"),
+                      buildDropdown(context, ['Theory', 'Practical', 'Applied'], _selectedType, (val) => setState(() => _selectedType = val)),
+                      buildLabel(context, "Status"),
+                      buildDropdown(context, ['Active', 'Inactive'], _selectedStatus, (val) => setState(() => _selectedStatus = val)),
+                      SizedBox(height: context.scale(16)),
+                    ],
+                  ),
+                ],
               ),
             ),
           ),
         ),
       ),
-    );
-  }
-
-  Widget _buildNarrowLayout(ThemeData theme) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        _buildTextField(theme, "Subject Name", _nameController, "Enter Subject Name", validator: (v) => v!.isEmpty ? 'This field is required' : null),
-        const SizedBox(height: 16),
-        _buildTextField(theme, "Subject Code", _codeController, "Enter Subject Code", validator: (v) => v!.isEmpty ? 'This field is required' : null),
-        const SizedBox(height: 16),
-        _buildTextField(theme, "Description (Optional)", _descriptionController, "Enter a brief description...", maxLines: 4, validator: null),
-        const SizedBox(height: 16),
-        _buildTextField(theme, "Credit", _creditController, "Enter Subject Credit", keyboardType: TextInputType.number, validator: (v) => v!.isEmpty ? 'This field is required' : null),
-        const SizedBox(height: 16),
-        _buildDropdownField(theme, "Type", _selectedType, ['Theory', 'Practical', 'Applied'], (val) => setState(() => _selectedType = val)),
-        const SizedBox(height: 16),
-        _buildDropdownField(theme, "Status", _selectedStatus, ['Active', 'Inactive'], (val) => setState(() => _selectedStatus = val)),
-        const SizedBox(height: 80), // Padding for FAB
-      ],
-    );
-  }
-
-  Widget _buildWideLayout(ThemeData theme) {
-    return Column(
-      children: [
-        Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Expanded(
-                child: _buildTextField(
-                    theme, "Subject Name", _nameController, "Enter Subject Name", validator: (v) => v!.isEmpty ? 'This field is required' : null)),
-            const SizedBox(width: 16),
-            Expanded(
-                child: _buildTextField(
-                    theme, "Subject Code", _codeController, "Enter Subject Code", validator: (v) => v!.isEmpty ? 'This field is required' : null)),
-          ],
-        ),
-        const SizedBox(height: 16),
-        _buildTextField(theme, "Description (Optional)", _descriptionController, "Enter a brief description...", maxLines: 3, validator: null),
-        const SizedBox(height: 16),
-        Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Expanded(
-                child: _buildTextField(
-                    theme, "Credit", _creditController, "Enter Subject Credit", keyboardType: TextInputType.number, validator: (v) => v!.isEmpty ? 'This field is required' : null)),
-            const SizedBox(width: 16),
-            Expanded(
-                child: _buildDropdownField(theme, "Type", _selectedType, ['Theory', 'Practical', 'Applied'], (val) => setState(() => _selectedType = val))),
-            const SizedBox(width: 16),
-            Expanded(
-                child: _buildDropdownField(theme, "Status", _selectedStatus, ['Active', 'Inactive'], (val) => setState(() => _selectedStatus = val))),
-          ],
-        ),
-        const SizedBox(height: 80), // Padding for FAB
-      ],
-    );
-  }
-
-  Widget _buildTextField(
-    ThemeData theme,
-    String label,
-    TextEditingController controller,
-    String hint, {
-    int maxLines = 1,
-    TextInputType? keyboardType,
-    String? Function(String?)? validator,
-  }) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(label,
-            style: theme.textTheme.titleMedium
-                ?.copyWith(color: theme.colorScheme.onPrimary)),
-        const SizedBox(height: 8),
-        TextFormField(
-          controller: controller,
-          maxLines: maxLines,
-          keyboardType: keyboardType,
-          decoration: InputDecoration(
-            hintText: hint,
-            hintStyle: TextStyle(color: theme.hintColor),
-            filled: true,
-            fillColor: theme.scaffoldBackgroundColor,
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(10),
-              borderSide: BorderSide.none,
-            ),
-            errorBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(10),
-              borderSide: BorderSide(color: theme.colorScheme.error, width: 1),
-            ),
-            focusedErrorBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(10),
-              borderSide: BorderSide(color: theme.colorScheme.error, width: 2),
-            ),
-          ),
-          validator: validator,
-        ),
-      ],
-    );
-  }
-
-  Widget _buildDropdownField(
-    ThemeData theme,
-    String label,
-    String? value,
-    List<String> items,
-    ValueChanged<String?> onChanged,
-  ) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(label,
-            style: theme.textTheme.titleMedium
-                ?.copyWith(color: theme.colorScheme.onPrimary)),
-        const SizedBox(height: 8),
-        DropdownButtonFormField<String>(
-          value: value,
-          items: items
-              .map((String item) =>
-                  DropdownMenuItem<String>(value: item, child: Text(item)))
-              .toList(),
-          onChanged: onChanged,
-          decoration: InputDecoration(
-            filled: true,
-            fillColor: theme.scaffoldBackgroundColor,
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(10),
-              borderSide: BorderSide.none,
-            ),
-          ),
-          validator: (value) =>
-              value == null ? 'Please make a selection' : null,
-        ),
-      ],
     );
   }
 }

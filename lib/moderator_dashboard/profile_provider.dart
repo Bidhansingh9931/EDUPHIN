@@ -1,35 +1,35 @@
+import 'package:eduphin/services/error_handler.dart';
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'dart:typed_data';
 
 import 'package:eduphin/services/api_service.dart';
 import 'package:flutter/material.dart';
-import 'package:http/http.dart' as http;
 import 'package:path_provider/path_provider.dart';
 import 'package:permission_handler/permission_handler.dart';
 
 import 'profile_model.dart';
+import 'cache_helper.dart';
 
 class ProfileProvider {
-  final String _profileApiUrl = "${ApiService.baseUrl}/api/moderator/profile";
+  static const String _cacheKey = 'profile_data';
 
-  Future<ProfileData> fetchProfileData() async {
-    final String? token = await ApiService.getToken();
-    if (token == null) {
-      throw Exception("Authentication token not found.");
+  Future<ProfileData?> getCachedProfileData() async {
+    final cached = await CacheHelper.load(_cacheKey);
+    if (cached != null) {
+      return ProfileData.fromMap(cached);
     }
+    return null;
+  }
 
-    final headers = {
-      'Authorization': 'Bearer $token',
-      'Accept': 'application/json',
-    };
-
+  Future<ProfileData> fetchProfileData({bool bypassCache = false}) async {
     try {
-      debugPrint("Fetching profile data from: $_profileApiUrl");
-      final response = await http.get(
-        Uri.parse(_profileApiUrl),
-        headers: headers,
-      ).timeout(const Duration(seconds: 20));
+      if (!bypassCache) {
+        final cached = await getCachedProfileData();
+        if (cached != null) return cached;
+      }
+      final response = await ApiService.get('moderator/profile');
 
       if (response.statusCode == 200) {
         debugPrint("Profile API Response received.");
@@ -48,124 +48,89 @@ class ProfileProvider {
             ..addAll(userMap)
             ..addAll(detailsMap);
 
+          // Save to cache
+          await CacheHelper.save(_cacheKey, combinedData);
+
           return ProfileData.fromMap(combinedData);
         } else {
-          throw Exception("Profile data from server has an unexpected format.");
+          throw ApiException("Received invalid data from server.");
         }
       } else {
-        debugPrint(
-            "Failed to load profile. Status: ${response.statusCode}, Body: ${response.body}");
-        throw Exception(
-            "Failed to load profile data. Check the URL and server logs.");
+        throw ApiException("Failed to load profile data", statusCode: response.statusCode);
       }
-    } on TimeoutException {
-      throw Exception("Connection timed out. Please check your network.");
+    } on SocketException {
+      throw NetworkException();
     } catch (e) {
+      if (e is ApiException || e is NetworkException) rethrow;
       debugPrint("An error occurred fetching profile: $e");
-      throw Exception("An error occurred: $e");
+      throw Exception('An unexpected error occurred: $e');
     }
   }
 
-  Future<void> saveProfileData(ProfileData data) async {
-    final String? token = await ApiService.getToken();
-    if (token == null) {
-      throw Exception("Authentication token not found.");
-    }
-
-    // Correct endpoint for updating the profile
-    final String updateUrl = "$_profileApiUrl/update";
-
-    final headers = {
-      'Authorization': 'Bearer $token',
-      'Accept': 'application/json',
-    };
-
+  Future<void> saveProfileData(Map<String, String> fields, {File? photo, Uint8List? webImage, String? fileName}) async {
     try {
-      debugPrint("Saving profile data to: $updateUrl using POST (multipart/form-data).");
-
-      final request = http.MultipartRequest('POST', Uri.parse(updateUrl));
-      request.headers.addAll(headers);
-
-      // No method spoofing needed if the backend route is POST
-      // request.fields['_method'] = 'PUT';
-
-      final Map<String, dynamic> fields = data.toMap();
-
-      fields.forEach((key, value) {
-        request.fields[key] = value?.toString() ?? '';
-      });
-
-      final streamedResponse = await request.send().timeout(const Duration(seconds: 20));
-      final response = await http.Response.fromStream(streamedResponse);
-
-      if (response.statusCode == 422) { // Handle validation errors specifically
-        final responseBody = jsonDecode(response.body);
-        final errors = responseBody['errors'] as Map<String, dynamic>;
-        String errorMessage = responseBody['message'] ?? "Validation failed!";
-        // Extract and format error messages
-        final errorDetails = errors.entries.map((e) => '${e.key}: ${e.value.join(', ')}').join('\n');
-        throw Exception('$errorMessage\n$errorDetails');
-      } else if (response.statusCode != 200) {
-        debugPrint("Failed to save profile. Status: ${response.statusCode}, Body: ${response.body}");
-        throw Exception("Failed to save profile. Server responded with status ${response.statusCode}");
-      }
-
-      debugPrint("Profile saved successfully. Response: ${response.body}");
-
-    } on TimeoutException {
-      throw Exception("Connection timed out. Please check your network.");
-    } catch (e) {
-      debugPrint("An error occurred saving profile: $e");
-      // Re-throw the original exception to preserve its type and message
-      rethrow;
-    }
-  }
-
-    Future<String> downloadProfileData() async {
-    try {
-      debugPrint("Starting profile download...");
-      if (Platform.isAndroid) {
-        debugPrint("Requesting storage permission...");
-        final status = await Permission.storage.request();
-        debugPrint("Permission status: $status");
-        if (status != PermissionStatus.granted) {
-          throw Exception("Storage permission not granted. Status was $status");
+      if (photo != null || webImage != null) {
+        if (webImage != null) {
+          await ApiService.updateModeratorProfileFromBytes(fields, webImage, fileName);
+        } else {
+          await ApiService.updateModeratorProfile(fields, photo: photo);
+        }
+      } else {
+        final response = await ApiService.post('moderator/profile/update', fields);
+        if (response.statusCode != 200) {
+          String errorMessage = "Failed to save profile.";
+          try {
+            final responseBody = jsonDecode(response.body);
+            if (response.statusCode == 422 && responseBody['errors'] != null) {
+              final errors = responseBody['errors'] as Map<String, dynamic>;
+              final errorDetails = errors.entries.map((e) => '${e.key}: ${e.value.join(', ')}').join('\n');
+              errorMessage = '${responseBody['message']}\n$errorDetails';
+            } else {
+              errorMessage = responseBody['message'] ?? errorMessage;
+            }
+          } catch (_) {}
+          throw ApiException(errorMessage, statusCode: response.statusCode);
         }
       }
+      // Invalidate cache on success so the next fetch gets fresh data
+      await CacheHelper.clear(_cacheKey);
+    } on SocketException {
+      throw NetworkException();
+    } catch (e) {
+      if (e is ApiException || e is NetworkException) rethrow;
+      debugPrint("An error occurred saving profile: $e");
+      throw Exception('An unexpected error occurred: $e');
+    }
+  }
 
-      debugPrint("Fetching profile data for download...");
+  Future<String> downloadProfileData() async {
+    try {
+      // Permission.storage is removed for Play Store compliance.
+      // On modern Android, the app may not need this for internal storage 
+      // or can use the Photo Picker for media.
+
       final profileData = await fetchProfileData();
-      debugPrint("Profile data fetched successfully.");
-      
-      debugPrint("Encoding data to JSON...");
       const jsonEncoder = JsonEncoder.withIndent('  ');
       final jsonData = jsonEncoder.convert(profileData.toMap());
-      debugPrint("JSON data encoded successfully.");
 
-      debugPrint("Getting downloads directory...");
       final directory = await getDownloadsDirectory();
       if (directory == null) {
         throw Exception("Could not get downloads directory.");
       }
-      debugPrint("Downloads directory: ${directory.path}");
 
       final filePath = '${directory.path}/profile_data.json';
-      debugPrint("File path will be: $filePath");
-
       final file = File(filePath);
-      debugPrint("Writing to file...");
       await file.writeAsString(jsonData);
-      debugPrint("File written successfully.");
 
       return filePath;
-    } catch (e, s) {
+    } catch (e) {
       debugPrint("An error occurred during download: $e");
-      debugPrint("Stack trace: $s");
       rethrow;
     }
   }
 
   Future<void> logout() async {
     await ApiService.logout();
+    await CacheHelper.clearAll();
   }
 }

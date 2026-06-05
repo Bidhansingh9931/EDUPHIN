@@ -5,7 +5,11 @@ import 'dart:ui';
 import 'package:eduphin/manager_dashboard/manageClasses/classList/section/create_new_section.dart';
 import 'package:eduphin/manager_dashboard/manageClasses/classList/section/edit_section.dart';
 import 'package:eduphin/manager_dashboard/manageClasses/classList/section/studentList/student_list.dart';
+import 'package:eduphin/services/error_handler.dart';
 import 'package:eduphin/services/api_service.dart';
+import 'package:eduphin/services/caching_service.dart';
+import 'package:eduphin/services/common_widgets.dart';
+import 'package:eduphin/services/responsive_helper.dart';
 import 'package:flutter/material.dart';
 
 import 'section_model.dart';
@@ -27,19 +31,49 @@ class SectionsPage extends StatefulWidget {
 class _SectionsPageState extends State<SectionsPage> {
   bool _isLoading = true;
   List<Section> _sections = [];
-  String _error = '';
+  Object? _error;
+  static const String _cacheKey = 'manager_classes'; // Sharing cache with ClassListPage
 
   @override
   void initState() {
     super.initState();
+    _loadCachedData();
     _fetchSections();
+  }
+
+  Future<void> _loadCachedData() async {
+    final cachedData = await CacheService.getCache(_cacheKey);
+    if (cachedData != null && mounted) {
+      _processSectionsFromCache(cachedData);
+    }
+  }
+
+  void _processSectionsFromCache(dynamic data) {
+    final List allClasses = data as List? ?? [];
+    final currentClass = allClasses.firstWhere(
+      (classData) => (classData['id'] is int ? classData['id'] : int.tryParse(classData['id'].toString())) == widget.classId,
+      orElse: () => null,
+    );
+
+    if (currentClass != null) {
+      final sectionsData = currentClass['sections'] as List? ?? [];
+      final fetchedSections = sectionsData
+          .map((sectionJson) => Section.fromJson(sectionJson))
+          .toList();
+
+      if (mounted) {
+        setState(() {
+          _sections = fetchedSections;
+        });
+      }
+    }
   }
 
   Future<void> _fetchSections() async {
     if (!mounted) return;
     setState(() {
-      _isLoading = true;
-      _error = '';
+      _isLoading = _sections.isEmpty;
+      _error = null;
     });
 
     try {
@@ -49,9 +83,11 @@ class _SectionsPageState extends State<SectionsPage> {
       final responseData = jsonDecode(response.body);
 
       if (response.statusCode == 200 && responseData['status'] == true) {
-        final allClasses = responseData['data'] as List? ?? [];
+        final List allClasses = responseData['data'] as List? ?? [];
+        await CacheService.setCache(_cacheKey, allClasses);
+        
         final currentClass = allClasses.firstWhere(
-              (classData) => classData['id'] == widget.classId,
+              (classData) => (classData['id'] is int ? classData['id'] : int.tryParse(classData['id'].toString())) == widget.classId,
           orElse: () => null,
         );
 
@@ -64,6 +100,7 @@ class _SectionsPageState extends State<SectionsPage> {
           if (mounted) {
             setState(() {
               _sections = fetchedSections;
+              _isLoading = false;
             });
           }
         } else {
@@ -73,26 +110,22 @@ class _SectionsPageState extends State<SectionsPage> {
         throw Exception(
             responseData['message'] ?? "Failed to fetch sections for class.");
       }
-    } on Exception catch (e) {
+    } catch (e) {
       if (mounted) {
         setState(() {
-          _error = e.toString().replaceFirst('Exception: ', '');
-        });
-      }
-    } finally {
-      if (mounted) {
-        setState(() {
+          _error = e;
           _isLoading = false;
         });
+        ErrorHandler.showError(context, e);
       }
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
+    final theme = context.theme;
     return Scaffold(
-      backgroundColor: theme.scaffoldBackgroundColor,
+      backgroundColor: theme.colorScheme.surface,
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () async {
           final result = await Navigator.push(
@@ -106,69 +139,145 @@ class _SectionsPageState extends State<SectionsPage> {
             _fetchSections(); // Refresh data if a new section was created
           }
         },
-        label: const Text("Create New Section"),
-        icon: const Icon(Icons.add),
+        backgroundColor: theme.colorScheme.primary,
+        foregroundColor: theme.colorScheme.onPrimary,
+        elevation: 2,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(context.scale(16))),
+        label: Text("Create New Section", style: TextStyle(fontSize: context.font(14), fontWeight: FontWeight.bold)),
+        icon: Icon(Icons.add, size: context.scale(20)),
       ),
       floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
       appBar: AppBar(
-        title: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Expanded(
-              child: Text(
-                "Sections for ${widget.className}",
-                overflow: TextOverflow.ellipsis,
-              ),
-            ),
-            const Icon(Icons.menu),
-          ],
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        leading: IconButton(
+          icon: Icon(Icons.arrow_back, color: theme.colorScheme.onSurface),
+          onPressed: () => Navigator.pop(context),
         ),
+        title: Text(
+          "Sections for ${widget.className}",
+          style: TextStyle(
+            fontWeight: FontWeight.bold,
+            color: theme.colorScheme.onSurface,
+            fontSize: context.font(18),
+          ),
+        ),
+        centerTitle: true,
       ),
       body: _buildBody(),
     );
   }
 
   Widget _buildBody() {
-    final theme = Theme.of(context);
-    if (_isLoading) {
-      return const Center(child: CircularProgressIndicator());
-    }
-    if (_error.isNotEmpty) {
-      return Center(child: Text(_error, style: TextStyle(color: theme.colorScheme.error)));
-    }
-    if (_sections.isEmpty) {
-      return const Center(child: Text("No sections found for this class."));
-    }
+    final theme = context.theme;
+    
+    return LoadingWrapper(
+      isLoading: _isLoading,
+      hasData: _sections.isNotEmpty,
+      error: _error,
+      onRetry: _fetchSections,
+      skeleton: _buildSkeleton(),
+      child: RefreshIndicator(
+        onRefresh: _fetchSections,
+        color: theme.colorScheme.primary,
+        child: _sections.isEmpty
+            ? Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(Icons.layers_clear_outlined, size: context.scale(64), color: theme.colorScheme.outlineVariant),
+                    SizedBox(height: context.scale(16)),
+                    Text("No sections found for this class.", style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: context.font(16))),
+                  ],
+                ),
+              )
+            : context.responsive(
+                ListView.separated(
+                  padding: EdgeInsets.fromLTRB(context.scale(16), context.scale(16), context.scale(16), context.scale(100)),
+                  itemCount: _sections.length,
+                  separatorBuilder: (context, index) => SizedBox(height: context.scale(16)),
+                  itemBuilder: (context, index) {
+                    final section = _sections[index];
+                    return SectionCard(section: section, onUpdate: _fetchSections);
+                  },
+                ),
+                tablet: GridView.builder(
+                  padding: EdgeInsets.fromLTRB(context.scale(16), context.scale(16), context.scale(16), context.scale(100)),
+                  itemCount: _sections.length,
+                  gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                    crossAxisCount: 2,
+                    mainAxisSpacing: context.scale(16),
+                    crossAxisSpacing: context.scale(16),
+                    mainAxisExtent: context.scale(200),
+                  ),
+                  itemBuilder: (context, index) {
+                    final section = _sections[index];
+                    return SectionCard(section: section, onUpdate: _fetchSections);
+                  },
+                ),
+                desktop: GridView.builder(
+                  padding: EdgeInsets.fromLTRB(context.scale(16), context.scale(16), context.scale(16), context.scale(100)),
+                  itemCount: _sections.length,
+                  gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                    crossAxisCount: 3,
+                    mainAxisSpacing: context.scale(20),
+                    crossAxisSpacing: context.scale(20),
+                    mainAxisExtent: context.scale(200),
+                  ),
+                  itemBuilder: (context, index) {
+                    final section = _sections[index];
+                    return SectionCard(section: section, onUpdate: _fetchSections);
+                  },
+                ),
+              ),
+      ),
+    );
+  }
 
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        if (constraints.maxWidth > 600) {
-          return GridView.builder(
-            padding: const EdgeInsets.fromLTRB(16, 16, 16, 80),
-            itemCount: _sections.length,
-            gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
-              maxCrossAxisExtent: 400,
-              mainAxisSpacing: 16,
-              crossAxisSpacing: 16,
-              childAspectRatio: 1.5, // Adjust for content
+  Widget _buildSkeleton() {
+    return ListView.separated(
+      padding: EdgeInsets.fromLTRB(context.scale(16), context.scale(16), context.scale(16), context.scale(100)),
+      itemCount: 5,
+      separatorBuilder: (context, index) => SizedBox(height: context.scale(16)),
+      itemBuilder: (context, index) => Container(
+        height: context.scale(200),
+        padding: EdgeInsets.all(context.scale(16)),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(context.scale(16)),
+          border: Border.all(color: context.theme.colorScheme.outlineVariant),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                SkeletonBox(height: context.scale(24), width: context.scale(120)),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    SkeletonBox(height: context.scale(10), width: context.scale(50)),
+                    SizedBox(height: context.scale(4)),
+                    SkeletonBox(height: context.scale(20), width: context.scale(30)),
+                  ],
+                ),
+              ],
             ),
-            itemBuilder: (context, index) {
-              final section = _sections[index];
-              return SectionCard(section: section, onUpdate: _fetchSections);
-            },
-          );
-        } else {
-          return ListView.separated(
-            padding: const EdgeInsets.fromLTRB(16, 16, 16, 80),
-            itemCount: _sections.length,
-            separatorBuilder: (context, index) => const SizedBox(height: 16),
-            itemBuilder: (context, index) {
-              final section = _sections[index];
-              return SectionCard(section: section, onUpdate: _fetchSections);
-            },
-          );
-        }
-      },
+            SizedBox(height: context.scale(8)),
+            SkeletonBox(height: context.scale(14), width: context.scale(150)),
+            const Spacer(),
+            Divider(color: context.theme.colorScheme.outlineVariant, height: context.scale(24)),
+            Row(
+              children: List.generate(3, (index) => Expanded(
+                child: Padding(
+                  padding: EdgeInsets.symmetric(horizontal: context.scale(4)),
+                  child: SkeletonBox(height: context.scale(36), borderRadius: context.scale(8)),
+                ),
+              )),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
@@ -181,48 +290,53 @@ class SectionCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
+    final theme = context.theme;
     return Container(
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(10),
-        color: theme.primaryColor,
+        borderRadius: BorderRadius.circular(context.scale(16)),
+        color: theme.colorScheme.surfaceContainerLow,
+        border: Border.all(color: theme.colorScheme.outlineVariant),
       ),
-      padding: const EdgeInsets.all(16),
+      padding: EdgeInsets.all(context.scale(16)),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(section.name,
-                  style: theme.textTheme.headlineSmall
-                      ?.copyWith(color: theme.colorScheme.onPrimary)),
+              Expanded(
+                child: Text(
+                  section.name,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(color: theme.colorScheme.onSurface, fontWeight: FontWeight.bold, fontSize: context.font(18)),
+                ),
+              ),
               Column(
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
                   Text("Class Limit",
-                      style: theme.textTheme.labelMedium
-                          ?.copyWith(color: theme.colorScheme.primary)),
+                      style: TextStyle(color: theme.colorScheme.primary, fontWeight: FontWeight.bold, fontSize: context.font(10), letterSpacing: 0.5)),
                   Text(section.limit.toString(),
-                      style: theme.textTheme.titleLarge
-                          ?.copyWith(color: theme.colorScheme.onPrimary)),
+                      style: TextStyle(color: theme.colorScheme.onSurface, fontWeight: FontWeight.bold, fontSize: context.font(16))),
                 ],
               )
             ],
           ),
-          Text("Mentor: ${section.mentor}",
-              style: theme.textTheme.bodyLarge?.copyWith(
-                  color: theme.colorScheme.onPrimary.withAlpha(180))),
-          const SizedBox(height: 12),
-          Divider(
-            color: theme.colorScheme.onPrimary.withAlpha(180),
-            thickness: 1,
+          SizedBox(height: context.scale(4)),
+          Text(
+            "Mentor: ${section.mentor}",
+            style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: context.font(13)),
           ),
-          const SizedBox(height: 8),
+          SizedBox(height: context.scale(16)),
+          Divider(color: theme.colorScheme.outlineVariant, height: context.scale(24)),
           Row(
             children: [
               Expanded(
-                child: ElevatedButton.icon(
+                child: _buildActionButton(
+                  context: context,
+                  icon: Icons.edit_outlined,
+                  label: "Edit",
+                  color: theme.colorScheme.primary,
                   onPressed: () async {
                     final result = await Navigator.push(
                         context,
@@ -233,16 +347,15 @@ class SectionCard extends StatelessWidget {
                       onUpdate();
                     }
                   },
-                  style: ElevatedButton.styleFrom(
-                      backgroundColor: theme.colorScheme.primaryContainer,
-                      foregroundColor: theme.colorScheme.onPrimaryContainer),
-                  icon: const Icon(Icons.edit, size: 16),
-                  label: const Text("Edit"),
                 ),
               ),
-              const SizedBox(width: 8),
+              SizedBox(width: context.scale(8)),
               Expanded(
-                child: ElevatedButton.icon(
+                child: _buildActionButton(
+                  context: context,
+                  icon: Icons.people_alt_outlined,
+                  label: "Students",
+                  color: theme.colorScheme.secondary,
                   onPressed: () {
                     Navigator.push(
                         context,
@@ -251,27 +364,54 @@ class SectionCard extends StatelessWidget {
                                 sectionId: section.id,
                                 sectionName: section.name)));
                   },
-                  style: ElevatedButton.styleFrom(
-                      backgroundColor: theme.colorScheme.secondaryContainer,
-                      foregroundColor: theme.colorScheme.onSecondaryContainer),
-                  icon: const Icon(Icons.people_alt_outlined, size: 16),
-                  label: const Text("Students", overflow: TextOverflow.ellipsis),
                 ),
               ),
-              const SizedBox(width: 8),
+              SizedBox(width: context.scale(8)),
               Expanded(
-                child: ElevatedButton.icon(
+                child: _buildActionButton(
+                  context: context,
+                  icon: Icons.delete_outline,
+                  label: "Delete",
+                  color: theme.colorScheme.error,
                   onPressed: () => showDeleteDialog(context, section, onUpdate),
-                  style: ElevatedButton.styleFrom(
-                      backgroundColor: theme.colorScheme.errorContainer,
-                      foregroundColor: theme.colorScheme.onErrorContainer),
-                  icon: const Icon(Icons.delete, size: 16),
-                  label: const Text("Delete"),
                 ),
               ),
             ],
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildActionButton({
+    required BuildContext context,
+    required IconData icon,
+    required String label,
+    required Color color,
+    required VoidCallback onPressed,
+  }) {
+    return InkWell(
+      onTap: onPressed,
+      borderRadius: BorderRadius.circular(context.scale(8)),
+      child: Container(
+        padding: EdgeInsets.symmetric(vertical: context.scale(8)),
+        decoration: BoxDecoration(
+          border: Border.all(color: color.withValues(alpha: 0.5)),
+          borderRadius: BorderRadius.circular(context.scale(8)),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, size: context.scale(16), color: color),
+            SizedBox(height: context.scale(2)),
+            Text(
+              label,
+              style: TextStyle(color: color, fontWeight: FontWeight.bold, fontSize: context.font(10)),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -283,9 +423,9 @@ void showDeleteDialog(
     context: context,
     barrierDismissible: true,
     barrierLabel: "Delete",
-    barrierColor: Theme.of(context).colorScheme.scrim,
+    barrierColor: context.theme.colorScheme.scrim.withValues(alpha: 0.5),
     transitionDuration: const Duration(milliseconds: 200),
-    pageBuilder: (_, __, ___) {
+    pageBuilder: (dialogContext, __, ___) {
       return DeleteSectionDialog(
         section: section,
         onUpdate: onUpdate,
@@ -316,7 +456,7 @@ class _DeleteSectionDialogState extends State<DeleteSectionDialog> {
     try {
       await ApiService.delete('manager/sections/${widget.section.id}');
       if (mounted) {
-        final theme = Theme.of(context);
+        final theme = context.theme;
         Navigator.pop(context);
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -329,9 +469,7 @@ class _DeleteSectionDialogState extends State<DeleteSectionDialog> {
     } catch (e) {
       if (mounted) {
         Navigator.pop(context);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: $e')),
-        );
+        ErrorHandler.showError(context, e);
       }
     } finally {
       if (mounted) {
@@ -342,82 +480,71 @@ class _DeleteSectionDialogState extends State<DeleteSectionDialog> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return Scaffold(
-      backgroundColor: Colors.transparent,
-      body: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 6, sigmaY: 6),
-        child: Center(
-          child: Container(
-            margin: const EdgeInsets.symmetric(horizontal: 24),
-            padding: const EdgeInsets.all(20),
-            decoration: BoxDecoration(
-              color: theme.cardColor,
-              borderRadius: BorderRadius.circular(20),
-            ),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  "Delete Section",
-                  style: theme.textTheme.headlineSmall?.copyWith(
-                    color: theme.colorScheme.onSurface,
-                  ),
-                ),
-                const SizedBox(height: 12),
-                Text(
-                  "Are you sure you want to delete this section: ${widget.section.name}? This action cannot be undone.",
-                  textAlign: TextAlign.center,
-                  style: theme.textTheme.bodyMedium?.copyWith(
-                    color: theme.colorScheme.onSurface.withAlpha(220),
-                  ),
-                ),
-                const SizedBox(height: 24),
-                SizedBox(
-                  width: double.infinity,
-                  child: ElevatedButton(
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: theme.colorScheme.error,
-                      foregroundColor: theme.colorScheme.onError,
-                      padding: const EdgeInsets.symmetric(vertical: 14),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
+    final theme = context.theme;
+    return Center(
+      child: Container(
+        margin: EdgeInsets.symmetric(horizontal: context.scale(24)),
+        padding: EdgeInsets.all(context.scale(20)),
+        decoration: BoxDecoration(
+          color: theme.colorScheme.surface,
+          borderRadius: BorderRadius.circular(context.scale(20)),
+          border: Border.all(color: theme.colorScheme.outlineVariant),
+        ),
+        child: Material(
+          color: Colors.transparent,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.warning_amber_rounded, color: theme.colorScheme.error, size: context.scale(48)),
+              SizedBox(height: context.scale(16)),
+              Text(
+                "Delete Section",
+                style: TextStyle(color: theme.colorScheme.onSurface, fontWeight: FontWeight.bold, fontSize: context.font(20)),
+              ),
+              SizedBox(height: context.scale(12)),
+              Text(
+                "Are you sure you want to delete this section: ${widget.section.name}? This action cannot be undone.",
+                textAlign: TextAlign.center,
+                style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: context.font(14)),
+              ),
+              SizedBox(height: context.scale(24)),
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton(
+                      style: OutlinedButton.styleFrom(
+                        padding: EdgeInsets.symmetric(vertical: context.scale(12)),
+                        side: BorderSide(color: theme.colorScheme.outlineVariant),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(context.scale(12))),
                       ),
+                      onPressed: () => Navigator.pop(context),
+                      child: Text("Cancel", style: TextStyle(color: theme.colorScheme.onSurface, fontWeight: FontWeight.w600)),
                     ),
-                    onPressed: _isDeleting ? null : _deleteSection,
-                    child: _isDeleting
-                        ? const SizedBox(
-                      height: 24,
-                      width: 24,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 3,
-                      ),
-                    )
-                        : const Text("Yes, Delete"),
                   ),
-                ),
-                const SizedBox(height: 12),
-                SizedBox(
-                  width: double.infinity,
-                  child: OutlinedButton(
-                    style: OutlinedButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(vertical: 14),
-                      side: BorderSide(color: theme.dividerColor),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
+                  SizedBox(width: context.scale(12)),
+                  Expanded(
+                    child: ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: theme.colorScheme.error,
+                        foregroundColor: theme.colorScheme.onError,
+                        padding: EdgeInsets.symmetric(vertical: context.scale(12)),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(context.scale(12))),
+                        elevation: 0,
                       ),
+                      onPressed: _isDeleting ? null : _deleteSection,
+                      child: _isDeleting
+                          ? SizedBox(height: context.scale(20), width: context.scale(20), child: CircularProgressIndicator(strokeWidth: 2, color: theme.colorScheme.onError))
+                          : const Text("Delete", style: TextStyle(fontWeight: FontWeight.bold)),
                     ),
-                    onPressed: () {
-                      Navigator.pop(context);
-                    },
-                    child: const Text("Cancel"),
                   ),
-                ),
-              ],
-            ),
+                ],
+              ),
+            ],
           ),
         ),
       ),
     );
   }
 }
+
+

@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:typed_data';
 import 'package:intl/intl.dart';
 
 class NewEmployee {
@@ -31,6 +32,8 @@ class NewEmployee {
   final String? emergencyContactName;
   final String? emergencyContactNumber;
   File? profileImage;
+  Uint8List? webImage;
+  String? imageName;
 
   NewEmployee({
     required this.instituteId,
@@ -62,28 +65,48 @@ class NewEmployee {
     this.emergencyContactName,
     this.emergencyContactNumber,
     this.profileImage,
+    this.webImage,
+    this.imageName,
   });
 
   int? _getRoleId(String? role) {
     if (role == null) return null;
     switch (role.toLowerCase()) {
+      case "moderator":
+        return 2;
       case "institute manager":
         return 3;
-      case "teacher":
+      case "counselors":
+      case "counselor":
         return 4;
-      case "student":
+      case "teacher":
+      case "teachers":
         return 5;
-      case "staff":
+      case "student":
+      case "students":
         return 6;
-      case "accountant":
+      case "librarian":
         return 7;
+      case "accountant":
+      case "accountants":
+        return 8;
+      case "staff":
+        return 9;
       default:
         return null;
     }
   }
 
-  Map<String, String> toApiData() {
-    final Map<String, String> data = {};
+  String _getApiStatus(String? status) {
+    if (status == null || status.isEmpty) return 'live';
+    final s = status.toLowerCase();
+    if (s == 'active' || s == 'live') return 'live';
+    if (s == 'inactive' || s == 'expired') return 'expired';
+    return s;
+  }
+
+  Map<String, dynamic> toApiData() {
+    final Map<String, dynamic> data = {};
     final DateFormat formatter = DateFormat('yyyy-MM-dd');
 
     data['institute_id'] = instituteId;
@@ -92,35 +115,40 @@ class NewEmployee {
 
     final roleId = _getRoleId(role);
     if (roleId != null) {
-      data['role_id'] = roleId.toString();
+      data['role_id'] = roleId;
     }
 
     if (gender != null) data['gender'] = gender!;
-    if (dateOfBirth != null) data['dob'] = formatter.format(dateOfBirth!);
+    if (dateOfBirth != null) {
+      final formattedDate = formatter.format(dateOfBirth!);
+      data['dob'] = formattedDate;
+      data['date_of_birth'] = formattedDate;
+    }
     if (phoneNumber != null) data['phone'] = phoneNumber!;
     if (address != null) data['address'] = address!;
     if (city != null) data['city'] = city!;
     if (state != null) data['state'] = state!;
     if (pinCode != null) data['pincode'] = pinCode!;
 
-    // Add other fields as meta data, which is a common practice for extended profiles.
-    if (relationshipStatus != null) data['meta[relationship_status]'] = relationshipStatus!;
-    if (alternateNumber != null) data['meta[alternate_phone]'] = alternateNumber!;
-    if (position != null) data['meta[position]'] = position!;
-    if (employmentType != null) data['meta[employment_type]'] = employmentType!;
-    if (joiningDate != null) data['meta[joining_date]'] = formatter.format(joiningDate!);
-    if (experience != null) data['meta[experience]'] = experience!;
-    if (status != null) data['meta[status]'] = status!;
-    if (reference != null) data['meta[reference]'] = reference!;
-    if (qualification != null) data['meta[qualification]'] = qualification!;
-    if (matriculationMarks != null) data['meta[matriculation_marks]'] = matriculationMarks!;
-    if (intermediateMarks != null) data['meta[intermediate_marks]'] = intermediateMarks!;
-    if (bankAccountNumber != null) data['meta[bank_account_number]'] = bankAccountNumber!;
-    if (ifscCode != null) data['meta[ifsc_code]'] = ifscCode!;
-    if (bankName != null) data['meta[bank_name]'] = bankName!;
-    if (branch != null) data['meta[bank_branch]'] = branch!;
-    if (emergencyContactName != null) data['meta[emergency_contact_name]'] = emergencyContactName!;
-    if (emergencyContactNumber != null) data['meta[emergency_contact_number]'] = emergencyContactNumber!;
+    if (relationshipStatus != null) data['relationship_status'] = relationshipStatus!;
+    if (alternateNumber != null) data['alternate_phone'] = alternateNumber!;
+    if (position != null) data['position'] = position!;
+    if (employmentType != null) data['employment_type'] = employmentType!;
+    if (joiningDate != null) data['joining_date'] = formatter.format(joiningDate!);
+    if (experience != null) data['experience'] = experience!;
+    if (status != null) {
+      data['status'] = _getApiStatus(status);
+    }
+    if (reference != null) data['reference'] = reference!;
+    if (qualification != null) data['qualification'] = qualification!;
+    if (matriculationMarks != null) data['x_marks'] = matriculationMarks!;
+    if (intermediateMarks != null) data['xii_marks'] = intermediateMarks!;
+    if (bankAccountNumber != null) data['bank_account_number'] = bankAccountNumber!;
+    if (ifscCode != null) data['ifsc_code'] = ifscCode!;
+    if (bankName != null) data['bank_name'] = bankName!;
+    if (branch != null) data['branch_name'] = branch!;
+    if (emergencyContactName != null) data['emergency_contact_name'] = emergencyContactName!;
+    if (emergencyContactNumber != null) data['emergency_contact_number'] = emergencyContactNumber!;
 
     return data;
   }

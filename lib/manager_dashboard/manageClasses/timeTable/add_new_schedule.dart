@@ -1,5 +1,7 @@
 import 'dart:convert';
 import 'package:eduphin/services/api_service.dart';
+import 'package:eduphin/services/responsive_helper.dart';
+import 'package:eduphin/teacher/dashboard/common_widgets.dart';
 import 'package:flutter/material.dart';
 
 // ───────────────────────────────────────────────────────────
@@ -191,37 +193,164 @@ class _AddNewSchedulePageState extends State<AddNewSchedulePage> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
+    final theme = context.theme;
     return Scaffold(
-      backgroundColor: theme.scaffoldBackgroundColor,
+      backgroundColor: theme.colorScheme.surface,
       appBar: AppBar(
-        title: const Text('Add New Schedule'),
-        centerTitle: true,
+        title: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text("Add New Schedule", style: theme.textTheme.titleLarge?.copyWith(fontSize: context.font(18), fontWeight: FontWeight.bold)),
+            Text("Fill in the information below to add a new class schedule.", style: theme.textTheme.labelSmall?.copyWith(color: theme.colorScheme.onSurfaceVariant, fontSize: context.font(11))),
+          ],
+        ),
+        centerTitle: false,
       ),
-      floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
-      floatingActionButton: _isLoading ? null : _buildActionButtons(theme),
+      bottomNavigationBar: _isLoading
+          ? null
+          : SafeArea(
+              child: Container(
+                padding: EdgeInsets.fromLTRB(context.spacing, context.scale(8), context.spacing, context.scale(16)),
+                decoration: BoxDecoration(
+                  color: theme.colorScheme.surface,
+                  border: Border(top: BorderSide(color: theme.colorScheme.outlineVariant.withValues(alpha: 0.5))),
+                ),
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 600),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: buildActionButton(
+                          context,
+                          "Cancel",
+                          () => Navigator.pop(context),
+                          isPrimary: false,
+                        ),
+                      ),
+                      SizedBox(width: context.spacing),
+                      Expanded(
+                        child: _isSaving
+                            ? const Center(child: CircularProgressIndicator())
+                            : buildActionButton(
+                                context,
+                                "Add Schedule",
+                                _addSchedule,
+                              ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
       body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
+          ? Center(child: CircularProgressIndicator(color: theme.colorScheme.primary))
           : SingleChildScrollView(
-              padding: const EdgeInsets.fromLTRB(16, 16, 16, 120),
+              padding: context.pagePadding,
               child: Center(
                 child: ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 800),
+                  constraints: const BoxConstraints(maxWidth: 600),
                   child: Form(
                     key: _formKey,
-                    child: Container(
-                      decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(10),
-                        color: theme.primaryColor,
-                      ),
-                      padding: const EdgeInsets.all(16),
-                      child: LayoutBuilder(builder: (context, constraints) {
-                        if (constraints.maxWidth > 600) {
-                          return _buildWideLayout(theme);
-                        } else {
-                          return _buildNarrowLayout(theme);
-                        }
-                      }),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          "Schedule Details",
+                          style: TextStyle(color: theme.colorScheme.onSurface, fontWeight: FontWeight.bold, fontSize: context.font(18)),
+                        ),
+                        SizedBox(height: context.scale(4)),
+                        Text(
+                          "Assign teacher and subject to class",
+                          style: theme.textTheme.labelSmall?.copyWith(color: theme.colorScheme.onSurfaceVariant, fontSize: context.font(11)),
+                        ),
+                        SizedBox(height: context.scale(24)),
+                        buildFilterCard(
+                          context,
+                          children: [
+                            buildLabel(context, "Class"),
+                            buildDropdown(
+                              context,
+                              _classList.map((c) => c.name).toList(),
+                              _classList.any((c) => c.id == _selectedClassId) ? _classList.firstWhere((c) => c.id == _selectedClassId).name : null,
+                              (value) {
+                                if (value == null) return;
+                                setState(() {
+                                  final selectedClass = _classList.firstWhere((c) => c.name == value);
+                                  _selectedClassId = selectedClass.id;
+                                  _selectedSectionId = null;
+                                  _sectionList = selectedClass.sections;
+                                });
+                              },
+                              hint: "Select Class",
+                            ),
+                            buildLabel(context, "Section"),
+                            buildDropdown(
+                              context,
+                              _sectionList.map((s) => s.name).toList(),
+                              _sectionList.any((s) => s.id == _selectedSectionId) ? _sectionList.firstWhere((s) => s.id == _selectedSectionId).name : null,
+                              (value) {
+                                if (value == null) return;
+                                setState(() {
+                                  _selectedSectionId = _sectionList.firstWhere((s) => s.name == value).id;
+                                });
+                              },
+                              hint: "Select Section",
+                            ),
+                            buildLabel(context, "Subject"),
+                            buildDropdown(
+                              context,
+                              _subjectList.map((s) => s.name).toList(),
+                              _subjectList.any((s) => s.id == _selectedSubjectId) ? _subjectList.firstWhere((s) => s.id == _selectedSubjectId).name : null,
+                              (value) {
+                                if (value == null) return;
+                                setState(() {
+                                  _selectedSubjectId = _subjectList.firstWhere((s) => s.name == value).id;
+                                });
+                              },
+                              hint: "Select Subject",
+                            ),
+                            buildLabel(context, "Teacher"),
+                            buildDropdown(
+                              context,
+                              _teacherList.map((t) => t.name).toList(),
+                              _teacherList.any((t) => t.id == _selectedTeacherId) ? _teacherList.firstWhere((t) => t.id == _selectedTeacherId).name : null,
+                              (value) {
+                                if (value == null) return;
+                                setState(() {
+                                  _selectedTeacherId = _teacherList.firstWhere((t) => t.name == value).id;
+                                });
+                              },
+                              hint: "Select Teacher",
+                            ),
+                            buildLabel(context, "Weekday"),
+                            buildDropdown(
+                              context,
+                              _weekdayList,
+                              _selectedWeekday,
+                              (value) => setState(() => _selectedWeekday = value),
+                              hint: "Select Weekday",
+                            ),
+                            SizedBox(height: context.scale(16)),
+                            buildResponsiveRow(context, [
+                              Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  buildLabel(context, "Start Time"),
+                                  _buildTimeSelector(context, _startTime, true),
+                                ],
+                              ),
+                              Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  buildLabel(context, "End Time"),
+                                  _buildTimeSelector(context, _endTime, false),
+                                ],
+                              ),
+                            ]),
+                            SizedBox(height: context.scale(16)),
+                          ],
+                        ),
+                      ],
                     ),
                   ),
                 ),
@@ -230,213 +359,29 @@ class _AddNewSchedulePageState extends State<AddNewSchedulePage> {
     );
   }
 
-  Widget _buildNarrowLayout(ThemeData theme) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        _buildDropdownField(theme, "Class", _selectedClassId, _classList.map((c) => DropdownMenuItem(value: c.id, child: Text(c.name))).toList(), (val) {
-          setState(() {
-            _selectedClassId = val;
-            _selectedSectionId = null; // Reset
-            if (val != null) {
-              _sectionList = _classList.firstWhere((c) => c.id == val).sections;
-            } else {
-              _sectionList = [];
-            }
-          });
-        }),
-        const SizedBox(height: 16),
-        _buildDropdownField(theme, "Section", _selectedSectionId, _sectionList.map((s) => DropdownMenuItem(value: s.id, child: Text(s.name))).toList(), (val) => setState(() => _selectedSectionId = val), key: ValueKey(_selectedClassId), dependentParent: "Class"),
-        const SizedBox(height: 16),
-        _buildDropdownField(theme, "Subject", _selectedSubjectId, _subjectList.map((s) => DropdownMenuItem(value: s.id, child: Text(s.name))).toList(), (val) => setState(() => _selectedSubjectId = val)),
-        const SizedBox(height: 16),
-        _buildDropdownField(theme, "Teacher", _selectedTeacherId, _teacherList.map((t) => DropdownMenuItem(value: t.id, child: Text(t.name))).toList(), (val) => setState(() => _selectedTeacherId = val)),
-        const SizedBox(height: 16),
-        _buildDropdownField(theme, "Weekday", _selectedWeekday, _weekdayList.map((d) => DropdownMenuItem(value: d, child: Text(d))).toList(), (val) => setState(() => _selectedWeekday = val)),
-        const SizedBox(height: 16),
-        Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Expanded(child: _buildTimeField(theme, "Start Time", _startTime, isStartTime: true)),
-            const SizedBox(width: 16),
-            Expanded(child: _buildTimeField(theme, "End Time", _endTime, isStartTime: false)),
-          ],
+  Widget _buildTimeSelector(BuildContext context, TimeOfDay? time, bool isStartTime) {
+    final theme = context.theme;
+    return InkWell(
+      onTap: () => _selectTime(context, isStartTime: isStartTime),
+      child: Container(
+        padding: EdgeInsets.symmetric(horizontal: context.spacing, vertical: context.spacing / 1.5),
+        decoration: BoxDecoration(
+          color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
+          borderRadius: BorderRadius.circular(context.scale(12)),
+          border: Border.all(color: theme.colorScheme.outlineVariant.withValues(alpha: 0.5), width: 0.5),
         ),
-        const SizedBox(height: 80), // For FAB
-      ],
-    );
-  }
-
-  Widget _buildWideLayout(ThemeData theme) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Expanded(child: _buildDropdownField(theme, "Class", _selectedClassId, _classList.map((c) => DropdownMenuItem(value: c.id, child: Text(c.name))).toList(), (val) {
-              setState(() {
-                _selectedClassId = val;
-                _selectedSectionId = null; // Reset
-                if (val != null) {
-                  _sectionList = _classList.firstWhere((c) => c.id == val).sections;
-                } else {
-                  _sectionList = [];
-                }
-              });
-            })),
-            const SizedBox(width: 16),
-            Expanded(child: _buildDropdownField(theme, "Section", _selectedSectionId, _sectionList.map((s) => DropdownMenuItem(value: s.id, child: Text(s.name))).toList(), (val) => setState(() => _selectedSectionId = val), key: ValueKey(_selectedClassId), dependentParent: "Class")),
-            const SizedBox(width: 16),
-            Expanded(child: _buildDropdownField(theme, "Weekday", _selectedWeekday, _weekdayList.map((d) => DropdownMenuItem(value: d, child: Text(d))).toList(), (val) => setState(() => _selectedWeekday = val))),
-          ],
-        ),
-        const SizedBox(height: 16),
-        Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Expanded(child: _buildDropdownField(theme, "Subject", _selectedSubjectId, _subjectList.map((s) => DropdownMenuItem(value: s.id, child: Text(s.name))).toList(), (val) => setState(() => _selectedSubjectId = val))),
-            const SizedBox(width: 16),
-            Expanded(child: _buildDropdownField(theme, "Teacher", _selectedTeacherId, _teacherList.map((t) => DropdownMenuItem(value: t.id, child: Text(t.name))).toList(), (val) => setState(() => _selectedTeacherId = val))),
-          ],
-        ),
-        const SizedBox(height: 16),
-        Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Expanded(child: _buildTimeField(theme, "Start Time", _startTime, isStartTime: true)),
-            const SizedBox(width: 16),
-            Expanded(child: _buildTimeField(theme, "End Time", _endTime, isStartTime: false)),
-          ],
-        ),
-        const SizedBox(height: 80), // For FAB
-      ],
-    );
-  }
-
-  /// A reusable and robust dropdown form field widget.
-  Widget _buildDropdownField<T>(ThemeData theme, String label, T? currentValue, List<DropdownMenuItem<T>> items, ValueChanged<T?> onChanged, {Key? key, String? hint, String? dependentParent}) {
-    final bool isDisabled = items.isEmpty;
-
-    String getHintText() {
-      if (isDisabled) {
-        return dependentParent != null ? "--Select a $dependentParent first--" : "--No options available--";
-      }
-      return hint ?? "--Select $label--";
-    }
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(label, style: theme.textTheme.titleMedium?.copyWith(color: theme.colorScheme.onPrimary)),
-        const SizedBox(height: 8),
-        DropdownButtonFormField<T>(
-          key: key,
-          value: currentValue,
-          items: items,
-          onChanged: isDisabled ? null : onChanged,
-          isExpanded: true,
-          decoration: InputDecoration(
-            hintText: getHintText(),
-            filled: true,
-            fillColor: theme.scaffoldBackgroundColor,
-            border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide.none),
-            disabledBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(10),
-              borderSide: BorderSide(color: theme.dividerColor.withAlpha(128)),
+            Text(
+              time?.format(context) ?? "Select",
+              style: theme.textTheme.bodyMedium?.copyWith(fontSize: context.font(14)),
             ),
-          ),
-          validator: (val) {
-            if (isDisabled && dependentParent != null) return null;
-            return val == null ? "Please select a $label" : null;
-          },
+            Icon(Icons.access_time_rounded, size: context.scale(18), color: theme.colorScheme.primary),
+          ],
         ),
-      ],
-    );
-  }
-
-  Widget _buildTimeField(ThemeData theme, String label, TimeOfDay? time, {required bool isStartTime}) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(label, style: theme.textTheme.titleMedium?.copyWith(color: theme.colorScheme.onPrimary)),
-        const SizedBox(height: 8),
-        FormField<TimeOfDay>(
-          initialValue: time,
-          validator: (val) => val == null ? "Please select a time" : null,
-          builder: (field) {
-            return InkWell(
-              onTap: () => _selectTime(context, isStartTime: isStartTime),
-              child: Container(
-                padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 12),
-                decoration: BoxDecoration(
-                  color: theme.scaffoldBackgroundColor,
-                  borderRadius: BorderRadius.circular(10),
-                  border: field.hasError ? Border.all(color: theme.colorScheme.error, width: 1) : null,
-                ),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(
-                      time?.format(context) ?? "--:--",
-                      style: theme.textTheme.bodyLarge,
-                    ),
-                    Icon(Icons.access_time, color: theme.hintColor),
-                  ],
-                ),
-              ),
-            );
-          },
-        ),
-      ],
-    );
-  }
-
-  Widget _buildActionButtons(ThemeData theme) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16.0),
-      child: Row(
-        children: [
-          Expanded(
-            child: OutlinedButton(
-              onPressed: () => Navigator.of(context).pop(),
-              style: OutlinedButton.styleFrom(
-                padding: const EdgeInsets.symmetric(vertical: 16),
-                foregroundColor: theme.colorScheme.onSurface,
-                side: BorderSide(color: theme.dividerColor),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-              ),
-              child: const Text("Cancel"),
-            ),
-          ),
-          const SizedBox(width: 16),
-          Expanded(
-            child: ElevatedButton.icon(
-              onPressed: _isSaving ? null : _addSchedule,
-              style: ElevatedButton.styleFrom(
-                padding: const EdgeInsets.symmetric(vertical: 16),
-                backgroundColor: theme.colorScheme.primary,
-                foregroundColor: theme.colorScheme.onPrimary,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-              ),
-              icon: _isSaving ? Container() : const Icon(Icons.add),
-              label: _isSaving
-                  ? const SizedBox(
-                      height: 24,
-                      width: 24,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 3,
-                      ),
-                    )
-                  : const Text("Add Schedule"),
-            ),
-          ),
-        ],
       ),
     );
   }
+
 }

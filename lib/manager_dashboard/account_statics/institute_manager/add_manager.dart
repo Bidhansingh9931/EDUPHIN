@@ -1,114 +1,13 @@
-import 'dart:convert';
+import 'package:eduphin/services/error_handler.dart';
+import 'package:eduphin/manager_dashboard/manager_dashboard.dart';
+import 'package:eduphin/models/new_employee.dart';
+import 'package:eduphin/models/new_student.dart';
 import 'package:eduphin/services/api_service.dart';
+import 'package:file_picker/file_picker.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-
-// ───────────────────────────────────────────────────────────
-//                          DATA MODELS
-// ───────────────────────────────────────────────────────────
-
-class Manager {
-  String fullName = '';
-  String email = '';
-  String newPassword = '';
-  String role = 'General Manager';
-  String? gender;
-  String dateOfBirth = '';
-  String? relationshipStatus;
-  String phoneNumber = '';
-  String alternateNumber = '';
-  String address = '';
-  String city = '';
-  String state = '';
-  String pinCode = '';
-  String position = '';
-  String? employmentType;
-  String joiningDate = '';
-  String experience = ''; // in years
-  String? status;
-  String reference = '';
-  String qualification = '';
-  String matriculationMarks = '';
-  String intermediateMarks = '';
-  String? matriculationMarksheet;
-  String? intermediateMarksheet;
-  String? resume;
-  String bankAccountNumber = '';
-  String ifscCode = '';
-  String bankName = '';
-  String branch = '';
-  String emergencyContactName = '';
-  String emergencyContactNumber = '';
-  String aadharNumber = ''; // Added for API
-}
-
-class ManagerFormData {
-  final List<String> genders;
-  final List<String> relationshipStatuses;
-  final List<String> employmentTypes;
-  final List<String> statuses;
-  final Manager manager;
-
-  ManagerFormData({
-    required this.genders,
-    required this.relationshipStatuses,
-    required this.employmentTypes,
-    required this.statuses,
-    required this.manager,
-  });
-}
-
-// ───────────────────────────────────────────────────────────
-//                         API SERVICE
-// ───────────────────────────────────────────────────────────
-
-class ManagerApiService {
-  Future<ManagerFormData> fetchManagerData() async {
-    await Future.delayed(const Duration(milliseconds: 300));
-    return ManagerFormData(
-      manager: Manager(), // Clean manager object
-      genders: ['Male', 'Female', 'Other'],
-      relationshipStatuses: ['Single', 'Married', 'Divorced', 'Widowed'],
-      employmentTypes: ['full-time', 'part-time', 'internship', 'contract-based', 'other'],
-      statuses: ['live', 'expired'],
-    );
-  }
-
-  Future<bool> saveManager(Manager manager) async {
-    final body = {
-      'name': manager.fullName,
-      'email': manager.email,
-      'password': manager.newPassword,
-      'role_id': '4', // Assuming '4' is for Manager
-      'institute_id': '1', // This should be dynamically set
-      'employment_type': manager.employmentType,
-      'gender': manager.gender,
-      'date_of_birth': manager.dateOfBirth,
-      'aadhar_number': manager.aadharNumber,
-      'address': manager.address,
-      'city': manager.city,
-      'state': manager.state,
-      'pincode': manager.pinCode,
-      'phone': manager.phoneNumber,
-      'alternate_phone': manager.alternateNumber,
-      'bank_account_number': manager.bankAccountNumber,
-      'status': manager.status,
-    };
-
-    final response = await ApiService.post('manager/users', body);
-    final responseData = jsonDecode(response.body);
-
-    if (response.statusCode >= 200 && response.statusCode < 300) {
-      return responseData['status'] == true;
-    } else {
-      throw Exception(responseData['message'] ?? 'Failed to save manager.');
-    }
-  }
-}
-
-
-// ───────────────────────────────────────────────────────────
-//                       ADD MANAGER PAGE
-// ───────────────────────────────────────────────────────────
+import 'package:image_picker/image_picker.dart';
+import 'package:intl/intl.dart';
 
 class AddManagerPage extends StatefulWidget {
   const AddManagerPage({super.key});
@@ -118,442 +17,516 @@ class AddManagerPage extends StatefulWidget {
 }
 
 class _AddManagerPageState extends State<AddManagerPage> {
-  final _apiService = ManagerApiService();
-  late Future<ManagerFormData> _formDataFuture;
-  late Manager _manager;
-  bool _isSubmitting = false;
+  final _formKey = GlobalKey<FormState>();
+  bool _isLoading = false;
+
+  // Controllers
+  final _fullNameController = TextEditingController();
+  final _emailController = TextEditingController();
+  final _newPasswordController = TextEditingController();
+  final _aadharController = TextEditingController();
+  final _phoneNumberController = TextEditingController();
+  final _alternateNumberController = TextEditingController();
+  final _addressController = TextEditingController();
+  final _cityController = TextEditingController();
+  final _stateController = TextEditingController();
+  final _pinCodeController = TextEditingController();
+  final _positionController = TextEditingController();
+  final _experienceController = TextEditingController();
+  final _referenceController = TextEditingController();
+  final _qualificationController = TextEditingController();
+  final _matriculationMarksController = TextEditingController();
+  final _intermediateMarksController = TextEditingController();
+  final _bankAccountNumberController = TextEditingController();
+  final _ifscCodeController = TextEditingController();
+  final _bankNameController = TextEditingController();
+  final _branchController = TextEditingController();
+  final _emergencyContactNameController = TextEditingController();
+  final _emergencyContactNumberController = TextEditingController();
+
+  // State variables
+  String? _gender;
+  DateTime? _dateOfBirth;
+  String? _relationshipStatus;
+  String? _employmentType;
+  DateTime? _joiningDate;
+  String? _status;
+  
+  AppFile? _profileImage;
+  AppFile? _matriculationMarksheet;
+  AppFile? _intermediateMarksheet;
+  AppFile? _resume;
 
   @override
-  void initState() {
-    super.initState();
-    _formDataFuture = _apiService.fetchManagerData();
+  void dispose() {
+    _fullNameController.dispose();
+    _emailController.dispose();
+    _newPasswordController.dispose();
+    _aadharController.dispose();
+    _phoneNumberController.dispose();
+    _alternateNumberController.dispose();
+    _addressController.dispose();
+    _cityController.dispose();
+    _stateController.dispose();
+    _pinCodeController.dispose();
+    _positionController.dispose();
+    _experienceController.dispose();
+    _referenceController.dispose();
+    _qualificationController.dispose();
+    _matriculationMarksController.dispose();
+    _intermediateMarksController.dispose();
+    _bankAccountNumberController.dispose();
+    _ifscCodeController.dispose();
+    _bankNameController.dispose();
+    _branchController.dispose();
+    _emergencyContactNameController.dispose();
+    _emergencyContactNumberController.dispose();
+    super.dispose();
   }
 
-  Future<void> _submitForm() async {
-    setState(() {
-      _isSubmitting = true;
-    });
-
-    try {
-      final success = await _apiService.saveManager(_manager);
-
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(success ? 'Manager saved successfully!' : 'Failed to save manager.'),
-            backgroundColor: success ? Colors.green : Colors.red,
-          ),
+  Future<void> _pickImage() async {
+    final picker = ImagePicker();
+    final pickedFile = await picker.pickImage(
+      source: ImageSource.gallery,
+      maxWidth: 1024,
+      maxHeight: 1024,
+      imageQuality: 80,
+    );
+    if (pickedFile != null) {
+      final bytes = await pickedFile.readAsBytes();
+      setState(() {
+        _profileImage = AppFile(
+          name: pickedFile.name,
+          bytes: bytes,
+          path: kIsWeb ? null : pickedFile.path,
         );
-        if (success) {
-          Navigator.of(context).pop();
-        }
+      });
+    }
+  }
+
+  Future<void> _pickDocument(Function(AppFile) onFilePicked) async {
+    final picker = ImagePicker();
+    final pickedFile = await picker.pickImage(
+      source: ImageSource.gallery,
+      maxWidth: 1024,
+      maxHeight: 1024,
+      imageQuality: 80,
+    );
+
+    if (pickedFile != null) {
+      final bytes = await pickedFile.readAsBytes();
+      setState(() {
+        onFilePicked(AppFile(
+          name: pickedFile.name,
+          bytes: bytes,
+          path: kIsWeb ? null : pickedFile.path,
+        ));
+      });
+    } else {
+      await _pickFile(onFilePicked);
+    }
+  }
+
+  Future<void> _pickFile(Function(AppFile) onFilePicked) async {
+    try {
+      FilePickerResult? result = await FilePicker.platform.pickFiles(withData: true);
+      if (result != null) {
+        final file = result.files.single;
+        setState(() {
+          onFilePicked(AppFile(
+            name: file.name,
+            bytes: file.bytes,
+            path: kIsWeb ? null : file.path,
+          ));
+        });
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(e.toString()),
-            backgroundColor: Colors.red,
-          ),
-        );
+        ErrorHandler.showError(context, e);
+      }
+    }
+  }
+
+  void _addManager() async {
+    if (!_formKey.currentState!.validate()) return;
+
+    setState(() => _isLoading = true);
+
+    try {
+      final employee = NewEmployee()
+        ..name = _fullNameController.text
+        ..email = _emailController.text
+        ..password = _newPasswordController.text
+        ..roleId = '4' // Manager
+        ..gender = _gender
+        ..dob = _dateOfBirth
+        ..relationshipStatus = _relationshipStatus
+        ..aadharNumber = _aadharController.text
+        ..phone = _phoneNumberController.text
+        ..alternatePhone = _alternateNumberController.text
+        ..address = _addressController.text
+        ..city = _cityController.text
+        ..state = _stateController.text
+        ..pincode = _pinCodeController.text
+        ..position = _positionController.text
+        ..employmentType = _employmentType
+        ..joiningDate = _joiningDate
+        ..experience = _experienceController.text
+        ..status = _status
+        ..reference = _referenceController.text
+        ..qualification = _qualificationController.text
+        ..matricMarks = _matriculationMarksController.text
+        ..interMarks = _intermediateMarksController.text
+        ..bankAccountNumber = _bankAccountNumberController.text
+        ..ifscCode = _ifscCodeController.text
+        ..bankName = _bankNameController.text
+        ..branch = _branchController.text
+        ..emergencyContactName = _emergencyContactNameController.text
+        ..emergencyContactNumber = _emergencyContactNumberController.text
+        ..photo = _profileImage
+        ..matriculationMarksheet = _matriculationMarksheet
+        ..intermediateMarksheet = _intermediateMarksheet
+        ..resume = _resume;
+
+      await ApiService.addEmployeeUser(employee);
+
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Manager added successfully!')));
+      Navigator.pop(context, true);
+    } catch (e) {
+      if (mounted) {
+        ErrorHandler.showError(context, e);
       }
     } finally {
-      if (mounted) {
-        setState(() {
-          _isSubmitting = false;
-        });
-      }
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final screenSize = MediaQuery.of(context).size;
+
     return Scaffold(
+      floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
+      floatingActionButton: Padding(
+        padding: EdgeInsets.symmetric(horizontal: screenSize.width * 0.04),
+        child: SizedBox(
+          width: double.infinity,
+          child: FloatingActionButton.extended(
+            heroTag: 'addManagerBtn',
+            onPressed: _isLoading ? null : _addManager,
+            label: _isLoading
+                ? const CircularProgressIndicator(valueColor: AlwaysStoppedAnimation<Color>(Colors.white))
+                : Text("Add Manager", style: theme.textTheme.labelLarge?.copyWith(color: theme.colorScheme.onPrimary)),
+            icon: _isLoading ? null : Icon(Icons.add, color: theme.colorScheme.onPrimary),
+          ),
+        ),
+      ),
       backgroundColor: theme.scaffoldBackgroundColor,
       appBar: AppBar(
-        title: const Text("Add New Manager"),
-        actions: [
-          Padding(
-            padding: const EdgeInsets.only(right: 8.0),
-            child: ElevatedButton(
-              onPressed: _isSubmitting ? null : _submitForm,
-              style: ElevatedButton.styleFrom(backgroundColor: theme.primaryColor),
-              child: _isSubmitting
-                  ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2))
-                  : const Text("Save"),
-            ),
-          ),
-        ],
+        title: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            const Text('Add Manager'),
+            InkWell(
+                onTap: () => Navigator.pushReplacement(
+                    context, MaterialPageRoute(builder: (context) => const ManagerDashboardPage())),
+                child: const Icon(Icons.home_sharp, size: 30)),
+          ],
+        ),
       ),
-      body: FutureBuilder<ManagerFormData>(
-        future: _formDataFuture,
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
-          } else if (snapshot.hasError) {
-            return Center(child: Text("Error: ${snapshot.error}"));
-          } else if (snapshot.hasData) {
-            final formData = snapshot.data!;
-            _manager = formData.manager;
-            return LayoutBuilder(
-              builder: (context, constraints) {
-                // Use a wider breakpoint for a 2-column layout to avoid cramping
-                final isWide = constraints.maxWidth > 800;
-
-                if (isWide) {
-                  // Wide layout: Two scrollable columns
-                  return Padding(
-                    padding: const EdgeInsets.fromLTRB(16, 16, 16, 50),
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Expanded(
-                          flex: 1,
-                          child: SingleChildScrollView(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                const _AddManagerProfileBox(),
-                                const SizedBox(height: 20),
-                                _buildEditableInfoTile(context, "Full Name", _manager.fullName, (val) => _manager.fullName = val),
-                                _buildEditableInfoTile(context, "Email", _manager.email, (val) => _manager.email = val),
-                                _buildEditableInfoTile(context, "New Password", _manager.newPassword, (val) => _manager.newPassword = val, isPassword: true),
-                                Text("Leave blank to keep existing's password", style: theme.textTheme.bodySmall),
-                                const SizedBox(height: 20),
-                                _buildPersonalDetailsSection(context, _manager, formData),
-                                const SizedBox(height: 20),
-                                _buildContactDetailsSection(context, _manager),
-                                const SizedBox(height: 20),
-                                _buildAddressDetailsSection(context, _manager),
-                              ],
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 20),
-                        Expanded(
-                          flex: 1,
-                          child: SingleChildScrollView(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                _buildProfessionalInformationSection(context, _manager, formData),
-                                const SizedBox(height: 20),
-                                _buildEducationDetailsSection(context, _manager),
-                                const SizedBox(height: 20),
-                                _buildBankingDetailsSection(context, _manager),
-                                const SizedBox(height: 20),
-                                _buildEmergencyContactDetailsSection(context, _manager),
-                              ],
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  );
-                } else {
-                  // Narrow layout: A single scrollable column
-                  return SingleChildScrollView(
-                    child: Padding(
-                      padding: const EdgeInsets.fromLTRB(16, 16, 16, 50),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const _AddManagerProfileBox(),
-                          const SizedBox(height: 20),
-                          _buildEditableInfoTile(context, "Full Name", _manager.fullName, (val) => _manager.fullName = val),
-                          _buildEditableInfoTile(context, "Email", _manager.email, (val) => _manager.email = val),
-                          _buildEditableInfoTile(context, "New Password", _manager.newPassword, (val) => _manager.newPassword = val, isPassword: true),
-                          Text("Leave blank to keep existing's password", style: theme.textTheme.bodySmall),
-                          const SizedBox(height: 20),
-                          _buildPersonalDetailsSection(context, _manager, formData),
-                          const SizedBox(height: 20),
-                          _buildContactDetailsSection(context, _manager),
-                          const SizedBox(height: 20),
-                          _buildAddressDetailsSection(context, _manager),
-                          const SizedBox(height: 20),
-                          _buildProfessionalInformationSection(context, _manager, formData),
-                          const SizedBox(height: 20),
-                          _buildEducationDetailsSection(context, _manager),
-                          const SizedBox(height: 20),
-                          _buildBankingDetailsSection(context, _manager),
-                          const SizedBox(height: 20),
-                          _buildEmergencyContactDetailsSection(context, _manager),
-                        ],
-                      ),
-                    ),
-                  );
-                }
-              },
-            );
-          } else {
-            return const Center(child: Text("No data available"));
-          }
-        },
+      body: Form(
+        key: _formKey,
+        child: Padding(
+          padding: EdgeInsets.fromLTRB(screenSize.width * 0.04, screenSize.width * 0.04, screenSize.width * 0.04, screenSize.height * 0.15),
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              return constraints.maxWidth > 800 ? _buildWideLayout() : _buildNarrowLayout();
+            },
+          ),
+        ),
       ),
     );
   }
 
-  Widget _buildSectionTitle(BuildContext context, String title) {
-    final theme = Theme.of(context);
-    return Column(
+  Widget _buildNarrowLayout() {
+    final screenSize = MediaQuery.of(context).size;
+    return SingleChildScrollView(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _ProfileBox(image: _profileImage, onPickImage: _pickImage),
+          SizedBox(height: screenSize.height * 0.02),
+          _buildSectionCard(title: "Account Details", children: _buildAccountDetailsSection()),
+          SizedBox(height: screenSize.height * 0.02),
+          _buildSectionCard(title: "Personal Details", children: _buildPersonalDetailsSection()),
+          SizedBox(height: screenSize.height * 0.02),
+          _buildSectionCard(title: "Contact Details", children: _buildContactDetailsSection()),
+          SizedBox(height: screenSize.height * 0.02),
+          _buildSectionCard(title: "Address Details", children: _buildAddressDetailsSection()),
+          SizedBox(height: screenSize.height * 0.02),
+          _buildSectionCard(title: "Professional Information", children: _buildProfessionalInformationSection()),
+          SizedBox(height: screenSize.height * 0.02),
+          _buildSectionCard(title: "Education & Documents", children: _buildEducationDetailsSection()),
+          SizedBox(height: screenSize.height * 0.02),
+          _buildSectionCard(title: "Banking Details", children: _buildBankingDetailsSection()),
+          SizedBox(height: screenSize.height * 0.02),
+          _buildSectionCard(title: "Emergency Contact Details", children: _buildEmergencyContactDetailsSection()),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildWideLayout() {
+    final screenSize = MediaQuery.of(context).size;
+    return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(title, style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold)),
-        const SizedBox(height: 12),
+        Expanded(
+          child: SingleChildScrollView(
+            child: Padding(
+              padding: EdgeInsets.only(right: screenSize.width * 0.01),
+              child: _buildLeftColumn(),
+            ),
+          ),
+        ),
+        Expanded(
+          child: SingleChildScrollView(
+            child: Padding(
+              padding: EdgeInsets.only(left: screenSize.width * 0.01),
+              child: _buildRightColumn(),
+            ),
+          ),
+        ),
       ],
     );
   }
 
-  Widget _buildEditableInfoTile(BuildContext context, String title, String initialValue, ValueChanged<String> onChanged, {bool isPassword = false}) {
+  Widget _buildLeftColumn() {
+    final screenSize = MediaQuery.of(context).size;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _ProfileBox(image: _profileImage, onPickImage: _pickImage),
+        SizedBox(height: screenSize.height * 0.02),
+        _buildSectionCard(title: "Account Details", children: _buildAccountDetailsSection()),
+        SizedBox(height: screenSize.height * 0.02),
+        _buildSectionCard(title: "Personal Details", children: _buildPersonalDetailsSection()),
+        SizedBox(height: screenSize.height * 0.02),
+        _buildSectionCard(title: "Contact Details", children: _buildContactDetailsSection()),
+        SizedBox(height: screenSize.height * 0.02),
+        _buildSectionCard(title: "Address Details", children: _buildAddressDetailsSection()),
+      ],
+    );
+  }
+
+  Widget _buildRightColumn() {
+    final screenSize = MediaQuery.of(context).size;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _buildSectionCard(title: "Professional Information", children: _buildProfessionalInformationSection()),
+        SizedBox(height: screenSize.height * 0.02),
+        _buildSectionCard(title: "Education & Documents", children: _buildEducationDetailsSection()),
+        SizedBox(height: screenSize.height * 0.02),
+        _buildSectionCard(title: "Banking Details", children: _buildBankingDetailsSection()),
+        SizedBox(height: screenSize.height * 0.02),
+        _buildSectionCard(title: "Emergency Contact Details", children: _buildEmergencyContactDetailsSection()),
+      ],
+    );
+  }
+
+  Widget _buildEditableInfoTile(String title, TextEditingController controller, {bool isPassword = false, TextInputType keyboardType = TextInputType.text}) {
     final theme = Theme.of(context);
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 8.0),
       child: TextFormField(
-        initialValue: initialValue,
-        onChanged: onChanged,
+        controller: controller,
         obscureText: isPassword,
+        keyboardType: keyboardType,
         style: theme.textTheme.bodyLarge,
-        decoration: InputDecoration(
-          labelText: title,
-          labelStyle: theme.textTheme.bodyMedium?.copyWith(color: theme.hintColor),
-          filled: true,
-          fillColor: theme.cardColor,
-          contentPadding: const EdgeInsets.symmetric(vertical: 16.0, horizontal: 12.0),
-          border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(8),
-            borderSide: BorderSide(color: theme.dividerColor, width: 1.0),
-          ),
-          enabledBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(8),
-            borderSide: BorderSide(color: theme.dividerColor, width: 1.0),
-          ),
-          focusedBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(8),
-            borderSide: BorderSide(color: theme.primaryColor, width: 1.5),
-          ),
-        ),
-      ),
-    );
-  }
-  
-  Widget _buildDropdownInfoTile(BuildContext context, String title, String? value, List<String> items, ValueChanged<String?> onChanged) {
-    final theme = Theme.of(context);
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8.0),
-      child: DropdownButtonFormField<String>(
-        initialValue: value,
-        items: items.map((item) => DropdownMenuItem(value: item, child: Text(item))).toList(),
-        onChanged: onChanged,
-        style: theme.textTheme.bodyLarge,
-        decoration: InputDecoration(
-          labelText: title,
-          labelStyle: theme.textTheme.bodyMedium?.copyWith(color: theme.hintColor),
-          filled: true,
-          fillColor: theme.cardColor,
-          contentPadding: const EdgeInsets.symmetric(vertical: 16.0, horizontal: 12.0),
-          border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-          enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide(color: theme.dividerColor, width: 1.0)),
-          focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide(color: theme.primaryColor, width: 1.5)),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildDatePickerTile(BuildContext context, String title, String value, ValueChanged<String> onDateChanged) {
-    final theme = Theme.of(context);
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8.0),
-      child: InkWell(
-        onTap: () async {
-          DateTime? pickedDate = await showDatePicker(
-            context: context,
-            initialDate: DateTime.tryParse(value) ?? DateTime.now(),
-            firstDate: DateTime(1950),
-            lastDate: DateTime.now().add(const Duration(days: 365 * 5)),
-          );
-          if (pickedDate != null) {
-            onDateChanged(pickedDate.toIso8601String().split('T').first);
-          }
+        decoration: _inputDecoration(theme, title),
+        validator: (value) {
+          if (value == null || value.isEmpty) return '$title cannot be empty';
+          return null;
         },
-        child: InputDecorator(
-          decoration: InputDecoration(
-            labelText: title,
-            labelStyle: theme.textTheme.bodyMedium?.copyWith(color: theme.hintColor),
-            filled: true,
-            fillColor: theme.cardColor,
-            contentPadding: const EdgeInsets.symmetric(vertical: 16.0, horizontal: 12.0),
-            border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide(color: theme.dividerColor, width: 1.0)),
-            enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide(color: theme.dividerColor, width: 1.0)),
-          ),
-          child: Text(value, style: theme.textTheme.bodyLarge),
-        ),
       ),
     );
   }
   
-  Widget _buildDocumentPickerTile(BuildContext context, String title, String? filePath, VoidCallback onPickFile) {
+  Widget _buildDropdownField<T>(String title, T? value, List<T> items, ValueChanged<T?> onChanged) {
     final theme = Theme.of(context);
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 8.0),
-      child: InkWell(
-        onTap: onPickFile,
-        child: InputDecorator(
-          decoration: InputDecoration(
-            labelText: title,
-            labelStyle: theme.textTheme.bodyMedium?.copyWith(color: theme.hintColor),
-            filled: true,
-            fillColor: theme.cardColor,
-            contentPadding: const EdgeInsets.symmetric(vertical: 4.0, horizontal: 12.0),
-            border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide(color: theme.dividerColor)),
-            enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide(color: theme.dividerColor)),
-          ),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Expanded(
-                child: Text(
-                  filePath ?? 'No document selected',
-                  overflow: TextOverflow.ellipsis,
-                  style: theme.textTheme.bodyLarge?.copyWith(color: filePath == null ? theme.hintColor : null),
-                ),
-              ),
-              IconButton(icon: Icon(Icons.upload_file, color: theme.primaryColor), onPressed: onPickFile),
-            ],
-          ),
-        ),
+      child: DropdownButtonFormField<T>(
+        value: value,
+        items: items.map((item) => DropdownMenuItem(value: item, child: Text(item.toString().split('.').last))).toList(),
+        onChanged: onChanged,
+        decoration: _inputDecoration(theme, title),
+        validator: (value) => value == null ? 'Please select a $title' : null,
       ),
     );
   }
 
-  Widget _buildPersonalDetailsSection(BuildContext context, Manager manager, ManagerFormData formData) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        _buildSectionTitle(context, "Personal Details"),
-        _buildEditableInfoTile(context, "Aadhaar Number", manager.aadharNumber, (val) => manager.aadharNumber = val),
-        _buildEditableInfoTile(context, "Role", manager.role, (val) => manager.role = val),
-        _buildDropdownInfoTile(context, "Gender", manager.gender, formData.genders, (val) => setState(() => manager.gender = val)),
-        _buildDatePickerTile(context, "Date of Birth", manager.dateOfBirth, (val) => setState(() => manager.dateOfBirth = val)),
-        _buildDropdownInfoTile(context, "Relationship Status", manager.relationshipStatus, formData.relationshipStatuses, (val) => setState(() => manager.relationshipStatus = val)),
-      ],
+  Widget _buildDatePickerField(String title, DateTime? selectedDate, ValueChanged<DateTime?> onDateChanged) {
+    final theme = Theme.of(context);
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8.0),
+      child: TextFormField(
+        readOnly: true,
+        controller: TextEditingController(text: selectedDate == null ? '' : DateFormat('yyyy-MM-dd').format(selectedDate)),
+        decoration: _inputDecoration(theme, title).copyWith(suffixIcon: const Icon(Icons.calendar_today)),
+        onTap: () async {
+          DateTime? picked = await showDatePicker(
+            context: context,
+            initialDate: selectedDate ?? DateTime.now(),
+            firstDate: DateTime(1950),
+            lastDate: DateTime.now(),
+          );
+          if (picked != null) onDateChanged(picked);
+        },
+        validator: (value) => value == null || value.isEmpty ? 'Please select a date' : null,
+      ),
     );
   }
 
-  Widget _buildContactDetailsSection(BuildContext context, Manager manager) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        _buildSectionTitle(context, "Contact Details"),
-        _buildEditableInfoTile(context, "Phone Number", manager.phoneNumber, (val) => manager.phoneNumber = val),
-        _buildEditableInfoTile(context, "Alternate Number", manager.alternateNumber, (val) => manager.alternateNumber = val),
-      ],
+  Widget _buildFilePickerTile(String title, AppFile? file, VoidCallback onPickFile) {
+    final theme = Theme.of(context);
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8.0),
+      child: TextFormField(
+        readOnly: true,
+        controller: TextEditingController(text: file?.name ?? 'No file selected'),
+        decoration: _inputDecoration(theme, title).copyWith(
+          suffixIcon: IconButton(icon: const Icon(Icons.upload_file), onPressed: onPickFile),
+        ),
+        onTap: onPickFile,
+      ),
     );
   }
 
-  Widget _buildAddressDetailsSection(BuildContext context, Manager manager) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        _buildSectionTitle(context, "Address Details"),
-        _buildEditableInfoTile(context, "Address", manager.address, (val) => manager.address = val),
-        _buildEditableInfoTile(context, "City", manager.city, (val) => manager.city = val),
-        _buildEditableInfoTile(context, "State", manager.state, (val) => manager.state = val),
-        _buildEditableInfoTile(context, "Pin Code", manager.pinCode, (val) => manager.pinCode = val),
-      ],
+  InputDecoration _inputDecoration(ThemeData theme, String label) {
+    final isDarkMode = theme.brightness == Brightness.dark;
+    return InputDecoration(
+      labelText: label,
+      labelStyle: theme.textTheme.bodyMedium?.copyWith(color: theme.hintColor),
+      filled: true,
+      fillColor: isDarkMode ? theme.scaffoldBackgroundColor : const Color(0xFFF3F3F3),
+      contentPadding: const EdgeInsets.symmetric(vertical: 16.0, horizontal: 12.0),
+      border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide.none),
+      enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide.none),
+      focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide(color: theme.primaryColor, width: 1.5)),
     );
   }
 
-  Widget _buildProfessionalInformationSection(BuildContext context, Manager manager, ManagerFormData formData) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        _buildSectionTitle(context, "Professional Information"),
-        _buildEditableInfoTile(context, "Position", manager.position, (val) => manager.position = val),
-        _buildDropdownInfoTile(context, "Employment Type", manager.employmentType, formData.employmentTypes, (val) => setState(() => manager.employmentType = val)),
-        _buildDatePickerTile(context, "Joining Date", manager.joiningDate, (val) => setState(() => manager.joiningDate = val)),
-        _buildEditableInfoTile(context, "Experience (in years)", manager.experience, (val) => manager.experience = val),
-        _buildDropdownInfoTile(context, "Status", manager.status, formData.statuses, (val) => setState(() => manager.status = val)),
-        _buildEditableInfoTile(context, "Reference", manager.reference, (val) => manager.reference = val),
-      ],
+  Widget _buildSectionCard({required String title, required List<Widget> children}) {
+    final theme = Theme.of(context);
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(color: theme.cardColor, borderRadius: BorderRadius.circular(12)),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(title, style: theme.textTheme.titleLarge), const Divider(height: 24), ...children]),
     );
   }
 
-  Widget _buildEducationDetailsSection(BuildContext context, Manager manager) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        _buildSectionTitle(context, "Education & Documents"),
-        _buildEditableInfoTile(context, "Qualification", manager.qualification, (val) => manager.qualification = val),
-        _buildEditableInfoTile(context, "Matriculation Marks (%)", manager.matriculationMarks, (val) => manager.matriculationMarks = val),
-        _buildEditableInfoTile(context, "Intermediate Marks (%)", manager.intermediateMarks, (val) => manager.intermediateMarks = val),
-        _buildDocumentPickerTile(context, "Matriculation Marksheet", manager.matriculationMarksheet, () {}),
-        _buildDocumentPickerTile(context, "Intermediate Marksheet", manager.intermediateMarksheet, () {}),
-        _buildDocumentPickerTile(context, "Resume", manager.resume, () {}),
-      ],
-    );
+  List<Widget> _buildAccountDetailsSection() {
+    return [
+      _buildEditableInfoTile("Full Name", _fullNameController),
+      _buildEditableInfoTile("Email", _emailController, keyboardType: TextInputType.emailAddress),
+      _buildEditableInfoTile("New Password", _newPasswordController, isPassword: true),
+    ];
   }
 
-  Widget _buildBankingDetailsSection(BuildContext context, Manager manager) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        _buildSectionTitle(context, "Banking Details"),
-        _buildEditableInfoTile(context, "Bank Account Number", manager.bankAccountNumber, (val) => manager.bankAccountNumber = val),
-        _buildEditableInfoTile(context, "IFSC Code", manager.ifscCode, (val) => manager.ifscCode = val),
-        _buildEditableInfoTile(context, "Bank Name", manager.bankName, (val) => manager.bankName = val),
-        _buildEditableInfoTile(context, "Branch", manager.branch, (val) => manager.branch = val),
-      ],
-    );
+  List<Widget> _buildPersonalDetailsSection() {
+    return [
+      _buildEditableInfoTile("Aadhaar Number", _aadharController),
+      _buildDropdownField("Gender", _gender, ['Male', 'Female', 'Other'], (val) => setState(() => _gender = val)),
+      _buildDatePickerField("Date of Birth", _dateOfBirth, (val) => setState(() => _dateOfBirth = val)),
+      _buildDropdownField("Relationship Status", _relationshipStatus, ['Single', 'Married'], (val) => setState(() => _relationshipStatus = val)),
+    ];
   }
 
-  Widget _buildEmergencyContactDetailsSection(BuildContext context, Manager manager) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        _buildSectionTitle(context, "Emergency Contact"),
-        _buildEditableInfoTile(context, "Contact Name", manager.emergencyContactName, (val) => manager.emergencyContactName = val),
-        _buildEditableInfoTile(context, "Contact Number", manager.emergencyContactNumber, (val) => manager.emergencyContactNumber = val),
-      ],
-    );
+  List<Widget> _buildContactDetailsSection() {
+    return [
+      _buildEditableInfoTile("Phone Number", _phoneNumberController, keyboardType: TextInputType.phone),
+      _buildEditableInfoTile("Alternate Number", _alternateNumberController, keyboardType: TextInputType.phone),
+    ];
+  }
+
+  List<Widget> _buildAddressDetailsSection() {
+    return [
+      _buildEditableInfoTile("Address", _addressController),
+      _buildEditableInfoTile("City", _cityController),
+      _buildEditableInfoTile("State", _stateController),
+      _buildEditableInfoTile("Pin code", _pinCodeController, keyboardType: TextInputType.number),
+    ];
+  }
+
+  List<Widget> _buildProfessionalInformationSection() {
+    return [
+      _buildEditableInfoTile("Position", _positionController),
+      _buildDropdownField("Employment Type", _employmentType, ['full-time', 'part-time', 'internship', 'contract-based', 'other'], (val) => setState(() => _employmentType = val)),
+      _buildDatePickerField("Joining Date", _joiningDate, (val) => setState(() => _joiningDate = val)),
+      _buildEditableInfoTile("Experience (Years)", _experienceController, keyboardType: TextInputType.number),
+      _buildDropdownField("Status", _status, ['live', 'expired'], (val) => setState(() => _status = val)),
+      _buildEditableInfoTile("Reference", _referenceController),
+    ];
+  }
+
+  List<Widget> _buildEducationDetailsSection() {
+    return [
+      _buildEditableInfoTile("Qualification", _qualificationController),
+      _buildEditableInfoTile("Matriculation Marks (%)", _matriculationMarksController, keyboardType: TextInputType.number),
+      _buildEditableInfoTile("Intermediate Marks (%)", _intermediateMarksController, keyboardType: TextInputType.number),
+      _buildFilePickerTile("Matriculation Marksheet", _matriculationMarksheet, () => _pickDocument((file) => _matriculationMarksheet = file)),
+      _buildFilePickerTile("Intermediate Marksheet", _intermediateMarksheet, () => _pickDocument((file) => _intermediateMarksheet = file)),
+      _buildFilePickerTile("Resume", _resume, () => _pickDocument((file) => _resume = file)),
+    ];
+  }
+
+  List<Widget> _buildBankingDetailsSection() {
+    return [
+      _buildEditableInfoTile("Bank Account Number", _bankAccountNumberController, keyboardType: TextInputType.number),
+      _buildEditableInfoTile("IFSC Code", _ifscCodeController),
+      _buildEditableInfoTile("Bank Name", _bankNameController),
+      _buildEditableInfoTile("Branch", _branchController),
+    ];
+  }
+
+  List<Widget> _buildEmergencyContactDetailsSection() {
+    return [
+      _buildEditableInfoTile("Emergency Contact Name", _emergencyContactNameController),
+      _buildEditableInfoTile("Emergency Contact Number", _emergencyContactNumberController, keyboardType: TextInputType.phone),
+    ];
   }
 }
 
-class _AddManagerProfileBox extends StatelessWidget {
-  const _AddManagerProfileBox();
+class _ProfileBox extends StatelessWidget {
+  final AppFile? image;
+  final VoidCallback onPickImage;
+  const _ProfileBox({this.image, required this.onPickImage});
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final textTheme = theme.textTheme;
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(16.0),
-      decoration: BoxDecoration(
-        color: theme.primaryColor,
-        borderRadius: BorderRadius.circular(12),
-      ),
+    final screenSize = MediaQuery.of(context).size;
+    return Center(
       child: Column(
         children: [
-          Row(
-            children: [
-              Icon(Icons.person_add, color: theme.colorScheme.onPrimary, size: 30),
-              const SizedBox(width: 8),
-              Text("New Manager Profile",
-                  style: textTheme.titleLarge?.copyWith(
-                      color: theme.colorScheme.onPrimary,
-                      fontWeight: FontWeight.bold))
-            ],
+          CircleAvatar(
+            radius: screenSize.width * 0.15,
+            backgroundColor: theme.colorScheme.surface,
+            backgroundImage: image?.bytes != null ? MemoryImage(image!.bytes!) : null,
+            child: image == null
+                ? Icon(Icons.person_add_alt_1_rounded, size: screenSize.width * 0.15, color: theme.colorScheme.onSurface.withAlpha(128))
+                : null,
           ),
-          const SizedBox(height: 16),
-          const CircleAvatar(
-            radius: 40,
-            child: Icon(Icons.add_a_photo, size: 40),
-          ),
-          const SizedBox(height: 8),
-          Text("Add Profile Photo",
-              style: textTheme.titleMedium
-                  ?.copyWith(color: theme.colorScheme.onPrimary, fontWeight: FontWeight.bold)),
+          SizedBox(height: screenSize.height * 0.01),
+          TextButton.icon(
+            onPressed: onPickImage,
+            icon: Icon(Icons.camera_alt, color: theme.colorScheme.primary),
+            label: Text("Upload Photo", style: TextStyle(color: theme.colorScheme.primary)),
+          )
         ],
       ),
     );

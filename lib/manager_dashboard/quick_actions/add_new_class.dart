@@ -1,5 +1,9 @@
 import 'dart:async';
 import 'package:eduphin/services/api_service.dart';
+import 'package:eduphin/services/common_widgets.dart';
+import 'package:eduphin/services/caching_service.dart';
+import 'package:eduphin/services/error_handler.dart';
+import 'package:eduphin/services/responsive_helper.dart';
 import 'package:flutter/material.dart';
 
 // ───────────────────────────────────────────────────────────
@@ -19,6 +23,7 @@ class NewClass {
 
 class ClassApiService {
   Future<List<String>> fetchClassLevels() async {
+    // This could also be an API call, but keeping it as is for now if it's static
     await Future.delayed(const Duration(milliseconds: 500));
     return [
       'Primary',
@@ -51,7 +56,11 @@ class AddNewClassPage extends StatefulWidget {
 class _AddNewClassPageState extends State<AddNewClassPage> {
   final _formKey = GlobalKey<FormState>();
   final _apiService = ClassApiService();
-  late Future<List<String>> _levelsFuture;
+  
+  List<String> _levels = [];
+  bool _isLoading = true;
+  Object? _error;
+  final String _cacheKey = 'class_levels';
 
   final _newClass = NewClass();
   bool _isSubmitting = false;
@@ -59,7 +68,51 @@ class _AddNewClassPageState extends State<AddNewClassPage> {
   @override
   void initState() {
     super.initState();
-    _levelsFuture = _apiService.fetchClassLevels();
+    _loadData();
+  }
+
+  Future<void> _loadData() async {
+    await _loadCachedData();
+    await _fetchLevels();
+  }
+
+  Future<void> _loadCachedData() async {
+    final cachedData = await CacheService.getCache(_cacheKey);
+    if (cachedData != null && cachedData is List) {
+      if (mounted) {
+        setState(() {
+          _levels = List<String>.from(cachedData);
+          _isLoading = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _fetchLevels() async {
+    if (_levels.isEmpty) {
+      setState(() {
+        _isLoading = true;
+        _error = null;
+      });
+    }
+    try {
+      final levels = await _apiService.fetchClassLevels();
+      await CacheService.setCache(_cacheKey, levels);
+      if (mounted) {
+        setState(() {
+          _levels = levels;
+          _isLoading = false;
+          _error = null;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _error = e;
+          _isLoading = _levels.isEmpty;
+        });
+      }
+    }
   }
 
   // Updated to handle exceptions from the API service gracefully
@@ -91,13 +144,7 @@ class _AddNewClassPageState extends State<AddNewClassPage> {
 
     } catch (e) {
       if (!mounted) return;
-      // Display specific error message from the exception
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(e.toString().replaceFirst("Exception: ", "")),
-          backgroundColor: Colors.red,
-        ),
-      );
+      ErrorHandler.showError(context, e);
     } finally {
       if (mounted) {
         setState(() {
@@ -117,33 +164,57 @@ class _AddNewClassPageState extends State<AddNewClassPage> {
         centerTitle: true,
       ),
       floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
-      floatingActionButton: FutureBuilder<List<String>>(
-        future: _levelsFuture,
-        builder: (context, snapshot) {
-          if (snapshot.hasData) {
-            return _buildActionButtons(theme);
-          } else {
-            return const SizedBox.shrink();
-          }
-        },
-      ),
-      body: FutureBuilder<List<String>>(
-        future: _levelsFuture,
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
-          } else if (snapshot.hasError) {
-            return Center(child: Text("Error loading data: ${snapshot.error}"));
-          } else if (snapshot.hasData) {
-            final levels = snapshot.data!;
-            return _buildForm(theme, levels);
-          } else {
-            return const Center(child: Text('No levels data available'));
-          }
-        },
+      floatingActionButton: _isLoading && _levels.isEmpty ? null : _buildActionButtons(theme),
+      body: LoadingWrapper(
+        isLoading: _isLoading,
+        hasData: _levels.isNotEmpty,
+        error: _error,
+        onRetry: _fetchLevels,
+        skeleton: _buildSkeleton(),
+        child: _buildForm(theme, _levels),
       ),
     );
   }
+
+  Widget _buildSkeleton() {
+    final screenSize = MediaQuery.of(context).size;
+    return SingleChildScrollView(
+      padding: EdgeInsets.all(screenSize.width * 0.04),
+      child: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 600),
+          child: Container(
+            padding: EdgeInsets.all(screenSize.width * 0.04),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const SkeletonBox(height: 20, width: 100),
+                const SizedBox(height: 10),
+                const SkeletonBox(height: 50),
+                const SizedBox(height: 20),
+                const SkeletonBox(height: 20, width: 100),
+                const SizedBox(height: 10),
+                const SkeletonBox(height: 50),
+                const SizedBox(height: 20),
+                const SkeletonBox(height: 20, width: 100),
+                const SizedBox(height: 10),
+                const SkeletonBox(height: 120),
+                const SizedBox(height: 20),
+                const SkeletonBox(height: 20, width: 100),
+                const SizedBox(height: 10),
+                const SkeletonBox(height: 50),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
 
   Widget _buildForm(ThemeData theme, List<String> levels) {
     final screenSize = MediaQuery.of(context).size;
@@ -330,3 +401,4 @@ class _AddNewClassPageState extends State<AddNewClassPage> {
     );
   }
 }
+

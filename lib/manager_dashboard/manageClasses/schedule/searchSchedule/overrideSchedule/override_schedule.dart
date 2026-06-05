@@ -1,5 +1,7 @@
 import 'dart:convert';
 import 'package:eduphin/services/api_service.dart';
+import 'package:eduphin/services/common_widgets.dart';
+import 'package:eduphin/services/error_handler.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
@@ -59,7 +61,7 @@ class _OverrideSchedulePageState extends State<OverrideSchedulePage>{
   
   bool _isSaving = false;
   bool _isLoading = true;
-  String _error = '';
+  Object? _error;
 
   String _overrideType = 'cancelled'; // Default value
   int? _newSubjectId;
@@ -114,8 +116,9 @@ class _OverrideSchedulePageState extends State<OverrideSchedulePage>{
     } catch (e) {
       if (mounted) {
         setState(() {
-          _error = e.toString().replaceFirst("Exception: ", "");
+          _error = e;
         });
+        ErrorHandler.showError(context, e);
       }
     } finally {
       if (mounted) {
@@ -169,8 +172,7 @@ class _OverrideSchedulePageState extends State<OverrideSchedulePage>{
       }
     } catch (e) {
         if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(e.toString().replaceFirst('Exception: ', ''))));
+        ErrorHandler.showError(context, e);
     } finally {
       if (mounted) {
         setState(() {
@@ -274,27 +276,13 @@ class _OverrideSchedulePageState extends State<OverrideSchedulePage>{
   }
 
   Widget _buildBody(ThemeData theme) {
-     if (_isLoading) {
-      return const Center(child: CircularProgressIndicator());
-    }
-
-    if (_error.isNotEmpty) {
-      return Center(
-        child: Padding(
-          padding: const EdgeInsets.all(20.0),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Text('Error: $_error', style: TextStyle(color: theme.colorScheme.error), textAlign: TextAlign.center,),
-              const SizedBox(height: 16),
-              ElevatedButton(onPressed: _fetchData, child: const Text("Retry"))
-            ],
-          ),
-        ),
-      );
-    }
-
-    return LayoutBuilder(
+    return LoadingWrapper(
+      isLoading: _isLoading,
+      hasData: _subjects.isNotEmpty || _teachers.isNotEmpty,
+      error: _error,
+      onRetry: _fetchData,
+      skeleton: const Center(child: CircularProgressIndicator()),
+      child: LayoutBuilder(
         builder: (context, constraints) {
           return SingleChildScrollView(
             padding: const EdgeInsets.fromLTRB(16, 16, 16, 100),
@@ -306,7 +294,8 @@ class _OverrideSchedulePageState extends State<OverrideSchedulePage>{
             ),
           );
         },
-      );
+      ),
+    );
   }
 
   Widget _buildNarrowLayout(ThemeData theme) {

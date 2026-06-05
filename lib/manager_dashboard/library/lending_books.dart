@@ -1,6 +1,10 @@
 import 'dart:convert';
-
 import 'package:eduphin/services/api_service.dart';
+import 'package:eduphin/services/caching_service.dart';
+import 'package:eduphin/services/common_widgets.dart';
+import 'package:eduphin/services/error_handler.dart';
+import 'package:eduphin/services/responsive_helper.dart';
+import 'package:eduphin/teacher/dashboard/library_models.dart';
 import 'package:flutter/material.dart';
 
 class LendingBooksScreen extends StatefulWidget {
@@ -11,292 +15,276 @@ class LendingBooksScreen extends StatefulWidget {
 }
 
 class _LendingBooksScreenState extends State<LendingBooksScreen> {
-  List<LendingBook> lendingBooks = [];
-  bool isLoading = true; // To show a loader while fetching data
+  bool _isLoading = true;
+  Object? _error;
+  List<IssuedBook> _issuedBooks = [];
 
   @override
   void initState() {
     super.initState();
-    _fetchLendingBooks();
+    _loadCachedData().then((_) => _fetchIssuedBooks());
   }
 
-  Future<void> _fetchLendingBooks() async {
-    setState(() {
-      isLoading = true;
-    });
+  Future<void> _loadCachedData() async {
+    final cache = await CacheService.getCache('lending_books');
+    if (cache != null && mounted) {
+      final List<dynamic> data = cache;
+      setState(() {
+        _issuedBooks = data.map((json) => IssuedBook.fromJson(json)).toList();
+        _isLoading = false;
+      });
+    }
+  }
+
+  Future<void> _fetchIssuedBooks() async {
+    if (mounted) {
+      setState(() {
+        _isLoading = _issuedBooks.isEmpty;
+        _error = null;
+      });
+    }
     try {
       final response = await ApiService.get('manager/lending');
 
       if (response.statusCode == 200) {
-        final Map<String, dynamic> body = json.decode(response.body);
-
-        if (body['status'] == true &&
-            body['data'] != null &&
-            body['data']['data'] != null) {
-          final List<dynamic> data = body['data']['data'];
+        final body = json.decode(response.body);
+        if (body['status'] == true) {
+          final List<dynamic> data = body['data'] is List ? body['data'] : (body['data']['data'] ?? []);
+          await CacheService.setCache('lending_books', data);
           if (mounted) {
             setState(() {
-              lendingBooks =
-                  data.map((json) => LendingBook.fromJson(json)).toList();
-              isLoading = false;
+              _issuedBooks = data.map((json) => IssuedBook.fromJson(json)).toList();
+              _isLoading = false;
             });
           }
         } else {
-          throw Exception(body['message'] ?? 'Failed to parse lending books data');
+          throw Exception(body['message'] ?? 'Failed to load lending books');
         }
       } else {
-        throw Exception(
-            'Failed to load lending books. Status code: ${response.statusCode}');
+        throw Exception('Failed to load lending books. Status: ${response.statusCode}');
       }
     } catch (e) {
       if (mounted) {
         setState(() {
-          isLoading = false;
+          _error = e;
+          _isLoading = false;
         });
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: ${e.toString()}')),
-        );
+        ErrorHandler.showError(context, e);
       }
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
+    final theme = context.theme;
     return Scaffold(
       backgroundColor: theme.scaffoldBackgroundColor,
       appBar: AppBar(
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        leading: BackButton(color: theme.colorScheme.onSurface),
-        title: Text(
-          "Lending Books",
-          style: TextStyle(color: theme.colorScheme.onSurface),
+        title: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text("Lending Books", style: theme.appBarTheme.titleTextStyle?.copyWith(fontSize: context.font(18))),
+            Text("Track issued and overdue library books", style: theme.textTheme.labelSmall?.copyWith(color: theme.hintColor, fontSize: context.font(11))),
+          ],
         ),
+        actions: [
+          IconButton(
+            onPressed: _fetchIssuedBooks,
+            icon: const Icon(Icons.refresh_rounded),
+            tooltip: "Refresh",
+          ),
+          SizedBox(width: context.xs),
+        ],
       ),
-      body: isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : lendingBooks.isEmpty
-              ? const Center(child: Text("No lending records found."))
-              : LayoutBuilder(
-                  builder: (context, constraints) {
-                    if (constraints.maxWidth > 600) {
-                      return _buildGridView(lendingBooks);
-                    } else {
-                      return _buildListView(lendingBooks);
-                    }
-                  },
+      body: LoadingWrapper(
+        isLoading: _isLoading,
+        hasData: _issuedBooks.isNotEmpty,
+        error: _error,
+        onRetry: _fetchIssuedBooks,
+        skeleton: _buildSkeleton(context),
+        child: _issuedBooks.isEmpty
+            ? Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(Icons.library_books_outlined, size: context.scale(64), color: theme.colorScheme.outlineVariant.withValues(alpha: 0.5)),
+                    SizedBox(height: context.scale(16)),
+                    Text("No books currently lent out.", style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: context.font(16))),
+                  ],
                 ),
-    );
-  }
-
-  Widget _buildListView(List<LendingBook> books) {
-    return ListView.builder(
-      padding: const EdgeInsets.fromLTRB(16, 16, 16, 50),
-      itemCount: books.length,
-      itemBuilder: (context, index) {
-        final book = books[index];
-        return Padding(
-          padding: const EdgeInsets.only(bottom: 16.0),
-          child: _LendingBookCard(book: book, index: index),
-        );
-      },
-    );
-  }
-
-  Widget _buildGridView(List<LendingBook> books) {
-    return GridView.builder(
-      padding: const EdgeInsets.fromLTRB(16, 16, 16, 50),
-      itemCount: books.length,
-      gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
-        maxCrossAxisExtent: 500, // Adjust as needed
-        mainAxisSpacing: 16,
-        crossAxisSpacing: 16,
-        childAspectRatio: 2.2, // Adjust for content
-      ),
-      itemBuilder: (context, index) {
-        final book = books[index];
-        return _LendingBookCard(book: book, index: index);
-      },
-    );
-  }
-}
-
-class _LendingBookCard extends StatelessWidget {
-  final LendingBook book;
-  final int index;
-
-  const _LendingBookCard({required this.book, required this.index});
-
-  Color _getStatusColor(BuildContext context, String status) {
-    final theme = Theme.of(context);
-    switch (status) {
-      case "Pending":
-        return theme.colorScheme.secondary;
-      case "Overdue":
-        return theme.colorScheme.error;
-      case "Returned":
-        return theme.colorScheme.primary;
-      default:
-        return theme.colorScheme.onSurface;
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return Container(
-      padding: const EdgeInsets.all(18),
-      decoration: BoxDecoration(
-        color: theme.cardColor,
-        borderRadius: BorderRadius.circular(18),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisAlignment: MainAxisAlignment.center, // For GridView
-        children: [
-          // Title Row
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Expanded(
-                child: Text(
-                  "${index + 1}.  ${book.title}",
-                  style: theme.textTheme.titleMedium?.copyWith(
-                    color: theme.colorScheme.onSurface,
-                    fontWeight: FontWeight.bold,
+              )
+            : RefreshIndicator(
+                onRefresh: _fetchIssuedBooks,
+                child: Center(
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 1200),
+                    child: context.responsive(
+                      _buildListView(),
+                      tablet: _buildGridView(2),
+                      desktop: _buildGridView(3),
+                    ),
                   ),
                 ),
               ),
-              const SizedBox(width: 16),
-              Text(
-                book.status,
-                style: theme.textTheme.labelMedium?.copyWith(
-                  color: _getStatusColor(context, book.status),
-                  fontWeight: FontWeight.bold,
-                ),
-              )
-            ],
-          ),
-          const SizedBox(height: 14),
-          // Details Row
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    _buildInfoField(theme, "Book Issue Number", book.issueNo),
-                    const SizedBox(height: 10),
-                    _buildInfoField(theme, "Due Date", book.dueDate),
-                  ],
-                ),
-              ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    _buildInfoField(theme, "Issued At", book.issuedAt),
-                    const SizedBox(height: 10),
-                    _buildInfoField(
-                      theme,
-                      "Days Overdue",
-                      book.overdueDays.toString(),
-                      highlight: book.overdueDays > 0,
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ],
       ),
     );
   }
 
-  Widget _buildInfoField(ThemeData theme, String label, String value,
-      {bool highlight = false}) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          label,
-          style: theme.textTheme.bodySmall?.copyWith(color: theme.hintColor),
-        ),
-        const SizedBox(height: 2),
-        Text(
-          value,
-          style: theme.textTheme.bodyMedium?.copyWith(
-            color: highlight
-                ? theme.colorScheme.error
-                : theme.colorScheme.onSurface,
-            fontWeight: FontWeight.w500,
+  Widget _buildSkeleton(BuildContext context) {
+    return ListView.builder(
+      padding: context.pagePadding,
+      itemCount: 5,
+      itemBuilder: (context, index) => Card(
+        elevation: 0,
+        margin: EdgeInsets.only(bottom: context.md),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(context.scale(16))),
+        color: Colors.white,
+        child: Padding(
+          padding: EdgeInsets.all(context.spacing),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  SkeletonBox(width: context.scale(150), height: context.scale(20)),
+                  SkeletonBox(width: context.scale(60), height: context.scale(20)),
+                ],
+              ),
+              SizedBox(height: context.scale(8)),
+              SkeletonBox(width: context.scale(100), height: context.scale(14)),
+              SizedBox(height: context.scale(16)),
+              Row(
+                children: [
+                  Expanded(child: SkeletonBox(height: context.scale(40))),
+                  SizedBox(width: context.scale(16)),
+                  Expanded(child: SkeletonBox(height: context.scale(40))),
+                ],
+              ),
+            ],
           ),
         ),
-      ],
+      ),
+    );
+  }
+
+  Widget _buildListView() {
+    return ListView.builder(
+      padding: context.pagePadding,
+      itemCount: _issuedBooks.length,
+      itemBuilder: (context, index) => _LendingCard(issuedBook: _issuedBooks[index]),
+    );
+  }
+
+  Widget _buildGridView(int crossAxisCount) {
+    return GridView.builder(
+      padding: context.pagePadding,
+      itemCount: _issuedBooks.length,
+      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: crossAxisCount,
+        mainAxisSpacing: context.md,
+        crossAxisSpacing: context.md,
+        childAspectRatio: 1.4,
+      ),
+      itemBuilder: (context, index) => _LendingCard(issuedBook: _issuedBooks[index]),
     );
   }
 }
 
-class LendingBook {
-  final String title;
-  final String issueNo;
-  final String issuedAt;
-  final String dueDate;
-  final int overdueDays;
-  final String status;
+class _LendingCard extends StatelessWidget {
+  final IssuedBook issuedBook;
 
-  LendingBook({
-    required this.title,
-    required this.issueNo,
-    required this.issuedAt,
-    required this.dueDate,
-    required this.overdueDays,
-    required this.status,
-  });
+  const _LendingCard({required this.issuedBook});
 
-  factory LendingBook.fromJson(Map<String, dynamic> json) {
-    final dueDateString = json['due_date'] as String?;
-    final returnedAt = json['returned_at'];
-    DateTime? dueDate;
-    if (dueDateString != null) {
-      dueDate = DateTime.tryParse(dueDateString);
-    }
+  @override
+  Widget build(BuildContext context) {
+    final theme = context.theme;
+    final isOverdue = issuedBook.daysOverdue != null && issuedBook.daysOverdue! > 0;
 
-    int overdueDays = 0;
-    if (returnedAt == null && dueDate != null && DateTime.now().isAfter(dueDate)) {
-      overdueDays = DateTime.now().difference(dueDate).inDays;
-    }
+    return Card(
+      elevation: 0,
+      margin: EdgeInsets.only(bottom: context.md),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(context.scale(16)),
+        side: BorderSide(color: theme.colorScheme.outlineVariant.withValues(alpha: 0.5)),
+      ),
+      color: theme.colorScheme.surfaceContainerLow,
+      child: Padding(
+        padding: EdgeInsets.all(context.spacing),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(issuedBook.book.title, style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold, fontSize: context.font(16))),
+                      if (issuedBook.lenderName != null)
+                        Text("Issued to: ${issuedBook.lenderName}", style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.primary, fontWeight: FontWeight.w500)),
+                      Text("Issue No: ${issuedBook.issueNo}", style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
+                    ],
+                  ),
+                ),
+                if (isOverdue)
+                  Container(
+                    padding: EdgeInsets.symmetric(horizontal: context.scale(8), vertical: context.scale(4)),
+                    decoration: BoxDecoration(
+                      color: theme.colorScheme.error.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(context.scale(6)),
+                    ),
+                    child: Text(
+                      "${issuedBook.daysOverdue} DAYS OVERDUE",
+                      style: TextStyle(color: theme.colorScheme.error, fontWeight: FontWeight.bold, fontSize: context.font(10)),
+                    ),
+                  ),
+              ],
+            ),
+            SizedBox(height: context.md),
+            Row(
+              children: [
+                _LendingInfoItem(icon: Icons.calendar_today_outlined, label: "Issued Date", value: issuedBook.issuedAt),
+                SizedBox(width: context.lg),
+                _LendingInfoItem(
+                  icon: Icons.event_busy_outlined,
+                  label: "Due Date",
+                  value: issuedBook.dueDate,
+                  valueColor: isOverdue ? theme.colorScheme.error : null,
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
 
-    String status;
-    if (returnedAt != null) {
-      status = "Returned";
-    } else if (overdueDays > 0) {
-      status = "Overdue";
-    } else {
-      status = "Pending";
-    }
+class _LendingInfoItem extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final String value;
+  final Color? valueColor;
 
-    String formatDate(String? dateString) {
-      if (dateString == null) return 'N/A';
-      try {
-        final date = DateTime.parse(dateString);
-        return date.toIso8601String().substring(0, 10);
-      } catch (e) {
-        return dateString;
-      }
-    }
+  const _LendingInfoItem({required this.icon, required this.label, required this.value, this.valueColor});
 
-    return LendingBook(
-      title: json['book']?['title'] ?? 'N/A',
-      issueNo: json['id']?.toString() ?? 'N/A',
-      issuedAt: formatDate(json['issued_at'] as String?),
-      dueDate: formatDate(dueDateString),
-      overdueDays: overdueDays,
-      status: status,
+  @override
+  Widget build(BuildContext context) {
+    final theme = context.theme;
+    return Row(
+      children: [
+        Icon(icon, size: context.scale(16), color: theme.colorScheme.primary),
+        SizedBox(width: context.xs),
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(label, style: theme.textTheme.labelSmall?.copyWith(fontSize: context.font(9), color: theme.hintColor)),
+            Text(value, style: theme.textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w600, fontSize: context.font(12), color: valueColor)),
+          ],
+        ),
+      ],
     );
   }
 }

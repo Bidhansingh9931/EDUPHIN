@@ -1,14 +1,43 @@
+import 'package:eduphin/services/error_handler.dart';
 import 'dart:async';
+import 'dart:io';
+import 'package:eduphin/moderator_dashboard/cache_helper.dart';
+import 'package:eduphin/moderator_dashboard/skeleton_widgets.dart';
 import 'package:eduphin/services/api_service.dart';
 import 'package:eduphin/moderator_dashboard/moderator_dashboard.dart';
+import 'package:eduphin/services/responsive_helper.dart';
+import 'package:eduphin/services/common_widgets.dart';
 import 'package:flutter/material.dart';
 
 import '../../institute/institute_model.dart';
 
 // 1. Data Provider to fetch live institute details
 class InstituteDetailProvider {
-  Future<Institute> fetchInstituteDetails(String instituteId) async {
-    return ApiService.getInstituteDetails(instituteId);
+  static const String _cacheKeyPrefix = 'institute_detail_';
+
+  Future<Institute> fetchInstituteDetails(String instituteId, {bool bypassCache = false}) async {
+    try {
+      if (!bypassCache) {
+        final cached = await getCachedInstituteDetails(instituteId);
+        if (cached != null) return cached;
+      }
+      final data = await ApiService.getInstituteDetails(instituteId);
+      await CacheHelper.save(_cacheKeyPrefix + instituteId, data.toJson());
+      return data;
+    } on SocketException {
+      throw NetworkException();
+    } catch (e) {
+      if (e is NetworkException) rethrow;
+      throw Exception('Failed to fetch institute details: $e');
+    }
+  }
+
+  Future<Institute?> getCachedInstituteDetails(String instituteId) async {
+    final cached = await CacheHelper.load(_cacheKeyPrefix + instituteId);
+    if (cached != null) {
+      return Institute.fromJson(cached);
+    }
+    return null;
   }
 }
 
@@ -25,183 +54,172 @@ class ViewInstitutePage extends StatefulWidget {
 class _ViewInstitutePageState extends State<ViewInstitutePage> {
   final InstituteDetailProvider _provider = InstituteDetailProvider();
   late Future<Institute> _instituteFuture;
+  Institute? _cachedInstitute;
 
   @override
   void initState() {
     super.initState();
-    _instituteFuture = _provider.fetchInstituteDetails(widget.instituteId);
+    _loadInitialData();
+  }
+
+  Future<void> _loadInitialData() async {
+    _cachedInstitute = await _provider.getCachedInstituteDetails(widget.instituteId);
+    if (mounted) {
+      setState(() {
+        _instituteFuture = _provider.fetchInstituteDetails(widget.instituteId);
+      });
+    }
+  }
+
+  Future<void> _refreshData({bool bypassCache = false}) async {
+    setState(() {
+      _instituteFuture = _provider.fetchInstituteDetails(widget.instituteId, bypassCache: bypassCache);
+    });
+    try {
+      await _instituteFuture;
+    } catch (e) {
+      if (mounted) {
+        ErrorHandler.showError(context, e);
+      }
+    }
   }
 
   @override
   Widget build(BuildContext context) {
-    final screenWidth = MediaQuery.of(context).size.width;
+    final theme = context.theme;
+    final colorScheme = theme.colorScheme;
 
-    double responsiveFontSize(double baseSize) {
-      if (screenWidth > 1200) return baseSize * 1.2;
-      if (screenWidth > 600) return baseSize * 1.1;
-      return baseSize;
-    }
-
-    Widget buildScaffold(String title, Widget body) {
-      return Scaffold(
-        backgroundColor: const Color(0xFF0D1B2A),
-        appBar: AppBar(
-          backgroundColor: const Color(0xFF0D1B2A),
-          iconTheme: const IconThemeData(color: Colors.white),
-          title: Text(title, style: TextStyle(color: Colors.white, fontSize: responsiveFontSize(18))),
-        ),
-        body: Center(child: body),
-      );
-    }
-
-    // 3. Use FutureBuilder to handle loading and displaying real data
     return FutureBuilder<Institute>(
       future: _instituteFuture,
       builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return buildScaffold("Loading...", const CircularProgressIndicator());
-        } else if (snapshot.hasError) {
-          return buildScaffold("Error", Text('Error: ${snapshot.error}', textAlign: TextAlign.center, style: const TextStyle(color: Colors.white70)));
-        } else if (!snapshot.hasData) {
-          return buildScaffold("Not Found", const Text('Institute not found.', style: TextStyle(color: Colors.white70)));
-        }
-
-        final institute = snapshot.data!;
-
-        // Helper to construct the full image URL
-        String? getLogoUrl(String? path) {
-          if (path == null || path.isEmpty) return null;
-          final baseUrl = ApiService.baseImageUrl; // Use the correct base URL from ApiService
-          return '$baseUrl/storage/$path';
-        }
-
-        final logoUrl = getLogoUrl(institute.logo);
-
-        Color getStatusColor(String status) {
-          switch (status.toLowerCase()) {
-            case 'active':
-              return Colors.green.shade600;
-            case 'inactive':
-              return Colors.red.shade600;
-            case 'pending':
-              return Colors.orange.shade600;
-            default:
-              return Colors.grey.shade600;
-          }
-        }
-
-        final detailItems = [
-          DetailCard(icon: Icons.person_outline_sharp, label: "Chairman", value: institute.chairmanName),
-          DetailCard(icon: Icons.book_outlined, label: "Institute Code", value: institute.code),
-          DetailCard(icon: Icons.calendar_today_outlined, label: "Established", value: institute.establishedYear.toString()),
-          DetailCard(icon: Icons.location_on_outlined, label: "Address", value: '${institute.address}, ${institute.city}, ${institute.state} - ${institute.pincode}'),
-          DetailCard(icon: Icons.email_outlined, label: "Email", value: institute.contactEmail),
-          DetailCard(icon: Icons.phone_outlined, label: "Phone Number", value: institute.contactPhone),
-          DetailCard(icon: Icons.web_outlined, label: "Website", value: institute.website ?? 'N/A'),
-          DetailCard(icon: Icons.corporate_fare_outlined, label: "Affiliation", value: institute.affiliationDetails ?? 'N/A'),
-        ];
-
-        return Scaffold(
-          backgroundColor: const Color(0xFF0D1B2A),
-          appBar: AppBar(
-            backgroundColor: const Color(0xFF0D1B2A),
-            iconTheme: const IconThemeData(color: Colors.white),
-            title: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Flexible(
-                  child: Text(
-                    institute.name,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(color: Colors.white, fontSize: responsiveFontSize(18)),
-                  ),
-                ),
-                InkWell(
-                  onTap: () => Navigator.pushReplacement(
-                      context, MaterialPageRoute(builder: (context) => const ModeratorDashboardPage())),                  child: const Icon(Icons.home_sharp, size: 30, color: Colors.white),
-                ),
-              ],
-            ),
+        return ModeratorLoadingWrapper<Institute>(
+          snapshot: snapshot,
+          cachedData: _cachedInstitute,
+          skeleton: Scaffold(
+            appBar: AppBar(title: const Text("Loading...")),
+            body: const DetailSkeleton(),
           ),
-          body: SingleChildScrollView(
-            child: Padding(
-              padding: EdgeInsets.fromLTRB(screenWidth * 0.04, 16, screenWidth * 0.04, 80),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.center,
-                children: [
-                  Center(
-                    child: Container(
-                      height: screenWidth * 0.25,
-                      width: screenWidth * 0.25,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        color: const Color(0xFF1B263B),
-                        border: Border.all(color: Colors.white24),
-                        image: logoUrl != null 
-                            ? DecorationImage(image: NetworkImage(logoUrl), fit: BoxFit.cover)
-                            : null,
-                      ),
-                      child: logoUrl == null
-                          ? Icon(Icons.school_outlined, size: screenWidth * 0.15, color: Colors.white70)
-                          : null,
+          onRefresh: () => _refreshData(bypassCache: true),
+          builder: (institute) {
+            final logoUrl = ApiService.getStorageUrl(institute.logo);
+
+            Color getStatusColor(String status) {
+              switch (status.toLowerCase()) {
+                case 'active':
+                  return Colors.greenAccent[700]!;
+                case 'inactive':
+                  return colorScheme.error;
+                case 'pending':
+                  return Colors.orangeAccent[700]!;
+                default:
+                  return colorScheme.outline;
+              }
+            }
+
+            final detailItems = [
+              DetailCard(icon: Icons.person_outline_sharp, label: "Chairman", value: institute.chairmanName),
+              DetailCard(icon: Icons.book_outlined, label: "Institute Code", value: institute.code),
+              DetailCard(icon: Icons.calendar_today_outlined, label: "Established", value: institute.establishedYear.toString()),
+              DetailCard(icon: Icons.location_on_outlined, label: "Address", value: '${institute.address}, ${institute.city}, ${institute.state} - ${institute.pincode}'),
+              DetailCard(icon: Icons.email_outlined, label: "Email", value: institute.contactEmail),
+              DetailCard(icon: Icons.phone_outlined, label: "Phone Number", value: institute.contactPhone),
+              DetailCard(icon: Icons.web_outlined, label: "Website", value: institute.website ?? 'N/A'),
+              DetailCard(icon: Icons.corporate_fare_outlined, label: "Affiliation", value: institute.affiliationDetails ?? 'N/A'),
+            ];
+
+            return Scaffold(
+              appBar: AppBar(
+                title: Text(institute.name, style: TextStyle(fontSize: context.font(20))),
+                actions: [
+                  IconButton(
+                    onPressed: () => Navigator.pushReplacement(
+                        context,
+                        MaterialPageRoute(builder: (context) => const ModeratorDashboardPage())
                     ),
+                    icon: Icon(Icons.home_rounded, size: context.scale(24)),
                   ),
-                  const SizedBox(height: 16),
-                  Text(
-                    institute.name,
-                    textAlign: TextAlign.center,
-                    style: TextStyle(color: Colors.white, fontSize: responsiveFontSize(22), fontWeight: FontWeight.bold),
-                  ),
-                  const SizedBox(height: 10),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Text(
-                        "Status: ",
-                        style: TextStyle(color: Colors.white70, fontSize: responsiveFontSize(14)),
-                      ),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-                        decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(30),
-                          color: getStatusColor(institute.status),
-                        ),
-                        child: Text(
-                          institute.status.toUpperCase(),
-                          style: TextStyle(fontWeight: FontWeight.bold, fontSize: responsiveFontSize(12), color: Colors.white),
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 24),
-                  LayoutBuilder(builder: (context, constraints) {
-                    if (constraints.maxWidth > 700) {
-                      return GridView.builder(
-                        shrinkWrap: true,
-                        physics: const NeverScrollableScrollPhysics(),
-                        itemCount: detailItems.length,
-                        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                          crossAxisCount: 2,
-                          crossAxisSpacing: 16,
-                          mainAxisSpacing: 16,
-                          childAspectRatio: 4, // Adjust for content
-                        ),
-                        itemBuilder: (context, index) => detailItems[index],
-                      );
-                    } else {
-                      return ListView.separated(
-                        shrinkWrap: true,
-                        physics: const NeverScrollableScrollPhysics(),
-                        itemCount: detailItems.length,
-                        itemBuilder: (context, index) => detailItems[index],
-                        separatorBuilder: (context, index) => const SizedBox(height: 12),
-                      );
-                    }
-                  }),
+                  SizedBox(width: context.md),
                 ],
               ),
-            ),
-          ),
+              body: RefreshIndicator(
+                onRefresh: () async => _refreshData(bypassCache: true),
+                child: SingleChildScrollView(
+                  padding: context.pagePadding,
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  child: Center(
+                    child: ConstrainedBox(
+                      constraints: const BoxConstraints(maxWidth: 900),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.center,
+                        children: [
+                          Center(
+                            child: ProfileAvatar(
+                              imageUrl: logoUrl,
+                              radius: context.scale(60),
+                            ),
+                          ),
+                          SizedBox(height: context.md),
+                          Text(
+                            institute.name,
+                            textAlign: TextAlign.center,
+                            style: TextStyle(fontSize: context.font(24), fontWeight: FontWeight.bold, color: colorScheme.onSurface),
+                          ),
+                          SizedBox(height: context.sm),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Text(
+                                "Status: ",
+                                style: TextStyle(color: colorScheme.onSurfaceVariant, fontSize: context.font(14)),
+                              ),
+                              Container(
+                                padding: EdgeInsets.symmetric(horizontal: context.scale(12), vertical: context.scale(4)),
+                                decoration: BoxDecoration(
+                                  borderRadius: BorderRadius.circular(context.scale(30)),
+                                  color: getStatusColor(institute.status).withValues(alpha: 0.1),
+                                  border: Border.all(color: getStatusColor(institute.status).withValues(alpha: 0.5)),
+                                ),
+                                child: Text(
+                                  institute.status.toUpperCase(),
+                                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: context.font(12), color: getStatusColor(institute.status)),
+                                ),
+                              ),
+                            ],
+                          ),
+                          SizedBox(height: context.lg),
+                          LayoutBuilder(builder: (context, constraints) {
+                            if (constraints.maxWidth > 600) {
+                              return GridView.builder(
+                                shrinkWrap: true,
+                                physics: const NeverScrollableScrollPhysics(),
+                                itemCount: detailItems.length,
+                                gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                                  crossAxisCount: 2,
+                                  crossAxisSpacing: context.md,
+                                  mainAxisSpacing: context.md,
+                                  mainAxisExtent: context.scale(100),
+                                ),
+                                itemBuilder: (context, index) => detailItems[index],
+                              );
+                            } else {
+                              return ListView.separated(
+                                shrinkWrap: true,
+                                physics: const NeverScrollableScrollPhysics(),
+                                itemCount: detailItems.length,
+                                itemBuilder: (context, index) => detailItems[index],
+                                separatorBuilder: (context, index) => SizedBox(height: context.md),
+                              );
+                            }
+                          }),
+                          SizedBox(height: context.xl),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            );
+          },
         );
       },
     );
@@ -222,28 +240,29 @@ class DetailCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final screenWidth = MediaQuery.of(context).size.width;
-    double responsiveFontSize(double baseSize) {
-      if (screenWidth > 1200) return baseSize * 1.2;
-      if (screenWidth > 600) return baseSize * 1.1;
-      return baseSize;
-    }
-
+    final colorScheme = Theme.of(context).colorScheme;
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 15),
+      padding: EdgeInsets.all(context.md),
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(16),
-        color: const Color(0xFF1B263B),
+        borderRadius: BorderRadius.circular(context.scale(16)),
+        color: colorScheme.surfaceContainerLow,
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          Icon(
-            icon,
-            color: const Color(0xFF0E86D4),
-            size: responsiveFontSize(28),
+          Container(
+            padding: EdgeInsets.all(context.sm),
+            decoration: BoxDecoration(
+              color: colorScheme.primary.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(context.scale(12)),
+            ),
+            child: Icon(
+              icon,
+              color: colorScheme.primary,
+              size: context.scale(24),
+            ),
           ),
-          const SizedBox(width: 15),
+          SizedBox(width: context.md),
           Expanded(
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
@@ -251,15 +270,15 @@ class DetailCard extends StatelessWidget {
               children: [
                 Text(
                   label,
-                  style: TextStyle(color: Colors.white54, fontSize: responsiveFontSize(13)),
+                  style: TextStyle(color: colorScheme.onSurfaceVariant, fontSize: context.font(12)),
                 ),
-                const SizedBox(height: 5),
+                SizedBox(height: context.xs),
                 Text(
                   value,
                   style: TextStyle(
-                      color: Colors.white,
-                      fontSize: responsiveFontSize(15),
-                      fontWeight: FontWeight.bold),
+                      fontSize: context.font(14),
+                      fontWeight: FontWeight.bold,
+                      color: colorScheme.onSurface),
                   overflow: TextOverflow.ellipsis,
                   maxLines: 2,
                 ),
@@ -271,3 +290,5 @@ class DetailCard extends StatelessWidget {
     );
   }
 }
+
+

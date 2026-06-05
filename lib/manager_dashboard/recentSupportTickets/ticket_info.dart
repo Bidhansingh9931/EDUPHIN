@@ -1,5 +1,9 @@
 import 'dart:convert';
+import 'package:eduphin/services/error_handler.dart';
 import 'package:eduphin/services/api_service.dart';
+import 'package:eduphin/services/caching_service.dart';
+import 'package:eduphin/services/common_widgets.dart';
+import 'package:eduphin/services/responsive_helper.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'ticket_details.dart';
@@ -136,26 +140,50 @@ class _TicketInfoPageState extends State<TicketInfoPage> {
   bool _isLoading = true;
   List<Ticket> _tickets = [];
   List<AssignableUser> _assignableUsers = [];
+  Object? _error;
+  final String _cacheKey = 'manager_tickets';
 
   @override
   void initState() {
     super.initState();
-    _fetchTickets();
+    _loadData();
+  }
+
+  Future<void> _loadData() async {
+    await _loadCachedData();
+    await _fetchTickets();
+  }
+
+  Future<void> _loadCachedData() async {
+    final cachedData = await CacheService.getCache(_cacheKey);
+    if (cachedData != null) {
+      if (mounted) {
+        setState(() {
+          final List<dynamic> ticketsList = cachedData['tickets'] as List? ?? [];
+          _tickets = ticketsList.whereType<Map<String, dynamic>>().map(Ticket.fromJson).toList();
+
+          final List<dynamic> usersList = cachedData['assignable_users'] as List? ?? [];
+          _assignableUsers = usersList.whereType<Map<String, dynamic>>().map(AssignableUser.fromJson).toList();
+          _isLoading = _tickets.isEmpty;
+        });
+      }
+    }
   }
 
   Future<void> _fetchTickets() async {
-    if (!mounted) return;
-    setState(() {
-      _isLoading = true;
-    });
+    if (_tickets.isEmpty) {
+      setState(() {
+        _isLoading = true;
+        _error = null;
+      });
+    }
 
     try {
       final response = await ApiService.get('manager/tickets');
 
-      if (!mounted) return;
-
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
+        await CacheService.setCache(_cacheKey, data);
 
         final List<dynamic> ticketsList = data['tickets'] as List? ?? [];
         final ticketsData =
@@ -165,82 +193,163 @@ class _TicketInfoPageState extends State<TicketInfoPage> {
         final usersData =
             usersList.whereType<Map<String, dynamic>>().map(AssignableUser.fromJson).toList();
 
-        setState(() {
-          _tickets = ticketsData;
-          _assignableUsers = usersData;
-          _isLoading = false;
-        });
+        if (mounted) {
+          setState(() {
+            _tickets = ticketsData;
+            _assignableUsers = usersData;
+            _isLoading = false;
+            _error = null;
+          });
+        }
       } else {
         throw Exception('Failed to load tickets');
       }
     } catch (e) {
-      if (!mounted) return;
-      setState(() {
-        _isLoading = false;
-      });
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(e.toString())),
-      );
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+          _error = e;
+        });
+        ErrorHandler.showError(context, e);
+      }
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
+    final theme = context.theme;
     return Scaffold(
-      backgroundColor: theme.scaffoldBackgroundColor,
+      backgroundColor: theme.colorScheme.surface,
       appBar: AppBar(
-        backgroundColor: theme.scaffoldBackgroundColor,
-        elevation: 0,
-        leading: BackButton(color: theme.colorScheme.onSurface),
-        title: const Text(
-          "Recent Support Tickets",
-          style: TextStyle(fontWeight: FontWeight.w600),
+        title: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text("Support Tickets", style: theme.appBarTheme.titleTextStyle?.copyWith(fontSize: context.font(18))),
+            Text("Manage and respond to support requests", style: theme.textTheme.labelSmall?.copyWith(color: theme.hintColor, fontSize: context.font(11))),
+          ],
         ),
-        actions: const [
-          Padding(
-            padding: EdgeInsets.only(right: 16),
-            child: Icon(Icons.download),
-          )
+        centerTitle: false,
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.download),
+            onPressed: () {
+              // TODO: Implement export
+            },
+          ),
+          SizedBox(width: context.sm),
         ],
       ),
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : LayoutBuilder(builder: (context, constraints) {
-              if (constraints.maxWidth > 700) {
-                return _buildGridView();
-              } else {
-                return _buildListView();
-              }
-            }),
+      body: LoadingWrapper(
+        isLoading: _isLoading,
+        hasData: _tickets.isNotEmpty,
+        error: _error,
+        onRetry: _fetchTickets,
+        skeleton: _buildSkeleton(),
+        child: RefreshIndicator(
+          onRefresh: _fetchTickets,
+          child: _tickets.isEmpty && !_isLoading
+              ? const Center(child: Text("No tickets found"))
+              : Center(
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 1200),
+                    child: context.responsive(
+                      _buildListView(),
+                      tablet: _buildGridView(crossAxisCount: 2),
+                      desktop: _buildGridView(crossAxisCount: 3),
+                    ),
+                  ),
+                ),
+        ),
+      ),
     );
   }
 
-  Widget _buildListView() {
-    return ListView.separated(
-      padding: const EdgeInsets.fromLTRB(16, 16, 16, 50),
-      itemCount: _tickets.length,
+  Widget _buildSkeleton() {
+    final theme = context.theme;
+    return ListView.builder(
+      padding: context.pagePadding,
+      itemCount: 5,
       itemBuilder: (context, index) {
-        return TicketCard(
-          key: ValueKey(_tickets[index].serial),
-          ticket: _tickets[index],
-          assignableUsers: _assignableUsers,
-          onUpdate: _fetchTickets,
+        return Padding(
+          padding: EdgeInsets.only(bottom: context.md),
+          child: Container(
+            padding: EdgeInsets.all(context.spacing),
+            decoration: BoxDecoration(
+              color: theme.colorScheme.surfaceContainerLow,
+              borderRadius: BorderRadius.circular(context.scale(16)),
+              border: Border.all(color: theme.colorScheme.outlineVariant),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    SkeletonBox(height: context.scale(15), width: context.scale(60)),
+                    SkeletonBox(height: context.scale(20), width: context.scale(80)),
+                  ],
+                ),
+                SizedBox(height: context.md),
+                SkeletonBox(height: context.scale(20), width: context.scale(200)),
+                SizedBox(height: context.md),
+                Row(
+                  children: [
+                    Expanded(child: SkeletonBox(height: context.scale(15), width: context.scale(80))),
+                    Expanded(child: SkeletonBox(height: context.scale(15), width: context.scale(80))),
+                  ],
+                ),
+                SizedBox(height: context.md),
+                SkeletonBox(height: context.scale(32), width: context.scale(32), borderRadius: context.scale(16)),
+                SizedBox(height: context.md),
+                SkeletonBox(height: context.scale(15), width: context.scale(100)),
+                SizedBox(height: context.md),
+                Divider(color: theme.colorScheme.outlineVariant),
+                SizedBox(height: context.sm),
+                Row(
+                  children: [
+                    SkeletonBox(height: context.scale(40), width: context.scale(60)),
+                    SizedBox(width: context.sm),
+                    SkeletonBox(height: context.scale(40), width: context.scale(60)),
+                    SizedBox(width: context.sm),
+                    Expanded(child: SkeletonBox(height: context.scale(45))),
+                  ],
+                ),
+              ],
+            ),
+          ),
         );
       },
-      separatorBuilder: (context, index) => const SizedBox(height: 16),
     );
   }
 
-  Widget _buildGridView() {
-    return GridView.builder(
-      padding: const EdgeInsets.fromLTRB(16, 16, 16, 50),
+
+  Widget _buildListView() {
+    return ListView.builder(
+      padding: context.pagePadding,
       itemCount: _tickets.length,
-      gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
-        maxCrossAxisExtent: 600,
-        mainAxisSpacing: 16,
-        crossAxisSpacing: 16,
-        childAspectRatio: 1.8,
+      itemBuilder: (context, index) {
+        return Padding(
+          padding: EdgeInsets.only(bottom: context.md),
+          child: TicketCard(
+            key: ValueKey(_tickets[index].serial),
+            ticket: _tickets[index],
+            assignableUsers: _assignableUsers,
+            onUpdate: _fetchTickets,
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildGridView({required int crossAxisCount}) {
+    return GridView.builder(
+      padding: context.pagePadding,
+      itemCount: _tickets.length,
+      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: crossAxisCount,
+        mainAxisSpacing: context.md,
+        crossAxisSpacing: context.md,
+        childAspectRatio: 0.9,
       ),
       itemBuilder: (context, index) {
         return TicketCard(
@@ -309,7 +418,7 @@ class _TicketCardState extends State<TicketCard> {
       }
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString())));
+      ErrorHandler.showError(context, e);
     }
   }
 
@@ -328,81 +437,169 @@ class _TicketCardState extends State<TicketCard> {
       }
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString())));
+      ErrorHandler.showError(context, e);
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: theme.colorScheme.surface,
-        borderRadius: BorderRadius.circular(16),
+    final theme = context.theme;
+    return Card(
+      elevation: 0,
+      color: theme.colorScheme.surfaceContainerLow,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(context.scale(16)),
+        side: BorderSide(color: theme.colorScheme.outlineVariant, width: 0.5),
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          _rowText(theme, "Serial No.", widget.ticket.serial, "Issued By",
-              widget.ticket.issuedBy),
-          const SizedBox(height: 12),
-          Text("Title", style: TextStyle(color: theme.hintColor)),
-          const SizedBox(height: 4),
-          Text(widget.ticket.title, style: theme.textTheme.titleMedium),
-          const SizedBox(height: 12),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              _priorityChip(theme),
-              _columnText(theme, "Category", widget.ticket.category),
-            ],
-          ),
-          const SizedBox(height: 12),
-          Text("Assigned to", style: TextStyle(color: theme.hintColor)),
-          const SizedBox(height: 6),
-          Row(
-            children: widget.assignableUsers
-                .where((user) => widget.ticket.assignedUsers.contains(user.id))
-                .map((e) => _avatar(theme, e.name.substring(0, 2).toUpperCase()))
-                .toList(),
-          ),
-          const SizedBox(height: 12),
-          Text("Created At", style: TextStyle(color: theme.hintColor)),
-          const SizedBox(height: 4),
-          Text(widget.ticket.createdAt),
-          const Divider(height: 32),
-          Row(
-            children: [
-              _actionButton(
-                theme,
-                text: "Change Status",
-                onTap: () => _openStatusBottomSheet(context),
-                isPrimary: false,
-              ),
-              const SizedBox(width: 10),
-              _actionButton(
-                theme,
-                text: "Set Priority",
-                onTap: () => _openPriorityBottomSheet(context),
-                isPrimary: false,
-              ),
-              const SizedBox(width: 10),
-              _actionButton(
-                theme,
-                text: "View",
-                onTap: () {
-                  Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                          builder: (context) =>
-                              TicketDetailsPage(ticketId: widget.ticket.serial)));
-                },
-                isPrimary: true,
-              ),
-            ],
-          ),
-        ],
+      child: Padding(
+        padding: EdgeInsets.all(context.spacing),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                _infoColumn(context, "Serial No.", widget.ticket.serial),
+                _priorityChip(context),
+              ],
+            ),
+            SizedBox(height: context.md),
+            Text("Title", style: theme.textTheme.labelSmall?.copyWith(color: theme.colorScheme.secondary, fontSize: context.font(11))),
+            Text(
+              widget.ticket.title,
+              style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold, fontSize: context.font(16)),
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+            ),
+            SizedBox(height: context.md),
+            Row(
+              children: [
+                Expanded(child: _infoColumn(context, "Issued By", widget.ticket.issuedBy)),
+                Expanded(child: _infoColumn(context, "Category", widget.ticket.category)),
+              ],
+            ),
+            SizedBox(height: context.md),
+            Text("Assigned to", style: theme.textTheme.labelSmall?.copyWith(color: theme.colorScheme.secondary, fontSize: context.font(11))),
+            const SizedBox(height: 4),
+            Row(
+              children: widget.assignableUsers
+                  .where((user) => widget.ticket.assignedUsers.contains(user.id))
+                  .map<Widget>((e) => _avatar(context, e.name.substring(0, 2).toUpperCase()))
+                  .toList(),
+            ),
+            SizedBox(height: context.md),
+            _infoColumn(context, "Created At", widget.ticket.createdAt),
+            SizedBox(height: context.md),
+            const Divider(),
+            SizedBox(height: context.sm),
+            Row(
+              children: [
+                _actionIconButton(
+                  context,
+                  icon: Icons.sync,
+                  label: "Status",
+                  onTap: () => _openStatusBottomSheet(context),
+                ),
+                SizedBox(width: context.sm),
+                _actionIconButton(
+                  context,
+                  icon: Icons.priority_high,
+                  label: "Priority",
+                  onTap: () => _openPriorityBottomSheet(context),
+                ),
+                SizedBox(width: context.sm),
+                Expanded(
+                  child: FilledButton(
+                    onPressed: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => TicketDetailsPage(ticketId: widget.ticket.serial),
+                        ),
+                      );
+                    },
+                    style: FilledButton.styleFrom(
+                      padding: EdgeInsets.symmetric(vertical: context.scale(12)),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(context.scale(12))),
+                    ),
+                    child: Text("VIEW DETAILS", style: TextStyle(fontSize: context.font(13), fontWeight: FontWeight.bold)),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _infoColumn(BuildContext context, String label, String value) {
+    final theme = context.theme;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(label, style: theme.textTheme.labelSmall?.copyWith(color: theme.colorScheme.secondary, fontSize: context.font(11))),
+        Text(value, style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600, fontSize: context.font(14))),
+      ],
+    );
+  }
+
+  Widget _priorityChip(BuildContext context) {
+    final theme = context.theme;
+    final color = _getPriorityColor(_selectedPriority);
+    return Container(
+      padding: EdgeInsets.symmetric(horizontal: context.scale(10), vertical: context.scale(4)),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(context.scale(20)),
+        border: Border.all(color: color.withValues(alpha: 0.2)),
+      ),
+      child: Text(
+        _selectedPriority.displayName.toUpperCase(),
+        style: theme.textTheme.labelSmall?.copyWith(color: color, fontWeight: FontWeight.bold, fontSize: context.font(10)),
+      ),
+    );
+  }
+
+  Widget _avatar(BuildContext context, String text) {
+    final theme = context.theme;
+    return Container(
+      margin: const EdgeInsets.only(right: 6),
+      width: context.scale(32),
+      height: context.scale(32),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.primaryContainer,
+        shape: BoxShape.circle,
+      ),
+      alignment: Alignment.center,
+      child: Text(
+        text,
+        style: theme.textTheme.labelSmall?.copyWith(
+          color: theme.colorScheme.onPrimaryContainer,
+          fontWeight: FontWeight.bold,
+          fontSize: context.font(10),
+        ),
+      ),
+    );
+  }
+
+  Widget _actionIconButton(BuildContext context, {required IconData icon, required String label, required VoidCallback onTap}) {
+    final theme = context.theme;
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(context.scale(12)),
+      child: Container(
+        padding: EdgeInsets.symmetric(horizontal: context.scale(8), vertical: context.scale(6)),
+        decoration: BoxDecoration(
+          border: Border.all(color: theme.colorScheme.outlineVariant),
+          borderRadius: BorderRadius.circular(context.scale(12)),
+        ),
+        child: Column(
+          children: [
+            Icon(icon, size: context.scale(18), color: theme.colorScheme.primary),
+            Text(label, style: theme.textTheme.labelSmall?.copyWith(fontSize: context.font(10))),
+          ],
+        ),
       ),
     );
   }
@@ -415,6 +612,7 @@ class _TicketCardState extends State<TicketCard> {
       context: context,
       title: "Change Ticket Status",
       contentBuilder: (modalStateSetter) => Column(
+        mainAxisSize: MainAxisSize.min,
         children: TicketStatus.values
             .map((status) => _radioTile<TicketStatus>(
                   status.displayName,
@@ -435,6 +633,7 @@ class _TicketCardState extends State<TicketCard> {
       context: context,
       title: "Set Ticket Priority",
       contentBuilder: (modalStateSetter) => Column(
+        mainAxisSize: MainAxisSize.min,
         children: TicketPriority.values
             .map((priority) => _radioTile<TicketPriority>(
                   priority.displayName,
@@ -458,48 +657,39 @@ class _TicketCardState extends State<TicketCard> {
     required String buttonText,
     required Future<void> Function() onConfirm,
   }) {
-    final theme = Theme.of(context);
+    final theme = context.theme;
     showModalBottomSheet(
       context: context,
-      backgroundColor: theme.cardColor,
+      backgroundColor: theme.colorScheme.surface,
       isScrollControlled: true,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(context.scale(24))),
       ),
       builder: (_) => StatefulBuilder(
         builder: (BuildContext context, StateSetter setModalState) {
           return Padding(
             padding: EdgeInsets.fromLTRB(
-                16, 16, 16, MediaQuery.of(context).padding.bottom + 16),
+                context.spacing, context.spacing, context.spacing, MediaQuery.of(context).padding.bottom + context.spacing),
             child: Column(mainAxisSize: MainAxisSize.min, children: [
-              Text(title, style: theme.textTheme.headlineSmall),
-              const SizedBox(height: 16),
-              contentBuilder(setModalState),
-              const SizedBox(height: 20),
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton(
-                  onPressed: () async {
-                    await onConfirm();
-                    if (context.mounted) {
-                      Navigator.pop(context);
-                    }
-                  },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: theme.colorScheme.primary,
-                    padding: const EdgeInsets.symmetric(vertical: 14),
-                    shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(14)),
-                  ),
-                  child: Text(
-                    buttonText,
-                    style: const TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 16),
-                  ),
+              Container(
+                width: context.scale(40),
+                height: 4,
+                margin: EdgeInsets.only(bottom: context.spacing),
+                decoration: BoxDecoration(
+                  color: theme.colorScheme.outlineVariant,
+                  borderRadius: BorderRadius.circular(2),
                 ),
               ),
+              Text(title, style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold, fontSize: context.font(18))),
+              SizedBox(height: context.spacing),
+              contentBuilder(setModalState),
+              SizedBox(height: context.spacing),
+              _buildModalActionButton(context, buttonText.toUpperCase(), () async {
+                await onConfirm();
+                if (context.mounted) {
+                  Navigator.pop(context);
+                }
+              }),
             ]),
           );
         },
@@ -507,97 +697,40 @@ class _TicketCardState extends State<TicketCard> {
     );
   }
 
+  Widget _buildModalActionButton(BuildContext context, String label, VoidCallback onPressed) {
+    final theme = context.theme;
+    return ElevatedButton(
+      onPressed: onPressed,
+      style: ElevatedButton.styleFrom(
+        backgroundColor: theme.colorScheme.primary,
+        foregroundColor: theme.colorScheme.onPrimary,
+        minimumSize: Size(double.infinity, context.scale(48)),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(context.scale(12))),
+      ),
+      child: Text(label, style: TextStyle(fontSize: context.font(14), fontWeight: FontWeight.bold)),
+    );
+  }
+
   Widget _radioTile<T>(
       String text, T value, T groupValue, ValueChanged<T?> onChanged) {
-    final theme = Theme.of(context);
+    final theme = context.theme;
     return Container(
-      margin: const EdgeInsets.only(bottom: 10),
+      margin: EdgeInsets.only(bottom: context.sm),
       decoration: BoxDecoration(
-        color: theme.colorScheme.surface,
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(12),
-        child: RadioListTile<T>(
-          title: Text(text, style: theme.textTheme.bodyLarge),
-          value: value,
-          groupValue: groupValue,
-          onChanged: onChanged,
-          activeColor: theme.colorScheme.primary,
+        color: theme.colorScheme.surfaceContainerLow,
+        borderRadius: BorderRadius.circular(context.scale(12)),
+        border: Border.all(
+          color: value == groupValue ? theme.colorScheme.primary : theme.colorScheme.outlineVariant,
+          width: value == groupValue ? 1.5 : 0.5,
         ),
       ),
-    );
-  }
-
-  Widget _rowText(ThemeData theme, String l1, String v1, String l2, String v2) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [_columnText(theme, l1, v1), _columnText(theme, l2, v2)],
-    );
-  }
-
-  Widget _columnText(ThemeData theme, String label, String value) {
-    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      Text(label, style: TextStyle(color: theme.hintColor)),
-      const SizedBox(height: 4),
-      Text(value, style: theme.textTheme.bodyLarge),
-    ]);
-  }
-
-  Widget _priorityChip(ThemeData theme) {
-    final color = _getPriorityColor(_selectedPriority);
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-      decoration: BoxDecoration(
-        color: color.withAlpha(38), // Replaced withAlpha
-        borderRadius: BorderRadius.circular(20),
-      ),
-      child: Text(_selectedPriority.displayName,
-          style: theme.textTheme.labelLarge
-              ?.copyWith(color: color, fontWeight: FontWeight.w600)),
-    );
-  }
-
-  Widget _avatar(ThemeData theme, String text) {
-    return Container(
-      margin: const EdgeInsets.only(right: 6),
-      width: 40,
-      height: 40,
-      decoration: BoxDecoration(
-        color: theme.colorScheme.secondary,
-        shape: BoxShape.circle,
-      ),
-      alignment: Alignment.center,
-      child: Text(text,
-          style: theme.textTheme.labelLarge?.copyWith(
-              color: theme.colorScheme.onSecondary,
-              fontWeight: FontWeight.bold)),
-    );
-  }
-
-  Widget _actionButton(ThemeData theme,
-      {required String text, required VoidCallback onTap, required bool isPrimary}) {
-    final Color textColor =
-        isPrimary ? theme.colorScheme.onPrimary : theme.colorScheme.onSecondaryContainer;
-    return Expanded(
-      child: ElevatedButton(
-        onPressed: onTap,
-        style: ElevatedButton.styleFrom(
-          backgroundColor: isPrimary
-              ? theme.colorScheme.primary
-              : theme.colorScheme.secondaryContainer,
-          foregroundColor: isPrimary
-              ? theme.colorScheme.onPrimary
-              : theme.colorScheme.onSecondaryContainer,
-          padding: const EdgeInsets.symmetric(vertical: 16),
-          shape:
-              RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        ),
-        child: Text(
-          text,
-          textAlign: TextAlign.center,
-          style: TextStyle(color: textColor),
-        ),
+      child: RadioListTile<T>(
+        title: Text(text, style: theme.textTheme.bodyLarge?.copyWith(fontSize: context.font(16), fontWeight: value == groupValue ? FontWeight.bold : FontWeight.normal)),
+        value: value,
+        groupValue: groupValue,
+        onChanged: onChanged,
+        activeColor: theme.colorScheme.primary,
+        contentPadding: EdgeInsets.symmetric(horizontal: context.sm),
       ),
     );
   }

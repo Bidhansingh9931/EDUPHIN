@@ -3,6 +3,8 @@ import 'dart:convert';
 import 'package:eduphin/login_logout/login.dart';
 import 'package:eduphin/login_logout/ui_helper.dart';
 import 'package:eduphin/services/api_service.dart';
+import 'package:eduphin/services/error_handler.dart';
+import 'package:eduphin/services/responsive_helper.dart';
 import 'package:flutter/material.dart';
 
 class UpdatedPasswordPage extends StatefulWidget {
@@ -37,7 +39,7 @@ class _UpdatedPasswordPageState extends State<UpdatedPasswordPage> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: const Text('Passwords do not match.'),
-          backgroundColor: Theme.of(context).colorScheme.error,
+          backgroundColor: context.theme.colorScheme.error,
         ),
       );
       return;
@@ -54,7 +56,7 @@ class _UpdatedPasswordPageState extends State<UpdatedPasswordPage> {
       });
 
       if (mounted) {
-        final theme = Theme.of(context);
+        final theme = context.theme;
         final responseData = jsonDecode(response.body);
         if (response.statusCode == 200 && responseData['status'] == true) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -74,13 +76,7 @@ class _UpdatedPasswordPageState extends State<UpdatedPasswordPage> {
       }
     } catch (e) {
       if (mounted) {
-        final theme = Theme.of(context);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(e.toString().replaceFirst('Exception: ', '')),
-            backgroundColor: theme.colorScheme.error,
-          ),
-        );
+        ErrorHandler.showError(context, e);
       }
     } finally {
       if (mounted) {
@@ -91,103 +87,101 @@ class _UpdatedPasswordPageState extends State<UpdatedPasswordPage> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
+    final theme = context.theme;
     return Scaffold(
-      body: Container(
-        width: double.infinity,
-        height: double.infinity,
-        decoration: BoxDecoration(
-          color: theme.scaffoldBackgroundColor,
-        ),
-        child: Center(
-          child: SingleChildScrollView(
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(25, 20, 25, 80),
-              child: LayoutBuilder(
-                builder: (context, constraints) {
-                  return Container(
-                    width: constraints.maxWidth > 500 ? 500 : constraints.maxWidth,
-                    decoration: BoxDecoration(
-                      color: theme.cardColor,
-                      borderRadius: BorderRadius.circular(20),
-                    ),
-                    child: Padding(
-                      padding: const EdgeInsets.all(25.0),
-                      child: Form(
-                        key: _formKey,
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          crossAxisAlignment: CrossAxisAlignment.center,
-                          children: [
-                            Icon(Icons.school, size: 100, color: theme.colorScheme.onSurface),
-                            const SizedBox(height: 10),
-                            Text(
-                              "Reset Password",
-                              style: theme.textTheme.headlineSmall?.copyWith(
-                                fontWeight: FontWeight.bold,
-                              ),
-                              textAlign: TextAlign.center,
+      backgroundColor: theme.scaffoldBackgroundColor,
+      body: Center(
+        child: SingleChildScrollView(
+          child: Padding(
+            padding: context.pagePadding,
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                return Container(
+                  width: constraints.maxWidth > 500 ? 500 : constraints.maxWidth,
+                  decoration: BoxDecoration(
+                    color: theme.cardColor,
+                    borderRadius: BorderRadius.circular(context.scale(20)),
+                  ),
+                  child: Padding(
+                    padding: EdgeInsets.all(context.scale(25)),
+                    child: Form(
+                      key: _formKey,
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        crossAxisAlignment: CrossAxisAlignment.center,
+                        children: [
+                          Icon(Icons.school, size: context.scale(100), color: theme.colorScheme.onSurface),
+                          SizedBox(height: context.scale(10)),
+                          Text(
+                            "Reset Password",
+                            style: theme.textTheme.headlineSmall?.copyWith(
+                              fontWeight: FontWeight.bold,
+                              fontSize: context.font(24),
                             ),
-                            const SizedBox(height: 8),
-                            Text(
-                              "Enter your new password below.",
-                              style: theme.textTheme.bodyMedium,
-                              textAlign: TextAlign.center,
+                            textAlign: TextAlign.center,
+                          ),
+                          SizedBox(height: context.scale(8)),
+                          Text(
+                            "Enter your new password below.",
+                            style: theme.textTheme.bodyMedium?.copyWith(
+                              fontSize: context.font(14),
                             ),
-                            const SizedBox(height: 20),
-                            UiHelper.customTextField(
-                              context,
-                              _passwordController,
-                              "New Password",
-                              Icons.lock,
-                              true,
-                            ),
-                            const SizedBox(height: 20),
-                            UiHelper.customTextField(
-                              context,
-                              _confirmPasswordController,
-                              "Confirm New Password",
-                              Icons.lock_outline,
-                              true,
-                            ),
-                            const SizedBox(height: 30),
-                             SizedBox(
-                              width: double.infinity,
-                              height: 50,
-                              child: ElevatedButton(
-                                onPressed: _isLoading ? null : _savePassword,
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: theme.colorScheme.primary,
-                                  foregroundColor: theme.colorScheme.onPrimary,
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(15),
-                                  ),
-                                  disabledBackgroundColor: theme.colorScheme.primary,
+                            textAlign: TextAlign.center,
+                          ),
+                          SizedBox(height: context.scale(20)),
+                          UiHelper.customTextField(
+                            context,
+                            _passwordController,
+                            "New Password",
+                            Icons.lock,
+                            true,
+                          ),
+                          SizedBox(height: context.scale(20)),
+                          UiHelper.customTextField(
+                            context,
+                            _confirmPasswordController,
+                            "Confirm New Password",
+                            Icons.lock_outline,
+                            true,
+                          ),
+                          SizedBox(height: context.scale(30)),
+                           SizedBox(
+                            width: double.infinity,
+                            height: context.scale(50),
+                            child: ElevatedButton(
+                              onPressed: _isLoading ? null : _savePassword,
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: theme.colorScheme.primary,
+                                foregroundColor: theme.colorScheme.onPrimary,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(context.scale(15)),
                                 ),
-                                child: _isLoading
-                                    ? const SizedBox(
-                                        height: 24,
-                                        width: 24,
-                                        child: CircularProgressIndicator(
-                                          strokeWidth: 3,
-                                        ),
-                                      )
-                                    : Text(
-                                        "SAVE PASSWORD",
-                                        style: theme.textTheme.titleMedium?.copyWith(
-                                          color: theme.colorScheme.onPrimary,
-                                          fontWeight: FontWeight.bold,
-                                        ),
-                                      ),
+                                disabledBackgroundColor: theme.colorScheme.primary.withValues(alpha: 0.5),
                               ),
+                              child: _isLoading
+                                  ? const SizedBox(
+                                      height: 24,
+                                      width: 24,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 3,
+                                      ),
+                                    )
+                                  : Text(
+                                      "SAVE PASSWORD",
+                                      style: theme.textTheme.titleMedium?.copyWith(
+                                        color: theme.colorScheme.onPrimary,
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: context.font(16),
+                                      ),
+                                    ),
                             ),
-                          ],
-                        ),
+                          ),
+                        ],
                       ),
                     ),
-                  );
-                },
-              ),
+                  ),
+                );
+              },
             ),
           ),
         ),

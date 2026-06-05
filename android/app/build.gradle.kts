@@ -16,17 +16,17 @@ if (keystorePropertiesFile.exists()) {
 }
 
 android {
-    namespace = "com.bidha.eduphin"
-    compileSdk = 36
-    ndkVersion = flutter.ndkVersion
+    namespace = "com.octopyder.eduphin"
+    compileSdk = flutter.compileSdkVersion
+    ndkVersion = "28.2.13676358"
 
     defaultConfig {
-        applicationId = "com.bidha.eduphin"
+        applicationId = "com.octopyder.eduphin"
         minSdk = flutter.minSdkVersion
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName
-}
+    }
 
 
     signingConfigs {
@@ -50,8 +50,12 @@ android {
     buildTypes {
         getByName("release") {
             signingConfig = signingConfigs.getByName("release")
-            isMinifyEnabled = false
-            isShrinkResources = false
+            isMinifyEnabled = true
+            isShrinkResources = true
+            proguardFiles(
+                getDefaultProguardFile("proguard-android-optimize.txt"),
+                "proguard-rules.pro"
+            )
         }
     }
 
@@ -67,4 +71,9 @@ android {
 
 flutter {
     source = "../.."
+}
+
+dependencies {
+    implementation("com.google.android.play:feature-delivery:2.1.0")
+    implementation("com.google.android.play:feature-delivery-ktx:2.1.0")
 }

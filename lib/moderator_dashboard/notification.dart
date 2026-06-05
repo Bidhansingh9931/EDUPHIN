@@ -1,7 +1,10 @@
+import 'package:eduphin/services/error_handler.dart';
+import 'package:eduphin/services/responsive_helper.dart';
 import 'package:flutter/material.dart';
 
 import 'notification_model.dart';
 import 'notification_provider.dart';
+import 'skeleton_widgets.dart';
 
 class NotificationPage extends StatefulWidget {
   const NotificationPage({super.key});
@@ -13,100 +16,97 @@ class NotificationPage extends StatefulWidget {
 class _NotificationPageState extends State<NotificationPage> {
   late Future<List<Message>> _messagesFuture;
   final NotificationProvider _provider = NotificationProvider();
+  List<Message>? _cachedMessages;
 
   @override
   void initState() {
     super.initState();
-    _messagesFuture = _provider.fetchMessages();
+    _loadCacheAndFetch();
+  }
+
+  Future<void> _loadCacheAndFetch() async {
+    final cached = await _provider.getCachedMessages();
+    if (mounted) {
+      setState(() {
+        _cachedMessages = cached;
+        _messagesFuture = _provider.fetchMessages();
+      });
+    }
+  }
+
+  Future<void> _refreshMessages() async {
+    setState(() {
+      _messagesFuture = _provider.fetchMessages(bypassCache: true);
+    });
+    try {
+      await _messagesFuture;
+    } catch (e) {
+      if (mounted) {
+        ErrorHandler.showError(context, e);
+      }
+    }
   }
 
   @override
   Widget build(BuildContext context) {
-    final screenWidth = MediaQuery.of(context).size.width;
-
-    double responsiveFontSize(double baseFontSize) {
-      // Adjust font size based on screen width
-      if (screenWidth > 600) {
-        return baseFontSize * 1.2; // Larger screens
-      } else if (screenWidth < 360) {
-        return baseFontSize * 0.9; // Smaller screens
-      }
-      return baseFontSize;
-    }
+    final theme = context.theme;
 
     return Scaffold(
-      backgroundColor: const Color(0xFF0D1B2A),
-      body: SafeArea(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // ---------------- Top Bar ----------------
-            Padding(
-              padding: EdgeInsets.all(screenWidth * 0.04), // Responsive padding
-              child: Row(
-                children: [
-                  GestureDetector(
-                    onTap: () => Navigator.pop(context),
-                    child: const Icon(Icons.arrow_back, color: Colors.white),
-                  ),
-                  const SizedBox(width: 12),
-                  Text(
-                    "Messages",
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: responsiveFontSize(22),
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-
-            // ---------------- Messages List ----------------
-            Expanded(
-              child: FutureBuilder<List<Message>>(
-                future: _messagesFuture,
-                builder: (context, snapshot) {
-                  if (snapshot.connectionState == ConnectionState.waiting) {
-                    return const Center(child: CircularProgressIndicator());
-                  } else if (snapshot.hasError) {
-                    return Center(
-                      child: Text(
-                        'Error: ${snapshot.error}',
-                        style: const TextStyle(color: Colors.white),
-                      ),
-                    );
-                  } else if (snapshot.hasData) {
-                    final messageList = snapshot.data!;
-                    return ListView.builder(
-                      padding: EdgeInsets.symmetric(
-                          horizontal: screenWidth * 0.04), // Responsive padding
-                      itemCount: messageList.length,
-                      itemBuilder: (context, index) {
-                        return MessageCard(messageList[index]);
-                      },
-                    );
-                  } else {
-                    return const Center(
-                      child: Text(
-                        'No messages found.',
-                        style: TextStyle(color: Colors.white54),
-                      ),
-                    );
-                  }
-                },
-              ),
-            ),
-          ],
+      appBar: AppBar(
+        title: const Text("Messages"),
+        actions: [
+          IconButton(
+            onPressed: _refreshMessages,
+            icon: Icon(Icons.refresh_rounded, size: context.scale(24)),
+          ),
+          SizedBox(width: context.scale(8)),
+        ],
+      ),
+      body: RefreshIndicator(
+        onRefresh: _refreshMessages,
+        child: FutureBuilder<List<Message>>(
+          future: _messagesFuture,
+          builder: (context, snapshot) {
+            return ModeratorLoadingWrapper<List<Message>>(
+              snapshot: snapshot,
+              cachedData: _cachedMessages,
+              skeleton: const NotificationSkeleton(),
+              onRefresh: _refreshMessages,
+              builder: (messages) {
+                if (messages.isEmpty) {
+                  return _buildEmptyState(theme);
+                }
+                return ListView.builder(
+                  padding: context.pagePadding,
+                  itemCount: messages.length,
+                  itemBuilder: (context, index) {
+                    return MessageCard(messages[index]);
+                  },
+                );
+              },
+            );
+          },
         ),
+      ),
+    );
+  }
+
+  Widget _buildEmptyState(ThemeData theme) {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(Icons.mark_email_read_outlined, size: context.scale(64), color: theme.hintColor.withValues(alpha: 0.3)),
+          SizedBox(height: context.scale(16)),
+          Text("No messages yet", style: TextStyle(fontWeight: FontWeight.bold, fontSize: context.font(16))),
+          SizedBox(height: context.scale(8)),
+          Text("Incoming messages will appear here", style: TextStyle(color: theme.hintColor, fontSize: context.font(14))),
+        ],
       ),
     );
   }
 }
 
-//
-// ---------------- Message Card Widget ----------------
-//
 class MessageCard extends StatelessWidget {
   final Message msg;
 
@@ -114,92 +114,66 @@ class MessageCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final screenWidth = MediaQuery.of(context).size.width;
+    final theme = context.theme;
+    final colorScheme = theme.colorScheme;
 
-    double responsiveFontSize(double baseFontSize) {
-      if (screenWidth > 600) {
-        return baseFontSize * 1.2;
-      } else if (screenWidth < 360) {
-        return baseFontSize * 0.9;
-      }
-      return baseFontSize;
-    }
-
-    return Container(
-      margin: EdgeInsets.only(
-          bottom: screenWidth * 0.04), // Responsive margin
-      padding: EdgeInsets.all(screenWidth * 0.04), // Responsive padding
-      decoration: BoxDecoration(
-        color: const Color(0xFF1B263B),
-        borderRadius: BorderRadius.circular(16),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // ----------- First row: icon + name + time -----------
-          Row(
+    return Card(
+      margin: EdgeInsets.only(bottom: context.scale(16)),
+      child: InkWell(
+        onTap: () {},
+        borderRadius: BorderRadius.circular(context.scale(16)),
+        child: Padding(
+          padding: EdgeInsets.all(context.scale(16)),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Profile Initial
-              CircleAvatar(
-                radius: screenWidth * 0.06, // Responsive radius
-                backgroundColor: Colors.blue,
-                child: Text(
-                  msg.name.isNotEmpty ? msg.name[0].toUpperCase() : '',
-                  style: TextStyle(
-                      color: Colors.white, fontSize: responsiveFontSize(20)),
-                ),
-              ),
-
-              const SizedBox(width: 14),
-
-              // Name & Title
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      msg.name,
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: responsiveFontSize(16),
-                        fontWeight: FontWeight.bold,
-                      ),
+              Row(
+                children: [
+                  CircleAvatar(
+                    radius: context.scale(24),
+                    backgroundColor: colorScheme.primary.withValues(alpha: 0.1),
+                    child: Text(
+                      msg.name.isNotEmpty ? msg.name[0].toUpperCase() : '',
+                      style: TextStyle(color: colorScheme.primary, fontWeight: FontWeight.bold, fontSize: context.font(18)),
                     ),
-                    const SizedBox(height: 4),
-                    Text(
-                      msg.title,
-                      style: TextStyle(
-                        color: Colors.white70,
-                        fontSize: responsiveFontSize(13),
-                      ),
-                      overflow: TextOverflow.ellipsis,
+                  ),
+                  SizedBox(width: context.scale(16)),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          msg.name,
+                          style: TextStyle(fontWeight: FontWeight.bold, fontSize: context.font(16)),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        Text(
+                          msg.title,
+                          style: TextStyle(color: theme.hintColor, fontSize: context.font(13)),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ],
                     ),
-                  ],
-                ),
+                  ),
+                  SizedBox(width: context.scale(8)),
+                  Text(
+                    msg.time,
+                    style: TextStyle(color: theme.hintColor, fontSize: context.font(11)),
+                  ),
+                ],
               ),
-
-              // Time
+              SizedBox(height: context.scale(12)),
+              const Divider(height: 1),
+              SizedBox(height: context.scale(12)),
               Text(
-                msg.time,
-                style: TextStyle(
-                    color: Colors.white54, fontSize: responsiveFontSize(12)),
+                msg.preview,
+                style: theme.textTheme.bodyMedium?.copyWith(height: 1.4),
+                overflow: TextOverflow.ellipsis,
+                maxLines: 2,
               ),
             ],
           ),
-
-          const SizedBox(height: 12),
-
-          // ----------- Preview Text -----------
-          Text(
-            msg.preview,
-            style: TextStyle(
-              color: Colors.white54,
-              fontSize: responsiveFontSize(13),
-            ),
-            overflow: TextOverflow.ellipsis,
-            maxLines: 1,
-          ),
-        ],
+        ),
       ),
     );
   }
