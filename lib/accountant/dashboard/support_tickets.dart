@@ -55,9 +55,17 @@ class _SupportTicketsPageState extends State<SupportTicketsPage> {
     return Scaffold(
       backgroundColor: theme.colorScheme.surface,
       appBar: AppBar(
-        title: Text(
-          widget.isAssigned ? "Assigned Tickets" : "Support Center",
-          style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold, fontSize: context.font(20)),
+        titleSpacing: 0,
+        title: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12.0),
+          child: FittedBox(
+            fit: BoxFit.scaleDown,
+            alignment: Alignment.centerLeft,
+            child: Text(
+              widget.isAssigned ? "Assigned Tickets" : "Support Center",
+              style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold, fontSize: context.font(20)),
+            ),
+          ),
         ),
         centerTitle: false,
       ),
@@ -178,15 +186,19 @@ class _SupportTicketsPageState extends State<SupportTicketsPage> {
     return buildFilterCard(
       context,
       children: [
-        Row(
-          children: [
-            Icon(Icons.filter_list_rounded, color: theme.colorScheme.primary, size: context.scale(20)),
-            SizedBox(width: context.scale(8)),
-            Text(
-              "Filter Tickets",
-              style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold, fontSize: context.font(16)),
-            ),
-          ],
+        FittedBox(
+          fit: BoxFit.scaleDown,
+          alignment: Alignment.centerLeft,
+          child: Row(
+            children: [
+              Icon(Icons.filter_list_rounded, color: theme.colorScheme.primary, size: context.scale(20)),
+              SizedBox(width: context.scale(8)),
+              Text(
+                "Filter Tickets",
+                style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold, fontSize: context.font(16)),
+              ),
+            ],
+          ),
         ),
         SizedBox(height: context.spacing),
         buildLabel(context, "Search"),
@@ -306,26 +318,30 @@ class _SupportTicketsPageState extends State<SupportTicketsPage> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Row(
-                children: [
-                  Container(
-                    padding: EdgeInsets.symmetric(horizontal: context.scale(10), vertical: context.scale(5)),
-                    decoration: BoxDecoration(
-                      color: theme.colorScheme.primaryContainer,
-                      borderRadius: BorderRadius.circular(context.scale(8)),
-                    ),
-                    child: Text(
-                      "#${ticket.id}",
-                      style: theme.textTheme.labelSmall?.copyWith(
-                        color: theme.colorScheme.onPrimaryContainer,
-                        fontWeight: FontWeight.bold,
-                        fontSize: context.font(11),
+              FittedBox(
+                fit: BoxFit.scaleDown,
+                alignment: Alignment.centerLeft,
+                child: Row(
+                  children: [
+                    Container(
+                      padding: EdgeInsets.symmetric(horizontal: context.scale(10), vertical: context.scale(5)),
+                      decoration: BoxDecoration(
+                        color: theme.colorScheme.primaryContainer,
+                        borderRadius: BorderRadius.circular(context.scale(8)),
+                      ),
+                      child: Text(
+                        "#${ticket.id}",
+                        style: theme.textTheme.labelSmall?.copyWith(
+                          color: theme.colorScheme.onPrimaryContainer,
+                          fontWeight: FontWeight.bold,
+                          fontSize: context.font(11),
+                        ),
                       ),
                     ),
-                  ),
-                  const Spacer(),
-                  Icon(Icons.chevron_right, size: context.scale(20), color: theme.colorScheme.onSurfaceVariant),
-                ],
+                    const SizedBox(width: 8),
+                    Icon(Icons.chevron_right, size: context.scale(20), color: theme.colorScheme.onSurfaceVariant),
+                  ],
+                ),
               ),
               SizedBox(height: context.spacing),
               Text(
@@ -334,27 +350,35 @@ class _SupportTicketsPageState extends State<SupportTicketsPage> {
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
               ),
-              const Spacer(),
-              Row(
-                children: [
-                  Flexible(child: _buildBadge(context, ticket.priority.toUpperCase(), priorityColor)),
-                  SizedBox(width: context.scale(8)),
-                  Flexible(child: _buildBadge(context, ticket.status.toUpperCase(), statusColor)),
-                ],
+              const SizedBox(height: 16),
+              FittedBox(
+                fit: BoxFit.scaleDown,
+                alignment: Alignment.centerLeft,
+                child: Row(
+                  children: [
+                    _buildBadge(context, ticket.priority.toUpperCase(), priorityColor),
+                    SizedBox(width: context.scale(8)),
+                    _buildBadge(context, ticket.status.toUpperCase(), statusColor),
+                  ],
+                ),
               ),
               SizedBox(height: context.spacing / 2),
-              Row(
-                children: [
-                  Icon(Icons.access_time, size: context.scale(12), color: theme.colorScheme.onSurfaceVariant),
-                  SizedBox(width: context.scale(4)),
-                  Text(
-                    ticket.createdAt,
-                    style: theme.textTheme.labelSmall?.copyWith(
-                      color: theme.colorScheme.onSurfaceVariant,
-                      fontSize: context.font(11),
+              FittedBox(
+                fit: BoxFit.scaleDown,
+                alignment: Alignment.centerLeft,
+                child: Row(
+                  children: [
+                    Icon(Icons.access_time, size: context.scale(12), color: theme.colorScheme.onSurfaceVariant),
+                    SizedBox(width: context.scale(4)),
+                    Text(
+                      ticket.createdAt,
+                      style: theme.textTheme.labelSmall?.copyWith(
+                        color: theme.colorScheme.onSurfaceVariant,
+                        fontSize: context.font(11),
+                      ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ],
           ),

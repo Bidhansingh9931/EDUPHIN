@@ -37,9 +37,17 @@ class _ExamPaperSchedulePageState extends State<ExamPaperSchedulePage> {
     return Scaffold(
       backgroundColor: theme.colorScheme.surface,
       appBar: AppBar(
-        title: Text("Exam Schedule",
-            style: theme.textTheme.titleLarge?.copyWith(
-                fontWeight: FontWeight.bold, fontSize: context.font(20))),
+        titleSpacing: 0,
+        title: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12.0),
+          child: FittedBox(
+            fit: BoxFit.scaleDown,
+            alignment: Alignment.centerLeft,
+            child: Text("Exam Schedule",
+                style: theme.textTheme.titleLarge?.copyWith(
+                    fontWeight: FontWeight.bold, fontSize: context.font(20))),
+          ),
+        ),
         centerTitle: false,
       ),
       body: StreamBuilder<Map<String, dynamic>>(
@@ -149,23 +157,25 @@ class _ExamPaperSchedulePageState extends State<ExamPaperSchedulePage> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            children: [
-              Container(
-                padding: EdgeInsets.all(context.scale(10)),
-                decoration: BoxDecoration(
-                  color: theme.colorScheme.onPrimaryContainer.withValues(alpha: 0.1),
-                  shape: BoxShape.circle,
+          FittedBox(
+            fit: BoxFit.scaleDown,
+            alignment: Alignment.centerLeft,
+            child: Row(
+              children: [
+                Container(
+                  padding: EdgeInsets.all(context.scale(10)),
+                  decoration: BoxDecoration(
+                    color: theme.colorScheme.onPrimaryContainer.withValues(alpha: 0.1),
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(
+                    Icons.description,
+                    color: theme.colorScheme.onPrimaryContainer,
+                    size: context.scale(24),
+                  ),
                 ),
-                child: Icon(
-                  Icons.description,
-                  color: theme.colorScheme.onPrimaryContainer,
-                  size: context.scale(24),
-                ),
-              ),
-              SizedBox(width: context.spacing),
-              Expanded(
-                child: Text(
+                SizedBox(width: context.spacing),
+                Text(
                   exam.name,
                   style: theme.textTheme.headlineSmall?.copyWith(
                     fontWeight: FontWeight.bold,
@@ -173,16 +183,20 @@ class _ExamPaperSchedulePageState extends State<ExamPaperSchedulePage> {
                     fontSize: context.font(20),
                   ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
           SizedBox(height: context.spacing * 1.5),
-          Row(
-            children: [
-              _buildHeaderStat(context, "TOTAL PAPERS", scheduleCount.toString()),
-              SizedBox(width: context.spacing * 2),
-              _buildHeaderStat(context, "STATUS", exam.status?.toUpperCase() ?? "ACTIVE"),
-            ],
+          FittedBox(
+            fit: BoxFit.scaleDown,
+            alignment: Alignment.centerLeft,
+            child: Row(
+              children: [
+                _buildHeaderStat(context, "TOTAL PAPERS", scheduleCount.toString()),
+                SizedBox(width: context.spacing * 2),
+                _buildHeaderStat(context, "STATUS", exam.status?.toUpperCase() ?? "ACTIVE"),
+              ],
+            ),
           ),
         ],
       ),
@@ -229,43 +243,45 @@ class _ExamPaperSchedulePageState extends State<ExamPaperSchedulePage> {
         border: Border.all(color: theme.colorScheme.outlineVariant),
       ),
       padding: EdgeInsets.all(context.spacing),
-      child: Row(
-        children: [
-          Container(
-            width: context.scale(56),
-            height: context.scale(56),
-            decoration: BoxDecoration(
-              color: theme.colorScheme.secondaryContainer,
-              borderRadius: BorderRadius.circular(context.scale(12)),
+      child: FittedBox(
+        fit: BoxFit.scaleDown,
+        alignment: Alignment.centerLeft,
+        child: Row(
+          children: [
+            Container(
+              width: context.scale(56),
+              height: context.scale(56),
+              decoration: BoxDecoration(
+                color: theme.colorScheme.secondaryContainer,
+                borderRadius: BorderRadius.circular(context.scale(12)),
+              ),
+              child: Icon(
+                Icons.menu_book,
+                color: theme.colorScheme.onSecondaryContainer,
+                size: context.scale(24),
+              ),
             ),
-            child: Icon(
-              Icons.menu_book,
-              color: theme.colorScheme.onSecondaryContainer,
-              size: context.scale(24),
-            ),
-          ),
-          SizedBox(width: context.spacing),
-          Expanded(
-            child: Column(
+            SizedBox(width: context.spacing),
+            Column(
               crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
               children: [
                 Text(
                   subjectName,
                   style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold, fontSize: context.font(14)),
                 ),
                 SizedBox(height: context.scale(8)),
-                Wrap(
-                  spacing: context.spacing,
-                  runSpacing: context.scale(4),
+                Row(
                   children: [
                     _buildInfoItem(context, Icons.calendar_today, schedule.date ?? 'N/A'),
+                    SizedBox(width: context.spacing),
                     _buildInfoItem(context, Icons.access_time, "${schedule.startTime ?? '--'} - ${schedule.endTime ?? '--'}"),
                   ],
                 ),
               ],
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

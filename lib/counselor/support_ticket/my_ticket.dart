@@ -141,7 +141,11 @@ class _SupportTicketsPageState extends State<SupportTicketsPage> {
     final theme = context.theme;
     return Scaffold(
       appBar: AppBar(
-        title: const Text("Support Tickets"),
+        title: FittedBox(
+          fit: BoxFit.scaleDown,
+          alignment: Alignment.centerLeft,
+          child: const Text("Support Tickets"),
+        ),
       ),
       body: SafeArea(
         child: LoadingWrapper(
@@ -396,9 +400,11 @@ class _SupportTicketsPageState extends State<SupportTicketsPage> {
                               .then((_) => _fetchTickets());
                         },
                         icon: Icon(Icons.add, size: context.scale(20)),
-                        label: Text("CREATE NEW TICKET",
-                            style: TextStyle(
-                                fontSize: context.font(14), fontWeight: FontWeight.bold)),
+                        label: FittedBox(
+                          child: Text("CREATE NEW TICKET",
+                              style: TextStyle(
+                                  fontSize: context.font(14), fontWeight: FontWeight.bold)),
+                        ),
                         style: ElevatedButton.styleFrom(
                           padding:
                               EdgeInsets.symmetric(vertical: context.scale(16)),

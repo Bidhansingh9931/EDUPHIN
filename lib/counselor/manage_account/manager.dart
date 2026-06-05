@@ -135,7 +135,11 @@ class _InstituteManagerPageState extends State<InstituteManagerPage> {
 
     return Scaffold(
       appBar: AppBar(
-        title: Text("Institute Managers", style: TextStyle(fontSize: context.font(20))),
+        title: FittedBox(
+          fit: BoxFit.scaleDown,
+          alignment: Alignment.centerLeft,
+          child: Text("Institute Managers", style: TextStyle(fontSize: context.font(20))),
+        ),
       ),
       body: RefreshIndicator(
         onRefresh: _fetchManagers,
@@ -202,26 +206,38 @@ class _InstituteManagerPageState extends State<InstituteManagerPage> {
                                     imageUrl: (manager.photo != null && manager.photo!.isNotEmpty) ? ApiService.getStorageUrl(manager.photo) : null,
                                     borderWidth: 0,
                                   ),
-                                  title: Text(
-                                    displayName,
-                                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: context.font(14)),
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
+                                  title: FittedBox(
+                                    fit: BoxFit.scaleDown,
+                                    alignment: Alignment.centerLeft,
+                                    child: Text(
+                                      displayName,
+                                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: context.font(14)),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
                                   ),
                                   subtitle: Column(
                                     crossAxisAlignment: CrossAxisAlignment.start,
                                     mainAxisSize: MainAxisSize.min,
                                     children: [
-                                      Text(
-                                        manager.employeeId != null ? 'ID: ${manager.employeeId}' : 'ID: N/A',
-                                        style: TextStyle(color: theme.hintColor, fontSize: context.font(12)),
+                                      FittedBox(
+                                        fit: BoxFit.scaleDown,
+                                        alignment: Alignment.centerLeft,
+                                        child: Text(
+                                          manager.employeeId != null ? 'ID: ${manager.employeeId}' : 'ID: N/A',
+                                          style: TextStyle(color: theme.hintColor, fontSize: context.font(12)),
+                                        ),
                                       ),
                                       if (manager.email != null)
-                                        Text(
-                                          manager.email!,
-                                          style: TextStyle(color: theme.hintColor, fontSize: context.font(11)),
-                                          maxLines: 1,
-                                          overflow: TextOverflow.ellipsis,
+                                        FittedBox(
+                                          fit: BoxFit.scaleDown,
+                                          alignment: Alignment.centerLeft,
+                                          child: Text(
+                                            manager.email!,
+                                            style: TextStyle(color: theme.hintColor, fontSize: context.font(11)),
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
                                         ),
                                     ],
                                   ),
@@ -252,9 +268,12 @@ class _InstituteManagerPageState extends State<InstituteManagerPage> {
         borderRadius: BorderRadius.circular(context.scale(20)),
         border: Border.all(color: color.withValues(alpha: 0.5)),
       ),
-      child: Text(
-        status.toUpperCase(),
-        style: TextStyle(color: color, fontSize: context.font(9), fontWeight: FontWeight.bold),
+      child: FittedBox(
+        fit: BoxFit.scaleDown,
+        child: Text(
+          status.toUpperCase(),
+          style: TextStyle(color: color, fontSize: context.font(9), fontWeight: FontWeight.bold),
+        ),
       ),
     );
   }

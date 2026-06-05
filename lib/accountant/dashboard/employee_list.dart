@@ -75,7 +75,14 @@ class _EmployeeListPageState extends State<EmployeeListPage> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text("Employee Directory"),
+        titleSpacing: 0,
+        title: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12.0),
+          child: FittedBox(
+            fit: BoxFit.scaleDown,
+            child: const Text("Employee Directory"),
+          ),
+        ),
       ),
       body: Column(
         children: [
@@ -164,21 +171,35 @@ class _EmployeeListPageState extends State<EmployeeListPage> {
                                           final targetId = employee.encryptedId ?? employee.userId.toString();
                                           Navigator.push(context, MaterialPageRoute(builder: (context) => SalarySlipsPage(employeeId: targetId)));
                                         },
-                                        leading: ProfileAvatar(
-                                          imageUrl: employee.photo != null ? "${ApiService.baseUrl}/storage/${employee.photo}" : null,
-                                          radius: context.scale(20),
-                                          borderWidth: 0,
+                                        leading: FittedBox(
+                                          fit: BoxFit.scaleDown,
+                                          child: ProfileAvatar(
+                                            imageUrl: employee.photo != null ? "${ApiService.baseUrl}/storage/${employee.photo}" : null,
+                                            radius: context.scale(20),
+                                            borderWidth: 0,
+                                          ),
                                         ),
-                                        title: Text(employee.name, style: TextStyle(fontWeight: FontWeight.bold, fontSize: context.font(15))),
-                                        subtitle: Column(
-                                          crossAxisAlignment: CrossAxisAlignment.start,
-                                          children: [
-                                            SizedBox(height: context.scale(4)),
-                                            Text(employee.email ?? "No Email", style: TextStyle(color: theme.colorScheme.secondary, fontSize: context.font(12)), maxLines: 1, overflow: TextOverflow.ellipsis),
-                                            Text(employee.phone ?? "No Phone", style: TextStyle(color: theme.hintColor, fontSize: context.font(12)), maxLines: 1, overflow: TextOverflow.ellipsis),
-                                          ],
+                                        title: FittedBox(
+                                          fit: BoxFit.scaleDown,
+                                          alignment: Alignment.centerLeft,
+                                          child: Text(employee.name, style: TextStyle(fontWeight: FontWeight.bold, fontSize: context.font(15))),
                                         ),
-                                        trailing: Icon(Icons.chevron_right, size: context.scale(20)),
+                                        subtitle: FittedBox(
+                                          fit: BoxFit.scaleDown,
+                                          alignment: Alignment.centerLeft,
+                                          child: Column(
+                                            crossAxisAlignment: CrossAxisAlignment.start,
+                                            children: [
+                                              SizedBox(height: context.scale(4)),
+                                              Text(employee.email ?? "No Email", style: TextStyle(color: theme.colorScheme.secondary, fontSize: context.font(12))),
+                                              Text(employee.phone ?? "No Phone", style: TextStyle(color: theme.hintColor, fontSize: context.font(12))),
+                                            ],
+                                          ),
+                                        ),
+                                        trailing: FittedBox(
+                                          fit: BoxFit.scaleDown,
+                                          child: Icon(Icons.chevron_right, size: context.scale(20)),
+                                        ),
                                       );
                                     },
                                   ),

@@ -139,7 +139,11 @@ class _ExamListPageState extends State<ExamListPage> {
     final theme = context.theme;
     return Scaffold(
       appBar: AppBar(
-        title: Text("Examination List", style: TextStyle(fontSize: context.font(20))),
+        title: FittedBox(
+          fit: BoxFit.scaleDown,
+          alignment: Alignment.centerLeft,
+          child: Text("Examination List", style: TextStyle(fontSize: context.font(20))),
+        ),
       ),
       body: RefreshIndicator(
         onRefresh: _fetchExams,

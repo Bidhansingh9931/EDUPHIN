@@ -54,7 +54,14 @@ class _CreateTicketPageState extends State<CreateTicketPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text("Submit New Ticket", style: TextStyle(fontSize: context.font(20))),
+        titleSpacing: 0,
+        title: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12.0),
+          child: FittedBox(
+            fit: BoxFit.scaleDown,
+            child: Text("Submit New Ticket", style: TextStyle(fontSize: context.font(20))),
+          ),
+        ),
         centerTitle: true,
       ),
       body: _isLoading
@@ -171,9 +178,13 @@ class _CreateTicketPageState extends State<CreateTicketPage> {
                 topRight: Radius.circular(16)
               ),
             ),
-            child: Text(
-              title, 
-              style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold, color: theme.colorScheme.primary, fontSize: context.font(15))
+            child: FittedBox(
+              fit: BoxFit.scaleDown,
+              alignment: Alignment.centerLeft,
+              child: Text(
+                title, 
+                style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold, color: theme.colorScheme.primary, fontSize: context.font(15))
+              ),
             ),
           ),
           Padding(

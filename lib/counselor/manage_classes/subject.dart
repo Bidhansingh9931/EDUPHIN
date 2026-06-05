@@ -134,7 +134,11 @@ class _SubjectManagementPageState extends State<SubjectManagementPage> {
     final theme = context.theme;
     return Scaffold(
       appBar: AppBar(
-        title: const Text("Subject Management"),
+        title: FittedBox(
+          fit: BoxFit.scaleDown,
+          alignment: Alignment.centerLeft,
+          child: const Text("Subject Management"),
+        ),
       ),
       body: RefreshIndicator(
         onRefresh: _fetchSubjects,

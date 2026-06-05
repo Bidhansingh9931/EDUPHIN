@@ -218,7 +218,11 @@ class _BookCatelogPageState extends State<BookCatelogPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text("Book Catalog"),
+        title: FittedBox(
+          fit: BoxFit.scaleDown,
+          alignment: Alignment.centerLeft,
+          child: const Text("Book Catalog"),
+        ),
       ),
       body: RefreshIndicator(
         onRefresh: _fetchBooks,

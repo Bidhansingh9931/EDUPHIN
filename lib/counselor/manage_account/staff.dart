@@ -134,7 +134,11 @@ class _StaffPageState extends State<StaffPage> {
     final theme = context.theme;
     return Scaffold(
       appBar: AppBar(
-        title: Text("Staff Directory", style: TextStyle(fontSize: context.font(20))),
+        title: FittedBox(
+          fit: BoxFit.scaleDown,
+          alignment: Alignment.centerLeft,
+          child: Text("Staff Directory", style: TextStyle(fontSize: context.font(20))),
+        ),
       ),
       body: RefreshIndicator(
         onRefresh: _fetchStaff,
@@ -200,26 +204,38 @@ class _StaffPageState extends State<StaffPage> {
                                     radius: context.scale(25),
                                     imageUrl: ApiService.getStorageUrl(staff.photo),
                                   ),
-                                  title: Text(
-                                    displayName,
-                                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: context.font(14)),
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
+                                  title: FittedBox(
+                                    fit: BoxFit.scaleDown,
+                                    alignment: Alignment.centerLeft,
+                                    child: Text(
+                                      displayName,
+                                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: context.font(14)),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
                                   ),
                                   subtitle: Column(
                                     crossAxisAlignment: CrossAxisAlignment.start,
                                     mainAxisSize: MainAxisSize.min,
                                     children: [
-                                      Text(
-                                        staff.employeeId != null ? 'ID: ${staff.employeeId}' : 'ID: N/A',
-                                        style: TextStyle(color: theme.hintColor, fontSize: context.font(12)),
+                                      FittedBox(
+                                        fit: BoxFit.scaleDown,
+                                        alignment: Alignment.centerLeft,
+                                        child: Text(
+                                          staff.employeeId != null ? 'ID: ${staff.employeeId}' : 'ID: N/A',
+                                          style: TextStyle(color: theme.hintColor, fontSize: context.font(12)),
+                                        ),
                                       ),
                                       if (staff.email != null)
-                                        Text(
-                                          staff.email!,
-                                          style: TextStyle(color: theme.hintColor, fontSize: context.font(11)),
-                                          maxLines: 1,
-                                          overflow: TextOverflow.ellipsis,
+                                        FittedBox(
+                                          fit: BoxFit.scaleDown,
+                                          alignment: Alignment.centerLeft,
+                                          child: Text(
+                                            staff.email!,
+                                            style: TextStyle(color: theme.hintColor, fontSize: context.font(11)),
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
                                         ),
                                     ],
                                   ),
@@ -250,9 +266,12 @@ class _StaffPageState extends State<StaffPage> {
         borderRadius: BorderRadius.circular(context.scale(20)),
         border: Border.all(color: color.withValues(alpha: 0.5)),
       ),
-      child: Text(
-        status.toUpperCase(),
-        style: TextStyle(color: color, fontSize: context.font(9), fontWeight: FontWeight.bold),
+      child: FittedBox(
+        fit: BoxFit.scaleDown,
+        child: Text(
+          status.toUpperCase(),
+          style: TextStyle(color: color, fontSize: context.font(9), fontWeight: FontWeight.bold),
+        ),
       ),
     );
   }

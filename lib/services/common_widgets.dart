@@ -218,33 +218,26 @@ class ProfileSection extends StatelessWidget {
               bottom: context.scale(12),
             ),
             child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
+                Icon(
+                  icon,
+                  size: context.scale(20),
+                  color: theme.colorScheme.primary,
+                ),
+                SizedBox(width: context.scale(8)),
                 Expanded(
-                  child: Row(
-                    children: [
-                      Icon(
-                        icon,
-                        size: context.scale(20),
-                        color: theme.colorScheme.primary,
-                      ),
-                      SizedBox(width: context.scale(8)),
-                      Expanded(
-                        child: Text(
-                          title,
-                          style: theme.textTheme.titleMedium?.copyWith(
-                            fontWeight: FontWeight.bold,
-                            fontSize: context.font(16),
-                          ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                    ],
+                  child: Text(
+                    title,
+                    style: theme.textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.bold,
+                      fontSize: context.font(16),
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                   ),
                 ),
-                if (status != null) SizedBox(width: context.scale(8)),
-                if (status != null)
+                if (status != null) ...[
+                  SizedBox(width: context.scale(8)),
                   Container(
                     padding: EdgeInsets.symmetric(
                       horizontal: context.scale(10),
@@ -266,7 +259,8 @@ class ProfileSection extends StatelessWidget {
                             : theme.colorScheme.primary,
                       ),
                     ),
-                  )
+                  ),
+                ],
               ],
             ),
           ),
@@ -397,9 +391,20 @@ class ProfileDropdown extends StatelessWidget {
     return Padding(
       padding: EdgeInsets.only(bottom: context.scale(16)),
       child: DropdownButtonFormField<String>(
+        isExpanded: true,
         value: value,
+        style: TextStyle(
+          fontSize: context.font(14),
+          color: context.theme.colorScheme.onSurface,
+        ),
         items: items
-            .map((i) => DropdownMenuItem(value: i, child: Text(i)))
+            .map((i) => DropdownMenuItem(
+                  value: i,
+                  child: Text(
+                    i,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ))
             .toList(),
         onChanged: onChanged,
         validator: validator,
@@ -632,7 +637,7 @@ class _ProfileAvatarState extends State<ProfileAvatar> {
             onBackgroundImageError: (exception, stackTrace) {
               debugPrint(
                   'ProfileAvatar: Error loading image ${widget.imageUrl}: $exception');
-              if (mounted) {
+              if (mounted && !_errorLoadingImage) {
                 WidgetsBinding.instance.addPostFrameCallback((_) {
                   if (mounted) {
                     setState(() {

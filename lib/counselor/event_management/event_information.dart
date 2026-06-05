@@ -199,7 +199,11 @@ class _ManageEventsPageState extends State<ExploreEventsPage> {
     _colorScheme = context.theme.colorScheme;
     return Scaffold(
       appBar: AppBar(
-        title: const Text("Manage Events"),
+        title: FittedBox(
+          fit: BoxFit.scaleDown,
+          alignment: Alignment.centerLeft,
+          child: const Text("Manage Events"),
+        ),
       ),
       body: LoadingWrapper(
         isLoading: _isLoading,
@@ -404,10 +408,12 @@ class _ManageEventsPageState extends State<ExploreEventsPage> {
                                             BorderRadius.circular(context.scale(8))),
                                   ),
                                   onPressed: () => _registerForEvent(event),
-                                  child: Text("REGISTER",
-                                      style: TextStyle(
-                                          fontSize: context.font(12),
-                                          fontWeight: FontWeight.bold)),
+                                  child: FittedBox(
+                                    child: Text("REGISTER",
+                                        style: TextStyle(
+                                            fontSize: context.font(12),
+                                            fontWeight: FontWeight.bold)),
+                                  ),
                                 ),
                               ),
                             ]);

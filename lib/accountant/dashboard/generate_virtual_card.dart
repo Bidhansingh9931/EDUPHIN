@@ -24,9 +24,7 @@ class _GenerateVirtualCardState extends State<GenerateVirtualCard> {
   @override
   void initState() {
     super.initState();
-    _cardStream = ApiService.getAccountantVirtualIdCardStream()..handleError((error) {
-      if (mounted) ErrorHandler.showError(context, error);
-    });
+    _cardStream = ApiService.getAccountantVirtualIdCardStream();
   }
 
   @override
@@ -37,9 +35,6 @@ class _GenerateVirtualCardState extends State<GenerateVirtualCard> {
     return StreamBuilder<AccountantVirtualIdCardData>(
       stream: _cardStream,
       builder: (context, snapshot) {
-        final isLoading = snapshot.connectionState == ConnectionState.waiting;
-        final cardData = snapshot.data;
-
         return Scaffold(
           backgroundColor: isDark ? bgColor : theme.colorScheme.surface,
           appBar: AppBar(
@@ -51,12 +46,19 @@ class _GenerateVirtualCardState extends State<GenerateVirtualCard> {
                   size: context.scale(20)),
               onPressed: () => Navigator.pop(context),
             ),
-            title: Text(
-              "Generate Virtual Card",
-              style: TextStyle(
-                  color: isDark ? Colors.white : theme.colorScheme.onSurface,
-                  fontWeight: FontWeight.bold,
-                  fontSize: context.font(18)),
+            titleSpacing: 0,
+            title: Padding(
+              padding: const EdgeInsets.only(right: 12.0),
+              child: FittedBox(
+                fit: BoxFit.scaleDown,
+                child: Text(
+                  "Generate Virtual Card",
+                  style: TextStyle(
+                      color: isDark ? Colors.white : theme.colorScheme.onSurface,
+                      fontWeight: FontWeight.bold,
+                      fontSize: context.font(18)),
+                ),
+              ),
             ),
             centerTitle: true,
           ),
@@ -120,7 +122,7 @@ class _GenerateVirtualCardState extends State<GenerateVirtualCard> {
               SizedBox(height: context.scale(10)),
               Skeleton(
                 height: context.scale(450),
-                width: double.infinity,
+                width: context.scale(350),
                 borderRadius: context.scale(20),
               ),
               SizedBox(height: context.scale(30)),
@@ -141,6 +143,7 @@ class _GenerateVirtualCardState extends State<GenerateVirtualCard> {
   Widget _buildIdCardFront(AccountantVirtualIdCardData data) {
     return Container(
       width: double.infinity,
+      constraints: BoxConstraints(maxWidth: context.scale(350)),
       decoration: BoxDecoration(
         color: idCardBg,
         borderRadius: BorderRadius.circular(context.scale(20)),
@@ -181,21 +184,30 @@ class _GenerateVirtualCardState extends State<GenerateVirtualCard> {
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
                     children: [
-                      Text(
-                        data.instituteName ?? "EDUPHIN ACADEMY",
-                        style: TextStyle(
-                            color: Colors.white,
-                            fontWeight: FontWeight.bold,
-                            fontSize: context.font(14)),
+                      FittedBox(
+                        fit: BoxFit.scaleDown,
+                        alignment: Alignment.centerLeft,
+                        child: Text(
+                          data.instituteName ?? "EDUPHIN ACADEMY",
+                          style: TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.bold,
+                              fontSize: context.font(14)),
+                        ),
                       ),
                       SizedBox(height: context.scale(4)),
-                      Text(
-                        data.instituteAddress ?? "Campus Identification Card",
-                        style: TextStyle(
-                            color: Colors.white70,
-                            fontSize: context.font(10),
-                            height: 1.4),
+                      FittedBox(
+                        fit: BoxFit.scaleDown,
+                        alignment: Alignment.centerLeft,
+                        child: Text(
+                          data.instituteAddress ?? "Campus Identification Card",
+                          style: TextStyle(
+                              color: Colors.white70,
+                              fontSize: context.font(10),
+                              height: 1.4),
+                        ),
                       ),
                     ],
                   ),
@@ -203,13 +215,16 @@ class _GenerateVirtualCardState extends State<GenerateVirtualCard> {
               ],
             ),
           ),
-          Text(
-            "ACCOUNTANT ID",
-            style: TextStyle(
-                color: Colors.white,
-                fontWeight: FontWeight.bold,
-                letterSpacing: 1.2,
-                fontSize: context.font(16)),
+          FittedBox(
+            fit: BoxFit.scaleDown,
+            child: Text(
+              "ACCOUNTANT ID",
+              style: TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.bold,
+                  letterSpacing: 1.2,
+                  fontSize: context.font(16)),
+            ),
           ),
           SizedBox(height: context.scale(15)),
           ProfileAvatar(
@@ -226,29 +241,56 @@ class _GenerateVirtualCardState extends State<GenerateVirtualCard> {
             ),
             child: Column(
               children: [
-                Text(
-                  data.name,
-                  style: TextStyle(
-                      color: Colors.white,
-                      fontWeight: FontWeight.bold,
-                      fontSize: context.font(18)),
+                FittedBox(
+                  fit: BoxFit.scaleDown,
+                  child: Text(
+                    data.name,
+                    style: TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold,
+                        fontSize: context.font(18)),
+                  ),
                 ),
                 SizedBox(height: context.scale(15)),
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Expanded(child: _buildInfoItem("Position", data.position ?? 'N/A')),
-                    SizedBox(width: context.scale(8)),
-                    Expanded(child: _buildInfoItem("Employee ID", data.employeeId ?? 'N/A', isRight: true)),
+                    Expanded(
+                      child: FittedBox(
+                        fit: BoxFit.scaleDown,
+                        alignment: Alignment.centerLeft,
+                        child: _buildInfoItem("Position", data.position ?? 'N/A'),
+                      ),
+                    ),
+                    SizedBox(width: context.scale(24)),
+                    Expanded(
+                      child: FittedBox(
+                        fit: BoxFit.scaleDown,
+                        alignment: Alignment.centerRight,
+                        child: _buildInfoItem("Employee ID", data.employeeId ?? 'N/A', isRight: true),
+                      ),
+                    ),
                   ],
                 ),
                 SizedBox(height: context.scale(15)),
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Expanded(child: _buildInfoItem("Employment", data.employmentType ?? 'N/A')),
-                    SizedBox(width: context.scale(8)),
-                    Expanded(child: _buildInfoItem("Joining", data.joiningDate ?? 'N/A', isRight: true)),
+                    Expanded(
+                      child: FittedBox(
+                        fit: BoxFit.scaleDown,
+                        alignment: Alignment.centerLeft,
+                        child: _buildInfoItem("Employment", data.employmentType ?? 'N/A'),
+                      ),
+                    ),
+                    SizedBox(width: context.scale(24)),
+                    Expanded(
+                      child: FittedBox(
+                        fit: BoxFit.scaleDown,
+                        alignment: Alignment.centerRight,
+                        child: _buildInfoItem("Joining", data.joiningDate ?? 'N/A', isRight: true),
+                      ),
+                    ),
                   ],
                 ),
               ],
@@ -256,20 +298,23 @@ class _GenerateVirtualCardState extends State<GenerateVirtualCard> {
           ),
           SizedBox(height: context.scale(15)),
           Container(
-            width: double.infinity,
+            constraints: BoxConstraints(maxWidth: context.scale(310)),
             margin: EdgeInsets.symmetric(horizontal: context.scale(20)),
-            padding: EdgeInsets.symmetric(vertical: context.scale(12)),
+            padding: EdgeInsets.symmetric(vertical: context.scale(12), horizontal: context.scale(8)),
             decoration: BoxDecoration(
               color: const Color(0xFF4A556E),
               borderRadius: BorderRadius.circular(context.scale(10)),
             ),
             child: Center(
-              child: Text(
-                "Authorized Signature",
-                style: TextStyle(
-                    color: Colors.white70,
-                    fontWeight: FontWeight.w600,
-                    fontSize: context.font(13)),
+              child: FittedBox(
+                fit: BoxFit.scaleDown,
+                child: Text(
+                  "Authorized Signature",
+                  style: TextStyle(
+                      color: Colors.white70,
+                      fontWeight: FontWeight.w600,
+                      fontSize: context.font(13)),
+                ),
               ),
             ),
           ),
@@ -282,6 +327,7 @@ class _GenerateVirtualCardState extends State<GenerateVirtualCard> {
   Widget _buildIdCardBack(AccountantVirtualIdCardData data) {
     return Container(
       width: double.infinity,
+      constraints: BoxConstraints(maxWidth: context.scale(350)),
       decoration: BoxDecoration(
         color: idCardBg,
         borderRadius: BorderRadius.circular(context.scale(20)),
@@ -332,21 +378,26 @@ class _GenerateVirtualCardState extends State<GenerateVirtualCard> {
 
   Widget _buildBackInfoItem(IconData icon, String label, String value) {
     return Row(
+      mainAxisSize: MainAxisSize.min,
       children: [
         Icon(icon, color: Colors.white54, size: context.scale(16)),
         SizedBox(width: context.scale(12)),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(label,
-                  style: TextStyle(color: Colors.white54, fontSize: context.font(10))),
-              Text(value,
-                  style: TextStyle(
-                      color: Colors.white,
-                      fontSize: context.font(12),
-                      fontWeight: FontWeight.w500)),
-            ],
+        Flexible(
+          child: FittedBox(
+            fit: BoxFit.scaleDown,
+            alignment: Alignment.centerLeft,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(label,
+                    style: TextStyle(color: Colors.white54, fontSize: context.font(10))),
+                Text(value,
+                    style: TextStyle(
+                        color: Colors.white,
+                        fontSize: context.font(12),
+                        fontWeight: FontWeight.w500)),
+              ],
+            ),
           ),
         ),
       ],
@@ -383,8 +434,9 @@ class _GenerateVirtualCardState extends State<GenerateVirtualCard> {
 
   Widget _buildActionButtons(AccountantVirtualIdCardData data) {
     return Padding(
-      padding: EdgeInsets.symmetric(horizontal: context.scale(24)),
+      padding: EdgeInsets.symmetric(horizontal: context.scale(20)),
       child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
         children: [
           Expanded(
             child: ElevatedButton(
@@ -401,24 +453,30 @@ class _GenerateVirtualCardState extends State<GenerateVirtualCard> {
                     borderRadius: BorderRadius.circular(context.scale(12))),
                 elevation: 0,
               ),
-              child: Text(
-                "FLIP CARD",
-                style: TextStyle(
-                    fontWeight: FontWeight.bold,
-                    letterSpacing: 1,
-                    fontSize: context.font(14)),
+              child: FittedBox(
+                fit: BoxFit.scaleDown,
+                child: Text(
+                  "FLIP CARD",
+                  style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      letterSpacing: 1,
+                      fontSize: context.font(14)),
+                ),
               ),
             ),
           ),
-          SizedBox(width: context.scale(16)),
+          SizedBox(width: context.scale(12)),
           Expanded(
             child: ElevatedButton.icon(
               onPressed: () => PdfService.generateAndPrintIdCard(data),
               icon: Icon(Icons.picture_as_pdf_rounded, size: context.scale(20)),
-              label: Text(
-                "DOWNLOAD",
-                style: TextStyle(
-                    fontWeight: FontWeight.bold, fontSize: context.font(13)),
+              label: FittedBox(
+                fit: BoxFit.scaleDown,
+                child: Text(
+                  "DOWNLOAD",
+                  style: TextStyle(
+                      fontWeight: FontWeight.bold, fontSize: context.font(13)),
+                ),
               ),
               style: ElevatedButton.styleFrom(
                 backgroundColor: const Color(0xFFC8D3F5),

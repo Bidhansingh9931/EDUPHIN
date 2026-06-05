@@ -148,7 +148,11 @@ class _ManageClassesPageState extends State<ManageClassesPage> {
     final theme = context.theme;
     return Scaffold(
       appBar: AppBar(
-        title: const Text("Manage Classes"),
+        title: FittedBox(
+          fit: BoxFit.scaleDown,
+          alignment: Alignment.centerLeft,
+          child: const Text("Manage Classes"),
+        ),
       ),
       body: RefreshIndicator(
         onRefresh: _fetchClasses,
@@ -212,15 +216,23 @@ class _ManageClassesPageState extends State<ManageClassesPage> {
                                           child: Column(
                                             crossAxisAlignment: CrossAxisAlignment.start,
                                             children: [
-                                              Text(classInfo.name,
-                                                  style: TextStyle(
-                                                      fontWeight: FontWeight.bold,
-                                                      fontSize: context.font(16))),
-                                              Text(isActive ? "ACTIVE" : "INACTIVE",
-                                                  style: TextStyle(
-                                                      color: isActive ? Colors.green : Colors.red,
-                                                      fontSize: context.font(10),
-                                                      fontWeight: FontWeight.bold)),
+                                              FittedBox(
+                                                fit: BoxFit.scaleDown,
+                                                alignment: Alignment.centerLeft,
+                                                child: Text(classInfo.name,
+                                                    style: TextStyle(
+                                                        fontWeight: FontWeight.bold,
+                                                        fontSize: context.font(16))),
+                                              ),
+                                              FittedBox(
+                                                fit: BoxFit.scaleDown,
+                                                alignment: Alignment.centerLeft,
+                                                child: Text(isActive ? "ACTIVE" : "INACTIVE",
+                                                    style: TextStyle(
+                                                        color: isActive ? Colors.green : Colors.red,
+                                                        fontSize: context.font(10),
+                                                        fontWeight: FontWeight.bold)),
+                                              ),
                                             ],
                                           ),
                                         ),

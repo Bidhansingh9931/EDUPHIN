@@ -194,7 +194,11 @@ class _MyRegisteredEventsPageState extends State<MyRegisteredEventsPage> {
     _colorScheme = context.theme.colorScheme;
     return Scaffold(
       appBar: AppBar(
-        title: const Text("My Registered Events"),
+        title: FittedBox(
+          fit: BoxFit.scaleDown,
+          alignment: Alignment.centerLeft,
+          child: const Text("My Registered Events"),
+        ),
       ),
       body: LoadingWrapper(
         isLoading: _isLoading,
@@ -338,9 +342,11 @@ class _MyRegisteredEventsPageState extends State<MyRegisteredEventsPage> {
                     shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(context.scale(8))),
                   ),
-                  child: Text("CANCEL REGISTRATION",
-                      style: TextStyle(
-                          fontWeight: FontWeight.bold, fontSize: context.font(12))),
+                  child: FittedBox(
+                    child: Text("CANCEL REGISTRATION",
+                        style: TextStyle(
+                            fontWeight: FontWeight.bold, fontSize: context.font(12))),
+                  ),
                 ),
               ),
             ],

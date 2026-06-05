@@ -174,12 +174,21 @@ class _EventListPageState extends State<EventListPage> with SingleTickerProvider
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text("Event Management", style: context.theme.appBarTheme.titleTextStyle?.copyWith(fontSize: context.font(18))),
-            Text("Explore and register for upcoming events", style: context.theme.textTheme.labelSmall?.copyWith(color: context.theme.hintColor, fontSize: context.font(11))),
-          ],
+        titleSpacing: 0,
+        title: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12.0),
+          child: FittedBox(
+            fit: BoxFit.scaleDown,
+            alignment: Alignment.centerLeft,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text("Event Management", style: context.theme.appBarTheme.titleTextStyle?.copyWith(fontSize: context.font(18))),
+                Text("Explore and register for upcoming events", style: context.theme.textTheme.labelSmall?.copyWith(color: context.theme.hintColor, fontSize: context.font(11))),
+              ],
+            ),
+          ),
         ),
         bottom: TabBar(
           controller: _tabController,
@@ -467,37 +476,49 @@ class _EventListPageState extends State<EventListPage> with SingleTickerProvider
                 children: [
                   Text(event.title, style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold, fontSize: context.font(16)), maxLines: 1, overflow: TextOverflow.ellipsis),
                   SizedBox(height: context.scale(8)),
-                  Row(
-                    children: [
-                      Icon(Icons.calendar_today_rounded, color: theme.colorScheme.primary, size: context.scale(14)),
-                      SizedBox(width: context.scale(8)),
-                      Text(event.date, style: theme.textTheme.bodySmall?.copyWith(fontSize: context.font(12))),
-                    ],
+                  FittedBox(
+                    fit: BoxFit.scaleDown,
+                    alignment: Alignment.centerLeft,
+                    child: Row(
+                      children: [
+                        Icon(Icons.calendar_today_rounded, color: theme.colorScheme.primary, size: context.scale(14)),
+                        SizedBox(width: context.scale(8)),
+                        Text(event.date, style: theme.textTheme.bodySmall?.copyWith(fontSize: context.font(12))),
+                      ],
+                    ),
                   ),
                   if (event.venue != null) ...[
                     SizedBox(height: context.scale(4)),
-                    Row(
-                      children: [
-                        Icon(Icons.location_on_outlined, color: theme.colorScheme.secondary, size: context.scale(14)),
-                        SizedBox(width: context.scale(8)),
-                        Expanded(child: Text(event.venue!, style: theme.textTheme.bodySmall?.copyWith(fontSize: context.font(12)), maxLines: 1, overflow: TextOverflow.ellipsis)),
-                      ],
+                    FittedBox(
+                      fit: BoxFit.scaleDown,
+                      alignment: Alignment.centerLeft,
+                      child: Row(
+                        children: [
+                          Icon(Icons.location_on_outlined, color: theme.colorScheme.secondary, size: context.scale(14)),
+                          SizedBox(width: context.scale(8)),
+                          Text(event.venue!, style: theme.textTheme.bodySmall?.copyWith(fontSize: context.font(12))),
+                        ],
+                      ),
                     ),
                   ],
                   SizedBox(height: context.scale(12)),
-                  Container(
-                    padding: EdgeInsets.symmetric(horizontal: context.scale(10), vertical: context.scale(4)),
-                    decoration: BoxDecoration(
-                      color: (event.isTicketed ? Colors.orange : Colors.green).withValues(alpha: 0.1),
-                      borderRadius: BorderRadius.circular(context.scale(8)),
-                    ),
-                    child: Text(
-                      event.isTicketed ? "PAID EVENT: ₹${event.ticketPrice}" : "FREE EVENT", 
-                      style: TextStyle(
-                        color: event.isTicketed ? Colors.orange : Colors.green, 
-                        fontSize: context.font(10), 
-                        fontWeight: FontWeight.bold
-                      )
+                  FittedBox(
+                    fit: BoxFit.scaleDown,
+                    alignment: Alignment.centerLeft,
+                    child: Container(
+                      padding: EdgeInsets.symmetric(horizontal: context.scale(10), vertical: context.scale(4)),
+                      decoration: BoxDecoration(
+                        color: (event.isTicketed ? Colors.orange : Colors.green).withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(context.scale(8)),
+                      ),
+                      child: Text(
+                        event.isTicketed ? "PAID EVENT: ₹${event.ticketPrice}" : "FREE EVENT", 
+                        style: TextStyle(
+                          color: event.isTicketed ? Colors.orange : Colors.green, 
+                          fontSize: context.font(10), 
+                          fontWeight: FontWeight.bold
+                        )
+                      ),
                     ),
                   ),
                   SizedBox(height: context.spacing),
@@ -593,13 +614,17 @@ class _EventListPageState extends State<EventListPage> with SingleTickerProvider
   Widget _detailInfoRow(IconData icon, String label, String value) {
     return Padding(
       padding: EdgeInsets.symmetric(vertical: context.scale(6)),
-      child: Row(
-        children: [
-          Icon(icon, size: context.scale(18), color: context.theme.colorScheme.primary),
-          SizedBox(width: context.spacing),
-          Text("$label: ", style: const TextStyle(fontWeight: FontWeight.bold)),
-          Expanded(child: Text(value)),
-        ],
+      child: FittedBox(
+        fit: BoxFit.scaleDown,
+        alignment: Alignment.centerLeft,
+        child: Row(
+          children: [
+            Icon(icon, size: context.scale(18), color: context.theme.colorScheme.primary),
+            SizedBox(width: context.spacing),
+            Text("$label: ", style: const TextStyle(fontWeight: FontWeight.bold)),
+            Text(value),
+          ],
+        ),
       ),
     );
   }
@@ -639,37 +664,41 @@ class _EventListPageState extends State<EventListPage> with SingleTickerProvider
                   if (registration.reasonForCancel != null && isCancelled)
                     Text("Reason: ${registration.reasonForCancel}", style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.error, fontStyle: FontStyle.italic)),
                   SizedBox(height: context.scale(8)),
-                  Row(
-                    children: [
-                      Container(
-                        padding: EdgeInsets.symmetric(horizontal: context.scale(8), vertical: context.scale(2)),
-                        decoration: BoxDecoration(
-                          color: (isCancelled ? Colors.red : Colors.green).withValues(alpha: 0.1),
-                          borderRadius: BorderRadius.circular(context.scale(6)),
-                        ),
-                        child: Text(
-                          registration.status.toUpperCase(), 
-                          style: TextStyle(
-                            color: isCancelled ? Colors.red : Colors.green, 
-                            fontSize: context.font(10), 
-                            fontWeight: FontWeight.bold
-                          )
-                        ),
-                      ),
-                      if (!isCancelled) ...[
-                        SizedBox(width: context.spacing),
-                        TextButton(
-                          onPressed: () => _cancelRegistration(registration),
-                          style: TextButton.styleFrom(
-                            foregroundColor: theme.colorScheme.error,
-                            padding: EdgeInsets.zero,
-                            minimumSize: Size.zero,
-                            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  FittedBox(
+                    fit: BoxFit.scaleDown,
+                    alignment: Alignment.centerLeft,
+                    child: Row(
+                      children: [
+                        Container(
+                          padding: EdgeInsets.symmetric(horizontal: context.scale(8), vertical: context.scale(2)),
+                          decoration: BoxDecoration(
+                            color: (isCancelled ? Colors.red : Colors.green).withValues(alpha: 0.1),
+                            borderRadius: BorderRadius.circular(context.scale(6)),
                           ),
-                          child: const Text("Cancel Spot"),
+                          child: Text(
+                            registration.status.toUpperCase(), 
+                            style: TextStyle(
+                              color: isCancelled ? Colors.red : Colors.green, 
+                              fontSize: context.font(10), 
+                              fontWeight: FontWeight.bold
+                            )
+                          ),
                         ),
+                        if (!isCancelled) ...[
+                          SizedBox(width: context.spacing),
+                          TextButton(
+                            onPressed: () => _cancelRegistration(registration),
+                            style: TextButton.styleFrom(
+                              foregroundColor: theme.colorScheme.error,
+                              padding: EdgeInsets.zero,
+                              minimumSize: Size.zero,
+                              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                            ),
+                            child: const Text("Cancel Spot"),
+                          ),
+                        ],
                       ],
-                    ],
+                    ),
                   ),
                 ],
               ),

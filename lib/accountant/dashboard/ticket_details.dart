@@ -95,9 +95,17 @@ class _TicketDetailsPageState extends State<TicketDetailsPage> {
     
     return Scaffold(
       appBar: AppBar(
-        title: StreamBuilder<TicketDetails>(
-          stream: _detailsStream,
-          builder: (context, snapshot) => Text(snapshot.hasData ? "Ticket #${snapshot.data!.ticket.id}" : "Ticket Details"),
+        titleSpacing: 0,
+        title: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12.0),
+          child: FittedBox(
+            fit: BoxFit.scaleDown,
+            alignment: Alignment.centerLeft,
+            child: StreamBuilder<TicketDetails>(
+              stream: _detailsStream,
+              builder: (context, snapshot) => Text(snapshot.hasData ? "Ticket #${snapshot.data!.ticket.id}" : "Ticket Details"),
+            ),
+          ),
         ),
         centerTitle: true,
         actions: [
@@ -263,23 +271,27 @@ class _TicketDetailsPageState extends State<TicketDetailsPage> {
                   style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold, fontSize: context.font(16))
                 ),
                 SizedBox(height: context.scale(12)),
-                Row(
-                  children: [
-                    _buildTag(context, details.ticket.status.toUpperCase(), _getStatusColor(details.ticket.status)),
-                    SizedBox(width: context.scale(8)),
-                    _buildTag(context, details.ticket.priority.toUpperCase(), _getPriorityColor(details.ticket.priority)),
-                    const Spacer(),
-                    if (details.ticket.status != 'resolved' && details.ticket.status != 'closed')
-                      TextButton.icon(
-                        onPressed: () => _updateStatus('resolved'),
-                        icon: Icon(Icons.check_circle_outline, size: context.scale(16)),
-                        label: Text(
-                          "CLOSE TICKET", 
-                          style: TextStyle(fontSize: context.font(10), fontWeight: FontWeight.bold)
+                FittedBox(
+                  fit: BoxFit.scaleDown,
+                  alignment: Alignment.centerLeft,
+                  child: Row(
+                    children: [
+                      _buildTag(context, details.ticket.status.toUpperCase(), _getStatusColor(details.ticket.status)),
+                      SizedBox(width: context.scale(8)),
+                      _buildTag(context, details.ticket.priority.toUpperCase(), _getPriorityColor(details.ticket.priority)),
+                      const SizedBox(width: 8),
+                      if (details.ticket.status != 'resolved' && details.ticket.status != 'closed')
+                        TextButton.icon(
+                          onPressed: () => _updateStatus('resolved'),
+                          icon: Icon(Icons.check_circle_outline, size: context.scale(16)),
+                          label: Text(
+                            "CLOSE TICKET", 
+                            style: TextStyle(fontSize: context.font(10), fontWeight: FontWeight.bold)
+                          ),
+                          style: TextButton.styleFrom(foregroundColor: Colors.green),
                         ),
-                        style: TextButton.styleFrom(foregroundColor: Colors.green),
-                      ),
-                  ],
+                    ],
+                  ),
                 ),
               ],
             ),
@@ -317,16 +329,20 @@ class _TicketDetailsPageState extends State<TicketDetailsPage> {
             if (reply.attachment != null)
               Padding(
                 padding: EdgeInsets.only(top: context.scale(8)),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(Icons.attach_file, size: context.scale(14), color: theme.colorScheme.primary),
-                    SizedBox(width: context.scale(4)),
-                    Text(
-                      "Attachment", 
-                      style: TextStyle(fontSize: context.font(11), decoration: TextDecoration.underline)
-                    ),
-                  ],
+                child: FittedBox(
+                  fit: BoxFit.scaleDown,
+                  alignment: Alignment.centerLeft,
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.attach_file, size: context.scale(14), color: theme.colorScheme.primary),
+                      SizedBox(width: context.scale(4)),
+                      Text(
+                        "Attachment", 
+                        style: TextStyle(fontSize: context.font(11), decoration: TextDecoration.underline)
+                      ),
+                    ],
+                  ),
                 ),
               ),
             SizedBox(height: context.scale(4)),
@@ -358,10 +374,12 @@ class _TicketDetailsPageState extends State<TicketDetailsPage> {
                   decoration: const InputDecoration(hintText: "Type reply..."),
                 ),
                 SizedBox(height: context.scale(12)),
-                Row(
-                  children: [
-                    Expanded(
-                      child: InkWell(
+                FittedBox(
+                  fit: BoxFit.scaleDown,
+                  alignment: Alignment.centerLeft,
+                  child: Row(
+                    children: [
+                      InkWell(
                         onTap: _pickFile,
                         child: Container(
                           height: context.scale(48),
@@ -375,31 +393,28 @@ class _TicketDetailsPageState extends State<TicketDetailsPage> {
                             children: [
                               Icon(Icons.image_outlined, size: context.scale(18), color: theme.hintColor),
                               SizedBox(width: context.scale(8)),
-                              Flexible(
-                                child: Text(
-                                  _selectedFile?.path.split('/').last ?? "Choose File",
-                                  style: TextStyle(color: theme.hintColor, fontSize: context.font(12)),
-                                  overflow: TextOverflow.ellipsis,
-                                ),
+                              Text(
+                                _selectedFile?.path.split('/').last ?? "Choose File",
+                                style: TextStyle(color: theme.hintColor, fontSize: context.font(12)),
                               ),
                             ],
                           ),
                         ),
                       ),
-                    ),
-                    SizedBox(width: context.scale(12)),
-                    SizedBox( 
-                      height: context.scale(48),
-                      child: ElevatedButton(
-                        style: ElevatedButton.styleFrom(
-                          minimumSize: Size(context.scale(80), context.scale(48)),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(context.scale(12))),
+                      SizedBox(width: context.scale(12)),
+                      SizedBox( 
+                        height: context.scale(48),
+                        child: ElevatedButton(
+                          style: ElevatedButton.styleFrom(
+                            minimumSize: Size(context.scale(80), context.scale(48)),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(context.scale(12))),
+                          ),
+                          onPressed: _isActionLoading ? null : _sendReply,
+                          child: const Text("SEND"),
                         ),
-                        onPressed: _isActionLoading ? null : _sendReply,
-                        child: const Text("SEND"),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               ],
             ),

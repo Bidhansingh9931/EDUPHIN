@@ -36,11 +36,30 @@ class _ExamListPageState extends State<ExamListPage> {
     return Scaffold(
       backgroundColor: theme.colorScheme.surface,
       appBar: AppBar(
-        title: Text("Examinations", style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold, fontSize: context.font(20))),
+        titleSpacing: 0,
+        title: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12.0),
+          child: Row(
+            children: [
+              Expanded(
+                child: FittedBox(
+                  fit: BoxFit.scaleDown,
+                  alignment: Alignment.centerLeft,
+                  child: Text("Examinations", style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold, fontSize: context.font(20))),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Flexible(
+                child: FittedBox(
+                  fit: BoxFit.scaleDown,
+                  alignment: Alignment.centerRight,
+                  child: IconButton(icon: const Icon(Icons.refresh_rounded), onPressed: _refreshExams),
+                ),
+              ),
+            ],
+          ),
+        ),
         centerTitle: false,
-        actions: [
-          IconButton(icon: const Icon(Icons.refresh_rounded), onPressed: _refreshExams),
-        ],
       ),
       body: StreamBuilder<List<Exam>>(
         stream: _examsStream,
@@ -132,21 +151,21 @@ class _ExamListPageState extends State<ExamListPage> {
                       Skeleton(width: 80, height: 12, borderRadius: 4),
                     ]),
                   ]),
-                  const Spacer(),
+                  SizedBox(height: context.spacing),
                   Row(children: [
                     Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                       Skeleton(width: 60, height: 10, borderRadius: 2),
                       const SizedBox(height: 4),
                       Skeleton(width: 80, height: 14, borderRadius: 4),
                     ]),
-                    const Spacer(),
+                    const Expanded(child: SizedBox()),
                     Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
                       Skeleton(width: 60, height: 10, borderRadius: 2),
                       const SizedBox(height: 4),
                       Skeleton(width: 80, height: 14, borderRadius: 4),
                     ]),
                   ]),
-                  const Spacer(),
+                  SizedBox(height: context.spacing),
                   Skeleton(width: double.infinity, height: context.scale(44), borderRadius: context.scale(12)),
                 ]),
               ),
@@ -159,19 +178,23 @@ class _ExamListPageState extends State<ExamListPage> {
 
   Widget _buildSectionHeader(String title, IconData icon) {
     final theme = context.theme;
-    return Row(
-      children: [
-        Icon(icon, size: context.scale(20), color: theme.colorScheme.primary),
-        SizedBox(width: context.scale(8)),
-        Text(
-          title,
-          style: theme.textTheme.titleMedium?.copyWith(
-            fontWeight: FontWeight.bold,
-            fontSize: context.font(18),
-            color: theme.colorScheme.onSurface,
+    return FittedBox(
+      fit: BoxFit.scaleDown,
+      alignment: Alignment.centerLeft,
+      child: Row(
+        children: [
+          Icon(icon, size: context.scale(20), color: theme.colorScheme.primary),
+          SizedBox(width: context.scale(8)),
+          Text(
+            title,
+            style: theme.textTheme.titleMedium?.copyWith(
+              fontWeight: FontWeight.bold,
+              fontSize: context.font(18),
+              color: theme.colorScheme.onSurface,
+            ),
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 
@@ -217,24 +240,27 @@ class _ExamListPageState extends State<ExamListPage> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Row(
-              children: [
-                Container(
-                  padding: EdgeInsets.all(context.scale(8)),
-                  decoration: BoxDecoration(
-                    color: theme.colorScheme.primaryContainer,
-                    borderRadius: BorderRadius.circular(context.scale(12)),
+            FittedBox(
+              fit: BoxFit.scaleDown,
+              alignment: Alignment.centerLeft,
+              child: Row(
+                children: [
+                  Container(
+                    padding: EdgeInsets.all(context.scale(8)),
+                    decoration: BoxDecoration(
+                      color: theme.colorScheme.primaryContainer,
+                      borderRadius: BorderRadius.circular(context.scale(12)),
+                    ),
+                    child: Icon(
+                      Icons.description_rounded,
+                      color: theme.colorScheme.onPrimaryContainer,
+                      size: context.scale(24),
+                    ),
                   ),
-                  child: Icon(
-                    Icons.description_rounded,
-                    color: theme.colorScheme.onPrimaryContainer,
-                    size: context.scale(24),
-                  ),
-                ),
-                SizedBox(width: context.md),
-                Expanded(
-                  child: Column(
+                  SizedBox(width: context.md),
+                  Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
                     children: [
                       Text(
                         exam.name,
@@ -243,7 +269,6 @@ class _ExamListPageState extends State<ExamListPage> {
                           fontSize: context.font(15),
                         ),
                         maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
                       ),
                       Text(
                         "Exam ID: EXAM${exam.id}",
@@ -255,18 +280,22 @@ class _ExamListPageState extends State<ExamListPage> {
                       ),
                     ],
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
-            const Spacer(),
-            Row(
-              children: [
-                _buildDateInfo(context, "START DATE", exam.startDate ?? 'N/A'),
-                const Spacer(),
-                _buildDateInfo(context, "END DATE", exam.endDate ?? 'N/A', alignRight: true),
-              ],
+            const SizedBox(height: 16),
+            FittedBox(
+              fit: BoxFit.scaleDown,
+              alignment: Alignment.centerLeft,
+              child: Row(
+                children: [
+                  _buildDateInfo(context, "START DATE", exam.startDate ?? 'N/A'),
+                  SizedBox(width: context.spacing),
+                  _buildDateInfo(context, "END DATE", exam.endDate ?? 'N/A', alignRight: true),
+                ],
+              ),
             ),
-            const Spacer(),
+            const SizedBox(height: 16),
             SizedBox(
               width: double.infinity,
               height: context.scale(44),

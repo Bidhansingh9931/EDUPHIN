@@ -182,7 +182,11 @@ class _SalaryBankPageState extends State<SalaryBankPage> {
 
     return Scaffold(
       appBar: AppBar(
-        title: Text("Salary & Bank", style: TextStyle(fontSize: context.font(20))),
+        title: FittedBox(
+          fit: BoxFit.scaleDown,
+          alignment: Alignment.centerLeft,
+          child: Text("Salary & Bank", style: TextStyle(fontSize: context.font(20))),
+        ),
       ),
       body: RefreshIndicator(
         onRefresh: _fetchSalaryData,
@@ -245,12 +249,16 @@ class _SalaryBankPageState extends State<SalaryBankPage> {
                                 ],
                               ),
                               SizedBox(height: context.scale(12)),
-                              Text(
-                                lastSalary != null ? "₹${lastSalary.amount}" : "₹0.00",
-                                style: TextStyle(
-                                  color: colorScheme.onPrimary,
-                                  fontSize: context.font(36),
-                                  fontWeight: FontWeight.bold,
+                              FittedBox(
+                                fit: BoxFit.scaleDown,
+                                alignment: Alignment.centerLeft,
+                                child: Text(
+                                  lastSalary != null ? "₹${lastSalary.amount}" : "₹0.00",
+                                  style: TextStyle(
+                                    color: colorScheme.onPrimary,
+                                    fontSize: context.font(36),
+                                    fontWeight: FontWeight.bold,
+                                  ),
                                 ),
                               ),
                               SizedBox(height: context.scale(32)),
@@ -328,12 +336,15 @@ class _SalaryBankPageState extends State<SalaryBankPage> {
                                     "Paid on ${salary.paymentDate}",
                                     style: TextStyle(fontSize: context.font(12)),
                                   ),
-                                  trailing: Text(
-                                    "₹${salary.amount}",
-                                    style: TextStyle(
-                                      color: colorScheme.primary,
-                                      fontWeight: FontWeight.bold,
-                                      fontSize: context.font(16),
+                                  trailing: FittedBox(
+                                    fit: BoxFit.scaleDown,
+                                    child: Text(
+                                      "₹${salary.amount}",
+                                      style: TextStyle(
+                                        color: colorScheme.primary,
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: context.font(16),
+                                      ),
                                     ),
                                   ),
                                 ),
@@ -363,12 +374,15 @@ class _SalaryBankPageState extends State<SalaryBankPage> {
           ),
         ),
         SizedBox(height: context.scale(4)),
-        Text(
-          value,
-          style: TextStyle(
-            color: colorScheme.onPrimary,
-            fontWeight: FontWeight.bold,
-            fontSize: context.font(14),
+        FittedBox(
+          fit: BoxFit.scaleDown,
+          child: Text(
+            value,
+            style: TextStyle(
+              color: colorScheme.onPrimary,
+              fontWeight: FontWeight.bold,
+              fontSize: context.font(14),
+            ),
           ),
         ),
       ],

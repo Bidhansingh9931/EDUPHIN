@@ -37,7 +37,7 @@ class _StudentFeeDetailPageState extends State<StudentFeeDetailPage> {
       final Map<String, String> query = {};
       if (_selectedClassId != null) query['class_filter'] = _selectedClassId.toString();
       if (_selectedSectionId != null) query['section_filter'] = _selectedSectionId.toString();
-      _studentsStream = ApiService.getAccountantStudentsStream(query)..handleError((error) {
+      _studentsStream = ApiService.getAccountantStudentsStream(query).handleError((error) {
         if (mounted) ErrorHandler.showError(context, error);
       });
     });
@@ -46,7 +46,7 @@ class _StudentFeeDetailPageState extends State<StudentFeeDetailPage> {
   void _fetchStudentDetails(String studentId) {
     setState(() {
       _selectedStudentId = studentId;
-      _studentDetailsStream = ApiService.getAccountantStudentFeeDetailsStream(studentId)..handleError((error) {
+      _studentDetailsStream = ApiService.getAccountantStudentFeeDetailsStream(studentId).handleError((error) {
         if (mounted) ErrorHandler.showError(context, error);
       });
     });
@@ -60,7 +60,15 @@ class _StudentFeeDetailPageState extends State<StudentFeeDetailPage> {
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(showDetails && isMobile ? "Student Details" : "Student Fees Management"),
+        titleSpacing: 0,
+        title: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12.0),
+          child: FittedBox(
+            fit: BoxFit.scaleDown,
+            alignment: Alignment.centerLeft,
+            child: Text(showDetails && isMobile ? "Student Details" : "Student Fees Management"),
+          ),
+        ),
         leading: showDetails && isMobile
             ? IconButton(
                 icon: const Icon(Icons.arrow_back),
@@ -286,16 +294,23 @@ class _StudentFeeDetailPageState extends State<StudentFeeDetailPage> {
                   selected: isSelected,
                   selectedTileColor: theme.colorScheme.primary.withValues(alpha: 0.05),
                   contentPadding: EdgeInsets.symmetric(horizontal: context.spacing, vertical: context.scale(4)),
-                  leading: CircleAvatar(
-                    radius: context.scale(16),
-                    backgroundColor: theme.colorScheme.primary.withValues(alpha: 0.1),
-                    child: Text("${index + 1}", style: TextStyle(fontSize: context.font(10), color: theme.colorScheme.primary, fontWeight: FontWeight.bold)),
+                  leading: FittedBox(
+                    fit: BoxFit.scaleDown,
+                    child: CircleAvatar(
+                      radius: context.scale(16),
+                      backgroundColor: theme.colorScheme.primary.withValues(alpha: 0.1),
+                      child: Text("${index + 1}", style: TextStyle(fontSize: context.font(10), color: theme.colorScheme.primary, fontWeight: FontWeight.bold)),
+                    ),
                   ),
-                  title: Text(
-                    "${student['first_name'] ?? ''} ${student['last_name'] ?? ''}".trim().isEmpty ? (student["name"]?.toString() ?? student["user"]?["name"]?.toString() ?? 'N/A') : "${student['first_name'] ?? ''} ${student['last_name'] ?? ''}",
-                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: context.font(14)),
+                  title: FittedBox(
+                    fit: BoxFit.scaleDown,
+                    alignment: Alignment.centerLeft,
+                    child: Text(
+                      "${student['first_name'] ?? ''} ${student['last_name'] ?? ''}".trim().isEmpty ? (student["name"]?.toString() ?? student["user"]?["name"]?.toString() ?? 'N/A') : "${student['first_name'] ?? ''} ${student['last_name'] ?? ''}",
+                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: context.font(14)),
+                    ),
                   ),
-                  subtitle: Text("${student["class"]?["name"] ?? 'N/A'} - ${student["section"]?["section_name"] ?? student["section"]?["name"] ?? 'N/A'}", style: TextStyle(fontSize: context.font(11), color: theme.hintColor)),
+                  subtitle: Text("${student["class"]?["name"] ?? 'N/A'} - ${student["section"]?["section_name"] ?? student["section"]?["name"] ?? 'N/A'}", style: TextStyle(fontSize: context.font(11), color: theme.hintColor), maxLines: 1, overflow: TextOverflow.ellipsis),
                   onTap: () => _fetchStudentDetails(studentId),
                 );
               },
@@ -323,17 +338,19 @@ class _StudentFeeDetailPageState extends State<StudentFeeDetailPage> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Row(
-              children: [
-                CircleAvatar(backgroundColor: theme.colorScheme.primary, radius: context.scale(24), child: Icon(Icons.person, color: Colors.white, size: context.scale(24))),
-                SizedBox(width: context.spacing),
-                Expanded(
-                  child: Text(
+            FittedBox(
+              fit: BoxFit.scaleDown,
+              alignment: Alignment.centerLeft,
+              child: Row(
+                children: [
+                  CircleAvatar(backgroundColor: theme.colorScheme.primary, radius: context.scale(24), child: Icon(Icons.person, color: Colors.white, size: context.scale(24))),
+                  SizedBox(width: context.spacing),
+                  Text(
                     "${info['first_name'] ?? ''} ${info['last_name'] ?? ''}".trim().isEmpty ? (info['name']?.toString() ?? 'N/A') : "${info['first_name'] ?? ''} ${info['last_name'] ?? ''}",
                     style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold, fontSize: context.font(18)),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
             SizedBox(height: context.spacing),
             _buildDetailGrid(context, info),
@@ -372,13 +389,17 @@ class _StudentFeeDetailPageState extends State<StudentFeeDetailPage> {
   Widget _buildSummaryRow(BuildContext context, String label, String value, Color color, {bool isBold = false}) {
     return Padding(
       padding: EdgeInsets.only(bottom: context.scale(8.0)),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Expanded(child: Text(label, style: TextStyle(fontSize: context.font(13)), maxLines: 1, overflow: TextOverflow.ellipsis)),
-          SizedBox(width: context.spacing),
-          Text(value, style: TextStyle(color: color, fontSize: context.font(15), fontWeight: isBold ? FontWeight.bold : FontWeight.w500)),
-        ],
+      child: FittedBox(
+        fit: BoxFit.scaleDown,
+        alignment: Alignment.centerLeft,
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(label, style: TextStyle(fontSize: context.font(13))),
+            SizedBox(width: context.spacing),
+            Text(value, style: TextStyle(color: color, fontSize: context.font(15), fontWeight: isBold ? FontWeight.bold : FontWeight.w500)),
+          ],
+        ),
       ),
     );
   }
@@ -400,12 +421,16 @@ class _StudentFeeDetailPageState extends State<StudentFeeDetailPage> {
           Container(
             padding: EdgeInsets.all(context.spacing),
             decoration: BoxDecoration(color: theme.colorScheme.primary, borderRadius: BorderRadius.vertical(top: Radius.circular(context.scale(16)))),
-            child: Row(
-              children: [
-                Icon(Icons.receipt_long, color: Colors.white, size: context.scale(20)),
-                SizedBox(width: context.spacing / 2),
-                const Text("Assigned Fee Components", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-              ],
+            child: FittedBox(
+              fit: BoxFit.scaleDown,
+              alignment: Alignment.centerLeft,
+              child: Row(
+                children: [
+                  Icon(Icons.receipt_long, color: Colors.white, size: context.scale(20)),
+                  SizedBox(width: context.spacing / 2),
+                  const Text("Assigned Fee Components", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                ],
+              ),
             ),
           ),
           if (fees.isEmpty)
@@ -474,23 +499,28 @@ class _StudentFeeDetailPageState extends State<StudentFeeDetailPage> {
           Container(
             padding: EdgeInsets.all(context.spacing),
             decoration: BoxDecoration(color: theme.colorScheme.error, borderRadius: BorderRadius.vertical(top: Radius.circular(context.scale(16)))),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Row(
-                  children: [
-                    Icon(Icons.warning_amber, color: Colors.white, size: context.scale(20)),
-                    SizedBox(width: context.spacing / 2),
-                    const Text("Late Fines / Penalties", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-                  ],
-                ),
-                TextButton.icon(
-                  onPressed: _showAddFineDialog,
-                  icon: Icon(Icons.add, size: context.scale(14), color: Colors.white),
-                  label: Text("ADD FINE", style: TextStyle(color: Colors.white, fontSize: context.font(11), fontWeight: FontWeight.bold)),
-                  style: TextButton.styleFrom(backgroundColor: Colors.white.withValues(alpha: 0.2)),
-                ),
-              ],
+            child: FittedBox(
+              fit: BoxFit.scaleDown,
+              alignment: Alignment.centerLeft,
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Row(
+                    children: [
+                      Icon(Icons.warning_amber, color: Colors.white, size: context.scale(20)),
+                      SizedBox(width: context.spacing / 2),
+                      const Text("Late Fines / Penalties", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                    ],
+                  ),
+                  SizedBox(width: context.spacing),
+                  TextButton.icon(
+                    onPressed: _showAddFineDialog,
+                    icon: Icon(Icons.add, size: context.scale(14), color: Colors.white),
+                    label: Text("ADD FINE", style: TextStyle(color: Colors.white, fontSize: context.font(11), fontWeight: FontWeight.bold)),
+                    style: TextButton.styleFrom(backgroundColor: Colors.white.withValues(alpha: 0.2)),
+                  ),
+                ],
+              ),
             ),
           ),
           if (fines.isEmpty)
@@ -531,12 +561,16 @@ class _StudentFeeDetailPageState extends State<StudentFeeDetailPage> {
           Container(
             padding: EdgeInsets.all(context.spacing),
             decoration: BoxDecoration(color: theme.colorScheme.secondary, borderRadius: BorderRadius.vertical(top: Radius.circular(context.scale(16)))),
-            child: Row(
-              children: [
-                Icon(Icons.history, color: Colors.white, size: context.scale(20)),
-                SizedBox(width: context.spacing / 2),
-                const Text("Transaction History", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-              ],
+            child: FittedBox(
+              fit: BoxFit.scaleDown,
+              alignment: Alignment.centerLeft,
+              child: Row(
+                children: [
+                  Icon(Icons.history, color: Colors.white, size: context.scale(20)),
+                  SizedBox(width: context.spacing / 2),
+                  const Text("Transaction History", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                ],
+              ),
             ),
           ),
           if (history.isEmpty)

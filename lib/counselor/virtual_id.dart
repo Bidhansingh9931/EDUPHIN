@@ -75,9 +75,13 @@ class _VirtualIdCardPageState extends State<VirtualIdCardPage> {
     return Scaffold(
       backgroundColor: theme.colorScheme.surface,
       appBar: AppBar(
-        title: Text(
-          "Digital ID Card",
-          style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold, fontSize: context.font(20)),
+        title: FittedBox(
+          fit: BoxFit.scaleDown,
+          alignment: Alignment.centerLeft,
+          child: Text(
+            "Digital ID Card",
+            style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold, fontSize: context.font(20)),
+          ),
         ),
       ),
       body: LayoutBuilder(
@@ -228,8 +232,21 @@ class _VirtualIdCardPageState extends State<VirtualIdCardPage> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(data.instituteName ?? "EDUPHIN ACADEMY", style: TextStyle(color: colorScheme.onPrimary, fontWeight: FontWeight.w900, fontSize: context.font(14), letterSpacing: 1), overflow: TextOverflow.ellipsis, maxLines: 1),
-                          Text("COUNSELOR IDENTIFICATION", style: TextStyle(color: colorScheme.onPrimary.withValues(alpha: 0.7), fontSize: context.font(9), fontWeight: FontWeight.bold, letterSpacing: 0.5), overflow: TextOverflow.ellipsis, maxLines: 1),
+                          Text(
+                            data.instituteName ?? "EDUPHIN ACADEMY",
+                            style: TextStyle(color: colorScheme.onPrimary, fontWeight: FontWeight.w900, fontSize: context.font(14), letterSpacing: 1),
+                            overflow: TextOverflow.ellipsis,
+                            maxLines: 1,
+                          ),
+                          FittedBox(
+                            fit: BoxFit.scaleDown,
+                            child: Text(
+                              "COUNSELOR IDENTIFICATION",
+                              style: TextStyle(color: colorScheme.onPrimary.withValues(alpha: 0.7), fontSize: context.font(9), fontWeight: FontWeight.bold, letterSpacing: 0.5),
+                              overflow: TextOverflow.ellipsis,
+                              maxLines: 1,
+                            ),
+                          ),
                         ],
                       ),
                     ),
@@ -384,9 +401,15 @@ class _VirtualIdCardPageState extends State<VirtualIdCardPage> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(label, style: TextStyle(color: colorScheme.onPrimary.withValues(alpha: 0.7), fontSize: context.font(9), fontWeight: FontWeight.bold, letterSpacing: 0.5)),
+        FittedBox(
+          fit: BoxFit.scaleDown,
+          child: Text(label, style: TextStyle(color: colorScheme.onPrimary.withValues(alpha: 0.7), fontSize: context.font(9), fontWeight: FontWeight.bold, letterSpacing: 0.5)),
+        ),
         SizedBox(height: context.scale(2)),
-        Text(value, style: TextStyle(color: colorScheme.onPrimary, fontSize: context.font(12), fontWeight: FontWeight.bold), overflow: TextOverflow.ellipsis, maxLines: 1),
+        FittedBox(
+          fit: BoxFit.scaleDown,
+          child: Text(value, style: TextStyle(color: colorScheme.onPrimary, fontSize: context.font(12), fontWeight: FontWeight.bold), overflow: TextOverflow.ellipsis, maxLines: 1),
+        ),
       ],
     );
   }
@@ -400,7 +423,7 @@ class _VirtualIdCardPageState extends State<VirtualIdCardPage> {
           child: FilledButton.icon(
             onPressed: _toggleFlip,
             icon: Icon(Icons.flip_camera_android_rounded, size: context.scale(20)),
-            label: Text(_isFront ? "VIEW BACK SIDE" : "VIEW FRONT SIDE"),
+            label: FittedBox(child: Text(_isFront ? "VIEW BACK SIDE" : "VIEW FRONT SIDE")),
             style: FilledButton.styleFrom(
               backgroundColor: colorScheme.primaryContainer,
               foregroundColor: colorScheme.onPrimaryContainer,
@@ -415,7 +438,7 @@ class _VirtualIdCardPageState extends State<VirtualIdCardPage> {
           child: ElevatedButton.icon(
             onPressed: () => PdfService.generateAndPrintIdCard(_idData!),
             icon: Icon(Icons.download, size: context.scale(20)),
-            label: Text("DOWNLOAD ID", style: TextStyle(fontSize: context.font(14))),
+            label: FittedBox(child: Text("DOWNLOAD ID", style: TextStyle(fontSize: context.font(14)))),
             style: ElevatedButton.styleFrom(
               backgroundColor: colorScheme.primary,
               foregroundColor: colorScheme.onPrimary,

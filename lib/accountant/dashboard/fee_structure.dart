@@ -23,7 +23,7 @@ class _FeeStructurePageState extends State<FeeStructurePage> {
 
   void _refreshFees() {
     setState(() {
-      _feesStream = ApiService.getAccountantFeesStream()..handleError((error) {
+      _feesStream = ApiService.getAccountantFeesStream().handleError((error) {
         if (mounted) ErrorHandler.showError(context, error);
       });
     });
@@ -64,10 +64,29 @@ class _FeeStructurePageState extends State<FeeStructurePage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text("Fee Structures"),
-        actions: [
-          IconButton(icon: const Icon(Icons.refresh_rounded), onPressed: _refreshFees),
-        ],
+        titleSpacing: 0,
+        title: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12.0),
+          child: Row(
+            children: [
+              Expanded(
+                child: FittedBox(
+                  fit: BoxFit.scaleDown,
+                  alignment: Alignment.centerLeft,
+                  child: const Text("Fee Structures"),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Flexible(
+                child: FittedBox(
+                  fit: BoxFit.scaleDown,
+                  alignment: Alignment.centerRight,
+                  child: IconButton(icon: const Icon(Icons.refresh_rounded), onPressed: _refreshFees),
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
       body: StreamBuilder<Map<String, dynamic>>(
         stream: _feesStream,
@@ -140,7 +159,8 @@ class _FeeStructurePageState extends State<FeeStructurePage> {
               Spacer(),
               Row(children: [
                 Skeleton(width: 80, height: 20, borderRadius: 4),
-                Spacer(),
+                const SizedBox(width: 16),
+                const Expanded(child: SizedBox()),
                 Skeleton(width: 32, height: 32, borderRadius: 16),
                 SizedBox(width: 8),
                 Skeleton(width: 32, height: 32, borderRadius: 16),
@@ -172,7 +192,8 @@ class _FeeStructurePageState extends State<FeeStructurePage> {
               Spacer(),
               Row(children: [
                 Skeleton(width: 80, height: 20, borderRadius: 4),
-                Spacer(),
+                const SizedBox(width: 16),
+                const Expanded(child: SizedBox()),
                 Skeleton(width: 32, height: 32, borderRadius: 16),
                 SizedBox(width: 8),
                 Skeleton(width: 32, height: 32, borderRadius: 16),
@@ -221,22 +242,22 @@ class _FeeStructurePageState extends State<FeeStructurePage> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                CircleAvatar(
-                  backgroundColor: theme.colorScheme.primary.withValues(alpha: 0.1),
-                  child: Icon(isInstitute ? Icons.account_balance : Icons.school, color: theme.colorScheme.primary, size: 20),
-                ),
-                Flexible(
-                  child: FittedBox(
-                    fit: BoxFit.scaleDown,
-                    child: Text("₹${fee.amount}", 
-                      style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
-                    ),
+            FittedBox(
+              fit: BoxFit.scaleDown,
+              alignment: Alignment.centerLeft,
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  CircleAvatar(
+                    backgroundColor: theme.colorScheme.primary.withValues(alpha: 0.1),
+                    child: Icon(isInstitute ? Icons.account_balance : Icons.school, color: theme.colorScheme.primary, size: 20),
                   ),
-                ),
-              ],
+                  const SizedBox(width: 12),
+                  Text("₹${fee.amount}", 
+                    style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
+                  ),
+                ],
+              ),
             ),
             const SizedBox(height: 12),
             Text(fee.feeName, 
@@ -250,26 +271,28 @@ class _FeeStructurePageState extends State<FeeStructurePage> {
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
               ),
-            const Spacer(),
-            Row(
-              children: [
-                Flexible(
-                  child: _buildSmallBadge(context, fee.isOptional ? "OPTIONAL" : "MANDATORY", fee.isOptional ? theme.colorScheme.secondary : Colors.green),
-                ),
-                const SizedBox(width: 4),
-                IconButton(
-                  onPressed: () => _showEditFeeDialog(fee), 
-                  icon: const Icon(Icons.edit_outlined, size: 20), 
-                  color: theme.colorScheme.primary,
-                  visualDensity: VisualDensity.compact,
-                ),
-                IconButton(
-                  onPressed: () => _deleteFee(fee), 
-                  icon: const Icon(Icons.delete_outline, size: 20), 
-                  color: theme.colorScheme.error,
-                  visualDensity: VisualDensity.compact,
-                ),
-              ],
+            const SizedBox(height: 16),
+            FittedBox(
+              fit: BoxFit.scaleDown,
+              alignment: Alignment.centerLeft,
+              child: Row(
+                children: [
+                  _buildSmallBadge(context, fee.isOptional ? "OPTIONAL" : "MANDATORY", fee.isOptional ? theme.colorScheme.secondary : Colors.green),
+                  const SizedBox(width: 4),
+                  IconButton(
+                    onPressed: () => _showEditFeeDialog(fee), 
+                    icon: const Icon(Icons.edit_outlined, size: 20), 
+                    color: theme.colorScheme.primary,
+                    visualDensity: VisualDensity.compact,
+                  ),
+                  IconButton(
+                    onPressed: () => _deleteFee(fee), 
+                    icon: const Icon(Icons.delete_outline, size: 20), 
+                    color: theme.colorScheme.error,
+                    visualDensity: VisualDensity.compact,
+                  ),
+                ],
+              ),
             ),
           ],
         ),
@@ -466,7 +489,7 @@ class _FeeFormDialogState extends State<FeeFormDialog> {
             Row(
               children: [
                 const Text("Mark as Optional?"),
-                const Spacer(),
+                const Expanded(child: SizedBox()),
                 Switch(value: _isOptional, onChanged: (v) => setState(() => _isOptional = v)),
               ],
             ),

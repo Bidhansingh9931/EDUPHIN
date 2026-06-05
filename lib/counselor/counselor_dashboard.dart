@@ -119,18 +119,22 @@ class _CounselorDashboardPageState extends State<CounselorDashboardPage> {
     return Scaffold(
       backgroundColor: theme.colorScheme.surface,
       appBar: AppBar(
-        title: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              "Counselor Dashboard",
-              style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold, fontSize: context.font(18)),
-            ),
-            Text(
-              "Overview & Management",
-              style: theme.textTheme.labelSmall?.copyWith(color: theme.colorScheme.onSurfaceVariant, fontSize: context.font(11)),
-            ),
-          ],
+        title: FittedBox(
+          fit: BoxFit.scaleDown,
+          alignment: Alignment.centerLeft,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                "Counselor Dashboard",
+                style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold, fontSize: context.font(18)),
+              ),
+              Text(
+                "Overview & Management",
+                style: theme.textTheme.labelSmall?.copyWith(color: theme.colorScheme.onSurfaceVariant, fontSize: context.font(11)),
+              ),
+            ],
+          ),
         ),
         centerTitle: false,
         actions: [
@@ -353,12 +357,17 @@ class _CounselorDashboardPageState extends State<CounselorDashboardPage> {
                 color: colorScheme.onSurface,
               ),
               textAlign: TextAlign.center,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
             ),
-            Text(
-              user?.position ?? "Counselor",
-              style: TextStyle(
-                fontSize: context.font(14),
-                color: colorScheme.onSurfaceVariant,
+            FittedBox(
+              fit: BoxFit.scaleDown,
+              child: Text(
+                user?.position ?? "Counselor",
+                style: TextStyle(
+                  fontSize: context.font(14),
+                  color: colorScheme.onSurfaceVariant,
+                ),
               ),
             ),
             SizedBox(height: context.scale(24)),
@@ -464,12 +473,15 @@ class _CounselorDashboardPageState extends State<CounselorDashboardPage> {
           child: Icon(icon, size: context.scale(20), color: colorScheme.primary),
         ),
         SizedBox(height: context.scale(6)),
-        Text(
-          value,
-          style: TextStyle(
-            fontWeight: FontWeight.w600,
-            fontSize: context.font(11),
-            color: colorScheme.onSurface,
+        FittedBox(
+          fit: BoxFit.scaleDown,
+          child: Text(
+            value,
+            style: TextStyle(
+              fontWeight: FontWeight.w600,
+              fontSize: context.font(11),
+              color: colorScheme.onSurface,
+            ),
           ),
         ),
       ],
@@ -478,15 +490,19 @@ class _CounselorDashboardPageState extends State<CounselorDashboardPage> {
 
   Widget _buildSectionHeader(BuildContext context, String title, IconData icon) {
     final theme = context.theme;
-    return Row(
-      children: [
-        Icon(icon, color: theme.colorScheme.primary, size: context.scale(20)),
-        SizedBox(width: context.scale(10)),
-        Text(
-          title,
-          style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold, fontSize: context.font(18)),
-        ),
-      ],
+    return FittedBox(
+      fit: BoxFit.scaleDown,
+      alignment: Alignment.centerLeft,
+      child: Row(
+        children: [
+          Icon(icon, color: theme.colorScheme.primary, size: context.scale(20)),
+          SizedBox(width: context.scale(10)),
+          Text(
+            title,
+            style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold, fontSize: context.font(18)),
+          ),
+        ],
+      ),
     );
   }
 

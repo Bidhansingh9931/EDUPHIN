@@ -37,7 +37,7 @@ class _AccountantDashboardState extends State<AccountantDashboard> {
 
   void _refreshData() {
     setState(() {
-      _dashboardStream = ApiService.getAccountantDashboardStream().asBroadcastStream()..handleError((error) {
+      _dashboardStream = ApiService.getAccountantDashboardStream().handleError((error) {
         if (mounted) ErrorHandler.showError(context, error);
       });
     });
@@ -56,57 +56,74 @@ class _AccountantDashboardState extends State<AccountantDashboard> {
         elevation: 0,
         titleSpacing: 0,
         title: Padding(
-          padding: const EdgeInsets.only(left: 12.0),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisSize: MainAxisSize.min,
+          padding: const EdgeInsets.symmetric(horizontal: 12.0),
+          child: Row(
             children: [
-              Text(
-                "Financial Overview",
-                style: TextStyle(
-                  fontSize: context.font(16),
-                  fontWeight: FontWeight.bold,
-                  color: isDark ? Colors.white : Colors.black,
+              Expanded(
+                child: FittedBox(
+                  fit: BoxFit.scaleDown,
+                  alignment: Alignment.centerLeft,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        "Financial Overview",
+                        style: TextStyle(
+                          fontSize: context.font(16),
+                          fontWeight: FontWeight.bold,
+                          color: isDark ? Colors.white : Colors.black,
+                        ),
+                        maxLines: 1,
+                      ),
+                      Text(
+                        "Dashboard",
+                        style: TextStyle(
+                          color: isDark ? Colors.white70 : colorScheme.secondary,
+                          fontSize: context.font(12),
+                          fontWeight: FontWeight.w500,
+                        ),
+                        maxLines: 1,
+                      ),
+                    ],
+                  ),
                 ),
-                overflow: TextOverflow.ellipsis,
-                maxLines: 1,
               ),
-              Text(
-                "Dashboard",
-                style: TextStyle(
-                  color: isDark ? Colors.white70 : colorScheme.secondary,
-                  fontSize: context.font(12),
-                  fontWeight: FontWeight.w500,
+              const SizedBox(width: 4),
+              Flexible(
+                child: FittedBox(
+                  fit: BoxFit.scaleDown,
+                  alignment: Alignment.centerRight,
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      IconButton(
+                        icon: Icon(Icons.notifications_none_rounded, color: isDark ? Colors.white : Colors.black),
+                        onPressed: () {},
+                      ),
+                      IconButton(
+                        icon: Icon(Icons.logout, color: isDark ? Colors.white : Colors.black),
+                        onPressed: () async {
+                          try {
+                            await ApiService.logout();
+                            if (context.mounted) {
+                              Navigator.of(context).pushAndRemoveUntil(
+                                MaterialPageRoute(builder: (context) => const LoginPage()),
+                                    (route) => false,
+                              );
+                            }
+                          } catch (e) {
+                            if (context.mounted) ErrorHandler.showError(context, e);
+                          }
+                        },
+                      ),
+                    ],
+                  ),
                 ),
-                overflow: TextOverflow.ellipsis,
-                maxLines: 1,
               ),
             ],
           ),
         ),
-        actions: [
-          IconButton(
-            icon: Icon(Icons.notifications_none_rounded, color: isDark ? Colors.white : Colors.black),
-            onPressed: () {},
-          ),
-          IconButton(
-            icon: Icon(Icons.logout, color: isDark ? Colors.white : Colors.black),
-            onPressed: () async {
-              try {
-                await ApiService.logout();
-                if (context.mounted) {
-                  Navigator.of(context).pushAndRemoveUntil(
-                    MaterialPageRoute(builder: (context) => const LoginPage()),
-                        (route) => false,
-                  );
-                }
-              } catch (e) {
-                if (context.mounted) ErrorHandler.showError(context, e);
-              }
-            },
-          ),
-          const SizedBox(width: 8),
-        ],
       ),
       body: StreamBuilder<accountant_model.AccountantDashboardData>(
         stream: _dashboardStream,
@@ -207,7 +224,7 @@ class _AccountantDashboardState extends State<AccountantDashboard> {
             crossAxisCount: context.isMobile ? 2 : 4,
             crossAxisSpacing: context.sm,
             mainAxisSpacing: context.sm,
-            childAspectRatio: context.isMobile ? 1.1 : 1.4,
+            childAspectRatio: context.isMobile ? 1.0 : 1.4,
             children: List.generate(4, (index) => const Skeleton(borderRadius: 16)),
           ),
           SizedBox(height: context.md),
@@ -228,18 +245,24 @@ class _AccountantDashboardState extends State<AccountantDashboard> {
     final isDark = context.isDarkMode;
     return SizedBox(
       width: double.infinity,
-      child: ElevatedButton.icon(
+      child: ElevatedButton(
         onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (context) => const GenerateVirtualCard())),
-        icon: const Icon(Icons.credit_card_rounded, size: 20),
-        label: FittedBox(
-          fit: BoxFit.scaleDown,
-          child: const Text("GENERATE VIRTUAL ID CARD"),
-        ),
         style: ElevatedButton.styleFrom(
           backgroundColor: isDark ? const Color(0xFF2C3550) : theme.colorScheme.surface,
           foregroundColor: isDark ? Colors.white : theme.colorScheme.primary,
           side: BorderSide(color: isDark ? Colors.white24 : theme.colorScheme.primary.withValues(alpha: 0.3)),
           padding: EdgeInsets.symmetric(vertical: context.isMobile ? 12 : 16),
+        ),
+        child: FittedBox(
+          fit: BoxFit.scaleDown,
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(Icons.credit_card_rounded, size: 20),
+              const SizedBox(width: 8),
+              const Text("GENERATE VIRTUAL ID CARD"),
+            ],
+          ),
         ),
       ),
     );
@@ -257,7 +280,7 @@ class _AccountantDashboardState extends State<AccountantDashboard> {
       crossAxisCount: context.responsive(2, tablet: 4, desktop: 4),
       crossAxisSpacing: context.sm,
       mainAxisSpacing: context.sm,
-      childAspectRatio: context.responsive(1.1, tablet: 1.3, desktop: 1.5),
+      childAspectRatio: context.responsive(1.0, tablet: 1.3, desktop: 1.5),
       children: [
         _buildStatCard(
           context,
@@ -310,32 +333,25 @@ class _AccountantDashboardState extends State<AccountantDashboard> {
         borderRadius: BorderRadius.circular(16),
         child: Padding(
           padding: EdgeInsets.all(context.sm),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Icon(icon, color: color, size: context.scale(20)),
-              const Spacer(),
-              Flexible(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    FittedBox(
-                      fit: BoxFit.scaleDown,
-                      alignment: Alignment.centerLeft,
-                      child: Text(value, style: TextStyle(fontSize: context.font(16), fontWeight: FontWeight.bold, color: isDark ? Colors.white : Colors.black)),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      label,
-                      style: TextStyle(color: isDark ? Colors.white70 : theme.hintColor, fontSize: context.font(11)),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ],
+          child: FittedBox(
+            fit: BoxFit.scaleDown,
+            alignment: Alignment.topLeft,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(icon, color: color, size: context.scale(20)),
+                const SizedBox(height: 12),
+                Text(value, style: TextStyle(fontSize: context.font(16), fontWeight: FontWeight.bold, color: isDark ? Colors.white : Colors.black)),
+                const SizedBox(height: 2),
+                Text(
+                  label,
+                  style: TextStyle(color: isDark ? Colors.white70 : theme.hintColor, fontSize: context.font(11)),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),
@@ -357,17 +373,18 @@ class _AccountantDashboardState extends State<AccountantDashboard> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Row(
-              children: [
-                Icon(Icons.bolt_rounded, color: isDark ? Colors.amberAccent : theme.colorScheme.primary, size: context.scale(18)),
-                SizedBox(width: context.sm),
-                Expanded(
-                  child: Text("Quick Actions",
+            FittedBox(
+              fit: BoxFit.scaleDown,
+              alignment: Alignment.centerLeft,
+              child: Row(
+                children: [
+                  Icon(Icons.bolt_rounded, color: isDark ? Colors.amberAccent : theme.colorScheme.primary, size: context.scale(18)),
+                  SizedBox(width: context.sm),
+                  Text("Quick Actions",
                     style: TextStyle(fontSize: context.font(16), fontWeight: FontWeight.bold, color: isDark ? Colors.white : Colors.black),
-                    overflow: TextOverflow.ellipsis,
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
             SizedBox(height: context.md),
             _buildActionButton(context, "FEE STRUCTURE", Icons.account_balance_wallet_outlined, const FeeStructurePage()),
@@ -386,19 +403,25 @@ class _AccountantDashboardState extends State<AccountantDashboard> {
     final theme = Theme.of(context);
     return SizedBox(
       width: double.infinity,
-      child: ElevatedButton.icon(
+      child: ElevatedButton(
         onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (context) => page)),
-        icon: Icon(icon, size: 18),
-        label: FittedBox(
-          fit: BoxFit.scaleDown,
-          child: Text(label, style: TextStyle(fontSize: context.font(13), fontWeight: FontWeight.w700)),
-        ),
         style: ElevatedButton.styleFrom(
           backgroundColor: isDark ? Colors.white.withValues(alpha: 0.05) : theme.colorScheme.onSurface.withValues(alpha: 0.05),
           foregroundColor: isDark ? Colors.white : theme.colorScheme.onSurface,
-          padding: const EdgeInsets.symmetric(vertical: 14),
+          padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 8),
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
           elevation: 0,
+        ),
+        child: FittedBox(
+          fit: BoxFit.scaleDown,
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(icon, size: 18),
+              const SizedBox(width: 8),
+              Text(label, style: TextStyle(fontSize: context.font(13), fontWeight: FontWeight.w700)),
+            ],
+          ),
         ),
       ),
     );
@@ -418,35 +441,47 @@ class _AccountantDashboardState extends State<AccountantDashboard> {
         padding: context.pagePadding,
         child: Column(
           children: [
-            Row(
-              children: [
-                Icon(Icons.person_outline_rounded, color: isDark ? Colors.blueAccent : theme.colorScheme.primary, size: context.scale(18)),
-                SizedBox(width: context.sm),
-                Expanded(
-                  child: Text("Profile Overview",
+            FittedBox(
+              fit: BoxFit.scaleDown,
+              alignment: Alignment.centerLeft,
+              child: Row(
+                children: [
+                  Icon(Icons.person_outline_rounded, color: isDark ? Colors.blueAccent : theme.colorScheme.primary, size: context.scale(18)),
+                  SizedBox(width: context.sm),
+                  Text("Profile Overview",
                     style: TextStyle(fontSize: context.font(16), fontWeight: FontWeight.bold, color: isDark ? Colors.white : Colors.black),
-                    overflow: TextOverflow.ellipsis,
                   ),
-                ),
-                IconButton(
-                  padding: EdgeInsets.zero,
-                  constraints: const BoxConstraints(),
-                  onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (context) => const AccountantProfile())),
-                  icon: Icon(Icons.edit_note_rounded, color: isDark ? Colors.blueAccent : theme.colorScheme.primary, size: context.scale(24)),
-                ),
-              ],
+                  const SizedBox(width: 8),
+                  IconButton(
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(),
+                    onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (context) => const AccountantProfile())),
+                    icon: Icon(Icons.edit_note_rounded, color: isDark ? Colors.blueAccent : theme.colorScheme.primary, size: context.scale(24)),
+                  ),
+                ],
+              ),
             ),
             SizedBox(height: context.md),
-            ProfileAvatar(
-              radius: context.scale(36),
-              imageUrl: user.photo != null ? "${ApiService.baseUrl}/storage/${user.photo}" : null,
+            FittedBox(
+              fit: BoxFit.scaleDown,
+              child: ProfileAvatar(
+                radius: context.scale(36),
+                imageUrl: user.photo != null ? "${ApiService.baseUrl}/storage/${user.photo}" : null,
+              ),
             ),
             SizedBox(height: context.sm),
             FittedBox(
               fit: BoxFit.scaleDown,
               child: Text(user.name, style: TextStyle(fontSize: context.font(18), fontWeight: FontWeight.bold, color: isDark ? Colors.white : Colors.black)),
             ),
-            Text(user.position ?? "Senior Accountant", style: TextStyle(color: isDark ? Colors.white70 : theme.colorScheme.secondary, fontSize: context.font(13))),
+            FittedBox(
+              fit: BoxFit.scaleDown,
+              child: Text(
+                user.position ?? "Senior Accountant",
+                style: TextStyle(color: isDark ? Colors.white70 : theme.colorScheme.secondary, fontSize: context.font(13)),
+                textAlign: TextAlign.center,
+              ),
+            ),
             SizedBox(height: context.md),
             _buildProfileDetail(context, Icons.badge_outlined, "Employee ID", user.userId.toString()),
             Divider(height: context.md, color: isDark ? Colors.white10 : null),
@@ -464,26 +499,24 @@ class _AccountantDashboardState extends State<AccountantDashboard> {
     final isDark = context.isDarkMode;
     return Padding(
       padding: EdgeInsets.symmetric(vertical: context.scale(4)),
-      child: Row(
-        children: [
-          Icon(icon, color: isDark ? Colors.white54 : theme.hintColor, size: 18),
-          SizedBox(width: context.sm),
-          Flexible(
-            child: Text(label,
+      child: FittedBox(
+        fit: BoxFit.scaleDown,
+        alignment: Alignment.centerLeft,
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, color: isDark ? Colors.white54 : theme.hintColor, size: 18),
+            SizedBox(width: context.sm),
+            Text(label,
               style: TextStyle(color: isDark ? Colors.white54 : theme.hintColor, fontSize: context.font(14)),
-              overflow: TextOverflow.ellipsis,
             ),
-          ),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Text(value,
+            const SizedBox(width: 16),
+            Text(value,
               textAlign: TextAlign.right,
               style: TextStyle(fontSize: context.font(14), fontWeight: FontWeight.w500, color: isDark ? Colors.white : Colors.black),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -503,23 +536,25 @@ class _AccountantDashboardState extends State<AccountantDashboard> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Row(
-              children: [
-                Icon(Icons.account_balance_wallet_outlined, color: isDark ? Colors.greenAccent : theme.colorScheme.primary, size: context.scale(18)),
-                SizedBox(width: context.sm),
-                Expanded(
-                  child: Text("My Salary",
+            FittedBox(
+              fit: BoxFit.scaleDown,
+              alignment: Alignment.centerLeft,
+              child: Row(
+                children: [
+                  Icon(Icons.account_balance_wallet_outlined, color: isDark ? Colors.greenAccent : theme.colorScheme.primary, size: context.scale(18)),
+                  SizedBox(width: context.sm),
+                  Text("My Salary",
                     style: TextStyle(fontSize: context.font(16), fontWeight: FontWeight.bold, color: isDark ? Colors.white : Colors.black),
-                    overflow: TextOverflow.ellipsis,
                   ),
-                ),
-                IconButton(
-                  padding: EdgeInsets.zero,
-                  constraints: const BoxConstraints(),
-                  onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (context) => const SalarySlipsPage())),
-                  icon: Icon(Icons.launch_rounded, color: isDark ? Colors.white54 : theme.hintColor, size: 18),
-                ),
-              ],
+                  const SizedBox(width: 8),
+                  IconButton(
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(),
+                    onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (context) => const SalarySlipsPage())),
+                    icon: Icon(Icons.launch_rounded, color: isDark ? Colors.white54 : theme.hintColor, size: 18),
+                  ),
+                ],
+              ),
             ),
             SizedBox(height: context.md),
             Center(
@@ -546,10 +581,12 @@ class _AccountantDashboardState extends State<AccountantDashboard> {
                     overflow: TextOverflow.ellipsis,
                   ),
                 ),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                  decoration: BoxDecoration(color: Colors.green.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(6)),
-                  child: const Text("Paid", style: TextStyle(color: Colors.greenAccent, fontSize: 12, fontWeight: FontWeight.bold)),
+                Flexible(
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    decoration: BoxDecoration(color: Colors.green.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(6)),
+                    child: const Text("Paid", style: TextStyle(color: Colors.greenAccent, fontSize: 12, fontWeight: FontWeight.bold), overflow: TextOverflow.ellipsis),
+                  ),
                 ),
               ],
             ),
@@ -647,17 +684,19 @@ class _AccountantDashboardState extends State<AccountantDashboard> {
         children: [
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
-            child: Row(
-              children: [
-                Icon(headerIcon, color: isDark ? Colors.white70 : theme.colorScheme.primary, size: 20),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Text(title,
+            child: FittedBox(
+              fit: BoxFit.scaleDown,
+              alignment: Alignment.centerLeft,
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(headerIcon, color: isDark ? Colors.white70 : theme.colorScheme.primary, size: 20),
+                  const SizedBox(width: 12),
+                  Text(title,
                     style: TextStyle(fontSize: context.font(15), fontWeight: FontWeight.bold, color: isDark ? Colors.white : Colors.black),
-                    overflow: TextOverflow.ellipsis,
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
           Divider(height: 1, color: isDark ? Colors.white10 : Colors.grey.withValues(alpha: 0.1)),
@@ -674,17 +713,18 @@ class _AccountantDashboardState extends State<AccountantDashboard> {
                         onTap: () => Navigator.push(context, MaterialPageRoute(builder: (context) => item.page)),
                         child: Container(
                           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                          child: Row(
-                            children: [
-                              Expanded(
-                                child: Text(item.title,
+                          child: FittedBox(
+                            fit: BoxFit.scaleDown,
+                            alignment: Alignment.centerLeft,
+                            child: Row(
+                              children: [
+                                Text(item.title,
                                   style: TextStyle(fontSize: context.font(14), color: isDark ? Colors.white : Colors.black87),
-                                  overflow: TextOverflow.ellipsis,
-                                  maxLines: 1,
                                 ),
-                              ),
-                              Icon(item.trailing, color: isDark ? Colors.white38 : theme.hintColor, size: 18),
-                            ],
+                                const SizedBox(width: 8),
+                                Icon(item.trailing, color: isDark ? Colors.white38 : theme.hintColor, size: 18),
+                              ],
+                            ),
                           ),
                         ),
                       );
@@ -736,18 +776,21 @@ class _AccountantDashboardState extends State<AccountantDashboard> {
           children: [
             Padding(
               padding: const EdgeInsets.all(16.0),
-              child: Row(
-                children: [
-                  Icon(icon, color: isDark ? Colors.white70 : theme.colorScheme.primary, size: 18),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(title,
+              child: FittedBox(
+                fit: BoxFit.scaleDown,
+                alignment: Alignment.centerLeft,
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(icon, color: isDark ? Colors.white70 : theme.colorScheme.primary, size: 18),
+                    const SizedBox(width: 8),
+                    Text(title,
                       style: TextStyle(fontSize: context.font(16), fontWeight: FontWeight.bold, color: isDark ? Colors.white : Colors.black),
-                      overflow: TextOverflow.ellipsis,
                     ),
-                  ),
-                  Icon(Icons.chevron_right, color: isDark ? Colors.white38 : theme.hintColor, size: 18),
-                ],
+                    const SizedBox(width: 8),
+                    Icon(Icons.chevron_right, color: isDark ? Colors.white38 : theme.hintColor, size: 18),
+                  ],
+                ),
               ),
             ),
             if (items.isEmpty)
@@ -786,17 +829,27 @@ class _AccountantDashboardState extends State<AccountantDashboard> {
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Text(mainText, style: TextStyle(fontSize: context.font(14), fontWeight: FontWeight.w600, color: isDark ? Colors.white : Colors.black)),
+                                Text(mainText, 
+                                  style: TextStyle(fontSize: context.font(14), fontWeight: FontWeight.w600, color: isDark ? Colors.white : Colors.black),
+                                  overflow: TextOverflow.ellipsis,
+                                  maxLines: 1,
+                                ),
                                 const SizedBox(height: 2),
-                                Text(subText, style: TextStyle(color: isDark ? Colors.white54 : theme.hintColor, fontSize: context.font(12))),
+                                Text(subText, 
+                                  style: TextStyle(color: isDark ? Colors.white54 : theme.hintColor, fontSize: context.font(12)),
+                                  overflow: TextOverflow.ellipsis,
+                                  maxLines: 1,
+                                ),
                               ],
                             ),
                           ),
+                          const SizedBox(width: 8),
                           Flexible(
                             child: Text(amount,
                               style: TextStyle(fontSize: context.font(14), fontWeight: FontWeight.bold, color: isDark ? Colors.white : Colors.black),
                               overflow: TextOverflow.ellipsis,
                               maxLines: 1,
+                              textAlign: TextAlign.right,
                             ),
                           ),
                         ],

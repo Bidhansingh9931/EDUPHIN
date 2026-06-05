@@ -167,7 +167,11 @@ class _MyBookIssuePageState extends State<MyBookIssuePage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text("My Issued Books"),
+        title: FittedBox(
+          fit: BoxFit.scaleDown,
+          alignment: Alignment.centerLeft,
+          child: const Text("My Issued Books"),
+        ),
       ),
       body: RefreshIndicator(
         onRefresh: _fetchLendingHistory,

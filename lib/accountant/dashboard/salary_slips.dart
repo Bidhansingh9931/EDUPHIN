@@ -29,13 +29,13 @@ class _SalarySlipsPageState extends State<SalarySlipsPage> {
     setState(() {
       if (widget.employeeId != null) {
         _salaryStream = ApiService.getAccountantEmployeeSalaryStream(widget.employeeId!)
-          ..handleError((error) {
+          .handleError((error) {
             if (!mounted) return;
             ErrorHandler.showError(context, error);
           });
       } else {
         _salaryStream = ApiService.getAccountantMySalariesStream()
-          ..handleError((error) {
+          .handleError((error) {
             if (!mounted) return;
             ErrorHandler.showError(context, error);
           });
@@ -49,7 +49,14 @@ class _SalarySlipsPageState extends State<SalarySlipsPage> {
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(widget.employeeId != null ? "Employee Salary Slips" : "My Salary Slips"),
+        titleSpacing: 0,
+        title: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12.0),
+          child: FittedBox(
+            fit: BoxFit.scaleDown,
+            child: Text(widget.employeeId != null ? "Employee Salary Slips" : "My Salary Slips"),
+          ),
+        ),
         centerTitle: true,
       ),
       body: StreamBuilder<Map<String, dynamic>>(
@@ -236,16 +243,20 @@ class _SalarySlipsPageState extends State<SalarySlipsPage> {
       ),
       child: Padding(
         padding: EdgeInsets.all(context.spacing),
-        child: Row(
-          children: [
-            ProfileAvatar(
-              imageUrl: employeeDetail.photo != null ? "${ApiService.baseUrl}/storage/${employeeDetail.photo}" : null,
-              radius: context.scale(28),
-            ),
-            SizedBox(width: context.spacing),
-            Expanded(
-              child: Column(
+        child: FittedBox(
+          fit: BoxFit.scaleDown,
+          alignment: Alignment.centerLeft,
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              ProfileAvatar(
+                imageUrl: employeeDetail.photo != null ? "${ApiService.baseUrl}/storage/${employeeDetail.photo}" : null,
+                radius: context.scale(28),
+              ),
+              SizedBox(width: context.spacing),
+              Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
                 children: [
                   Text(
                     employeeDetail.name,
@@ -260,13 +271,11 @@ class _SalarySlipsPageState extends State<SalarySlipsPage> {
                     style: theme.textTheme.bodyMedium?.copyWith(
                       color: theme.hintColor,
                     ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
                   ),
                 ],
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );

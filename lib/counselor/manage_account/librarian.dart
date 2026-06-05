@@ -134,7 +134,11 @@ class _LibrarianPageState extends State<LibrarianPage> {
     final theme = context.theme;
     return Scaffold(
       appBar: AppBar(
-        title: Text("Librarians Directory", style: TextStyle(fontSize: context.font(20))),
+        title: FittedBox(
+          fit: BoxFit.scaleDown,
+          alignment: Alignment.centerLeft,
+          child: Text("Librarians Directory", style: TextStyle(fontSize: context.font(20))),
+        ),
       ),
       body: RefreshIndicator(
         onRefresh: _fetchLibrarians,
@@ -200,26 +204,38 @@ class _LibrarianPageState extends State<LibrarianPage> {
                                     radius: context.scale(25),
                                     imageUrl: ApiService.getStorageUrl(librarian.photo),
                                   ),
-                                  title: Text(
-                                    displayName,
-                                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: context.font(14)),
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
+                                  title: FittedBox(
+                                    fit: BoxFit.scaleDown,
+                                    alignment: Alignment.centerLeft,
+                                    child: Text(
+                                      displayName,
+                                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: context.font(14)),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
                                   ),
                                   subtitle: Column(
                                     crossAxisAlignment: CrossAxisAlignment.start,
                                     mainAxisSize: MainAxisSize.min,
                                     children: [
-                                      Text(
-                                        librarian.employeeId != null ? 'ID: ${librarian.employeeId}' : 'ID: N/A',
-                                        style: TextStyle(color: theme.hintColor, fontSize: context.font(12)),
+                                      FittedBox(
+                                        fit: BoxFit.scaleDown,
+                                        alignment: Alignment.centerLeft,
+                                        child: Text(
+                                          librarian.employeeId != null ? 'ID: ${librarian.employeeId}' : 'ID: N/A',
+                                          style: TextStyle(color: theme.hintColor, fontSize: context.font(12)),
+                                        ),
                                       ),
                                       if (librarian.email != null)
-                                        Text(
-                                          librarian.email!,
-                                          style: TextStyle(color: theme.hintColor, fontSize: context.font(11)),
-                                          maxLines: 1,
-                                          overflow: TextOverflow.ellipsis,
+                                        FittedBox(
+                                          fit: BoxFit.scaleDown,
+                                          alignment: Alignment.centerLeft,
+                                          child: Text(
+                                            librarian.email!,
+                                            style: TextStyle(color: theme.hintColor, fontSize: context.font(11)),
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
                                         ),
                                     ],
                                   ),
@@ -250,9 +266,12 @@ class _LibrarianPageState extends State<LibrarianPage> {
         borderRadius: BorderRadius.circular(context.scale(20)),
         border: Border.all(color: color.withValues(alpha: 0.5)),
       ),
-      child: Text(
-        status.toUpperCase(),
-        style: TextStyle(color: color, fontSize: context.font(9), fontWeight: FontWeight.bold),
+      child: FittedBox(
+        fit: BoxFit.scaleDown,
+        child: Text(
+          status.toUpperCase(),
+          style: TextStyle(color: color, fontSize: context.font(9), fontWeight: FontWeight.bold),
+        ),
       ),
     );
   }

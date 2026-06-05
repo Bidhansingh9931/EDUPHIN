@@ -74,7 +74,14 @@ class _LibraryLendingPageState extends State<LibraryLendingPage> {
     return Scaffold(
       backgroundColor: theme.colorScheme.surface,
       appBar: AppBar(
-        title: const Text("Lending History"),
+        titleSpacing: 0,
+        title: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12.0),
+          child: FittedBox(
+            fit: BoxFit.scaleDown,
+            child: const Text("Lending History"),
+          ),
+        ),
         centerTitle: true,
       ),
       body: StreamBuilder<teacher_library.LendingPagination>(
@@ -133,15 +140,19 @@ class _LibraryLendingPageState extends State<LibraryLendingPage> {
     return buildFilterCard(
       context,
       children: [
-        Row(
-          children: [
-            Icon(Icons.filter_list, color: theme.colorScheme.primary, size: context.scale(20)),
-            SizedBox(width: context.scale(8)),
-            Text(
-              "Filter Records",
-              style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold),
-            ),
-          ],
+        FittedBox(
+          fit: BoxFit.scaleDown,
+          alignment: Alignment.centerLeft,
+          child: Row(
+            children: [
+              Icon(Icons.filter_list, color: theme.colorScheme.primary, size: context.scale(20)),
+              SizedBox(width: context.scale(8)),
+              Text(
+                "Filter Records",
+                style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold),
+              ),
+            ],
+          ),
         ),
         SizedBox(height: context.spacing),
         buildResponsiveRow(context, [
@@ -258,18 +269,20 @@ class _LibraryLendingPageState extends State<LibraryLendingPage> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Expanded(
-                child: Column(
+          FittedBox(
+            fit: BoxFit.scaleDown,
+            alignment: Alignment.centerLeft,
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
                   children: [
                     Text(
                       record.book.title,
                       style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold, fontSize: context.font(16)),
                       maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
                     ),
                     Text(
                       "Book ID: ${record.book.id}",
@@ -277,18 +290,24 @@ class _LibraryLendingPageState extends State<LibraryLendingPage> {
                     ),
                   ],
                 ),
-              ),
-              _statusBadge(context, isReturned),
-            ],
+                SizedBox(width: context.spacing),
+                _statusBadge(context, isReturned),
+              ],
+            ),
           ),
-          const Spacer(),
+          const SizedBox(height: 16),
           Divider(color: theme.colorScheme.outlineVariant, height: context.scale(24)),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              _infoCol(context, "ISSUED", record.issuedAt),
-              _infoCol(context, "DUE DATE", record.dueDate, isEnd: true),
-            ],
+          FittedBox(
+            fit: BoxFit.scaleDown,
+            alignment: Alignment.centerLeft,
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                _infoCol(context, "ISSUED", record.issuedAt),
+                SizedBox(width: context.spacing * 2),
+                _infoCol(context, "DUE DATE", record.dueDate, isEnd: true),
+              ],
+            ),
           ),
         ],
       ),
@@ -400,7 +419,7 @@ class _LibraryLendingPageState extends State<LibraryLendingPage> {
                 Skeleton(height: context.scale(22), width: context.scale(65), borderRadius: context.scale(20)),
               ],
             ),
-            const Spacer(),
+            SizedBox(height: context.spacing),
             Divider(color: context.theme.colorScheme.outlineVariant, height: context.scale(24)),
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,

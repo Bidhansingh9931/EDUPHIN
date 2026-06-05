@@ -479,31 +479,31 @@ class ApiService {
   static Stream<teacher_ticket_details.TicketDetails> getLibrarianTicketDetailsStream(String ticketId) => Stream.fromFuture(getLibrarianTicketDetails(ticketId));
 
   // Accountant Stream Wrappers
-  static Stream<accountant_model.AccountantDashboardData> getAccountantDashboardStream() => Stream.fromFuture(getAccountantDashboard());
-  static Stream<List<accountant_model.Event>> getAccountantEventsStream({String? status, String? type}) => Stream.fromFuture(getAccountantEvents(status: status, type: type));
-  static Stream<List<accountant_model.EventRegistration>> getAccountantRegisteredEventsStream({String? status, String? type}) => Stream.fromFuture(getAccountantRegisteredEvents(status: status, type: type));
-  static Stream<List<accountant_model.Exam>> getAccountantExamsStream() => Stream.fromFuture(getAccountantExams());
-  static Stream<accountant_model.UserDetail> getAccountantProfileStream() => Stream.fromFuture(getAccountantProfile());
-  static Stream<Map<String, dynamic>> getAccountantExamScheduleStream(String id) => Stream.fromFuture(getAccountantExamSchedule(id));
-  static Stream<teacher_library.BookPagination> getAccountantLibraryBooksStream(Map<String, String> filters, int page) => Stream.fromFuture(getAccountantLibraryBooks(filters, page));
-  static Stream<teacher_library.LendingPagination> getAccountantLendingBooksStream(Map<String, String> filters, int page) => Stream.fromFuture(getAccountantLendingBooks(filters, page));
-  static Stream<Map<String, dynamic>> getAccountantStudentsStream(Map<String, String> filters) => Stream.fromFuture(getAccountantStudents(filters));
-  static Stream<Map<String, dynamic>> getAccountantStudentFeeDetailsStream(String studentId) => Stream.fromFuture(getAccountantStudentFeeDetails(studentId));
-  static Stream<Map<String, dynamic>> getAccountantMySalariesStream() => Stream.fromFuture(getAccountantMySalaries());
-  static Stream<Map<String, dynamic>> getAccountantEmployeeSalaryStream(String id) => Stream.fromFuture(getAccountantEmployeeSalary(id));
-  static Stream<Map<String, dynamic>> getAccountantSalaryDetailStream(String id, {String? employeeId, String? numericId}) => Stream.fromFuture(getAccountantSalaryDetail(id, employeeId: employeeId, numericId: numericId));
+  static Stream<accountant_model.AccountantDashboardData> getAccountantDashboardStream() => Stream.fromFuture(getAccountantDashboard()).asBroadcastStream();
+  static Stream<List<accountant_model.Event>> getAccountantEventsStream({String? status, String? type}) => Stream.fromFuture(getAccountantEvents(status: status, type: type)).asBroadcastStream();
+  static Stream<List<accountant_model.EventRegistration>> getAccountantRegisteredEventsStream({String? status, String? type}) => Stream.fromFuture(getAccountantRegisteredEvents(status: status, type: type)).asBroadcastStream();
+  static Stream<List<accountant_model.Exam>> getAccountantExamsStream() => Stream.fromFuture(getAccountantExams()).asBroadcastStream();
+  static Stream<accountant_model.UserDetail> getAccountantProfileStream() => Stream.fromFuture(getAccountantProfile()).asBroadcastStream();
+  static Stream<Map<String, dynamic>> getAccountantExamScheduleStream(String id) => Stream.fromFuture(getAccountantExamSchedule(id)).asBroadcastStream();
+  static Stream<teacher_library.BookPagination> getAccountantLibraryBooksStream(Map<String, String> filters, int page) => Stream.fromFuture(getAccountantLibraryBooks(filters, page)).asBroadcastStream();
+  static Stream<teacher_library.LendingPagination> getAccountantLendingBooksStream(Map<String, String> filters, int page) => Stream.fromFuture(getAccountantLendingBooks(filters, page)).asBroadcastStream();
+  static Stream<Map<String, dynamic>> getAccountantStudentsStream(Map<String, String> filters) => Stream.fromFuture(getAccountantStudents(filters)).asBroadcastStream();
+  static Stream<Map<String, dynamic>> getAccountantStudentFeeDetailsStream(String studentId) => Stream.fromFuture(getAccountantStudentFeeDetails(studentId)).asBroadcastStream();
+  static Stream<Map<String, dynamic>> getAccountantMySalariesStream() => Stream.fromFuture(getAccountantMySalaries()).asBroadcastStream();
+  static Stream<Map<String, dynamic>> getAccountantEmployeeSalaryStream(String id) => Stream.fromFuture(getAccountantEmployeeSalary(id)).asBroadcastStream();
+  static Stream<Map<String, dynamic>> getAccountantSalaryDetailStream(String id, {String? employeeId, String? numericId}) => Stream.fromFuture(getAccountantSalaryDetail(id, employeeId: employeeId, numericId: numericId)).asBroadcastStream();
   static Stream<Map<String, dynamic>> getAccountantFeesStream() {
     return (() async* {
       while (true) {
         yield await getAccountantFees();
         await Future.delayed(const Duration(seconds: 10));
       }
-    })();
+    })().asBroadcastStream();
   }
-  static Stream<List<accountant_model.UserDetail>> getEmployeesByRoleStream(dynamic roleId) => Stream.fromFuture(getEmployeesByRole(roleId));
+  static Stream<List<accountant_model.UserDetail>> getEmployeesByRoleStream(dynamic roleId) => Stream.fromFuture(getEmployeesByRole(roleId)).asBroadcastStream();
   static Stream<teacher_ticket_details.TicketDetails> getTicketDetailsAccountantStream(String id) => Stream.fromFuture(getTicketDetailsAccountant(id)).asBroadcastStream();
-  static Stream<List<teacher_ticket.SupportTicket>> getAccountantTicketsStream(Map<String, String> filters) => Stream.fromFuture(getAccountantTickets(filters));
-  static Stream<List<teacher_ticket.SupportTicket>> getAccountantAssignedTicketsStream(Map<String, String> filters) => Stream.fromFuture(getAccountantAssignedTickets(filters));
+  static Stream<List<teacher_ticket.SupportTicket>> getAccountantTicketsStream(Map<String, String> filters) => Stream.fromFuture(getAccountantTickets(filters)).asBroadcastStream();
+  static Stream<List<teacher_ticket.SupportTicket>> getAccountantAssignedTicketsStream(Map<String, String> filters) => Stream.fromFuture(getAccountantAssignedTickets(filters)).asBroadcastStream();
 
   static Future<List<moderator_institute.Institute>> getInstitutes() async {
     final response = await get('moderator/institutes');

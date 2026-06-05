@@ -63,7 +63,7 @@ class ThemeService {
         style: ElevatedButton.styleFrom(
           backgroundColor: colorScheme.primary,
           foregroundColor: colorScheme.onPrimary,
-          minimumSize: const Size(double.infinity, 54),
+          minimumSize: const Size(64, 54),
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
           elevation: 0,
           textStyle: GoogleFonts.inter(fontWeight: FontWeight.w700, fontSize: 16),

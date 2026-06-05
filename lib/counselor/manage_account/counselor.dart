@@ -134,7 +134,11 @@ class _CounselorPageState extends State<CounselorPage> {
     final theme = context.theme;
     return Scaffold(
       appBar: AppBar(
-        title: Text("Counselors Directory", style: TextStyle(fontSize: context.font(20))),
+        title: FittedBox(
+          fit: BoxFit.scaleDown,
+          alignment: Alignment.centerLeft,
+          child: Text("Counselors Directory", style: TextStyle(fontSize: context.font(20))),
+        ),
       ),
       body: RefreshIndicator(
         onRefresh: _fetchCounselors,
@@ -201,26 +205,38 @@ class _CounselorPageState extends State<CounselorPage> {
                                     radius: context.scale(24),
                                     imageUrl: ApiService.getStorageUrl(counselor.photo),
                                   ),
-                                  title: Text(
-                                    displayName,
-                                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: context.font(14)),
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
+                                  title: FittedBox(
+                                    fit: BoxFit.scaleDown,
+                                    alignment: Alignment.centerLeft,
+                                    child: Text(
+                                      displayName,
+                                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: context.font(14)),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
                                   ),
                                   subtitle: Column(
                                     crossAxisAlignment: CrossAxisAlignment.start,
                                     mainAxisSize: MainAxisSize.min,
                                     children: [
-                                      Text(
-                                        counselor.employeeId != null ? 'ID: ${counselor.employeeId}' : 'ID: N/A',
-                                        style: TextStyle(color: theme.hintColor, fontSize: context.font(12)),
+                                      FittedBox(
+                                        fit: BoxFit.scaleDown,
+                                        alignment: Alignment.centerLeft,
+                                        child: Text(
+                                          counselor.employeeId != null ? 'ID: ${counselor.employeeId}' : 'ID: N/A',
+                                          style: TextStyle(color: theme.hintColor, fontSize: context.font(12)),
+                                        ),
                                       ),
                                       if (counselor.email != null)
-                                        Text(
-                                          counselor.email!,
-                                          style: TextStyle(color: theme.hintColor, fontSize: context.font(11)),
-                                          maxLines: 1,
-                                          overflow: TextOverflow.ellipsis,
+                                        FittedBox(
+                                          fit: BoxFit.scaleDown,
+                                          alignment: Alignment.centerLeft,
+                                          child: Text(
+                                            counselor.email!,
+                                            style: TextStyle(color: theme.hintColor, fontSize: context.font(11)),
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
                                         ),
                                     ],
                                   ),
@@ -251,9 +267,12 @@ class _CounselorPageState extends State<CounselorPage> {
         borderRadius: BorderRadius.circular(context.scale(20)),
         border: Border.all(color: color.withValues(alpha: 0.2)),
       ),
-      child: Text(
-        status.toUpperCase(),
-        style: TextStyle(color: color, fontSize: context.font(9), fontWeight: FontWeight.bold),
+      child: FittedBox(
+        fit: BoxFit.scaleDown,
+        child: Text(
+          status.toUpperCase(),
+          style: TextStyle(color: color, fontSize: context.font(9), fontWeight: FontWeight.bold),
+        ),
       ),
     );
   }

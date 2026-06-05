@@ -272,9 +272,13 @@ class _CounselorProfilePageState extends State<CounselorProfilePage> {
     return Scaffold(
       backgroundColor: theme.colorScheme.surface,
       appBar: AppBar(
-        title: Text(
-          "Profile Settings",
-          style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold, fontSize: context.font(20)),
+        title: FittedBox(
+          fit: BoxFit.scaleDown,
+          alignment: Alignment.centerLeft,
+          child: Text(
+            "Profile Settings",
+            style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold, fontSize: context.font(20)),
+          ),
         ),
         centerTitle: false,
         actions: [
@@ -632,15 +636,21 @@ class _CounselorProfilePageState extends State<CounselorProfilePage> {
 
   List<Widget> _buildHeaderInfo(BuildContext context, ThemeData theme) {
     return [
-      Text(
-        _userDetail?.fullName ?? "Unknown User",
-        textAlign: context.isMobile ? TextAlign.center : TextAlign.start,
-        style: theme.textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold, fontSize: context.font(20)),
+      FittedBox(
+        fit: BoxFit.scaleDown,
+        child: Text(
+          _userDetail?.fullName ?? "Unknown User",
+          textAlign: context.isMobile ? TextAlign.center : TextAlign.start,
+          style: theme.textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold, fontSize: context.font(20)),
+        ),
       ),
-      Text(
-        _userDetail?.position ?? "Counselor",
-        textAlign: context.isMobile ? TextAlign.center : TextAlign.start,
-        style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onSurfaceVariant, fontSize: context.font(14)),
+      FittedBox(
+        fit: BoxFit.scaleDown,
+        child: Text(
+          _userDetail?.position ?? "Counselor",
+          textAlign: context.isMobile ? TextAlign.center : TextAlign.start,
+          style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onSurfaceVariant, fontSize: context.font(14)),
+        ),
       ),
     ];
   }

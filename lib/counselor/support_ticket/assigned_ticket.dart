@@ -139,7 +139,11 @@ class _AssignedTicketsPageState extends State<AssignedTicketsPage> {
     return Scaffold(
       backgroundColor: colorScheme.surface,
       appBar: AppBar(
-        title: Text("Assigned Tickets", style: TextStyle(fontSize: context.font(20))),
+        title: FittedBox(
+          fit: BoxFit.scaleDown,
+          alignment: Alignment.centerLeft,
+          child: Text("Assigned Tickets", style: TextStyle(fontSize: context.font(20))),
+        ),
       ),
       body: LoadingWrapper(
         isLoading: _isLoading,
@@ -299,7 +303,9 @@ class _AssignedTicketsPageState extends State<AssignedTicketsPage> {
                     style: FilledButton.styleFrom(
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(context.scale(12))),
                     ),
-                    child: Text("TAKE ACTION", style: TextStyle(fontWeight: FontWeight.bold, fontSize: context.font(14))),
+                    child: FittedBox(
+                      child: Text("TAKE ACTION", style: TextStyle(fontWeight: FontWeight.bold, fontSize: context.font(14))),
+                    ),
                   ),
                 ),
               ],
@@ -318,9 +324,12 @@ class _AssignedTicketsPageState extends State<AssignedTicketsPage> {
         borderRadius: BorderRadius.circular(context.scale(6)),
         border: Border.all(color: color.withValues(alpha: 0.5)),
       ),
-      child: Text(
-        text,
-        style: TextStyle(color: color, fontSize: context.font(10), fontWeight: FontWeight.bold),
+      child: FittedBox(
+        fit: BoxFit.scaleDown,
+        child: Text(
+          text,
+          style: TextStyle(color: color, fontSize: context.font(10), fontWeight: FontWeight.bold),
+        ),
       ),
     );
   }

@@ -192,6 +192,7 @@ class _AccountantProfileState extends State<AccountantProfile> {
                   }
                 },
               ),
+              SizedBox(width: context.scale(8)),
             ],
           ),
           body: LoadingWrapper<UserDetail>(
@@ -213,7 +214,75 @@ class _AccountantProfileState extends State<AccountantProfile> {
                             children: [
                               _buildHeader(context, user),
                               SizedBox(height: context.xl),
-                              AdaptiveFieldRow(children: [
+                              if (context.isDesktop)
+                                Row(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Expanded(
+                                      child: ProfileSection(
+                                        title: "Account Info",
+                                        icon: Icons.account_circle_outlined,
+                                        children: [
+                                          ProfileTextField(
+                                            label: "Full Name",
+                                            controller: _nameController,
+                                            enabled: false,
+                                            icon: Icons.person_outline,
+                                          ),
+                                          ProfileTextField(
+                                            label: "Email Address",
+                                            controller: _emailController,
+                                            enabled: false,
+                                            icon: Icons.email_outlined,
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                    SizedBox(width: context.xl),
+                                    Expanded(
+                                      child: ProfileSection(
+                                        title: "Personal Info",
+                                        icon: Icons.person_outline,
+                                        children: [
+                                          AdaptiveFieldRow(children: [
+                                            ProfileDropdown(
+                                              label: "Gender",
+                                              value: _gender,
+                                              items: const ['Male', 'Female', 'Other'],
+                                              onChanged: (v) => setState(() => _gender = v),
+                                              icon: Icons.wc_outlined,
+                                            ),
+                                            ProfileDropdown(
+                                              label: "Relationship",
+                                              value: _relationshipStatus,
+                                              items: const ['Single', 'Married', 'Divorced', 'Widowed'],
+                                              onChanged: (v) => setState(() => _relationshipStatus = v),
+                                              icon: Icons.favorite_outline,
+                                            ),
+                                          ]),
+                                          ProfileTextField(
+                                            label: "Date of Birth",
+                                            controller: _dobController,
+                                            readOnly: true,
+                                            icon: Icons.calendar_today_rounded,
+                                            onTap: () async {
+                                              DateTime? picked = await showDatePicker(
+                                                context: context,
+                                                initialDate: DateTime.now().subtract(const Duration(days: 365 * 18)),
+                                                firstDate: DateTime(1950),
+                                                lastDate: DateTime.now(),
+                                              );
+                                              if (picked != null) {
+                                                setState(() => _dobController.text = DateFormat('yyyy-MM-dd').format(picked));
+                                              }
+                                            },
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ],
+                                )
+                              else ...[
                                 ProfileSection(
                                   title: "Account Info",
                                   icon: Icons.account_circle_outlined,
@@ -271,8 +340,59 @@ class _AccountantProfileState extends State<AccountantProfile> {
                                     ),
                                   ],
                                 ),
-                              ]),
-                              AdaptiveFieldRow(children: [
+                              ],
+                              if (context.isDesktop)
+                                Row(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Expanded(
+                                      child: ProfileSection(
+                                        title: "Contact Details",
+                                        icon: Icons.contact_phone_outlined,
+                                        children: [
+                                          ProfileTextField(
+                                            label: "Phone Number",
+                                            controller: _phoneController,
+                                            keyboardType: TextInputType.phone,
+                                            icon: Icons.phone_android,
+                                          ),
+                                          ProfileTextField(
+                                            label: "Alternate Phone",
+                                            controller: _altPhoneController,
+                                            keyboardType: TextInputType.phone,
+                                            icon: Icons.phone,
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                    SizedBox(width: context.xl),
+                                    Expanded(
+                                      child: ProfileSection(
+                                        title: "Residential Address",
+                                        icon: Icons.home_outlined,
+                                        children: [
+                                          ProfileTextField(
+                                            label: "Full Address",
+                                            controller: _addressController,
+                                            icon: Icons.map_outlined,
+                                            maxLines: 2,
+                                          ),
+                                          AdaptiveFieldRow(children: [
+                                            ProfileTextField(label: "City", controller: _cityController),
+                                            ProfileTextField(label: "State", controller: _stateController),
+                                          ]),
+                                          ProfileTextField(
+                                            label: "Pincode",
+                                            controller: _pincodeController,
+                                            keyboardType: TextInputType.number,
+                                            icon: Icons.pin_drop_outlined,
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ],
+                                )
+                              else ...[
                                 ProfileSection(
                                   title: "Contact Details",
                                   icon: Icons.contact_phone_outlined,
@@ -313,7 +433,7 @@ class _AccountantProfileState extends State<AccountantProfile> {
                                     ),
                                   ],
                                 ),
-                              ]),
+                              ],
                               ProfileSection(
                                 title: "Banking & Documents",
                                 icon: Icons.account_balance_outlined,
@@ -423,57 +543,75 @@ class _AccountantProfileState extends State<AccountantProfile> {
   }
 
   Widget _buildHeader(BuildContext context, UserDetail? user) {
+    final headerText = Column(
+      crossAxisAlignment: context.isMobile ? CrossAxisAlignment.center : CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        FittedBox(
+          fit: BoxFit.scaleDown,
+          child: Text(
+            _nameController.text,
+            style: context.theme.textTheme.headlineSmall?.copyWith(
+              fontWeight: FontWeight.bold,
+              fontSize: context.font(24),
+            ),
+          ),
+        ),
+        FittedBox(
+          fit: BoxFit.scaleDown,
+          child: Text(
+            _emailController.text,
+            style: context.theme.textTheme.bodyMedium?.copyWith(
+              color: context.theme.colorScheme.onSurfaceVariant,
+              fontSize: context.font(16),
+            ),
+          ),
+        ),
+        SizedBox(height: context.md),
+        FittedBox(
+          fit: BoxFit.scaleDown,
+          child: Container(
+            padding: EdgeInsets.symmetric(
+              horizontal: context.scale(12),
+              vertical: context.scale(4),
+            ),
+            decoration: BoxDecoration(
+              color: context.theme.colorScheme.primaryContainer,
+              borderRadius: BorderRadius.circular(context.scale(20)),
+            ),
+            child: Text(
+              "ACCOUNTANT",
+              style: TextStyle(
+                color: context.theme.colorScheme.onPrimaryContainer,
+                fontWeight: FontWeight.bold,
+                fontSize: context.font(12),
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+
     return Flex(
       direction: context.isMobile ? Axis.vertical : Axis.horizontal,
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
-        ProfileAvatar(
-          radius: context.scale(60),
-          localImage: _image,
-          webImage: _imageBytes,
-          imageUrl: ApiService.getStorageUrl(user?.photo),
-          onCameraTap: _pickImage,
+        FittedBox(
+          fit: BoxFit.scaleDown,
+          child: ProfileAvatar(
+            radius: context.scale(60),
+            localImage: _image,
+            webImage: _imageBytes,
+            imageUrl: ApiService.getStorageUrl(user?.photo),
+            onCameraTap: _pickImage,
+          ),
         ),
         if (!context.isMobile) SizedBox(width: context.xl),
         if (context.isMobile) SizedBox(height: context.md),
-        Column(
-          crossAxisAlignment: context.isMobile ? CrossAxisAlignment.center : CrossAxisAlignment.start,
-          children: [
-            Text(
-              _nameController.text,
-              style: context.theme.textTheme.headlineSmall?.copyWith(
-                fontWeight: FontWeight.bold,
-                fontSize: context.font(24),
-              ),
-            ),
-            Text(
-              _emailController.text,
-              style: context.theme.textTheme.bodyMedium?.copyWith(
-                color: context.theme.colorScheme.onSurfaceVariant,
-                fontSize: context.font(16),
-              ),
-            ),
-            SizedBox(height: context.md),
-            Container(
-              padding: EdgeInsets.symmetric(
-                horizontal: context.scale(12),
-                vertical: context.scale(4),
-              ),
-              decoration: BoxDecoration(
-                color: context.theme.colorScheme.primaryContainer,
-                borderRadius: BorderRadius.circular(context.scale(20)),
-              ),
-              child: Text(
-                "ACCOUNTANT",
-                style: TextStyle(
-                  color: context.theme.colorScheme.onPrimaryContainer,
-                  fontWeight: FontWeight.bold,
-                  fontSize: context.font(12),
-                ),
-              ),
-            ),
-          ],
-        ),
+        if (context.isMobile)
+          headerText
+        else
+          Flexible(child: headerText),
       ],
     );
   }

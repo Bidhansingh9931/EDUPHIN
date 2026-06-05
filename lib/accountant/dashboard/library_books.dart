@@ -60,7 +60,14 @@ class _LibraryBooksPageState extends State<LibraryBooksPage> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text("Library Inventory"),
+        titleSpacing: 0,
+        title: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12.0),
+          child: FittedBox(
+            fit: BoxFit.scaleDown,
+            child: const Text("Library Inventory"),
+          ),
+        ),
         centerTitle: true,
       ),
       body: StreamBuilder<BookPagination>(
@@ -120,12 +127,16 @@ class _LibraryBooksPageState extends State<LibraryBooksPage> {
     return buildFilterCard(
       context,
       children: [
-        Row(
-          children: [
-            Icon(Icons.search_rounded, color: theme.colorScheme.primary, size: context.scale(20)),
-            SizedBox(width: context.scale(8)),
-            Text("Search Inventory", style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
-          ],
+        FittedBox(
+          fit: BoxFit.scaleDown,
+          alignment: Alignment.centerLeft,
+          child: Row(
+            children: [
+              Icon(Icons.search_rounded, color: theme.colorScheme.primary, size: context.scale(20)),
+              SizedBox(width: context.scale(8)),
+              Text("Search Inventory", style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
+            ],
+          ),
         ),
         SizedBox(height: context.spacing),
         buildResponsiveRow(context, [
@@ -240,67 +251,73 @@ class _LibraryBooksPageState extends State<LibraryBooksPage> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Container(
-                        padding: EdgeInsets.all(context.scale(10)),
-                        decoration: BoxDecoration(
-                          color: theme.colorScheme.primaryContainer.withValues(alpha: 0.4),
-                          borderRadius: BorderRadius.circular(context.scale(10)),
+                  FittedBox(
+                    fit: BoxFit.scaleDown,
+                    alignment: Alignment.centerLeft,
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Container(
+                          padding: EdgeInsets.all(context.scale(10)),
+                          decoration: BoxDecoration(
+                            color: theme.colorScheme.primaryContainer.withValues(alpha: 0.4),
+                            borderRadius: BorderRadius.circular(context.scale(10)),
+                          ),
+                          child: Icon(Icons.menu_book_rounded, color: theme.colorScheme.primary, size: context.scale(20)),
                         ),
-                        child: Icon(Icons.menu_book_rounded, color: theme.colorScheme.primary, size: context.scale(20)),
-                      ),
-                      SizedBox(width: context.spacing / 2),
-                      Expanded(
-                        child: Column(
+                        SizedBox(width: context.spacing / 2),
+                        Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisSize: MainAxisSize.min,
                           children: [
                             Text(
                               book.title,
                               style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold, fontSize: context.font(15)),
                               maxLines: 2,
-                              overflow: TextOverflow.ellipsis
                             ),
                             Text(
                               "by ${book.author}",
                               style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant),
                               maxLines: 1,
-                              overflow: TextOverflow.ellipsis
                             ),
                           ],
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
-                  const Spacer(),
+                  SizedBox(height: context.spacing),
                   Divider(color: theme.colorScheme.outlineVariant, height: context.spacing),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text("ISBN", style: theme.textTheme.labelSmall?.copyWith(color: theme.hintColor)),
-                          Text(book.isbn ?? 'N/A', style: theme.textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w600)),
-                        ],
-                      ),
-                      Container(
-                        padding: EdgeInsets.symmetric(horizontal: context.scale(10), vertical: context.scale(4)),
-                        decoration: BoxDecoration(
-                          color: (isAvailable ? Colors.green : Colors.red).withValues(alpha: 0.1),
-                          borderRadius: BorderRadius.circular(context.scale(8)),
+                  FittedBox(
+                    fit: BoxFit.scaleDown,
+                    alignment: Alignment.centerLeft,
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text("ISBN", style: theme.textTheme.labelSmall?.copyWith(color: theme.hintColor)),
+                            Text(book.isbn ?? 'N/A', style: theme.textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w600)),
+                          ],
                         ),
-                        child: Text(
-                          isAvailable ? "${book.availableCopies} Available" : "Out of Stock",
-                          style: TextStyle(
-                            color: isAvailable ? Colors.green : Colors.red,
-                            fontSize: context.font(11),
-                            fontWeight: FontWeight.bold
-                          )
+                        SizedBox(width: context.spacing),
+                        Container(
+                          padding: EdgeInsets.symmetric(horizontal: context.scale(10), vertical: context.scale(4)),
+                          decoration: BoxDecoration(
+                            color: (isAvailable ? Colors.green : Colors.red).withValues(alpha: 0.1),
+                            borderRadius: BorderRadius.circular(context.scale(8)),
+                          ),
+                          child: Text(
+                            isAvailable ? "${book.availableCopies} Available" : "Out of Stock",
+                            style: TextStyle(
+                              color: isAvailable ? Colors.green : Colors.red,
+                              fontSize: context.font(11),
+                              fontWeight: FontWeight.bold
+                            )
+                          ),
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
                 ],
               ),

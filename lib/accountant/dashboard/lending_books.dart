@@ -55,7 +55,14 @@ class _LendingBooksPageState extends State<LendingBooksPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text("Lending Records"),
+        titleSpacing: 0,
+        title: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12.0),
+          child: FittedBox(
+            fit: BoxFit.scaleDown,
+            child: const Text("Lending Records"),
+          ),
+        ),
         centerTitle: true,
       ),
       body: StreamBuilder<LendingPagination>(
@@ -138,12 +145,16 @@ class _LendingBooksPageState extends State<LendingBooksPage> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Row(
-              children: [
-                Icon(Icons.filter_alt_outlined, color: theme.colorScheme.primary, size: context.scale(20)),
-                SizedBox(width: context.scale(8)),
-                Text("Search & Filter", style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
-              ],
+            FittedBox(
+              fit: BoxFit.scaleDown,
+              alignment: Alignment.centerLeft,
+              child: Row(
+                children: [
+                  Icon(Icons.filter_alt_outlined, color: theme.colorScheme.primary, size: context.scale(20)),
+                  SizedBox(width: context.scale(8)),
+                  Text("Search & Filter", style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
+                ],
+              ),
             ),
             SizedBox(height: context.spacing),
             TextField(
@@ -279,30 +290,35 @@ class _LendingBooksPageState extends State<LendingBooksPage> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Expanded(
-                        child: Text(
+                  FittedBox(
+                    fit: BoxFit.scaleDown,
+                    alignment: Alignment.centerLeft,
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
                           record.book.title, 
                           style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold, fontSize: context.font(15)), 
-                          maxLines: 1, 
-                          overflow: TextOverflow.ellipsis
-                        )
-                      ),
-                      _statusBadge(context, isReturned),
-                    ],
+                        ),
+                        SizedBox(width: context.spacing),
+                        _statusBadge(context, isReturned),
+                      ],
+                    ),
                   ),
-                  Text("ISBN: ${record.book.isbn ?? 'N/A'}", style: theme.textTheme.bodySmall?.copyWith(color: theme.hintColor)),
-                  const Spacer(),
+                  Text("ISBN: ${record.book.isbn ?? 'N/A'}", style: theme.textTheme.bodySmall?.copyWith(color: theme.hintColor), maxLines: 1, overflow: TextOverflow.ellipsis),
+                  const SizedBox(height: 16),
                   Divider(color: theme.colorScheme.outlineVariant, height: context.spacing),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Expanded(child: _infoCol(context, "Issued", record.issuedAt)),
-                      SizedBox(width: context.scale(8)),
-                      Expanded(child: _infoCol(context, "Due", record.dueDate, isRed: (record.daysOverdue ?? 0) > 0)),
-                    ],
+                  FittedBox(
+                    fit: BoxFit.scaleDown,
+                    alignment: Alignment.centerLeft,
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        _infoCol(context, "Issued", record.issuedAt),
+                        SizedBox(width: context.scale(24)),
+                        _infoCol(context, "Due", record.dueDate, isRed: (record.daysOverdue ?? 0) > 0),
+                      ],
+                    ),
                   ),
                 ],
               ),
